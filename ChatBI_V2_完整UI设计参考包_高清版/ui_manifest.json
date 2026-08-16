@@ -1,0 +1,100 @@
+[
+  {
+    "page": "01_登录页",
+    "html": "01_登录页.html",
+    "png": "01_登录页.png",
+    "design_size": "1440x900",
+    "output_size": "2880x1800"
+  },
+  {
+    "page": "02_问数据_空状态",
+    "html": "02_问数据_空状态.html",
+    "png": "02_问数据_空状态.png",
+    "design_size": "1440x900",
+    "output_size": "2880x1800"
+  },
+  {
+    "page": "03_问数据_分析结果",
+    "html": "03_问数据_分析结果.html",
+    "png": "03_问数据_分析结果.png",
+    "design_size": "1440x900",
+    "output_size": "2880x1800"
+  },
+  {
+    "page": "04_数据源列表",
+    "html": "04_数据源列表.html",
+    "png": "04_数据源列表.png",
+    "design_size": "1440x900",
+    "output_size": "2880x1800"
+  },
+  {
+    "page": "05_数据源详情与Schema管理",
+    "html": "05_数据源详情与Schema管理.html",
+    "png": "05_数据源详情与Schema管理.png",
+    "design_size": "1440x900",
+    "output_size": "2880x1800"
+  },
+  {
+    "page": "06_语义模型列表",
+    "html": "06_语义模型列表.html",
+    "png": "06_语义模型列表.png",
+    "design_size": "1440x900",
+    "output_size": "2880x1800"
+  },
+  {
+    "page": "07_语义模型编辑器",
+    "html": "07_语义模型编辑器.html",
+    "png": "07_语义模型编辑器.png",
+    "design_size": "1440x900",
+    "output_size": "2880x1800"
+  },
+  {
+    "page": "08_答案库",
+    "html": "08_答案库.html",
+    "png": "08_答案库.png",
+    "design_size": "1440x900",
+    "output_size": "2880x1800"
+  },
+  {
+    "page": "09_看板列表",
+    "html": "09_看板列表.html",
+    "png": "09_看板列表.png",
+    "design_size": "1440x900",
+    "output_size": "2880x1800"
+  },
+  {
+    "page": "10_经营看板详情",
+    "html": "10_经营看板详情.html",
+    "png": "10_经营看板详情.png",
+    "design_size": "1440x900",
+    "output_size": "2880x1800"
+  },
+  {
+    "page": "11_评测中心总览",
+    "html": "11_评测中心总览.html",
+    "png": "11_评测中心总览.png",
+    "design_size": "1440x900",
+    "output_size": "2880x1800"
+  },
+  {
+    "page": "12_评测用例详情",
+    "html": "12_评测用例详情.html",
+    "png": "12_评测用例详情.png",
+    "design_size": "1440x900",
+    "output_size": "2880x1800"
+  },
+  {
+    "page": "13_系统设置与模型服务",
+    "html": "13_系统设置与模型服务.html",
+    "png": "13_系统设置与模型服务.png",
+    "design_size": "1440x900",
+    "output_size": "2880x1800"
+  },
+  {
+    "page": "14_用户角色与审计",
+    "html": "14_用户角色与审计.html",
+    "png": "14_用户角色与审计.png",
+    "design_size": "1440x900",
+    "output_size": "2880x1800"
+  }
+]

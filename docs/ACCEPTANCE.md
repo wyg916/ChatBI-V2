@@ -1,0 +1,28 @@
+# ChatBI V2 验收标准
+
+## 产品主链路
+
+- 数据源连接、Schema 同步、语义模型发布、自然语言问数、SQL 校验、查询执行、结果验证、图表、洞察、答案保存、看板和评测全部可用。
+
+## 安全
+
+- 只读账号、单语句、SELECT/CTE allowlist、超时、行数限制、敏感字段控制和完整审计。
+- DDL、DML、多语句、系统表越权、文件访问和外部程序全部被拒绝。
+
+## 质量
+
+- Day 3：Golden 20；SQL 执行成功率 ≥95%；结果准确率 ≥90%。
+- Day 5：Golden 50；SQL 执行成功率 ≥98%；结果准确率 ≥95%。
+- Backend、Frontend、E2E、Migration、Docker 连续启动全部 PASS。
+- 浏览器 console error、page error、blocking request failure 为 0。
+
+## UI
+
+- 1440×900 为设计基准；1366×768 与 1920×1080 可用。
+- 六个一级模块导航清楚；问数据为默认首页。
+- SQL 和技术细节折叠展示；业务结论优先。
+
+## 工程
+
+- 工作树 clean；主仓库唯一；无重复 clone、长期 worktree 和未说明 stash。
+- 文档、迁移、测试、许可证和一键启动脚本齐全。

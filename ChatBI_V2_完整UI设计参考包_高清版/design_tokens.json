@@ -1,0 +1,33 @@
+{
+  "design_base": "1440x900",
+  "output_resolution": "2880x1800",
+  "style": "Chat-first，亮色内容区，深色侧栏，紫色主色",
+  "colors": {
+    "primary": "#5B5CF6",
+    "primary_gradient": [
+      "#6757FF",
+      "#5146F6"
+    ],
+    "sidebar": "#0D1728",
+    "background": "#F6F8FC",
+    "card": "#FFFFFF",
+    "text": "#182033",
+    "muted": "#6F7890",
+    "border": "#E5E9F2",
+    "success": "#10B981",
+    "warning": "#F59E0B",
+    "danger": "#EF4444"
+  },
+  "typography": {
+    "font": "Noto Sans CJK SC / Microsoft YaHei",
+    "body": "14-16px",
+    "page_title": "22-26px",
+    "kpi": "28-36px"
+  },
+  "layout": {
+    "sidebar": "236px",
+    "topbar": "68px",
+    "content_padding": "22px 26px 24px",
+    "card_radius": "14px"
+  }
+}
