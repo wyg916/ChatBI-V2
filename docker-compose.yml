@@ -1,0 +1,47 @@
+name: chatbi-v2
+
+services:
+  backend:
+    build:
+      context: ./backend
+    environment:
+      CHATBI_ENVIRONMENT: development
+      CHATBI_DATABASE_URL: postgresql+psycopg://chatbi_app:${CHATBI_META_PASSWORD:?Run scripts/bootstrap-local-databases.ps1 first}@host.docker.internal:5432/chatbi_v2
+      CHATBI_DATASOURCE_SECRET_KEY: ${CHATBI_DATASOURCE_SECRET_KEY:?Run scripts/bootstrap-local-databases.ps1 first}
+      CHATBI_SEED_DEMO_SEMANTIC_MODEL: "true"
+      CHATBI_DEMO_POSTGRES_HOST: host.docker.internal
+      CHATBI_DEMO_POSTGRES_PORT: "5432"
+      CHATBI_DEMO_POSTGRES_DATABASE: chatbi_v2
+      CHATBI_DEMO_POSTGRES_SCHEMA: demo_business
+      CHATBI_DEMO_POSTGRES_USERNAME: chatbi_reader
+      CHATBI_DEMO_POSTGRES_PASSWORD: ${CHATBI_DEMO_POSTGRES_PASSWORD:?Run scripts/bootstrap-local-databases.ps1 first}
+      CHATBI_DEMO_MYSQL_HOST: host.docker.internal
+      CHATBI_DEMO_MYSQL_PORT: "3306"
+      CHATBI_DEMO_MYSQL_DATABASE: chatbi_demo_business
+      CHATBI_DEMO_MYSQL_USERNAME: chatbi_reader
+      CHATBI_DEMO_MYSQL_PASSWORD: ${CHATBI_DEMO_MYSQL_PASSWORD:?Run scripts/bootstrap-local-databases.ps1 first}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    ports:
+      - "8000:8000"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health', timeout=2)"]
+      interval: 4s
+      timeout: 4s
+      retries: 30
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+    ports:
+      - "5173:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost/ >/dev/null || exit 1"]
+      interval: 4s
+      timeout: 4s
+      retries: 30
+    restart: unless-stopped

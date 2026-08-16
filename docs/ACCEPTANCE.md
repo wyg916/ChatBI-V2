@@ -15,6 +15,8 @@
 - Day 5：Golden 50；SQL 执行成功率 ≥98%；结果准确率 ≥95%。
 - Backend、Frontend、E2E、Migration、Docker 连续启动全部 PASS。
 - 浏览器 console error、page error、blocking request failure 为 0。
+- Docker Compose 中数据库服务数为 0；项目数据实际存在本机 PostgreSQL/MySQL。
+- PostgreSQL 主验证链必须 PASS；MySQL 辅助连接与 Schema 同步必须 PASS。
 
 ## UI
 
@@ -26,3 +28,4 @@
 
 - 工作树 clean；主仓库唯一；无重复 clone、长期 worktree 和未说明 stash。
 - 文档、迁移、测试、许可证和一键启动脚本齐全。
+- 前端只能通过 Backend API 访问数据库；任何前端直连数据库或暴露数据库凭据均为 FAIL。
