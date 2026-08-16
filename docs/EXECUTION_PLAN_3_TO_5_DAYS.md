@@ -4,11 +4,12 @@
 
 - 建立独立仓库和 AGENTS.md。
 - 创建 Web/API/Packages/Docs 目录。
-- 接入 PostgreSQL 元数据库、迁移和演示业务库。
-- 完成 PostgreSQL/MySQL 数据源连接测试、Schema 同步和字段浏览。
+- 接入本机 PostgreSQL 元数据库、迁移和模拟业务 Schema；数据库数据不放入 Docker。
+- 以 PostgreSQL 为主、MySQL 为辅完成数据源连接测试、Schema 同步和字段浏览。
+- 按真实经营关系生成至少 12 个月模拟数据写入本机两套数据库，前端仅通过 Backend API 使用这些数据。
 - 完成最小 Semantic Model 数据结构和发布状态。
 - 完成登录、问数据空态、数据源列表/详情、语义模型列表的页面骨架。
-- Gate：一键启动、数据源连接、Schema 同步、前后端构建全部 PASS。
+- Gate：本机数据库初始化、一键应用启动、两种数据源连接、Schema 同步、前后端构建全部 PASS。
 
 ## Day 2：问数主链路
 
