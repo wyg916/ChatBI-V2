@@ -2,6 +2,7 @@ name: chatbi-v2
 
 services:
   backend:
+    image: chatbi-v2-backend
     build:
       context: .
       dockerfile: backend/Dockerfile

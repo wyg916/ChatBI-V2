@@ -1,28 +1,48 @@
-# Day 5 Final Release Status
+# Day 5 RAG + Multi-Agent Final Closure
 
-## Candidate gate
+## Final gate
 
 - `DAY_5_GATE=PASS`
-- `P2_SCOPE_ADDED=0`
-- `COLD_START=PASS`
-- `ONE_CLICK_START_RUN1=PASS`
-- `ONE_CLICK_START_RUN2=PASS`
-- `GOLDEN50=PASS`
-- `BACKEND=118/118 PASS`
-- `FRONTEND=PASS`
-- `SERIAL_E2E=36/36 PASS`
-- `PARALLEL_E2E=72/72 PASS (5 workers x 2, retries=0)`
-- `UI14=14/14 PASS`
-- `SECRET_SCAN=PASS`
-- `LICENSE_GATE=PASS`
-- `MIGRATION_GATE=PASS`
+- `CHATBI_V2_V1_FINAL=PASS`
+- `RAG_REQUIRED=YES`
+- `MULTI_AGENT_REQUIRED=YES`
+- `RAG_RUNTIME=PASS`
+- `RAG_LIVE_BRIDGE=PASS`
+- `RAG_WORKSPACE_ISOLATION=PASS`
+- `RAG_IDENTITY_MAPPING=PASS`
+- `RAG_GOLDEN=120/120 PASS`
+- `RAG_RECALL_AT_10=1.0000`
+- `RAG_CITATION_ACCURACY=1.0000`
+- `RAG_UNAUTHORIZED_RETRIEVAL=0`
+- `MULTI_AGENT_RUNTIME=PASS (5 fixed roles)`
+- `TOOL_EXECUTOR=PASS (6 allowlisted tools)`
+- `COMPLEX_ANALYSIS_E2E=10/10 PASS`
+- `TRACE_COMPLETENESS=100%`
+- `DIRECT_DB_ACCESS_BY_AGENT=0`
+- `UNAUTHORIZED_TOOL_CALL=0`
+- `SQL_GUARD_BYPASS=0`
+- `RBAC_BYPASS=0`
+- `BACKEND=121/121 PASS`
+- `FRONTEND=TypeScript PASS; Vitest 27/27; Build PASS`
+- `SERIAL_E2E=50/50 PASS`
+- `PARALLEL_E2E=50/50 PASS (5 workers, retries=0)`
+- `GOLDEN50=PostgreSQL 50/50; MySQL 10/10; Golden20 regression PASS`
+- `SECURITY=38/38 dangerous SQL blocked; actual writes 0`
+- `MIGRATION=single head; upgrade-base-upgrade PASS; head 20260817_0008`
+- `COLD_START_RUN1=PASS (174.9s)`
+- `COLD_START_RUN2=PASS (83.5s)`
 - `ROLLBACK_SIMULATION=PASS`
+- `PROVIDER_LIVE_SMOKE=Kimi/MiMo/DeepSeek PASS`
+- `TRACKED_SECRET_MATCHES=0`
+- `OLD_SOURCE_CODE_COPY=0`
+- `LICENSE_GATE=PASS`
+- `P2_SCOPE_ADDED=0`
 
-All functional, correctness, security, migration, cold-start, stability, UI, documentation and rollback gates passed on the final candidate. No new P2 product module was added. The optional professional RAG and bounded orchestration interoperability remains behind its own contracts and feature flags; ordinary Ask continues through the deterministic NL2SQL/Guard/Executor/Oracle path.
+The release contains a ChatBI-specific Live RAG Runtime and a bounded five-role orchestrator. Ordinary `DATA_QUERY` remains on the direct QueryPipeline fast path. `KNOWLEDGE_QUERY`, `HYBRID_ANALYSIS`, and `COMPLEX_ANALYSIS` use signed workspace identity, fixed tools, SQL Guard, Result Oracle, citation verification, explicit budgets, and fail-closed behavior. No general RAG platform, general Agent platform, or dynamic tool marketplace was added.
 
-## Final Git condition
+## Git release condition
 
-`DAY_5_STATUS=PASS` and `CHATBI_V2_V1_FINAL=PASS` are valid only when the following release-finalization command outputs are identical and the working tree is clean:
+The final release response records the literal values after merge, push, fetch, and annotated-tag verification. These four values must be identical:
 
 ```powershell
 git rev-parse main
@@ -31,11 +51,13 @@ git ls-remote origin refs/heads/main
 git rev-parse "chatbi-v2-v1.0.0^{}"
 ```
 
-The annotated tag's peeled target is the authoritative Final SHA; the final release response records the literal values after push and remote verification.
-
 ## Evidence
 
+- `docs/evidence/day5/rag-multiagent-final-acceptance.json`
+- `docs/evidence/day5/rag-golden-120.json`
+- `docs/evidence/day5/complex-e2e-10.json`
+- `docs/evidence/day5/cold-start-rag-agent-run1.json`
+- `docs/evidence/day5/cold-start-rag-agent-run2.json`
+- `docs/evidence/day5/rollback-rag-agent-simulation.json`
+- `docs/evidence/day5/rag-agent-license-gate.json`
 - `docs/releases/V1_FINAL_MANIFEST.md`
-- `docs/evidence/day5/README.md`
-- `RELEASE_NOTES_V1.md`
-- `docs/releases/V1_ROLLBACK.md`

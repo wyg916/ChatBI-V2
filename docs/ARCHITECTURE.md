@@ -8,7 +8,7 @@
 - SQL 解析与方言：SQLGlot 或等价 AST 解析器。
 - 模型：通过 `ModelProviderAdapter` 接入本地确定性语义运行时与命名的 OpenAI-compatible 服务；当前包含 Kimi `kimi-k2.6`、MiMo `mimo-v2.5`、DeepSeek `deepseek-v4-flash`，供应商差异封装在 Adapter 内。
 - 评测：IBM Text-to-SQL Evaluation Toolkit + 自研 Business Result Oracle。
-- 部署：Docker Compose 只承载 Backend/Frontend；开发数据库运行在本机，不创建 Docker 数据库容器或数据卷。CI 执行 Backend、Frontend、E2E、Golden Set。
+- 部署：Docker Compose 承载 Backend、独立 RAG Runtime 与 Frontend；开发数据库运行在本机，不创建 Docker 数据库容器或数据卷。CI 执行 Backend、Frontend、E2E、Golden Set。
 
 ## 2. 数据运行基线
 
@@ -63,15 +63,17 @@
 
 浏览器仍只访问 `/api/v1`；SQL 执行连接、数据库凭据、Guard 与 Oracle 均不下放到前端。
 
-## 6. 受控 RAG 与有限分析编排
+## 6. V1 受控 RAG 与最小 Multi-Agent
 
 `POST /api/v1/analysis` 先由确定性 Question Router 分类：
 
 - `DATA_QUERY`：直接进入既有 `QueryPipeline`，不默认进入 Agent。
-- `KNOWLEDGE_QUERY`：按 RAG Feature Flag 调用 `RagAdapter`，随后执行 Citation/Answer Guard；失败可回退 `QueryPipeline`。
-- `HYBRID_ANALYSIS`：合并 Oracle 已通过的数据结果与验证过的知识证据；RAG shadow 结果不向用户发布。
-- `COMPLEX_ANALYSIS`：仅在路由白名单和 Agent Feature Flag 同时允许时进入有限状态机，否则回退 `DATA_QUERY`。
+- `KNOWLEDGE_QUERY`：调用 Live `RagAdapter`，随后执行 Citation/Answer Guard；没有授权证据时失败关闭。
+- `HYBRID_ANALYSIS`：只合并 Oracle 已通过的数据结果与 CitationVerifier 已通过的知识证据。
+- `COMPLEX_ANALYSIS`：进入固定五角色编排；任何验证失败均不得发布未验证结论。
 
-契约位于根目录 `packages/`，业务代码不引用冻结旧仓库的内部类或绝对路径。每次 Adapter/Tool 调用携带 Workspace、用户、角色、允许的数据源/语义模型/工具、Trace、超时、最大步数与 token 预算。Agent 只能持有 `ToolExecutor`，不能获得数据库连接或 Connector；数据工具仍执行 `Semantic Context → NL2SQL → SQL Guard → Query Executor → Result Oracle`。
+RAG Runtime 是当前仓库独立编写的 FastAPI 服务，通过 HMAC 签名的 Workspace、用户、角色和 Trace 身份调用。Runtime 先验证用户与 Workspace 归属，再按 `knowledge_acl` 过滤文档版本，随后召回并返回带 document/version/chunk 身份的引用；超时、签名错误、身份不一致、无授权证据均失败关闭。旧仓库生产源码复制数为 0。
 
-旧项目二没有可验证的完整 Multi-Agent Runtime。当前 `agent-orchestrator` 是用于复杂分析的最薄确定性状态机，具备工具白名单、超时、步数和预算边界，不是通用 Agent 平台。旧 Agent HTTP Adapter 因无法注入 ChatBI `ToolExecutor` 而拒绝远程数据执行，直到兼容协议与对应安全测试补齐。
+契约位于根目录 `packages/`。Multi-Agent 固定为 `PlannerAgent`、`DataAnalystAgent`、`KnowledgeAgent`、`VerificationAgent`、`InsightAgent`；统一 `ToolExecutor` 只暴露 `QUERY_DATA`、`RETRIEVE_KNOWLEDGE`、`VERIFY_RESULT`、`VERIFY_CITATION`、`GENERATE_CHART`、`GENERATE_INSIGHT`。最大步骤 8、工具调用 12、重规划 2、深度 2、总超时 30 秒。Agent 不能获得数据库连接、Connector、文件、任意 URL 或动态工具；`QUERY_DATA` 始终执行 `Semantic Context → NL2SQL → SQL Guard → Query Executor → Result Oracle`。
+
+`POST /api/v1/analysis/stream` 只流式输出 `UNDERSTANDING`、`QUERYING_DATA`、`RETRIEVING_KNOWLEDGE`、`VERIFYING`、`GENERATING_INSIGHT`、`COMPLETED` 及耗时，不输出模型思维过程。运行记录保存 TTFT、总耗时、工具耗时、角色、步骤、工具、结果签名、引用与验证状态。

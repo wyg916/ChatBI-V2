@@ -1,0 +1,120 @@
+{
+  "day_5_status": "PASS",
+  "chatbi_v2_v1_final": "PASS",
+  "generated_at": "2026-08-18",
+  "product_decision": {
+    "rag_required": true,
+    "multi_agent_required": true,
+    "general_rag_platform": false,
+    "general_agent_platform": false
+  },
+  "rag": {
+    "runtime": "PASS",
+    "live_bridge": "PASS",
+    "workspace_isolation": "PASS",
+    "identity_mapping": "PASS",
+    "golden": "120/120 PASS",
+    "recall_at_10": 1.0,
+    "citation_accuracy": 1.0,
+    "unauthorized_retrieval": 0
+  },
+  "routes": {
+    "question_router": "PASS",
+    "DATA_QUERY": "PASS_FAST_PATH",
+    "KNOWLEDGE_QUERY": "PASS_LIVE_RAG",
+    "HYBRID_ANALYSIS": "PASS_VERIFIED_EVIDENCE_FUSION",
+    "COMPLEX_ANALYSIS": "PASS_BOUNDED_ORCHESTRATION"
+  },
+  "multi_agent": {
+    "runtime": "PASS",
+    "roles": [
+      "PlannerAgent",
+      "DataAnalystAgent",
+      "KnowledgeAgent",
+      "VerificationAgent",
+      "InsightAgent"
+    ],
+    "tool_executor": "PASS",
+    "tools": [
+      "QUERY_DATA",
+      "RETRIEVE_KNOWLEDGE",
+      "VERIFY_RESULT",
+      "VERIFY_CITATION",
+      "GENERATE_CHART",
+      "GENERATE_INSIGHT"
+    ],
+    "tool_allowlist": "PASS",
+    "tool_rbac": "PASS",
+    "budgets": {
+      "max_agent_steps": 8,
+      "max_tool_calls": 12,
+      "max_replan": 2,
+      "max_agent_depth": 2,
+      "timeout_seconds": 30
+    },
+    "security": {
+      "direct_db_access_by_agent": 0,
+      "infinite_loop": 0,
+      "unbounded_tool_call": 0,
+      "unauthorized_tool_call": 0,
+      "sql_guard_bypass": 0,
+      "result_oracle_bypass": 0,
+      "rbac_bypass": 0
+    },
+    "trace_completeness": "100%",
+    "complex_analysis_e2e": "10/10 PASS"
+  },
+  "streaming": {
+    "status": "PASS",
+    "public_stages": [
+      "UNDERSTANDING",
+      "QUERYING_DATA",
+      "RETRIEVING_KNOWLEDGE",
+      "VERIFYING",
+      "GENERATING_INSIGHT",
+      "COMPLETED"
+    ],
+    "chain_of_thought_exposed": false,
+    "complex_e2e_ttft_ms": {"min": 0, "max": 0},
+    "complex_e2e_total_latency_ms": {"min": 321, "max": 1628, "average": 559.4},
+    "complex_e2e_tool_latency_ms": {"min": 320, "max": 1627}
+  },
+  "prompt_migration": "6/6 PASS_WITH_SOURCE_VERSION_PURPOSE_CHECKSUM",
+  "database_migration": "PASS_SINGLE_HEAD_20260817_0008_UPGRADE_BASE_UPGRADE_AND_ROLLBACK",
+  "runtime_table_audit": {
+    "table_count": 15,
+    "all_used": true,
+    "row_counts": {
+      "knowledge_source": 1,
+      "knowledge_document": 6,
+      "knowledge_document_version": 6,
+      "knowledge_chunk": 6,
+      "knowledge_acl": 6,
+      "knowledge_ingestion_run": 1,
+      "rag_retrieval_run": 243,
+      "rag_citation": 736,
+      "orchestration_profile": 1,
+      "orchestration_run": 11,
+      "orchestration_step": 77,
+      "tool_binding": 6,
+      "tool_call": 66,
+      "prompt_template": 6,
+      "prompt_version": 6
+    }
+  },
+  "license_gate": "PASS_OLD_SOURCE_COPY_0",
+  "regression": {
+    "backend": "121/121 PASS",
+    "frontend": "TYPECHECK_PASS_VITEST_27/27_BUILD_PASS",
+    "serial_e2e": "50/50 PASS",
+    "parallel_e2e": "50/50 PASS_5_WORKERS_RETRIES_0",
+    "golden50": "POSTGRESQL_50/50_MYSQL_10/10_GOLDEN20_PASS",
+    "sql_security": "38/38_BLOCKED_ACTUAL_WRITES_0",
+    "provider_live_smoke": "KIMI_MIMO_DEEPSEEK_PASS",
+    "cold_start": "2/2 PASS",
+    "rollback": "PASS",
+    "tracked_secret_matches": 0,
+    "p0_regression": 0
+  },
+  "blockers": []
+}

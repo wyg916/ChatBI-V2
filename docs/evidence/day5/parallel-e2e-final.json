@@ -1,13 +1,18 @@
 {
-  "checked_at": "2026-08-17T23:25:06+08:00",
+  "checked_at": "2026-08-18",
   "workers": 5,
   "playwright_retries": 0,
-  "runtime_race": 0,
-  "runs": [
-    { "run": 1, "passed": 36, "failed": 0, "duration_seconds": 63.3 },
-    { "run": 2, "passed": 36, "failed": 0, "duration_seconds": 70.7 }
-  ],
-  "total_passed": 72,
-  "total_failed": 0,
-  "result": "PASS"
+  "pre_fix_run": {
+    "passed": 45,
+    "failed": 5,
+    "cause": "The new suite selected an ephemeral semantic model that another parallel test deleted.",
+    "resolution": "Select the stable seeded semantic model by name."
+  },
+  "accepted_final_run": {
+    "passed": 50,
+    "failed": 0,
+    "duration_minutes": 1.5,
+    "runtime_race": 0
+  },
+  "result": "PASS_AFTER_TEST_ISOLATION_FIX"
 }

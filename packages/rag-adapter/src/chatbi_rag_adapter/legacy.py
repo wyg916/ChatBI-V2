@@ -96,6 +96,7 @@ class LiveRagAdapter:
                     base_url=self.base_url,
                     timeout=request.context.timeout_ms / 1000,
                     follow_redirects=False,
+                    trust_env=False,
                 ) as client:
                     response = client.post(self.endpoint, content=body_bytes, headers=headers)
                     if response.status_code >= 500 and attempt < self.retry_count:
@@ -141,6 +142,7 @@ class LiveRagAdapter:
                 base_url=self.base_url,
                 timeout=timeout_ms / 1000,
                 follow_redirects=False,
+                trust_env=False,
             ) as client:
                 response = client.get("/health")
                 return response.status_code == 200 and response.json().get("status") == "ok"

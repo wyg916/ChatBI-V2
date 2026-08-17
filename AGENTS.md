@@ -26,6 +26,8 @@
 5. Result Oracle：指标、维度、时间、过滤、Join 与结果值校验。
 6. 问数据、数据源、语义模型、答案库、看板、评测中心六个一级模块。
 7. Golden Set、回归测试、Docker Compose 一键启动和发布门禁。
+8. 专业业务知识的受控 RAG：真实 HTTP Bridge、Workspace/用户/角色签名映射、ACL、Citation/Answer Guard 与 Golden 120。
+9. 复杂 ChatBI 分析的最小多 Agent 编排：固定五角色、六工具、硬预算、完整 Trace 与流式阶段反馈。
 
 ### P1：仅在 P0 全部通过后处理
 
@@ -35,11 +37,12 @@
 
 - 复杂长期记忆、遗忘策略、通用 RAG 生命周期、通用 Agent/Skills、预测建模、复杂告警、通用报表引擎、插件市场、深度 OIDC/Vault、跨行业工作流。
 
-### 受控复用例外（ADR-029）
+### V1 受控 RAG / Multi-Agent 冻结范围（ADR-030）
 
-- P0 全部门禁通过后，允许把面向专业业务知识的受控 RAG、面向复杂 ChatBI 分析的有限 Agent Orchestration，以及旧项目二已验证的 RAG/Agent 内核作为非阻断 P1 增强接入。
-- 只允许通过自有 Contract、Adapter、Feature Flag、Shadow 和 Canary 接入；普通问数仍走确定性 NL2SQL、SQL Guard、Query Executor 与 Result Oracle 主链路。
-- 继续禁止通用知识库平台、通用 Agent 管理平台、Skills 市场、复杂长期记忆/遗忘平台、与 ChatBI 主链路无关的 Agent、整仓复制旧项目，以及让 RAG/Agent 成为 P0 阻断项。
+- 专业知识 RAG 与面向复杂 ChatBI 分析的最小 Multi-Agent 是 V1/P0 发布必选能力，不得以可选增强或默认关闭状态交付。
+- `DATA_QUERY` 仍只走确定性 QueryPipeline；`KNOWLEDGE_QUERY`、`HYBRID_ANALYSIS`、`COMPLEX_ANALYSIS` 分别走受控 RAG、验证后融合、五角色有限编排。
+- Multi-Agent 只允许 `PlannerAgent`、`DataAnalystAgent`、`KnowledgeAgent`、`VerificationAgent`、`InsightAgent`，以及六个固定 ToolExecutor 工具；不得动态注册工具、直接连接数据库或形成通用 Agent 平台。
+- 继续禁止通用知识库平台、通用 Agent 管理平台、Skills 市场、复杂长期记忆/遗忘平台、与 ChatBI 主链路无关的 Agent 和整仓复制旧项目。
 
 ## 4. 与其他项目的边界
 

@@ -10,6 +10,7 @@ $schema = 'chatbi_release_cold_' + (Get-Date -Format 'yyyyMMddHHmmss') + '_' + $
 $portOffset = $PID % 1000
 $backendPort = 18000 + $portOffset
 $frontendPort = 15000 + $portOffset
+$ragPort = 19000 + $portOffset
 $composeProject = 'chatbi-v2-day5-cold-' + $PID
 $apiBase = "http://127.0.0.1:${backendPort}/api/v1"
 $evidence = Join-Path $projectRoot $EvidencePath
@@ -52,6 +53,7 @@ try {
   $env:COMPOSE_PROJECT_NAME = $composeProject
   $env:CHATBI_BACKEND_PORT = [string]$backendPort
   $env:CHATBI_FRONTEND_PORT = [string]$frontendPort
+  $env:CHATBI_RAG_PORT = [string]$ragPort
   & (Join-Path $PSScriptRoot 'stop.ps1')
   $env:CHATBI_RELEASE_SCHEMA = $schema
   & $python (Join-Path $projectRoot 'backend\scripts\manage_release_schema.py') create
@@ -71,8 +73,8 @@ try {
 
   $result.stage = 'MIGRATION'
   $migration = (& docker compose exec -T backend alembic current 2>&1 | Out-String)
-  if($LASTEXITCODE -ne 0 -or $migration -notmatch '20260817_0007') { throw 'Migration head mismatch' }
-  $result.migration = '20260817_0007_HEAD'
+  if($LASTEXITCODE -ne 0 -or $migration -notmatch '20260817_0008') { throw 'Migration head mismatch' }
+  $result.migration = '20260817_0008_HEAD'
 
   $result.stage = 'DATASOURCE_LIST'
   $sources = Invoke-RestMethod -Uri "$apiBase/datasources" -TimeoutSec 10
@@ -135,6 +137,7 @@ try {
     Remove-Item Env:COMPOSE_PROJECT_NAME -ErrorAction SilentlyContinue
     Remove-Item Env:CHATBI_BACKEND_PORT -ErrorAction SilentlyContinue
     Remove-Item Env:CHATBI_FRONTEND_PORT -ErrorAction SilentlyContinue
+    Remove-Item Env:CHATBI_RAG_PORT -ErrorAction SilentlyContinue
   }
   $result.cleanup = if($cleanup) { 'PASS' } else { 'FAIL' }
   $result.duration_seconds = [Math]::Round($timer.Elapsed.TotalSeconds, 1)

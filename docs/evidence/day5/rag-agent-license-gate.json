@@ -1,0 +1,21 @@
+{
+  "gate": "PASS",
+  "generated_at": "2026-08-18",
+  "old_source_code_copy": 0,
+  "old_source_imports": 0,
+  "git_submodules": 0,
+  "tracked_secret_matches": 0,
+  "implementation": "INDEPENDENT_CHATBI_REIMPLEMENTATION",
+  "allowed_reuse": [
+    "contracts",
+    "design",
+    "schema concepts",
+    "test ideas",
+    "interface behavior"
+  ],
+  "legacy_name_matches_explained": "Compatibility configuration names, frozen snapshot migration code, and historical tests only; no old production source import.",
+  "prompt_source": "CHATBI_V1_REIMPLEMENTED",
+  "prompt_count": 6,
+  "old_payload_distributed": false,
+  "secrets_recorded": false
+}

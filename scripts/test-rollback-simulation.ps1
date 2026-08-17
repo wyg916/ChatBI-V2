@@ -7,9 +7,9 @@ $ErrorActionPreference = 'Stop'
 $projectRoot = Split-Path -Parent $PSScriptRoot
 $python = Join-Path $projectRoot 'backend\.venv\Scripts\python.exe'
 $schema = 'chatbi_release_rollback_' + (Get-Date -Format 'yyyyMMddHHmmss') + '_' + $PID
-$previousSha = 'd70125f6172dd170c419110fd75d47e87a7f121a'
-$day4Migration = '20260817_0006'
-$finalMigration = '20260817_0007'
+$previousSha = '4ec4f0eb8e4060cec035d76b1ffbe32d8f80fce0'
+$previousMigration = '20260817_0007'
+$finalMigration = '20260817_0008'
 $portOffset = $PID % 1000
 $previousPort = 20000 + $portOffset
 $finalPort = 21000 + $portOffset
@@ -26,7 +26,7 @@ $result = [ordered]@{
   rollback_simulation = 'FAIL'
   final_candidate = $finalMigration
   previous_safe_baseline_sha = $previousSha
-  previous_safe_migration = $day4Migration
+  previous_safe_migration = $previousMigration
   previous_start = 'NOT_RUN'
   previous_ask = 'NOT_RUN'
   previous_evaluation = 'NOT_RUN'
@@ -127,8 +127,8 @@ try {
   try {
     & $python -m alembic upgrade $finalMigration
     if($LASTEXITCODE -ne 0) { throw 'Initial final migration failed' }
-    & $python -m alembic downgrade $day4Migration
-    if($LASTEXITCODE -ne 0) { throw 'Downgrade to Day 4 failed' }
+    & $python -m alembic downgrade $previousMigration
+    if($LASTEXITCODE -ne 0) { throw 'Downgrade to public v1.0.0 failed' }
   } finally { Pop-Location }
 
   $result.stage = 'PREVIOUS_SAFE_START'

@@ -20,6 +20,15 @@ V1.0.0 Final Release 的本次执行报告见 [`docs/status/DAY5_STATUS.md`](sta
 - Docker Compose 中数据库服务数为 0；项目数据实际存在本机 PostgreSQL/MySQL。
 - PostgreSQL 主验证链必须 PASS；MySQL 辅助连接与 Schema 同步必须 PASS。
 
+## V1 RAG 与有限 Multi-Agent
+
+- 专业知识 RAG 与面向复杂分析的有限 Multi-Agent 均为 V1/P0 必选，发布默认必须为 `on`。
+- 只允许 `DATA_QUERY`、`KNOWLEDGE_QUERY`、`HYBRID_ANALYSIS`、`COMPLEX_ANALYSIS` 四种路由；普通问数保持 QueryPipeline fast path。
+- RAG Golden 至少 120 条，Recall@10 与 Citation Accuracy 均不低于 0.95，越权检索必须为 0。
+- 编排固定五角色、六个 allowlisted 工具；步骤不超过 8、工具调用不超过 12、重规划不超过 2、深度不超过 2、总超时不超过 30 秒。
+- Agent 直连数据库、未知工具、SQL Guard 绕过、Result Oracle 绕过、RBAC 绕过、无限循环和无界工具调用均必须为 0。
+- Complex Analysis 真实 E2E 至少 10/10，Trace 完整率 100%；长任务仅流式输出公开阶段，不输出内部推理。
+
 ## UI
 
 - 1440×900 为设计基准；1366×768 与 1920×1080 可用。

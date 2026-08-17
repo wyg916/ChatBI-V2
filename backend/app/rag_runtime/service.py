@@ -5,7 +5,7 @@ import re
 from dataclasses import dataclass
 from math import log
 
-from sqlalchemy import or_, select
+from sqlalchemy import exists, or_, select
 from sqlalchemy.orm import Session
 
 from app.models import (
@@ -106,18 +106,18 @@ def retrieve(
             KnowledgeDocument.id == KnowledgeDocumentVersion.document_id,
         )
         .join(KnowledgeSource, KnowledgeSource.id == KnowledgeDocument.source_id)
-        .join(
-            KnowledgeAcl,
-            KnowledgeAcl.document_version_id == KnowledgeDocumentVersion.id,
-        )
         .where(
             KnowledgeDocument.workspace_id == identity.workspace_id,
             KnowledgeDocumentVersion.status == "ACTIVE",
             KnowledgeSource.status == "ACTIVE",
-            KnowledgeAcl.permission == "READ",
-            or_(*acl_predicates),
+            exists(
+                select(KnowledgeAcl.id).where(
+                    KnowledgeAcl.document_version_id == KnowledgeDocumentVersion.id,
+                    KnowledgeAcl.permission == "READ",
+                    or_(*acl_predicates),
+                )
+            ),
         )
-        .distinct()
     ).all()
     query_tokens = _tokens(query)
     if not query_tokens:

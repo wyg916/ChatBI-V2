@@ -1,9 +1,11 @@
 # ADR-029：受控复用旧项目二 RAG 与有限编排资产
 
-- 状态：Accepted
+- 状态：Superseded by ADR-030
 - 日期：2026-08-17
 - 决策范围：P0 已通过后的非阻断 P1 增强
 - 事实基线：旧仓库 `codex/integration-4.1-full`；产品冻结提交 `b6be894a7153f7ce8d31dfc65da7222bd7af1b5f`；审计提交 `ce0764be9c92c7433fae54a62e247736708ea7e5`；RAG 基线 `81f0adadc992ae8be7897c491bc243131e52e610`
+
+> 2026-08-17 最终产品决策已由 ADR-030 覆盖本文件中的“非阻断 P1、默认 shadow/off、Multi-Agent PARTIAL”结论。本文件只保留早期审计历史，不能作为当前 V1 配置或验收依据。
 
 ## 背景
 

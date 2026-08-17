@@ -168,7 +168,13 @@ class AnalysisService:
         ))
         self._record_orchestration(db, principal, request, result, idempotency_key)
         if result.status not in {"SUCCEEDED", "PARTIAL"} and settings.agent_fallback_enabled:
-            fallback = self._data(db, request, principal)
+            try:
+                fallback = self._data(db, request, principal)
+            except (LookupError, ValueError):
+                fallback = {
+                    "status": "FAILED",
+                    "error_code": "AGENT_FALLBACK_QUERY_FAILED",
+                }
             self._audit_route(db, principal, QuestionRoute.COMPLEX_ANALYSIS, trace_id, "FALLBACK", True)
             return self._response(
                 QuestionRoute.COMPLEX_ANALYSIS,

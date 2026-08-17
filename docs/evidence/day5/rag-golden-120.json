@@ -1,0 +1,1576 @@
+{
+  "suite": "CHATBI_V1_RAG_GOLDEN_120",
+  "generated_at": "2026-08-17T16:10:07.949627+00:00",
+  "cases": 120,
+  "recall_at_10": 1.0,
+  "citation_accuracy": 1.0,
+  "unauthorized_access": 0,
+  "live_bridge": true,
+  "workspace_identity_signed": true,
+  "passed": true,
+  "results": [
+    {
+      "case_id": "RAG-revenue-01",
+      "topic": "revenue",
+      "status": "SUCCEEDED",
+      "trace_id": "TRACE-a495ec9b-37b1-4009-9c6d-a7e747e50a1f",
+      "hit_at_10": true,
+      "citation_verified": true,
+      "citation_ids": [
+        "citation-1",
+        "citation-2",
+        "citation-3",
+        "citation-4"
+      ]
+    },
+    {
+      "case_id": "RAG-revenue-02",
+      "topic": "revenue",
+      "status": "SUCCEEDED",
+      "trace_id": "TRACE-676c97a5-bee9-425f-97d6-2520e0cc0ea1",
+      "hit_at_10": true,
+      "citation_verified": true,
+      "citation_ids": [
+        "citation-1",
+        "citation-2",
+        "citation-3"
+      ]
+    },
+    {
+      "case_id": "RAG-revenue-03",
+      "topic": "revenue",
+      "status": "SUCCEEDED",
+      "trace_id": "TRACE-595d18cb-2e9b-4e8c-b4fa-9018695183f5",
+      "hit_at_10": true,
+      "citation_verified": true,
+      "citation_ids": [
+        "citation-1",
+        "citation-2",
+        "citation-3"
+      ]
+    },
+    {
+      "case_id": "RAG-revenue-04",
+      "topic": "revenue",
+      "status": "SUCCEEDED",
+      "trace_id": "TRACE-da595935-7cb6-43dc-857c-462fbaf8bddb",
+      "hit_at_10": true,
+      "citation_verified": true,
+      "citation_ids": [
+        "citation-1",
+        "citation-2",
+        "citation-3"
+      ]
+    },
+    {
+      "case_id": "RAG-revenue-05",
+      "topic": "revenue",
+      "status": "SUCCEEDED",
+      "trace_id": "TRACE-3037663c-6fef-4aaf-960d-985182e86338",
+      "hit_at_10": true,
+      "citation_verified": true,
+      "citation_ids": [
+        "citation-1",
+        "citation-2",
+        "citation-3"
+      ]
+    },
+    {
+      "case_id": "RAG-revenue-06",
+      "topic": "revenue",
+      "status": "SUCCEEDED",
+      "trace_id": "TRACE-1fd057b0-0c10-4ad7-a98c-9b1861f49304",
+      "hit_at_10": true,
+      "citation_verified": true,
+      "citation_ids": [
+        "citation-1",
+        "citation-2",
+        "citation-3",
+        "citation-4"
+      ]
+    },
+    {
+      "case_id": "RAG-revenue-07",
+      "topic": "revenue",
+      "status": "SUCCEEDED",
+      "trace_id": "TRACE-aa296f06-4a4d-4d9a-aa64-4db4a5c4e87f",
+      "hit_at_10": true,
+      "citation_verified": true,
+      "citation_ids": [
+        "citation-1",
+        "citation-2",
+        "citation-3"
+      ]
+    },
+    {
+      "case_id": "RAG-revenue-08",
+      "topic": "revenue",
+      "status": "SUCCEEDED",
+      "trace_id": "TRACE-e0f0cdd5-fbba-47c9-8b09-eda9b198ae01",
+      "hit_at_10": true,
+      "citation_verified": true,
+      "citation_ids": [
+        "citation-1",
+        "citation-2",
+        "citation-3"
+      ]
+    },
+    {
+      "case_id": "RAG-revenue-09",
+      "topic": "revenue",
+      "status": "SUCCEEDED",
+      "trace_id": "TRACE-8c296de6-f186-43c7-b089-6d31caed3111",
+      "hit_at_10": true,
+      "citation_verified": true,
+      "citation_ids": [
+        "citation-1",
+        "citation-2",
+        "citation-3"
+      ]
+    },
+    {
+      "case_id": "RAG-revenue-10",
+      "topic": "revenue",
+      "status": "SUCCEEDED",
+      "trace_id": "TRACE-63adc41d-e42f-491d-83f9-22a200029a23",
+      "hit_at_10": true,
+      "citation_verified": true,
+      "citation_ids": [
+        "citation-1",
+        "citation-2",
+        "citation-3",
+        "citation-4",
+        "citation-5"
+      ]
+    },
+    {
+      "case_id": "RAG-revenue-11",
+      "topic": "revenue",
+      "status": "SUCCEEDED",
+      "trace_id": "TRACE-e72c07ec-eea5-40b8-9a02-f49a7f6c5c62",
+      "hit_at_10": true,
+      "citation_verified": true,
+      "citation_ids": [
+        "citation-1",
+        "citation-2",
+        "citation-3",
+        "citation-4"
+      ]
+    },
+    {
+      "case_id": "RAG-revenue-12",
+      "topic": "revenue",
+      "status": "SUCCEEDED",
+      "trace_id": "TRACE-203448db-af03-4693-bf85-799d7933d249",
+      "hit_at_10": true,
+      "citation_verified": true,
+      "citation_ids": [
+        "citation-1",
+        "citation-2",
+        "citation-3"
+      ]
+    },
+    {
+      "case_id": "RAG-revenue-13",
+      "topic": "revenue",
+      "status": "SUCCEEDED",
+      "trace_id": "TRACE-30e51a2d-2e06-47db-a2e1-c46d1ddf3238",
+      "hit_at_10": true,
+      "citation_verified": true,
+      "citation_ids": [
+        "citation-1",
+        "citation-2",
+        "citation-3",
+        "citation-4"
+      ]
+    },
+    {
+      "case_id": "RAG-revenue-14",
+      "topic": "revenue",
+      "status": "SUCCEEDED",
+      "trace_id": "TRACE-b5eb12fb-8e0e-4429-ad7b-6257b7a8a324",
+      "hit_at_10": true,
+      "citation_verified": true,
+      "citation_ids": [
+        "citation-1",
+        "citation-2",
+        "citation-3"
+      ]
+    },
+    {
+      "case_id": "RAG-revenue-15",
+      "topic": "revenue",
+      "status": "SUCCEEDED",
+      "trace_id": "TRACE-5610174d-e267-4d7f-8242-b6406fc0e39b",
+      "hit_at_10": true,
+      "citation_verified": true,
+      "citation_ids": [
+        "citation-1",
+        "citation-2",
+        "citation-3",
+        "citation-4",
+        "citation-5"
+      ]
+    },
+    {
+      "case_id": "RAG-revenue-16",
+      "topic": "revenue",
+      "status": "SUCCEEDED",
+      "trace_id": "TRACE-b1095f34-6bbc-416a-aabd-2f108e68b14b",
+      "hit_at_10": true,
+      "citation_verified": true,
+      "citation_ids": [
+        "citation-1",
+        "citation-2",
+        "citation-3"
+      ]
+    },
+    {
+      "case_id": "RAG-revenue-17",
+      "topic": "revenue",
+      "status": "SUCCEEDED",
+      "trace_id": "TRACE-a5efbbfc-e427-458d-a805-9b16872e3f5c",
+      "hit_at_10": true,
+      "citation_verified": true,
+      "citation_ids": [
+        "citation-1",
+        "citation-2",
+        "citation-3",
+        "citation-4"
+      ]
+    },
+    {
+      "case_id": "RAG-revenue-18",
+      "topic": "revenue",
+      "status": "SUCCEEDED",
+      "trace_id": "TRACE-cd69b4ba-a13a-48b7-92be-d9a7932591cb",
+      "hit_at_10": true,
+      "citation_verified": true,
+      "citation_ids": [
+        "citation-1",
+        "citation-2",
+        "citation-3"
+      ]
+    },
+    {
+      "case_id": "RAG-revenue-19",
+      "topic": "revenue",
+      "status": "SUCCEEDED",
+      "trace_id": "TRACE-b4dc2ab3-96c1-4a4b-abf3-6e38ed8b0407",
+      "hit_at_10": true,
+      "citation_verified": true,
+      "citation_ids": [
+        "citation-1",
+        "citation-2",
+        "citation-3",
+        "citation-4"
+      ]
+    },
+    {
+      "case_id": "RAG-revenue-20",
+      "topic": "revenue",
+      "status": "SUCCEEDED",
+      "trace_id": "TRACE-14dca21e-770e-4345-a320-5086403fcfd3",
+      "hit_at_10": true,
+      "citation_verified": true,
+      "citation_ids": [
+        "citation-1",
+        "citation-2",
+        "citation-3"
+      ]
+    },
+    {
+      "case_id": "RAG-profit-01",
+      "topic": "profit",
+      "status": "SUCCEEDED",
+      "trace_id": "TRACE-d1e924e2-3c03-468f-993e-0368a3e779d8",
+      "hit_at_10": true,
+      "citation_verified": true,
+      "citation_ids": [
+        "citation-1",
+        "citation-2",
+        "citation-3",
+        "citation-4"
+      ]
+    },
+    {
+      "case_id": "RAG-profit-02",
+      "topic": "profit",
+      "status": "SUCCEEDED",
+      "trace_id": "TRACE-b6af8f83-748e-4416-9999-6c67c927af10",
+      "hit_at_10": true,
+      "citation_verified": true,
+      "citation_ids": [
+        "citation-1",
+        "citation-2",
+        "citation-3"
+      ]
+    },
+    {
+      "case_id": "RAG-profit-03",
+      "topic": "profit",
+      "status": "SUCCEEDED",
+      "trace_id": "TRACE-ace528e9-676b-454e-b9ec-e77c65adc689",
+      "hit_at_10": true,
+      "citation_verified": true,
+      "citation_ids": [
+        "citation-1",
+        "citation-2",
+        "citation-3"
+      ]
+    },
+    {
+      "case_id": "RAG-profit-04",
+      "topic": "profit",
+      "status": "SUCCEEDED",
+      "trace_id": "TRACE-77326fb5-2769-48b9-981e-99844b497493",
+      "hit_at_10": true,
+      "citation_verified": true,
+      "citation_ids": [
+        "citation-1",
+        "citation-2",
+        "citation-3"
+      ]
+    },
+    {
+      "case_id": "RAG-profit-05",
+      "topic": "profit",
+      "status": "SUCCEEDED",
+      "trace_id": "TRACE-ff6fea8c-a7fd-4bca-aade-4170a71e681b",
+      "hit_at_10": true,
+      "citation_verified": true,
+      "citation_ids": [
+        "citation-1",
+        "citation-2",
+        "citation-3"
+      ]
+    },
+    {
+      "case_id": "RAG-profit-06",
+      "topic": "profit",
+      "status": "SUCCEEDED",
+      "trace_id": "TRACE-415d70d2-fd28-4eba-89a6-3d7b2e1b57e7",
+      "hit_at_10": true,
+      "citation_verified": true,
+      "citation_ids": [
+        "citation-1",
+        "citation-2",
+        "citation-3",
+        "citation-4"
+      ]
+    },
+    {
+      "case_id": "RAG-profit-07",
+      "topic": "profit",
+      "status": "SUCCEEDED",
+      "trace_id": "TRACE-1fb818f6-7230-4d55-b6d3-a4bc6d13e5ea",
+      "hit_at_10": true,
+      "citation_verified": true,
+      "citation_ids": [
+        "citation-1",
+        "citation-2",
+        "citation-3"
+      ]
+    },
+    {
+      "case_id": "RAG-profit-08",
+      "topic": "profit",
+      "status": "SUCCEEDED",
+      "trace_id": "TRACE-4157afeb-4cce-45c6-b8d6-1052cc422182",
+      "hit_at_10": true,
+      "citation_verified": true,
+      "citation_ids": [
+        "citation-1",
+        "citation-2",
+        "citation-3"
+      ]
+    },
+    {
+      "case_id": "RAG-profit-09",
+      "topic": "profit",
+      "status": "SUCCEEDED",
+      "trace_id": "TRACE-3711ca6e-632b-45d0-9bf2-0833fad20511",
+      "hit_at_10": true,
+      "citation_verified": true,
+      "citation_ids": [
+        "citation-1",
+        "citation-2",
+        "citation-3"
+      ]
+    },
+    {
+      "case_id": "RAG-profit-10",
+      "topic": "profit",
+      "status": "SUCCEEDED",
+      "trace_id": "TRACE-144f8bf4-473a-4b47-8e68-94a325aedd5b",
+      "hit_at_10": true,
+      "citation_verified": true,
+      "citation_ids": [
+        "citation-1",
+        "citation-2",
+        "citation-3",
+        "citation-4",
+        "citation-5"
+      ]
+    },
+    {
+      "case_id": "RAG-profit-11",
+      "topic": "profit",
+      "status": "SUCCEEDED",
+      "trace_id": "TRACE-0abbcdd1-8bca-4e44-b02a-e3083cf4f0d8",
+      "hit_at_10": true,
+      "citation_verified": true,
+      "citation_ids": [
+        "citation-1",
+        "citation-2",
+        "citation-3",
+        "citation-4"
+      ]
+    },
+    {
+      "case_id": "RAG-profit-12",
+      "topic": "profit",
+      "status": "SUCCEEDED",
+      "trace_id": "TRACE-1650fbc1-405b-4281-8ed9-32fd3aaa49ab",
+      "hit_at_10": true,
+      "citation_verified": true,
+      "citation_ids": [
+        "citation-1",
+        "citation-2",
+        "citation-3"
+      ]
+    },
+    {
+      "case_id": "RAG-profit-13",
+      "topic": "profit",
+      "status": "SUCCEEDED",
+      "trace_id": "TRACE-b998a6e3-0d8e-4cf7-9a37-707df20a7594",
+      "hit_at_10": true,
+      "citation_verified": true,
+      "citation_ids": [
+        "citation-1",
+        "citation-2",
+        "citation-3",
+        "citation-4"
+      ]
+    },
+    {
+      "case_id": "RAG-profit-14",
+      "topic": "profit",
+      "status": "SUCCEEDED",
+      "trace_id": "TRACE-0a02d176-26d0-4e56-aab7-f87d443db58e",
+      "hit_at_10": true,
+      "citation_verified": true,
+      "citation_ids": [
+        "citation-1",
+        "citation-2",
+        "citation-3"
+      ]
+    },
+    {
+      "case_id": "RAG-profit-15",
+      "topic": "profit",
+      "status": "SUCCEEDED",
+      "trace_id": "TRACE-d4221e04-c2f2-40ba-a1d0-5d9c673197aa",
+      "hit_at_10": true,
+      "citation_verified": true,
+      "citation_ids": [
+        "citation-1",
+        "citation-2",
+        "citation-3",
+        "citation-4",
+        "citation-5"
+      ]
+    },
+    {
+      "case_id": "RAG-profit-16",
+      "topic": "profit",
+      "status": "SUCCEEDED",
+      "trace_id": "TRACE-b90577ea-0c22-4c9b-92c4-c8e2b4b8e772",
+      "hit_at_10": true,
+      "citation_verified": true,
+      "citation_ids": [
+        "citation-1",
+        "citation-2",
+        "citation-3"
+      ]
+    },
+    {
+      "case_id": "RAG-profit-17",
+      "topic": "profit",
+      "status": "SUCCEEDED",
+      "trace_id": "TRACE-50856878-dbf3-483a-beb9-79caa9fa4426",
+      "hit_at_10": true,
+      "citation_verified": true,
+      "citation_ids": [
+        "citation-1",
+        "citation-2",
+        "citation-3",
+        "citation-4"
+      ]
+    },
+    {
+      "case_id": "RAG-profit-18",
+      "topic": "profit",
+      "status": "SUCCEEDED",
+      "trace_id": "TRACE-d181e08e-8893-464b-b813-39a11cf6e3fd",
+      "hit_at_10": true,
+      "citation_verified": true,
+      "citation_ids": [
+        "citation-1",
+        "citation-2",
+        "citation-3"
+      ]
+    },
+    {
+      "case_id": "RAG-profit-19",
+      "topic": "profit",
+      "status": "SUCCEEDED",
+      "trace_id": "TRACE-8ce4d222-787f-4e23-bcfb-928c198b5230",
+      "hit_at_10": true,
+      "citation_verified": true,
+      "citation_ids": [
+        "citation-1",
+        "citation-2",
+        "citation-3",
+        "citation-4"
+      ]
+    },
+    {
+      "case_id": "RAG-profit-20",
+      "topic": "profit",
+      "status": "SUCCEEDED",
+      "trace_id": "TRACE-664300a0-ef89-4ce3-a63d-e5c7cdd4bd5a",
+      "hit_at_10": true,
+      "citation_verified": true,
+      "citation_ids": [
+        "citation-1",
+        "citation-2",
+        "citation-3"
+      ]
+    },
+    {
+      "case_id": "RAG-orders-01",
+      "topic": "orders",
+      "status": "SUCCEEDED",
+      "trace_id": "TRACE-894a3bd4-e69f-4f16-8f22-47c9cff84c19",
+      "hit_at_10": true,
+      "citation_verified": true,
+      "citation_ids": [
+        "citation-1",
+        "citation-2",
+        "citation-3",
+        "citation-4",
+        "citation-5"
+      ]
+    },
+    {
+      "case_id": "RAG-orders-02",
+      "topic": "orders",
+      "status": "SUCCEEDED",
+      "trace_id": "TRACE-f639791c-c899-48bc-833f-4e17780f7985",
+      "hit_at_10": true,
+      "citation_verified": true,
+      "citation_ids": [
+        "citation-1",
+        "citation-2",
+        "citation-3",
+        "citation-4"
+      ]
+    },
+    {
+      "case_id": "RAG-orders-03",
+      "topic": "orders",
+      "status": "SUCCEEDED",
+      "trace_id": "TRACE-710e3638-8986-4579-9e13-b4ad0adf7b84",
+      "hit_at_10": true,
+      "citation_verified": true,
+      "citation_ids": [
+        "citation-1",
+        "citation-2",
+        "citation-3",
+        "citation-4"
+      ]
+    },
+    {
+      "case_id": "RAG-orders-04",
+      "topic": "orders",
+      "status": "SUCCEEDED",
+      "trace_id": "TRACE-a951acf7-6479-4a31-8204-7c4e2921c0fe",
+      "hit_at_10": true,
+      "citation_verified": true,
+      "citation_ids": [
+        "citation-1",
+        "citation-2",
+        "citation-3",
+        "citation-4"
+      ]
+    },
+    {
+      "case_id": "RAG-orders-05",
+      "topic": "orders",
+      "status": "SUCCEEDED",
+      "trace_id": "TRACE-7d513990-61fc-4346-bb4d-410857892ee2",
+      "hit_at_10": true,
+      "citation_verified": true,
+      "citation_ids": [
+        "citation-1",
+        "citation-2",
+        "citation-3",
+        "citation-4"
+      ]
+    },
+    {
+      "case_id": "RAG-orders-06",
+      "topic": "orders",
+      "status": "SUCCEEDED",
+      "trace_id": "TRACE-3a9e5d10-8380-430b-acd5-7bdb9b59ce8d",
+      "hit_at_10": true,
+      "citation_verified": true,
+      "citation_ids": [
+        "citation-1",
+        "citation-2",
+        "citation-3",
+        "citation-4",
+        "citation-5"
+      ]
+    },
+    {
+      "case_id": "RAG-orders-07",
+      "topic": "orders",
+      "status": "SUCCEEDED",
+      "trace_id": "TRACE-97bf664d-adf4-4706-a832-3b6880b54569",
+      "hit_at_10": true,
+      "citation_verified": true,
+      "citation_ids": [
+        "citation-1",
+        "citation-2",
+        "citation-3",
+        "citation-4"
+      ]
+    },
+    {
+      "case_id": "RAG-orders-08",
+      "topic": "orders",
+      "status": "SUCCEEDED",
+      "trace_id": "TRACE-42278332-e0b6-44eb-a51d-a7de7b500b5e",
+      "hit_at_10": true,
+      "citation_verified": true,
+      "citation_ids": [
+        "citation-1",
+        "citation-2",
+        "citation-3",
+        "citation-4"
+      ]
+    },
+    {
+      "case_id": "RAG-orders-09",
+      "topic": "orders",
+      "status": "SUCCEEDED",
+      "trace_id": "TRACE-85d2f361-2279-4563-a73d-700941eacfcb",
+      "hit_at_10": true,
+      "citation_verified": true,
+      "citation_ids": [
+        "citation-1",
+        "citation-2",
+        "citation-3",
+        "citation-4"
+      ]
+    },
+    {
+      "case_id": "RAG-orders-10",
+      "topic": "orders",
+      "status": "SUCCEEDED",
+      "trace_id": "TRACE-1551ed6b-76ef-4dbb-86b7-33df4f367a99",
+      "hit_at_10": true,
+      "citation_verified": true,
+      "citation_ids": [
+        "citation-1",
+        "citation-2",
+        "citation-3",
+        "citation-4",
+        "citation-5"
+      ]
+    },
+    {
+      "case_id": "RAG-orders-11",
+      "topic": "orders",
+      "status": "SUCCEEDED",
+      "trace_id": "TRACE-6e26784c-3a61-4a18-80f8-99d09315962e",
+      "hit_at_10": true,
+      "citation_verified": true,
+      "citation_ids": [
+        "citation-1",
+        "citation-2",
+        "citation-3",
+        "citation-4",
+        "citation-5"
+      ]
+    },
+    {
+      "case_id": "RAG-orders-12",
+      "topic": "orders",
+      "status": "SUCCEEDED",
+      "trace_id": "TRACE-ace50e7d-6383-4d4f-801d-7a44048e2112",
+      "hit_at_10": true,
+      "citation_verified": true,
+      "citation_ids": [
+        "citation-1",
+        "citation-2",
+        "citation-3",
+        "citation-4"
+      ]
+    },
+    {
+      "case_id": "RAG-orders-13",
+      "topic": "orders",
+      "status": "SUCCEEDED",
+      "trace_id": "TRACE-587da4de-7fe8-4988-afab-c7da525773e9",
+      "hit_at_10": true,
+      "citation_verified": true,
+      "citation_ids": [
+        "citation-1",
+        "citation-2",
+        "citation-3",
+        "citation-4",
+        "citation-5"
+      ]
+    },
+    {
+      "case_id": "RAG-orders-14",
+      "topic": "orders",
+      "status": "SUCCEEDED",
+      "trace_id": "TRACE-6e3ae422-79a5-49e6-9142-572a9ac0f9a5",
+      "hit_at_10": true,
+      "citation_verified": true,
+      "citation_ids": [
+        "citation-1",
+        "citation-2",
+        "citation-3",
+        "citation-4"
+      ]
+    },
+    {
+      "case_id": "RAG-orders-15",
+      "topic": "orders",
+      "status": "SUCCEEDED",
+      "trace_id": "TRACE-78fb844e-9992-41ec-b407-524454a9b948",
+      "hit_at_10": true,
+      "citation_verified": true,
+      "citation_ids": [
+        "citation-1",
+        "citation-2",
+        "citation-3",
+        "citation-4",
+        "citation-5"
+      ]
+    },
+    {
+      "case_id": "RAG-orders-16",
+      "topic": "orders",
+      "status": "SUCCEEDED",
+      "trace_id": "TRACE-eb3086fe-5b6d-43ea-9c39-342942d63067",
+      "hit_at_10": true,
+      "citation_verified": true,
+      "citation_ids": [
+        "citation-1",
+        "citation-2",
+        "citation-3",
+        "citation-4"
+      ]
+    },
+    {
+      "case_id": "RAG-orders-17",
+      "topic": "orders",
+      "status": "SUCCEEDED",
+      "trace_id": "TRACE-c35545c4-107e-411b-898a-df77f42964b4",
+      "hit_at_10": true,
+      "citation_verified": true,
+      "citation_ids": [
+        "citation-1",
+        "citation-2",
+        "citation-3",
+        "citation-4",
+        "citation-5"
+      ]
+    },
+    {
+      "case_id": "RAG-orders-18",
+      "topic": "orders",
+      "status": "SUCCEEDED",
+      "trace_id": "TRACE-d9615493-00c3-45e6-b5e2-827fffb9ec65",
+      "hit_at_10": true,
+      "citation_verified": true,
+      "citation_ids": [
+        "citation-1",
+        "citation-2",
+        "citation-3",
+        "citation-4"
+      ]
+    },
+    {
+      "case_id": "RAG-orders-19",
+      "topic": "orders",
+      "status": "SUCCEEDED",
+      "trace_id": "TRACE-f3bbf5c6-4ee1-43c0-9b16-b653bd0f24d3",
+      "hit_at_10": true,
+      "citation_verified": true,
+      "citation_ids": [
+        "citation-1",
+        "citation-2",
+        "citation-3",
+        "citation-4",
+        "citation-5"
+      ]
+    },
+    {
+      "case_id": "RAG-orders-20",
+      "topic": "orders",
+      "status": "SUCCEEDED",
+      "trace_id": "TRACE-74954d22-ed86-468b-9d71-f2fc5207899d",
+      "hit_at_10": true,
+      "citation_verified": true,
+      "citation_ids": [
+        "citation-1",
+        "citation-2",
+        "citation-3",
+        "citation-4"
+      ]
+    },
+    {
+      "case_id": "RAG-region-01",
+      "topic": "region",
+      "status": "SUCCEEDED",
+      "trace_id": "TRACE-bf410f53-dd68-4d1e-900a-30abe98b7a72",
+      "hit_at_10": true,
+      "citation_verified": true,
+      "citation_ids": [
+        "citation-1",
+        "citation-2"
+      ]
+    },
+    {
+      "case_id": "RAG-region-02",
+      "topic": "region",
+      "status": "SUCCEEDED",
+      "trace_id": "TRACE-2805c3c4-157b-48f0-b9f5-48f6d8b02514",
+      "hit_at_10": true,
+      "citation_verified": true,
+      "citation_ids": [
+        "citation-1",
+        "citation-2"
+      ]
+    },
+    {
+      "case_id": "RAG-region-03",
+      "topic": "region",
+      "status": "SUCCEEDED",
+      "trace_id": "TRACE-c7c6d8db-9ce0-4795-8675-eb7bcc1f209d",
+      "hit_at_10": true,
+      "citation_verified": true,
+      "citation_ids": [
+        "citation-1",
+        "citation-2"
+      ]
+    },
+    {
+      "case_id": "RAG-region-04",
+      "topic": "region",
+      "status": "SUCCEEDED",
+      "trace_id": "TRACE-674761fe-d823-4ac7-91b2-ade69a5829f5",
+      "hit_at_10": true,
+      "citation_verified": true,
+      "citation_ids": [
+        "citation-1",
+        "citation-2"
+      ]
+    },
+    {
+      "case_id": "RAG-region-05",
+      "topic": "region",
+      "status": "SUCCEEDED",
+      "trace_id": "TRACE-b7243de5-df94-4f29-91aa-987e9af1a2dc",
+      "hit_at_10": true,
+      "citation_verified": true,
+      "citation_ids": [
+        "citation-1",
+        "citation-2"
+      ]
+    },
+    {
+      "case_id": "RAG-region-06",
+      "topic": "region",
+      "status": "SUCCEEDED",
+      "trace_id": "TRACE-f7bcae6a-a7e6-4e4c-a2b3-5d1be74bb589",
+      "hit_at_10": true,
+      "citation_verified": true,
+      "citation_ids": [
+        "citation-1",
+        "citation-2",
+        "citation-3",
+        "citation-4"
+      ]
+    },
+    {
+      "case_id": "RAG-region-07",
+      "topic": "region",
+      "status": "SUCCEEDED",
+      "trace_id": "TRACE-9f36d14d-31ef-4b1e-aba4-c3437dc27758",
+      "hit_at_10": true,
+      "citation_verified": true,
+      "citation_ids": [
+        "citation-1",
+        "citation-2"
+      ]
+    },
+    {
+      "case_id": "RAG-region-08",
+      "topic": "region",
+      "status": "SUCCEEDED",
+      "trace_id": "TRACE-63ef38a8-e6e0-401a-8327-de37cc7dcdaa",
+      "hit_at_10": true,
+      "citation_verified": true,
+      "citation_ids": [
+        "citation-1",
+        "citation-2"
+      ]
+    },
+    {
+      "case_id": "RAG-region-09",
+      "topic": "region",
+      "status": "SUCCEEDED",
+      "trace_id": "TRACE-0d9d2fbb-4073-4da4-b38b-665c17a20fcf",
+      "hit_at_10": true,
+      "citation_verified": true,
+      "citation_ids": [
+        "citation-1",
+        "citation-2"
+      ]
+    },
+    {
+      "case_id": "RAG-region-10",
+      "topic": "region",
+      "status": "SUCCEEDED",
+      "trace_id": "TRACE-e4ce0d18-ecd1-4051-8c07-06c46db3f608",
+      "hit_at_10": true,
+      "citation_verified": true,
+      "citation_ids": [
+        "citation-1",
+        "citation-2",
+        "citation-3"
+      ]
+    },
+    {
+      "case_id": "RAG-region-11",
+      "topic": "region",
+      "status": "SUCCEEDED",
+      "trace_id": "TRACE-d0d282b5-19c2-44e4-888a-cf31df18bb32",
+      "hit_at_10": true,
+      "citation_verified": true,
+      "citation_ids": [
+        "citation-1",
+        "citation-2",
+        "citation-3",
+        "citation-4"
+      ]
+    },
+    {
+      "case_id": "RAG-region-12",
+      "topic": "region",
+      "status": "SUCCEEDED",
+      "trace_id": "TRACE-cd00584a-4d87-443a-a5be-b326c29366fe",
+      "hit_at_10": true,
+      "citation_verified": true,
+      "citation_ids": [
+        "citation-1",
+        "citation-2"
+      ]
+    },
+    {
+      "case_id": "RAG-region-13",
+      "topic": "region",
+      "status": "SUCCEEDED",
+      "trace_id": "TRACE-43c47554-9d0f-40e8-a825-7f8cba1b6ed3",
+      "hit_at_10": true,
+      "citation_verified": true,
+      "citation_ids": [
+        "citation-1",
+        "citation-2",
+        "citation-3"
+      ]
+    },
+    {
+      "case_id": "RAG-region-14",
+      "topic": "region",
+      "status": "SUCCEEDED",
+      "trace_id": "TRACE-9d576e02-8c5c-4f90-a1f3-0c0e799ffb16",
+      "hit_at_10": true,
+      "citation_verified": true,
+      "citation_ids": [
+        "citation-1",
+        "citation-2",
+        "citation-3"
+      ]
+    },
+    {
+      "case_id": "RAG-region-15",
+      "topic": "region",
+      "status": "SUCCEEDED",
+      "trace_id": "TRACE-d372d5ed-b977-4d6f-8465-dbfb2d343162",
+      "hit_at_10": true,
+      "citation_verified": true,
+      "citation_ids": [
+        "citation-1",
+        "citation-2",
+        "citation-3",
+        "citation-4"
+      ]
+    },
+    {
+      "case_id": "RAG-region-16",
+      "topic": "region",
+      "status": "SUCCEEDED",
+      "trace_id": "TRACE-b498831f-cfb0-470c-ab6b-d33295d065e5",
+      "hit_at_10": true,
+      "citation_verified": true,
+      "citation_ids": [
+        "citation-1",
+        "citation-2",
+        "citation-3",
+        "citation-4"
+      ]
+    },
+    {
+      "case_id": "RAG-region-17",
+      "topic": "region",
+      "status": "SUCCEEDED",
+      "trace_id": "TRACE-e7f27202-d183-43f4-a181-c782a8326a07",
+      "hit_at_10": true,
+      "citation_verified": true,
+      "citation_ids": [
+        "citation-1",
+        "citation-2",
+        "citation-3"
+      ]
+    },
+    {
+      "case_id": "RAG-region-18",
+      "topic": "region",
+      "status": "SUCCEEDED",
+      "trace_id": "TRACE-9108bdf5-77f9-4e19-9faf-d0d0f87ac14e",
+      "hit_at_10": true,
+      "citation_verified": true,
+      "citation_ids": [
+        "citation-1",
+        "citation-2"
+      ]
+    },
+    {
+      "case_id": "RAG-region-19",
+      "topic": "region",
+      "status": "SUCCEEDED",
+      "trace_id": "TRACE-bbc719d2-0967-42f3-b823-15a5245e833b",
+      "hit_at_10": true,
+      "citation_verified": true,
+      "citation_ids": [
+        "citation-1",
+        "citation-2"
+      ]
+    },
+    {
+      "case_id": "RAG-region-20",
+      "topic": "region",
+      "status": "SUCCEEDED",
+      "trace_id": "TRACE-3160e767-3534-4682-b044-4cff773ae668",
+      "hit_at_10": true,
+      "citation_verified": true,
+      "citation_ids": [
+        "citation-1",
+        "citation-2"
+      ]
+    },
+    {
+      "case_id": "RAG-time-01",
+      "topic": "time",
+      "status": "SUCCEEDED",
+      "trace_id": "TRACE-f27ae4ac-c4bd-4a26-8e43-835bf0125a33",
+      "hit_at_10": true,
+      "citation_verified": true,
+      "citation_ids": [
+        "citation-1",
+        "citation-2"
+      ]
+    },
+    {
+      "case_id": "RAG-time-02",
+      "topic": "time",
+      "status": "SUCCEEDED",
+      "trace_id": "TRACE-32879eb2-0d7f-443f-b5c4-305a77d54320",
+      "hit_at_10": true,
+      "citation_verified": true,
+      "citation_ids": [
+        "citation-1"
+      ]
+    },
+    {
+      "case_id": "RAG-time-03",
+      "topic": "time",
+      "status": "SUCCEEDED",
+      "trace_id": "TRACE-fb525f37-9fde-4c88-a3b4-7e3af41fe961",
+      "hit_at_10": true,
+      "citation_verified": true,
+      "citation_ids": [
+        "citation-1"
+      ]
+    },
+    {
+      "case_id": "RAG-time-04",
+      "topic": "time",
+      "status": "SUCCEEDED",
+      "trace_id": "TRACE-15ede6c4-2e09-4359-811f-3b51c37f79e1",
+      "hit_at_10": true,
+      "citation_verified": true,
+      "citation_ids": [
+        "citation-1"
+      ]
+    },
+    {
+      "case_id": "RAG-time-05",
+      "topic": "time",
+      "status": "SUCCEEDED",
+      "trace_id": "TRACE-4f23f612-5f68-4830-a7af-fc68d2166965",
+      "hit_at_10": true,
+      "citation_verified": true,
+      "citation_ids": [
+        "citation-1"
+      ]
+    },
+    {
+      "case_id": "RAG-time-06",
+      "topic": "time",
+      "status": "SUCCEEDED",
+      "trace_id": "TRACE-0e95f053-7a98-45e8-a75b-456a7bcdb262",
+      "hit_at_10": true,
+      "citation_verified": true,
+      "citation_ids": [
+        "citation-1",
+        "citation-2",
+        "citation-3"
+      ]
+    },
+    {
+      "case_id": "RAG-time-07",
+      "topic": "time",
+      "status": "SUCCEEDED",
+      "trace_id": "TRACE-834bb303-2553-4e0f-8ac8-14def7d32811",
+      "hit_at_10": true,
+      "citation_verified": true,
+      "citation_ids": [
+        "citation-1"
+      ]
+    },
+    {
+      "case_id": "RAG-time-08",
+      "topic": "time",
+      "status": "SUCCEEDED",
+      "trace_id": "TRACE-2ea14360-f8b6-4f09-a4c8-5803575b1ef4",
+      "hit_at_10": true,
+      "citation_verified": true,
+      "citation_ids": [
+        "citation-1"
+      ]
+    },
+    {
+      "case_id": "RAG-time-09",
+      "topic": "time",
+      "status": "SUCCEEDED",
+      "trace_id": "TRACE-c5cc2a6d-f338-4119-a051-d1d96818a97e",
+      "hit_at_10": true,
+      "citation_verified": true,
+      "citation_ids": [
+        "citation-1"
+      ]
+    },
+    {
+      "case_id": "RAG-time-10",
+      "topic": "time",
+      "status": "SUCCEEDED",
+      "trace_id": "TRACE-d889d02d-407c-43b9-9c5c-0e4ee70c61b5",
+      "hit_at_10": true,
+      "citation_verified": true,
+      "citation_ids": [
+        "citation-1",
+        "citation-2",
+        "citation-3"
+      ]
+    },
+    {
+      "case_id": "RAG-time-11",
+      "topic": "time",
+      "status": "SUCCEEDED",
+      "trace_id": "TRACE-806fb7d9-ef7e-4529-a5eb-4c118a26b7bb",
+      "hit_at_10": true,
+      "citation_verified": true,
+      "citation_ids": [
+        "citation-1",
+        "citation-2",
+        "citation-3"
+      ]
+    },
+    {
+      "case_id": "RAG-time-12",
+      "topic": "time",
+      "status": "SUCCEEDED",
+      "trace_id": "TRACE-20e46778-436c-4fdf-a5d4-29b7ab67a060",
+      "hit_at_10": true,
+      "citation_verified": true,
+      "citation_ids": [
+        "citation-1"
+      ]
+    },
+    {
+      "case_id": "RAG-time-13",
+      "topic": "time",
+      "status": "SUCCEEDED",
+      "trace_id": "TRACE-f3664a8a-3a9e-40b0-81da-2722fce41729",
+      "hit_at_10": true,
+      "citation_verified": true,
+      "citation_ids": [
+        "citation-1",
+        "citation-2"
+      ]
+    },
+    {
+      "case_id": "RAG-time-14",
+      "topic": "time",
+      "status": "SUCCEEDED",
+      "trace_id": "TRACE-0a0ae253-45ae-4cbc-8b49-c14eb0528107",
+      "hit_at_10": true,
+      "citation_verified": true,
+      "citation_ids": [
+        "citation-1",
+        "citation-2"
+      ]
+    },
+    {
+      "case_id": "RAG-time-15",
+      "topic": "time",
+      "status": "SUCCEEDED",
+      "trace_id": "TRACE-8211274d-bfed-45f3-af86-c38b844f8e3a",
+      "hit_at_10": true,
+      "citation_verified": true,
+      "citation_ids": [
+        "citation-1",
+        "citation-2",
+        "citation-3"
+      ]
+    },
+    {
+      "case_id": "RAG-time-16",
+      "topic": "time",
+      "status": "SUCCEEDED",
+      "trace_id": "TRACE-5bef5269-f1e3-45de-8983-0f3eded7b12c",
+      "hit_at_10": true,
+      "citation_verified": true,
+      "citation_ids": [
+        "citation-1",
+        "citation-2",
+        "citation-3"
+      ]
+    },
+    {
+      "case_id": "RAG-time-17",
+      "topic": "time",
+      "status": "SUCCEEDED",
+      "trace_id": "TRACE-30e94033-1181-4265-adf5-ad8f8204665d",
+      "hit_at_10": true,
+      "citation_verified": true,
+      "citation_ids": [
+        "citation-1",
+        "citation-2"
+      ]
+    },
+    {
+      "case_id": "RAG-time-18",
+      "topic": "time",
+      "status": "SUCCEEDED",
+      "trace_id": "TRACE-ce3426ba-dcbf-41d2-ba32-10c1c8b155b5",
+      "hit_at_10": true,
+      "citation_verified": true,
+      "citation_ids": [
+        "citation-1"
+      ]
+    },
+    {
+      "case_id": "RAG-time-19",
+      "topic": "time",
+      "status": "SUCCEEDED",
+      "trace_id": "TRACE-56a385c0-2e10-48cb-a7d3-9d14e878da4a",
+      "hit_at_10": true,
+      "citation_verified": true,
+      "citation_ids": [
+        "citation-1",
+        "citation-2"
+      ]
+    },
+    {
+      "case_id": "RAG-time-20",
+      "topic": "time",
+      "status": "SUCCEEDED",
+      "trace_id": "TRACE-67d49ab9-9eb9-4a5f-ac9f-d7f8bac74a4c",
+      "hit_at_10": true,
+      "citation_verified": true,
+      "citation_ids": [
+        "citation-1"
+      ]
+    },
+    {
+      "case_id": "RAG-verification-01",
+      "topic": "verification",
+      "status": "SUCCEEDED",
+      "trace_id": "TRACE-b603c172-771a-4dc5-8924-463714f7fc12",
+      "hit_at_10": true,
+      "citation_verified": true,
+      "citation_ids": [
+        "citation-1",
+        "citation-2",
+        "citation-3"
+      ]
+    },
+    {
+      "case_id": "RAG-verification-02",
+      "topic": "verification",
+      "status": "SUCCEEDED",
+      "trace_id": "TRACE-fbfcec91-b4c8-4e5f-b8dd-55cb7c9889ba",
+      "hit_at_10": true,
+      "citation_verified": true,
+      "citation_ids": [
+        "citation-1",
+        "citation-2"
+      ]
+    },
+    {
+      "case_id": "RAG-verification-03",
+      "topic": "verification",
+      "status": "SUCCEEDED",
+      "trace_id": "TRACE-6a514119-c6aa-4420-8981-70be1ad35811",
+      "hit_at_10": true,
+      "citation_verified": true,
+      "citation_ids": [
+        "citation-1",
+        "citation-2"
+      ]
+    },
+    {
+      "case_id": "RAG-verification-04",
+      "topic": "verification",
+      "status": "SUCCEEDED",
+      "trace_id": "TRACE-87dbb475-6b4b-4a28-a725-e99bbc1c0595",
+      "hit_at_10": true,
+      "citation_verified": true,
+      "citation_ids": [
+        "citation-1",
+        "citation-2"
+      ]
+    },
+    {
+      "case_id": "RAG-verification-05",
+      "topic": "verification",
+      "status": "SUCCEEDED",
+      "trace_id": "TRACE-3b39b119-9e8e-4ab2-917d-a913aa93179f",
+      "hit_at_10": true,
+      "citation_verified": true,
+      "citation_ids": [
+        "citation-1",
+        "citation-2"
+      ]
+    },
+    {
+      "case_id": "RAG-verification-06",
+      "topic": "verification",
+      "status": "SUCCEEDED",
+      "trace_id": "TRACE-54e31e98-e7f5-4a8c-9d2f-d443883849d5",
+      "hit_at_10": true,
+      "citation_verified": true,
+      "citation_ids": [
+        "citation-1",
+        "citation-2"
+      ]
+    },
+    {
+      "case_id": "RAG-verification-07",
+      "topic": "verification",
+      "status": "SUCCEEDED",
+      "trace_id": "TRACE-e3606afb-a336-4b0b-b858-6eb0080091ab",
+      "hit_at_10": true,
+      "citation_verified": true,
+      "citation_ids": [
+        "citation-1",
+        "citation-2"
+      ]
+    },
+    {
+      "case_id": "RAG-verification-08",
+      "topic": "verification",
+      "status": "SUCCEEDED",
+      "trace_id": "TRACE-147edd31-0ab2-409d-a83b-8cd06564ecd4",
+      "hit_at_10": true,
+      "citation_verified": true,
+      "citation_ids": [
+        "citation-1",
+        "citation-2"
+      ]
+    },
+    {
+      "case_id": "RAG-verification-09",
+      "topic": "verification",
+      "status": "SUCCEEDED",
+      "trace_id": "TRACE-05f32406-8006-4075-96a5-014b55bf1812",
+      "hit_at_10": true,
+      "citation_verified": true,
+      "citation_ids": [
+        "citation-1",
+        "citation-2"
+      ]
+    },
+    {
+      "case_id": "RAG-verification-10",
+      "topic": "verification",
+      "status": "SUCCEEDED",
+      "trace_id": "TRACE-409a6577-9a87-4386-8d44-6a507d3384c4",
+      "hit_at_10": true,
+      "citation_verified": true,
+      "citation_ids": [
+        "citation-1",
+        "citation-2",
+        "citation-3"
+      ]
+    },
+    {
+      "case_id": "RAG-verification-11",
+      "topic": "verification",
+      "status": "SUCCEEDED",
+      "trace_id": "TRACE-4c2e7a11-f843-43c2-a7ce-b84e37d97331",
+      "hit_at_10": true,
+      "citation_verified": true,
+      "citation_ids": [
+        "citation-1",
+        "citation-2",
+        "citation-3"
+      ]
+    },
+    {
+      "case_id": "RAG-verification-12",
+      "topic": "verification",
+      "status": "SUCCEEDED",
+      "trace_id": "TRACE-415d1f4b-6f2a-44e7-bf63-f9da2664e99a",
+      "hit_at_10": true,
+      "citation_verified": true,
+      "citation_ids": [
+        "citation-1",
+        "citation-2"
+      ]
+    },
+    {
+      "case_id": "RAG-verification-13",
+      "topic": "verification",
+      "status": "SUCCEEDED",
+      "trace_id": "TRACE-e6b99da0-4a8a-44fb-9554-e6cd40534e2f",
+      "hit_at_10": true,
+      "citation_verified": true,
+      "citation_ids": [
+        "citation-1",
+        "citation-2"
+      ]
+    },
+    {
+      "case_id": "RAG-verification-14",
+      "topic": "verification",
+      "status": "SUCCEEDED",
+      "trace_id": "TRACE-f5113b3b-6b07-4c86-acee-1d88047efd80",
+      "hit_at_10": true,
+      "citation_verified": true,
+      "citation_ids": [
+        "citation-1",
+        "citation-2"
+      ]
+    },
+    {
+      "case_id": "RAG-verification-15",
+      "topic": "verification",
+      "status": "SUCCEEDED",
+      "trace_id": "TRACE-ef17895a-0ebe-48be-8ce0-2cbd84c6de30",
+      "hit_at_10": true,
+      "citation_verified": true,
+      "citation_ids": [
+        "citation-1",
+        "citation-2",
+        "citation-3",
+        "citation-4",
+        "citation-5"
+      ]
+    },
+    {
+      "case_id": "RAG-verification-16",
+      "topic": "verification",
+      "status": "SUCCEEDED",
+      "trace_id": "TRACE-b9a30242-e4cb-49c7-b0a8-b8a29b1667bd",
+      "hit_at_10": true,
+      "citation_verified": true,
+      "citation_ids": [
+        "citation-1",
+        "citation-2",
+        "citation-3"
+      ]
+    },
+    {
+      "case_id": "RAG-verification-17",
+      "topic": "verification",
+      "status": "SUCCEEDED",
+      "trace_id": "TRACE-d311a6db-9e6d-4293-91de-2b3c3432075c",
+      "hit_at_10": true,
+      "citation_verified": true,
+      "citation_ids": [
+        "citation-1",
+        "citation-2"
+      ]
+    },
+    {
+      "case_id": "RAG-verification-18",
+      "topic": "verification",
+      "status": "SUCCEEDED",
+      "trace_id": "TRACE-05d87b3a-d9ee-4b0f-9299-701d97791663",
+      "hit_at_10": true,
+      "citation_verified": true,
+      "citation_ids": [
+        "citation-1",
+        "citation-2"
+      ]
+    },
+    {
+      "case_id": "RAG-verification-19",
+      "topic": "verification",
+      "status": "SUCCEEDED",
+      "trace_id": "TRACE-4e2bcc40-a5da-454d-9dc6-8405407a458e",
+      "hit_at_10": true,
+      "citation_verified": true,
+      "citation_ids": [
+        "citation-1",
+        "citation-2",
+        "citation-3"
+      ]
+    },
+    {
+      "case_id": "RAG-verification-20",
+      "topic": "verification",
+      "status": "SUCCEEDED",
+      "trace_id": "TRACE-3f6a7278-4312-4895-b887-f50f8930b23b",
+      "hit_at_10": true,
+      "citation_verified": true,
+      "citation_ids": [
+        "citation-1",
+        "citation-2"
+      ]
+    }
+  ]
+}
