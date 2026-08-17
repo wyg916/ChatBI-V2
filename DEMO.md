@@ -26,10 +26,10 @@
 - `按品类统计利润率`
 - `2026年第一季度按地区统计收入和成本`
 
-## 外部模型与受控增强（2 分钟）
+## 外部模型、Live RAG 与有限编排（2 分钟）
 
 - Kimi、MiMo、DeepSeek 通过后端 OpenAI-compatible Adapter 接入；密钥仅保存在本机 `.env`，不进入前端、Git 或证据文件。
 - 发布默认 Provider 仍为 deterministic，保证演示可复现；三家在线 Provider 已通过 Discovery、鉴权、Chat、SQLPlan 与 SQL Guard Live Smoke。
-- RAG 默认 `shadow`、有限编排默认 `off`。普通问数始终走确定性 NL2SQL、SQL Guard、Query Executor 与 Result Oracle 主链路。
+- RAG 与最小 Multi-Agent 在 V1 默认 `on`。演示 `KNOWLEDGE_QUERY` 的真实引用、`HYBRID_ANALYSIS` 的验证融合、`COMPLEX_ANALYSIS` 的五角色/六工具 Trace 与 SSE 阶段；普通 `DATA_QUERY` 始终只走 QueryPipeline。
 
 演示时只陈述当前页面和验收证据可以证明的结果，不展示密钥、内部思维过程或本机绝对路径。

@@ -1,0 +1,1144 @@
+{
+  "suite": "CHATBI_V1_COMPLEX_E2E_10",
+  "generated_at": "2026-08-17T16:11:50.426936+00:00",
+  "cases": 10,
+  "passed": true,
+  "security": {
+    "AGENT_DIRECT_DB_ACCESS": 0,
+    "AGENT_SQL_GUARD_BYPASS": 0,
+    "AGENT_RESULT_ORACLE_BYPASS": 0,
+    "UNAUTHORIZED_TOOL_CALL": 0,
+    "CROSS_WORKSPACE_LEAK": 0
+  },
+  "results": [
+    {
+      "case_id": "day5-complex-01-v1",
+      "run_id": "762a419f-51ae-4e72-9682-365a01558f80",
+      "trace_id": "TRACE-3f76fc33-4d40-46f6-a012-7c0ad5d594e1",
+      "status": "SUCCEEDED",
+      "question": "综合分析全部收入并结合收入口径给出经营洞察",
+      "roles": [
+        "PlannerAgent",
+        "DataAnalystAgent",
+        "KnowledgeAgent",
+        "VerificationAgent",
+        "InsightAgent"
+      ],
+      "tool_calls": [
+        {
+          "ordinal": 2,
+          "agent_role": "DataAnalystAgent",
+          "tool_name": "QUERY_DATA",
+          "status": "SUCCEEDED",
+          "duration_ms": 1550
+        },
+        {
+          "ordinal": 3,
+          "agent_role": "KnowledgeAgent",
+          "tool_name": "RETRIEVE_KNOWLEDGE",
+          "status": "SUCCEEDED",
+          "duration_ms": 77
+        },
+        {
+          "ordinal": 4,
+          "agent_role": "VerificationAgent",
+          "tool_name": "VERIFY_RESULT",
+          "status": "SUCCEEDED",
+          "duration_ms": 0
+        },
+        {
+          "ordinal": 5,
+          "agent_role": "VerificationAgent",
+          "tool_name": "VERIFY_CITATION",
+          "status": "SUCCEEDED",
+          "duration_ms": 0
+        },
+        {
+          "ordinal": 6,
+          "agent_role": "InsightAgent",
+          "tool_name": "GENERATE_CHART",
+          "status": "SUCCEEDED",
+          "duration_ms": 0
+        },
+        {
+          "ordinal": 7,
+          "agent_role": "InsightAgent",
+          "tool_name": "GENERATE_INSIGHT",
+          "status": "SUCCEEDED",
+          "duration_ms": 0
+        }
+      ],
+      "sql": "SELECT SUM(o.revenue) AS revenue FROM demo_business.orders AS o LIMIT 500",
+      "result_signature": "178d1b593bd923261abc1efd86c94975a01f6e169e3b45ba1de4ac86460f2172",
+      "citations": [
+        {
+          "citation_id": "citation-1",
+          "document_id": "2b619ab1-56b8-4b8b-8efa-21694429a65f",
+          "document_version_id": "80923a1f-9bdb-4228-aac1-23375e349549",
+          "chunk_id": "d7deeae6-ce4f-46c9-9af1-dee3ee474b9d",
+          "source": "ChatBI V1 Business Glossary:business-glossary/revenue.md",
+          "locator": "definition",
+          "score": 0.357672
+        },
+        {
+          "citation_id": "citation-2",
+          "document_id": "658a724f-6e0d-479b-bd38-2c947c8d21d4",
+          "document_version_id": "ad499333-2c02-4c2c-a5dd-7b8c7fcebff0",
+          "chunk_id": "e08d0b04-6a85-48ca-8491-635721651a0f",
+          "source": "ChatBI V1 Business Glossary:business-glossary/profit.md",
+          "locator": "definition",
+          "score": 0.285413
+        },
+        {
+          "citation_id": "citation-3",
+          "document_id": "d4472acb-b2c8-43ae-9f7f-df645bc73850",
+          "document_version_id": "bd422fe8-326b-4347-976c-8694413c299e",
+          "chunk_id": "17e30b78-468d-4974-bb12-e42f4dcdc94f",
+          "source": "ChatBI V1 Business Glossary:business-glossary/verification.md",
+          "locator": "definition",
+          "score": 0.182351
+        },
+        {
+          "citation_id": "citation-4",
+          "document_id": "e2a6d7ce-5047-4865-a092-57ac15d5a2d7",
+          "document_version_id": "7354ce65-32e4-41f0-bd2d-0b360f76e02c",
+          "chunk_id": "3ca92676-3767-4266-aa95-0b216720178d",
+          "source": "ChatBI V1 Business Glossary:business-glossary/orders.md",
+          "locator": "definition",
+          "score": 0.182351
+        },
+        {
+          "citation_id": "citation-5",
+          "document_id": "737b830c-5dd3-46fc-97da-28de935f619b",
+          "document_version_id": "fbb56ad5-fe09-4552-bcb0-af4f040df690",
+          "chunk_id": "5b6bb196-bc22-4080-8e13-986a4cbb2228",
+          "source": "ChatBI V1 Business Glossary:business-glossary/region.md",
+          "locator": "definition",
+          "score": 0.182351
+        }
+      ],
+      "verification": {
+        "result_verified": true,
+        "citation_verified": true
+      },
+      "final_answer": "revenue为1,725,750元。 相关业务口径已由《收入口径与退款处理》《利润与成本口径》《ChatBI 可验证结果发布规则》验证。",
+      "performance": {
+        "ttft_ms": 0,
+        "total_latency_ms": 1628,
+        "tool_latency_ms": 1627
+      },
+      "trace_complete": true,
+      "tool_call_count": 6,
+      "replan_count": 0,
+      "max_depth_observed": 1
+    },
+    {
+      "case_id": "day5-complex-02-v1",
+      "run_id": "31cbd4e1-5061-4f81-9f9d-ad167e483806",
+      "trace_id": "TRACE-3ff3aaf9-03e8-49f1-9219-2289d42c36b7",
+      "status": "SUCCEEDED",
+      "question": "综合分析利润并结合成本口径给出经营洞察",
+      "roles": [
+        "PlannerAgent",
+        "DataAnalystAgent",
+        "KnowledgeAgent",
+        "VerificationAgent",
+        "InsightAgent"
+      ],
+      "tool_calls": [
+        {
+          "ordinal": 2,
+          "agent_role": "DataAnalystAgent",
+          "tool_name": "QUERY_DATA",
+          "status": "SUCCEEDED",
+          "duration_ms": 417
+        },
+        {
+          "ordinal": 3,
+          "agent_role": "KnowledgeAgent",
+          "tool_name": "RETRIEVE_KNOWLEDGE",
+          "status": "SUCCEEDED",
+          "duration_ms": 102
+        },
+        {
+          "ordinal": 4,
+          "agent_role": "VerificationAgent",
+          "tool_name": "VERIFY_RESULT",
+          "status": "SUCCEEDED",
+          "duration_ms": 0
+        },
+        {
+          "ordinal": 5,
+          "agent_role": "VerificationAgent",
+          "tool_name": "VERIFY_CITATION",
+          "status": "SUCCEEDED",
+          "duration_ms": 0
+        },
+        {
+          "ordinal": 6,
+          "agent_role": "InsightAgent",
+          "tool_name": "GENERATE_CHART",
+          "status": "SUCCEEDED",
+          "duration_ms": 0
+        },
+        {
+          "ordinal": 7,
+          "agent_role": "InsightAgent",
+          "tool_name": "GENERATE_INSIGHT",
+          "status": "SUCCEEDED",
+          "duration_ms": 0
+        }
+      ],
+      "sql": "SELECT SUM(o.cost) AS cost, SUM(o.revenue - o.cost) AS profit FROM demo_business.orders AS o LIMIT 500",
+      "result_signature": "71e4e55b842d1b0c69e59f3673bfb4f5421628802a5a78f91b9b8d553545dcdf",
+      "citations": [
+        {
+          "citation_id": "citation-1",
+          "document_id": "658a724f-6e0d-479b-bd38-2c947c8d21d4",
+          "document_version_id": "ad499333-2c02-4c2c-a5dd-7b8c7fcebff0",
+          "chunk_id": "e08d0b04-6a85-48ca-8491-635721651a0f",
+          "source": "ChatBI V1 Business Glossary:business-glossary/profit.md",
+          "locator": "definition",
+          "score": 0.420563
+        },
+        {
+          "citation_id": "citation-2",
+          "document_id": "e2a6d7ce-5047-4865-a092-57ac15d5a2d7",
+          "document_version_id": "7354ce65-32e4-41f0-bd2d-0b360f76e02c",
+          "chunk_id": "3ca92676-3767-4266-aa95-0b216720178d",
+          "source": "ChatBI V1 Business Glossary:business-glossary/orders.md",
+          "locator": "definition",
+          "score": 0.183798
+        },
+        {
+          "citation_id": "citation-3",
+          "document_id": "737b830c-5dd3-46fc-97da-28de935f619b",
+          "document_version_id": "fbb56ad5-fe09-4552-bcb0-af4f040df690",
+          "chunk_id": "5b6bb196-bc22-4080-8e13-986a4cbb2228",
+          "source": "ChatBI V1 Business Glossary:business-glossary/region.md",
+          "locator": "definition",
+          "score": 0.183798
+        },
+        {
+          "citation_id": "citation-4",
+          "document_id": "2b619ab1-56b8-4b8b-8efa-21694429a65f",
+          "document_version_id": "80923a1f-9bdb-4228-aac1-23375e349549",
+          "chunk_id": "d7deeae6-ce4f-46c9-9af1-dee3ee474b9d",
+          "source": "ChatBI V1 Business Glossary:business-glossary/revenue.md",
+          "locator": "definition",
+          "score": 0.183798
+        }
+      ],
+      "verification": {
+        "result_verified": true,
+        "citation_verified": true
+      },
+      "final_answer": "cost为952,455元；profit为773,295元。 相关业务口径已由《利润与成本口径》《订单量与有效订单口径》《区域经营维度说明》验证。",
+      "performance": {
+        "ttft_ms": 0,
+        "total_latency_ms": 521,
+        "tool_latency_ms": 519
+      },
+      "trace_complete": true,
+      "tool_call_count": 6,
+      "replan_count": 0,
+      "max_depth_observed": 1
+    },
+    {
+      "case_id": "day5-complex-03-v1",
+      "run_id": "23801d74-6899-420f-bbe5-196a8bb25bb6",
+      "trace_id": "TRACE-4b9fb794-9639-45d0-b687-2848c1962fb5",
+      "status": "SUCCEEDED",
+      "question": "综合分析订单量并说明有效订单口径",
+      "roles": [
+        "PlannerAgent",
+        "DataAnalystAgent",
+        "KnowledgeAgent",
+        "VerificationAgent",
+        "InsightAgent"
+      ],
+      "tool_calls": [
+        {
+          "ordinal": 2,
+          "agent_role": "DataAnalystAgent",
+          "tool_name": "QUERY_DATA",
+          "status": "SUCCEEDED",
+          "duration_ms": 300
+        },
+        {
+          "ordinal": 3,
+          "agent_role": "KnowledgeAgent",
+          "tool_name": "RETRIEVE_KNOWLEDGE",
+          "status": "SUCCEEDED",
+          "duration_ms": 100
+        },
+        {
+          "ordinal": 4,
+          "agent_role": "VerificationAgent",
+          "tool_name": "VERIFY_RESULT",
+          "status": "SUCCEEDED",
+          "duration_ms": 0
+        },
+        {
+          "ordinal": 5,
+          "agent_role": "VerificationAgent",
+          "tool_name": "VERIFY_CITATION",
+          "status": "SUCCEEDED",
+          "duration_ms": 0
+        },
+        {
+          "ordinal": 6,
+          "agent_role": "InsightAgent",
+          "tool_name": "GENERATE_CHART",
+          "status": "SUCCEEDED",
+          "duration_ms": 0
+        },
+        {
+          "ordinal": 7,
+          "agent_role": "InsightAgent",
+          "tool_name": "GENERATE_INSIGHT",
+          "status": "SUCCEEDED",
+          "duration_ms": 0
+        }
+      ],
+      "sql": "SELECT COUNT(o.order_id) AS order_count FROM demo_business.orders AS o LIMIT 500",
+      "result_signature": "a05bcede04500d7a4c6872e133eeda3f94551656922cdcb8e63502f68c6fd38f",
+      "citations": [
+        {
+          "citation_id": "citation-1",
+          "document_id": "e2a6d7ce-5047-4865-a092-57ac15d5a2d7",
+          "document_version_id": "7354ce65-32e4-41f0-bd2d-0b360f76e02c",
+          "chunk_id": "3ca92676-3767-4266-aa95-0b216720178d",
+          "source": "ChatBI V1 Business Glossary:business-glossary/orders.md",
+          "locator": "definition",
+          "score": 0.561512
+        },
+        {
+          "citation_id": "citation-2",
+          "document_id": "2b619ab1-56b8-4b8b-8efa-21694429a65f",
+          "document_version_id": "80923a1f-9bdb-4228-aac1-23375e349549",
+          "chunk_id": "d7deeae6-ce4f-46c9-9af1-dee3ee474b9d",
+          "source": "ChatBI V1 Business Glossary:business-glossary/revenue.md",
+          "locator": "definition",
+          "score": 0.45144
+        },
+        {
+          "citation_id": "citation-3",
+          "document_id": "658a724f-6e0d-479b-bd38-2c947c8d21d4",
+          "document_version_id": "ad499333-2c02-4c2c-a5dd-7b8c7fcebff0",
+          "chunk_id": "e08d0b04-6a85-48ca-8491-635721651a0f",
+          "source": "ChatBI V1 Business Glossary:business-glossary/profit.md",
+          "locator": "definition",
+          "score": 0.45144
+        },
+        {
+          "citation_id": "citation-4",
+          "document_id": "bd8ec696-0644-4bf2-b725-82163cbe67bc",
+          "document_version_id": "64702c14-a6fa-4f08-a8cb-1d25de6b5be6",
+          "chunk_id": "59dd89d8-a806-4359-b488-30f4d1eac864",
+          "source": "ChatBI V1 Business Glossary:business-glossary/time.md",
+          "locator": "definition",
+          "score": 0.191518
+        },
+        {
+          "citation_id": "citation-5",
+          "document_id": "737b830c-5dd3-46fc-97da-28de935f619b",
+          "document_version_id": "fbb56ad5-fe09-4552-bcb0-af4f040df690",
+          "chunk_id": "5b6bb196-bc22-4080-8e13-986a4cbb2228",
+          "source": "ChatBI V1 Business Glossary:business-glossary/region.md",
+          "locator": "definition",
+          "score": 0.191518
+        }
+      ],
+      "verification": {
+        "result_verified": true,
+        "citation_verified": true
+      },
+      "final_answer": "order_count为1,095个。 相关业务口径已由《订单量与有效订单口径》《收入口径与退款处理》《利润与成本口径》验证。",
+      "performance": {
+        "ttft_ms": 0,
+        "total_latency_ms": 401,
+        "tool_latency_ms": 400
+      },
+      "trace_complete": true,
+      "tool_call_count": 6,
+      "replan_count": 0,
+      "max_depth_observed": 1
+    },
+    {
+      "case_id": "day5-complex-04-v1",
+      "run_id": "634e5964-ecbb-432b-a48e-df672185580c",
+      "trace_id": "TRACE-781c13bd-952e-4fad-83f9-c66b3c8eabb7",
+      "status": "SUCCEEDED",
+      "question": "综合分析各地区收入并解释区域经营维度",
+      "roles": [
+        "PlannerAgent",
+        "DataAnalystAgent",
+        "KnowledgeAgent",
+        "VerificationAgent",
+        "InsightAgent"
+      ],
+      "tool_calls": [
+        {
+          "ordinal": 2,
+          "agent_role": "DataAnalystAgent",
+          "tool_name": "QUERY_DATA",
+          "status": "SUCCEEDED",
+          "duration_ms": 241
+        },
+        {
+          "ordinal": 3,
+          "agent_role": "KnowledgeAgent",
+          "tool_name": "RETRIEVE_KNOWLEDGE",
+          "status": "SUCCEEDED",
+          "duration_ms": 79
+        },
+        {
+          "ordinal": 4,
+          "agent_role": "VerificationAgent",
+          "tool_name": "VERIFY_RESULT",
+          "status": "SUCCEEDED",
+          "duration_ms": 0
+        },
+        {
+          "ordinal": 5,
+          "agent_role": "VerificationAgent",
+          "tool_name": "VERIFY_CITATION",
+          "status": "SUCCEEDED",
+          "duration_ms": 0
+        },
+        {
+          "ordinal": 6,
+          "agent_role": "InsightAgent",
+          "tool_name": "GENERATE_CHART",
+          "status": "SUCCEEDED",
+          "duration_ms": 0
+        },
+        {
+          "ordinal": 7,
+          "agent_role": "InsightAgent",
+          "tool_name": "GENERATE_INSIGHT",
+          "status": "SUCCEEDED",
+          "duration_ms": 0
+        }
+      ],
+      "sql": "SELECT r.region_name AS region, SUM(o.revenue) AS revenue FROM demo_business.orders AS o JOIN demo_business.regions AS r ON r.region_id = o.region_id GROUP BY r.region_name ORDER BY revenue DESC LIMIT 500",
+      "result_signature": "d7fbef0368e14fe6bfd22f601f68dff95b90d93df411d5e4cd61aa90f5483709",
+      "citations": [
+        {
+          "citation_id": "citation-1",
+          "document_id": "737b830c-5dd3-46fc-97da-28de935f619b",
+          "document_version_id": "fbb56ad5-fe09-4552-bcb0-af4f040df690",
+          "chunk_id": "5b6bb196-bc22-4080-8e13-986a4cbb2228",
+          "source": "ChatBI V1 Business Glossary:business-glossary/region.md",
+          "locator": "definition",
+          "score": 0.524845
+        },
+        {
+          "citation_id": "citation-2",
+          "document_id": "658a724f-6e0d-479b-bd38-2c947c8d21d4",
+          "document_version_id": "ad499333-2c02-4c2c-a5dd-7b8c7fcebff0",
+          "chunk_id": "e08d0b04-6a85-48ca-8491-635721651a0f",
+          "source": "ChatBI V1 Business Glossary:business-glossary/profit.md",
+          "locator": "definition",
+          "score": 0.291525
+        },
+        {
+          "citation_id": "citation-3",
+          "document_id": "2b619ab1-56b8-4b8b-8efa-21694429a65f",
+          "document_version_id": "80923a1f-9bdb-4228-aac1-23375e349549",
+          "chunk_id": "d7deeae6-ce4f-46c9-9af1-dee3ee474b9d",
+          "source": "ChatBI V1 Business Glossary:business-glossary/revenue.md",
+          "locator": "definition",
+          "score": 0.185406
+        }
+      ],
+      "verification": {
+        "result_verified": true,
+        "citation_verified": true
+      },
+      "final_answer": "查询返回 5 行按region汇总的可验证结果。 相关业务口径已由《区域经营维度说明》《利润与成本口径》《收入口径与退款处理》验证。",
+      "performance": {
+        "ttft_ms": 0,
+        "total_latency_ms": 321,
+        "tool_latency_ms": 320
+      },
+      "trace_complete": true,
+      "tool_call_count": 6,
+      "replan_count": 0,
+      "max_depth_observed": 1
+    },
+    {
+      "case_id": "day5-complex-05-v1",
+      "run_id": "50fb8dde-d4ff-4165-9860-bb42cb4449fb",
+      "trace_id": "TRACE-d1ce5974-98c0-4671-befd-48035d000ce6",
+      "status": "SUCCEEDED",
+      "question": "综合分析月度收入趋势并说明同比环比时间窗口",
+      "roles": [
+        "PlannerAgent",
+        "DataAnalystAgent",
+        "KnowledgeAgent",
+        "VerificationAgent",
+        "InsightAgent"
+      ],
+      "tool_calls": [
+        {
+          "ordinal": 2,
+          "agent_role": "DataAnalystAgent",
+          "tool_name": "QUERY_DATA",
+          "status": "SUCCEEDED",
+          "duration_ms": 314
+        },
+        {
+          "ordinal": 3,
+          "agent_role": "KnowledgeAgent",
+          "tool_name": "RETRIEVE_KNOWLEDGE",
+          "status": "SUCCEEDED",
+          "duration_ms": 81
+        },
+        {
+          "ordinal": 4,
+          "agent_role": "VerificationAgent",
+          "tool_name": "VERIFY_RESULT",
+          "status": "SUCCEEDED",
+          "duration_ms": 0
+        },
+        {
+          "ordinal": 5,
+          "agent_role": "VerificationAgent",
+          "tool_name": "VERIFY_CITATION",
+          "status": "SUCCEEDED",
+          "duration_ms": 0
+        },
+        {
+          "ordinal": 6,
+          "agent_role": "InsightAgent",
+          "tool_name": "GENERATE_CHART",
+          "status": "SUCCEEDED",
+          "duration_ms": 0
+        },
+        {
+          "ordinal": 7,
+          "agent_role": "InsightAgent",
+          "tool_name": "GENERATE_INSIGHT",
+          "status": "SUCCEEDED",
+          "duration_ms": 0
+        }
+      ],
+      "sql": "WITH monthly AS (SELECT DATE_TRUNC('MONTH', o.order_date) AS month, SUM(o.revenue) AS revenue FROM demo_business.orders AS o GROUP BY DATE_TRUNC('MONTH', o.order_date)) SELECT month, revenue, ROUND((revenue - LAG(revenue, 1) OVER (ORDER BY month)) * 100.0 / NULLIF(LAG(revenue, 1) OVER (ORDER BY month), 0), 4) AS revenue_mom FROM monthly ORDER BY month ASC LIMIT 500",
+      "result_signature": "5b8552728afc7fbf6dc7b105afdc6e2932cb062809265a1f8a7208a78a9ff3de",
+      "citations": [
+        {
+          "citation_id": "citation-1",
+          "document_id": "bd8ec696-0644-4bf2-b725-82163cbe67bc",
+          "document_version_id": "64702c14-a6fa-4f08-a8cb-1d25de6b5be6",
+          "chunk_id": "59dd89d8-a806-4359-b488-30f4d1eac864",
+          "source": "ChatBI V1 Business Glossary:business-glossary/time.md",
+          "locator": "definition",
+          "score": 0.498655
+        },
+        {
+          "citation_id": "citation-2",
+          "document_id": "737b830c-5dd3-46fc-97da-28de935f619b",
+          "document_version_id": "fbb56ad5-fe09-4552-bcb0-af4f040df690",
+          "chunk_id": "5b6bb196-bc22-4080-8e13-986a4cbb2228",
+          "source": "ChatBI V1 Business Glossary:business-glossary/region.md",
+          "locator": "definition",
+          "score": 0.181041
+        },
+        {
+          "citation_id": "citation-3",
+          "document_id": "2b619ab1-56b8-4b8b-8efa-21694429a65f",
+          "document_version_id": "80923a1f-9bdb-4228-aac1-23375e349549",
+          "chunk_id": "d7deeae6-ce4f-46c9-9af1-dee3ee474b9d",
+          "source": "ChatBI V1 Business Glossary:business-glossary/revenue.md",
+          "locator": "definition",
+          "score": 0.181041
+        },
+        {
+          "citation_id": "citation-4",
+          "document_id": "658a724f-6e0d-479b-bd38-2c947c8d21d4",
+          "document_version_id": "ad499333-2c02-4c2c-a5dd-7b8c7fcebff0",
+          "chunk_id": "e08d0b04-6a85-48ca-8491-635721651a0f",
+          "source": "ChatBI V1 Business Glossary:business-glossary/profit.md",
+          "locator": "definition",
+          "score": 0.181041
+        }
+      ],
+      "verification": {
+        "result_verified": true,
+        "citation_verified": true
+      },
+      "final_answer": "查询返回 13 行按month汇总的可验证结果。 相关业务口径已由《同比环比与时间窗口》《区域经营维度说明》《收入口径与退款处理》验证。",
+      "performance": {
+        "ttft_ms": 0,
+        "total_latency_ms": 396,
+        "tool_latency_ms": 395
+      },
+      "trace_complete": true,
+      "tool_call_count": 6,
+      "replan_count": 0,
+      "max_depth_observed": 1
+    },
+    {
+      "case_id": "day5-complex-06-v1",
+      "run_id": "6946535e-6e08-42e4-995a-7bcd87177fd9",
+      "trace_id": "TRACE-d9f2a9ac-6327-4a73-a92f-30e4afc9c26e",
+      "status": "SUCCEEDED",
+      "question": "综合分析收入并说明 SQL Guard 与 Result Oracle 验证规则",
+      "roles": [
+        "PlannerAgent",
+        "DataAnalystAgent",
+        "KnowledgeAgent",
+        "VerificationAgent",
+        "InsightAgent"
+      ],
+      "tool_calls": [
+        {
+          "ordinal": 2,
+          "agent_role": "DataAnalystAgent",
+          "tool_name": "QUERY_DATA",
+          "status": "SUCCEEDED",
+          "duration_ms": 368
+        },
+        {
+          "ordinal": 3,
+          "agent_role": "KnowledgeAgent",
+          "tool_name": "RETRIEVE_KNOWLEDGE",
+          "status": "SUCCEEDED",
+          "duration_ms": 109
+        },
+        {
+          "ordinal": 4,
+          "agent_role": "VerificationAgent",
+          "tool_name": "VERIFY_RESULT",
+          "status": "SUCCEEDED",
+          "duration_ms": 0
+        },
+        {
+          "ordinal": 5,
+          "agent_role": "VerificationAgent",
+          "tool_name": "VERIFY_CITATION",
+          "status": "SUCCEEDED",
+          "duration_ms": 0
+        },
+        {
+          "ordinal": 6,
+          "agent_role": "InsightAgent",
+          "tool_name": "GENERATE_CHART",
+          "status": "SUCCEEDED",
+          "duration_ms": 0
+        },
+        {
+          "ordinal": 7,
+          "agent_role": "InsightAgent",
+          "tool_name": "GENERATE_INSIGHT",
+          "status": "SUCCEEDED",
+          "duration_ms": 0
+        }
+      ],
+      "sql": "SELECT SUM(o.revenue) AS revenue FROM demo_business.orders AS o LIMIT 500",
+      "result_signature": "178d1b593bd923261abc1efd86c94975a01f6e169e3b45ba1de4ac86460f2172",
+      "citations": [
+        {
+          "citation_id": "citation-1",
+          "document_id": "d4472acb-b2c8-43ae-9f7f-df645bc73850",
+          "document_version_id": "bd422fe8-326b-4347-976c-8694413c299e",
+          "chunk_id": "17e30b78-468d-4974-bb12-e42f4dcdc94f",
+          "source": "ChatBI V1 Business Glossary:business-glossary/verification.md",
+          "locator": "definition",
+          "score": 0.53991
+        },
+        {
+          "citation_id": "citation-2",
+          "document_id": "2b619ab1-56b8-4b8b-8efa-21694429a65f",
+          "document_version_id": "80923a1f-9bdb-4228-aac1-23375e349549",
+          "chunk_id": "d7deeae6-ce4f-46c9-9af1-dee3ee474b9d",
+          "source": "ChatBI V1 Business Glossary:business-glossary/revenue.md",
+          "locator": "definition",
+          "score": 0.537902
+        },
+        {
+          "citation_id": "citation-3",
+          "document_id": "737b830c-5dd3-46fc-97da-28de935f619b",
+          "document_version_id": "fbb56ad5-fe09-4552-bcb0-af4f040df690",
+          "chunk_id": "5b6bb196-bc22-4080-8e13-986a4cbb2228",
+          "source": "ChatBI V1 Business Glossary:business-glossary/region.md",
+          "locator": "definition",
+          "score": 0.280098
+        },
+        {
+          "citation_id": "citation-4",
+          "document_id": "e2a6d7ce-5047-4865-a092-57ac15d5a2d7",
+          "document_version_id": "7354ce65-32e4-41f0-bd2d-0b360f76e02c",
+          "chunk_id": "3ca92676-3767-4266-aa95-0b216720178d",
+          "source": "ChatBI V1 Business Glossary:business-glossary/orders.md",
+          "locator": "definition",
+          "score": 0.185406
+        },
+        {
+          "citation_id": "citation-5",
+          "document_id": "658a724f-6e0d-479b-bd38-2c947c8d21d4",
+          "document_version_id": "ad499333-2c02-4c2c-a5dd-7b8c7fcebff0",
+          "chunk_id": "e08d0b04-6a85-48ca-8491-635721651a0f",
+          "source": "ChatBI V1 Business Glossary:business-glossary/profit.md",
+          "locator": "definition",
+          "score": 0.185406
+        }
+      ],
+      "verification": {
+        "result_verified": true,
+        "citation_verified": true
+      },
+      "final_answer": "revenue为1,725,750元。 相关业务口径已由《ChatBI 可验证结果发布规则》《收入口径与退款处理》《区域经营维度说明》验证。",
+      "performance": {
+        "ttft_ms": 0,
+        "total_latency_ms": 478,
+        "tool_latency_ms": 477
+      },
+      "trace_complete": true,
+      "tool_call_count": 6,
+      "replan_count": 0,
+      "max_depth_observed": 1
+    },
+    {
+      "case_id": "day5-complex-07-v1",
+      "run_id": "f3a715f2-1914-4fa2-80e1-fb1e5501a20f",
+      "trace_id": "TRACE-c0320d0a-0d03-4751-b0f5-1f7db193a337",
+      "status": "SUCCEEDED",
+      "question": "综合分析各产品收入并结合退款口径给出洞察",
+      "roles": [
+        "PlannerAgent",
+        "DataAnalystAgent",
+        "KnowledgeAgent",
+        "VerificationAgent",
+        "InsightAgent"
+      ],
+      "tool_calls": [
+        {
+          "ordinal": 2,
+          "agent_role": "DataAnalystAgent",
+          "tool_name": "QUERY_DATA",
+          "status": "SUCCEEDED",
+          "duration_ms": 353
+        },
+        {
+          "ordinal": 3,
+          "agent_role": "KnowledgeAgent",
+          "tool_name": "RETRIEVE_KNOWLEDGE",
+          "status": "SUCCEEDED",
+          "duration_ms": 116
+        },
+        {
+          "ordinal": 4,
+          "agent_role": "VerificationAgent",
+          "tool_name": "VERIFY_RESULT",
+          "status": "SUCCEEDED",
+          "duration_ms": 0
+        },
+        {
+          "ordinal": 5,
+          "agent_role": "VerificationAgent",
+          "tool_name": "VERIFY_CITATION",
+          "status": "SUCCEEDED",
+          "duration_ms": 0
+        },
+        {
+          "ordinal": 6,
+          "agent_role": "InsightAgent",
+          "tool_name": "GENERATE_CHART",
+          "status": "SUCCEEDED",
+          "duration_ms": 0
+        },
+        {
+          "ordinal": 7,
+          "agent_role": "InsightAgent",
+          "tool_name": "GENERATE_INSIGHT",
+          "status": "SUCCEEDED",
+          "duration_ms": 0
+        }
+      ],
+      "sql": "SELECT p.product_name AS product, SUM(o.revenue) AS revenue FROM demo_business.orders AS o JOIN demo_business.products AS p ON p.product_id = o.product_id WHERE o.status = 'REFUNDED' GROUP BY p.product_name ORDER BY revenue DESC LIMIT 500",
+      "result_signature": "c85edc0fc38581e62730855fb92d9258da3008357d1caccbbb5a7a21dcdaf01b",
+      "citations": [
+        {
+          "citation_id": "citation-1",
+          "document_id": "2b619ab1-56b8-4b8b-8efa-21694429a65f",
+          "document_version_id": "80923a1f-9bdb-4228-aac1-23375e349549",
+          "chunk_id": "d7deeae6-ce4f-46c9-9af1-dee3ee474b9d",
+          "source": "ChatBI V1 Business Glossary:business-glossary/revenue.md",
+          "locator": "definition",
+          "score": 0.357672
+        },
+        {
+          "citation_id": "citation-2",
+          "document_id": "e2a6d7ce-5047-4865-a092-57ac15d5a2d7",
+          "document_version_id": "7354ce65-32e4-41f0-bd2d-0b360f76e02c",
+          "chunk_id": "3ca92676-3767-4266-aa95-0b216720178d",
+          "source": "ChatBI V1 Business Glossary:business-glossary/orders.md",
+          "locator": "definition",
+          "score": 0.285413
+        },
+        {
+          "citation_id": "citation-3",
+          "document_id": "658a724f-6e0d-479b-bd38-2c947c8d21d4",
+          "document_version_id": "ad499333-2c02-4c2c-a5dd-7b8c7fcebff0",
+          "chunk_id": "e08d0b04-6a85-48ca-8491-635721651a0f",
+          "source": "ChatBI V1 Business Glossary:business-glossary/profit.md",
+          "locator": "definition",
+          "score": 0.285413
+        }
+      ],
+      "verification": {
+        "result_verified": true,
+        "citation_verified": true
+      },
+      "final_answer": "查询返回 5 行按product汇总的可验证结果。 相关业务口径已由《收入口径与退款处理》《订单量与有效订单口径》《利润与成本口径》验证。",
+      "performance": {
+        "ttft_ms": 0,
+        "total_latency_ms": 470,
+        "tool_latency_ms": 469
+      },
+      "trace_complete": true,
+      "tool_call_count": 6,
+      "replan_count": 0,
+      "max_depth_observed": 1
+    },
+    {
+      "case_id": "day5-complex-08-v1",
+      "run_id": "9ea798e0-4f63-4ce9-a071-fe9003da08d4",
+      "trace_id": "TRACE-0b5b0849-ca8b-43ad-8c45-6a3d7faa6213",
+      "status": "SUCCEEDED",
+      "question": "综合分析各客户订单量并说明订单去重口径",
+      "roles": [
+        "PlannerAgent",
+        "DataAnalystAgent",
+        "KnowledgeAgent",
+        "VerificationAgent",
+        "InsightAgent"
+      ],
+      "tool_calls": [
+        {
+          "ordinal": 2,
+          "agent_role": "DataAnalystAgent",
+          "tool_name": "QUERY_DATA",
+          "status": "SUCCEEDED",
+          "duration_ms": 274
+        },
+        {
+          "ordinal": 3,
+          "agent_role": "KnowledgeAgent",
+          "tool_name": "RETRIEVE_KNOWLEDGE",
+          "status": "SUCCEEDED",
+          "duration_ms": 79
+        },
+        {
+          "ordinal": 4,
+          "agent_role": "VerificationAgent",
+          "tool_name": "VERIFY_RESULT",
+          "status": "SUCCEEDED",
+          "duration_ms": 0
+        },
+        {
+          "ordinal": 5,
+          "agent_role": "VerificationAgent",
+          "tool_name": "VERIFY_CITATION",
+          "status": "SUCCEEDED",
+          "duration_ms": 0
+        },
+        {
+          "ordinal": 6,
+          "agent_role": "InsightAgent",
+          "tool_name": "GENERATE_CHART",
+          "status": "SUCCEEDED",
+          "duration_ms": 0
+        },
+        {
+          "ordinal": 7,
+          "agent_role": "InsightAgent",
+          "tool_name": "GENERATE_INSIGHT",
+          "status": "SUCCEEDED",
+          "duration_ms": 0
+        }
+      ],
+      "sql": "SELECT c.customer_name AS customer, COUNT(o.order_id) AS order_count FROM demo_business.orders AS o JOIN demo_business.customers AS c ON c.customer_id = o.customer_id GROUP BY c.customer_name ORDER BY order_count DESC LIMIT 500",
+      "result_signature": "e5765f96f1b5b93a51c41c389bf20b3fb4919736008066ee8b9e98d6aad5f131",
+      "citations": [
+        {
+          "citation_id": "citation-1",
+          "document_id": "e2a6d7ce-5047-4865-a092-57ac15d5a2d7",
+          "document_version_id": "7354ce65-32e4-41f0-bd2d-0b360f76e02c",
+          "chunk_id": "3ca92676-3767-4266-aa95-0b216720178d",
+          "source": "ChatBI V1 Business Glossary:business-glossary/orders.md",
+          "locator": "definition",
+          "score": 0.47858
+        },
+        {
+          "citation_id": "citation-2",
+          "document_id": "2b619ab1-56b8-4b8b-8efa-21694429a65f",
+          "document_version_id": "80923a1f-9bdb-4228-aac1-23375e349549",
+          "chunk_id": "d7deeae6-ce4f-46c9-9af1-dee3ee474b9d",
+          "source": "ChatBI V1 Business Glossary:business-glossary/revenue.md",
+          "locator": "definition",
+          "score": 0.291525
+        },
+        {
+          "citation_id": "citation-3",
+          "document_id": "658a724f-6e0d-479b-bd38-2c947c8d21d4",
+          "document_version_id": "ad499333-2c02-4c2c-a5dd-7b8c7fcebff0",
+          "chunk_id": "e08d0b04-6a85-48ca-8491-635721651a0f",
+          "source": "ChatBI V1 Business Glossary:business-glossary/profit.md",
+          "locator": "definition",
+          "score": 0.291525
+        },
+        {
+          "citation_id": "citation-4",
+          "document_id": "bd8ec696-0644-4bf2-b725-82163cbe67bc",
+          "document_version_id": "64702c14-a6fa-4f08-a8cb-1d25de6b5be6",
+          "chunk_id": "59dd89d8-a806-4359-b488-30f4d1eac864",
+          "source": "ChatBI V1 Business Glossary:business-glossary/time.md",
+          "locator": "definition",
+          "score": 0.185406
+        },
+        {
+          "citation_id": "citation-5",
+          "document_id": "737b830c-5dd3-46fc-97da-28de935f619b",
+          "document_version_id": "fbb56ad5-fe09-4552-bcb0-af4f040df690",
+          "chunk_id": "5b6bb196-bc22-4080-8e13-986a4cbb2228",
+          "source": "ChatBI V1 Business Glossary:business-glossary/region.md",
+          "locator": "definition",
+          "score": 0.185406
+        }
+      ],
+      "verification": {
+        "result_verified": true,
+        "citation_verified": true
+      },
+      "final_answer": "查询返回 60 行按customer汇总的可验证结果。 相关业务口径已由《订单量与有效订单口径》《收入口径与退款处理》《利润与成本口径》验证。",
+      "performance": {
+        "ttft_ms": 0,
+        "total_latency_ms": 355,
+        "tool_latency_ms": 353
+      },
+      "trace_complete": true,
+      "tool_call_count": 6,
+      "replan_count": 0,
+      "max_depth_observed": 1
+    },
+    {
+      "case_id": "day5-complex-09-v1",
+      "run_id": "e2818a49-f40c-4503-a4ec-06fd955b039e",
+      "trace_id": "TRACE-2438d55c-c6be-4f1c-a284-4007828cd689",
+      "status": "SUCCEEDED",
+      "question": "综合分析季度利润并解释利润与成本定义",
+      "roles": [
+        "PlannerAgent",
+        "DataAnalystAgent",
+        "KnowledgeAgent",
+        "VerificationAgent",
+        "InsightAgent"
+      ],
+      "tool_calls": [
+        {
+          "ordinal": 2,
+          "agent_role": "DataAnalystAgent",
+          "tool_name": "QUERY_DATA",
+          "status": "SUCCEEDED",
+          "duration_ms": 481
+        },
+        {
+          "ordinal": 3,
+          "agent_role": "KnowledgeAgent",
+          "tool_name": "RETRIEVE_KNOWLEDGE",
+          "status": "SUCCEEDED",
+          "duration_ms": 102
+        },
+        {
+          "ordinal": 4,
+          "agent_role": "VerificationAgent",
+          "tool_name": "VERIFY_RESULT",
+          "status": "SUCCEEDED",
+          "duration_ms": 0
+        },
+        {
+          "ordinal": 5,
+          "agent_role": "VerificationAgent",
+          "tool_name": "VERIFY_CITATION",
+          "status": "SUCCEEDED",
+          "duration_ms": 0
+        },
+        {
+          "ordinal": 6,
+          "agent_role": "InsightAgent",
+          "tool_name": "GENERATE_CHART",
+          "status": "SUCCEEDED",
+          "duration_ms": 0
+        },
+        {
+          "ordinal": 7,
+          "agent_role": "InsightAgent",
+          "tool_name": "GENERATE_INSIGHT",
+          "status": "SUCCEEDED",
+          "duration_ms": 0
+        }
+      ],
+      "sql": "SELECT SUM(o.cost) AS cost, SUM(o.revenue - o.cost) AS profit FROM demo_business.orders AS o LIMIT 500",
+      "result_signature": "71e4e55b842d1b0c69e59f3673bfb4f5421628802a5a78f91b9b8d553545dcdf",
+      "citations": [
+        {
+          "citation_id": "citation-1",
+          "document_id": "658a724f-6e0d-479b-bd38-2c947c8d21d4",
+          "document_version_id": "ad499333-2c02-4c2c-a5dd-7b8c7fcebff0",
+          "chunk_id": "e08d0b04-6a85-48ca-8491-635721651a0f",
+          "source": "ChatBI V1 Business Glossary:business-glossary/profit.md",
+          "locator": "definition",
+          "score": 0.434185
+        },
+        {
+          "citation_id": "citation-2",
+          "document_id": "bd8ec696-0644-4bf2-b725-82163cbe67bc",
+          "document_version_id": "64702c14-a6fa-4f08-a8cb-1d25de6b5be6",
+          "chunk_id": "59dd89d8-a806-4359-b488-30f4d1eac864",
+          "source": "ChatBI V1 Business Glossary:business-glossary/time.md",
+          "locator": "definition",
+          "score": 0.187204
+        }
+      ],
+      "verification": {
+        "result_verified": true,
+        "citation_verified": true
+      },
+      "final_answer": "cost为952,455元；profit为773,295元。 相关业务口径已由《利润与成本口径》《同比环比与时间窗口》验证。",
+      "performance": {
+        "ttft_ms": 0,
+        "total_latency_ms": 583,
+        "tool_latency_ms": 583
+      },
+      "trace_complete": true,
+      "tool_call_count": 6,
+      "replan_count": 0,
+      "max_depth_observed": 1
+    },
+    {
+      "case_id": "day5-complex-10-v1",
+      "run_id": "c222057f-e9ec-4c77-83d3-99e1b5692025",
+      "trace_id": "TRACE-a3ed3da1-bca0-4160-912f-dfbbbfb817b1",
+      "status": "SUCCEEDED",
+      "question": "综合分析区域订单量并给出可验证结论与引用",
+      "roles": [
+        "PlannerAgent",
+        "DataAnalystAgent",
+        "KnowledgeAgent",
+        "VerificationAgent",
+        "InsightAgent"
+      ],
+      "tool_calls": [
+        {
+          "ordinal": 2,
+          "agent_role": "DataAnalystAgent",
+          "tool_name": "QUERY_DATA",
+          "status": "SUCCEEDED",
+          "duration_ms": 369
+        },
+        {
+          "ordinal": 3,
+          "agent_role": "KnowledgeAgent",
+          "tool_name": "RETRIEVE_KNOWLEDGE",
+          "status": "SUCCEEDED",
+          "duration_ms": 71
+        },
+        {
+          "ordinal": 4,
+          "agent_role": "VerificationAgent",
+          "tool_name": "VERIFY_RESULT",
+          "status": "SUCCEEDED",
+          "duration_ms": 0
+        },
+        {
+          "ordinal": 5,
+          "agent_role": "VerificationAgent",
+          "tool_name": "VERIFY_CITATION",
+          "status": "SUCCEEDED",
+          "duration_ms": 0
+        },
+        {
+          "ordinal": 6,
+          "agent_role": "InsightAgent",
+          "tool_name": "GENERATE_CHART",
+          "status": "SUCCEEDED",
+          "duration_ms": 0
+        },
+        {
+          "ordinal": 7,
+          "agent_role": "InsightAgent",
+          "tool_name": "GENERATE_INSIGHT",
+          "status": "SUCCEEDED",
+          "duration_ms": 0
+        }
+      ],
+      "sql": "SELECT r.region_name AS region, COUNT(o.order_id) AS order_count FROM demo_business.orders AS o JOIN demo_business.regions AS r ON r.region_id = o.region_id GROUP BY r.region_name ORDER BY order_count DESC LIMIT 500",
+      "result_signature": "d75a01acb51524781e1df4ed79a31e64832ce479377e2b322ffcd2362dd55544",
+      "citations": [
+        {
+          "citation_id": "citation-1",
+          "document_id": "d4472acb-b2c8-43ae-9f7f-df645bc73850",
+          "document_version_id": "bd422fe8-326b-4347-976c-8694413c299e",
+          "chunk_id": "17e30b78-468d-4974-bb12-e42f4dcdc94f",
+          "source": "ChatBI V1 Business Glossary:business-glossary/verification.md",
+          "locator": "definition",
+          "score": 0.463303
+        },
+        {
+          "citation_id": "citation-2",
+          "document_id": "e2a6d7ce-5047-4865-a092-57ac15d5a2d7",
+          "document_version_id": "7354ce65-32e4-41f0-bd2d-0b360f76e02c",
+          "chunk_id": "3ca92676-3767-4266-aa95-0b216720178d",
+          "source": "ChatBI V1 Business Glossary:business-glossary/orders.md",
+          "locator": "definition",
+          "score": 0.285413
+        },
+        {
+          "citation_id": "citation-3",
+          "document_id": "bd8ec696-0644-4bf2-b725-82163cbe67bc",
+          "document_version_id": "64702c14-a6fa-4f08-a8cb-1d25de6b5be6",
+          "chunk_id": "59dd89d8-a806-4359-b488-30f4d1eac864",
+          "source": "ChatBI V1 Business Glossary:business-glossary/time.md",
+          "locator": "definition",
+          "score": 0.182351
+        },
+        {
+          "citation_id": "citation-4",
+          "document_id": "737b830c-5dd3-46fc-97da-28de935f619b",
+          "document_version_id": "fbb56ad5-fe09-4552-bcb0-af4f040df690",
+          "chunk_id": "5b6bb196-bc22-4080-8e13-986a4cbb2228",
+          "source": "ChatBI V1 Business Glossary:business-glossary/region.md",
+          "locator": "definition",
+          "score": 0.182351
+        },
+        {
+          "citation_id": "citation-5",
+          "document_id": "2b619ab1-56b8-4b8b-8efa-21694429a65f",
+          "document_version_id": "80923a1f-9bdb-4228-aac1-23375e349549",
+          "chunk_id": "d7deeae6-ce4f-46c9-9af1-dee3ee474b9d",
+          "source": "ChatBI V1 Business Glossary:business-glossary/revenue.md",
+          "locator": "definition",
+          "score": 0.182351
+        }
+      ],
+      "verification": {
+        "result_verified": true,
+        "citation_verified": true
+      },
+      "final_answer": "查询返回 5 行按region汇总的可验证结果。 相关业务口径已由《ChatBI 可验证结果发布规则》《订单量与有效订单口径》《同比环比与时间窗口》验证。",
+      "performance": {
+        "ttft_ms": 0,
+        "total_latency_ms": 441,
+        "tool_latency_ms": 440
+      },
+      "trace_complete": true,
+      "tool_call_count": 6,
+      "replan_count": 0,
+      "max_depth_observed": 1
+    }
+  ]
+}

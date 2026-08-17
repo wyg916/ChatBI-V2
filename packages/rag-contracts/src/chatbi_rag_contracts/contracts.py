@@ -30,8 +30,8 @@ class RagRequest(BaseModel):
 
     @model_validator(mode="after")
     def require_retrieval_tool(self) -> "RagRequest":
-        if "knowledge.retrieve" not in self.context.allowed_tools:
-            raise ValueError("knowledge.retrieve is not allowed")
+        if "RETRIEVE_KNOWLEDGE" not in self.context.allowed_tools:
+            raise ValueError("RETRIEVE_KNOWLEDGE is not allowed")
         return self
 
 

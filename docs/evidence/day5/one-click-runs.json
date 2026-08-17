@@ -1,27 +1,35 @@
 {
-  "checked_at": "2026-08-17T23:25:06+08:00",
+  "checked_at": "2026-08-18",
   "candidate_version": "1.0.0",
+  "migration_head": "20260817_0008",
   "run1": {
     "full_stop_before_start": true,
-    "duration_seconds": 34.7,
+    "duration_seconds": 174.9,
     "backend_http": 200,
     "frontend_http": 200,
+    "live_rag": "READY_SIGNED_WORKSPACE_IDENTITY",
+    "bounded_multi_agent": "READY_FIVE_ROLES_SIX_TOOLS",
     "metadata_postgresql": "READY",
     "demo_postgresql": "READY",
     "demo_mysql": "READY",
+    "golden50": "PASS",
     "result": "PASS"
   },
   "full_stop_between_runs": true,
   "run2": {
     "full_stop_before_start": true,
-    "duration_seconds": 23.7,
+    "duration_seconds": 83.5,
     "backend_http": 200,
     "frontend_http": 200,
+    "live_rag": "READY_SIGNED_WORKSPACE_IDENTITY",
+    "bounded_multi_agent": "READY_FIVE_ROLES_SIX_TOOLS",
     "metadata_postgresql": "READY",
     "demo_postgresql": "READY",
     "demo_mysql": "READY",
+    "golden50": "PASS",
     "result": "PASS"
   },
-  "run2_left_running_for_demo": true,
+  "real_local_databases_preserved": true,
+  "secrets_recorded": false,
   "result": "PASS"
 }

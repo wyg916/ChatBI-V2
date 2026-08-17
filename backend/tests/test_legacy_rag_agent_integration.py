@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import time
 from pathlib import Path
 
 import httpx
@@ -9,10 +10,13 @@ from pydantic import ValidationError
 
 from chatbi_agent_contracts import (
     AgentExecutionContext,
+    AgentRole,
     OrchestrationRequest,
+    OrchestrationResult,
     QuestionRoute,
     ToolCall,
     ToolResult,
+    ToolName,
 )
 from chatbi_agent_orchestrator import BoundedAgentOrchestrator, LegacyAgentOrchestratorAdapter, OrchestrationError
 from chatbi_prompt_registry import PromptRegistry, PromptTemplate, PromptVersion
@@ -40,10 +44,10 @@ def rag_context(**updates) -> RagExecutionContext:
         "roles": frozenset({"ANALYST"}),
         "allowed_datasources": frozenset({"datasource-a"}),
         "allowed_semantic_models": frozenset({"model-a"}),
-        "allowed_tools": frozenset({"knowledge.retrieve"}),
+        "allowed_tools": frozenset({ToolName.RETRIEVE_KNOWLEDGE.value}),
         "trace_id": "TRACE-12345678",
         "timeout_ms": 1000,
-        "max_steps": 3,
+        "max_steps": 8,
         "token_budget": 1000,
     }
     values.update(updates)
@@ -52,7 +56,7 @@ def rag_context(**updates) -> RagExecutionContext:
 
 def agent_context(**updates) -> AgentExecutionContext:
     values = rag_context().model_dump()
-    values["allowed_tools"] = frozenset({"data.query", "knowledge.retrieve"})
+    values["allowed_tools"] = frozenset(item.value for item in ToolName)
     values.update(updates)
     return AgentExecutionContext(**values)
 
@@ -133,6 +137,7 @@ def test_legacy_rag_adapter_carries_identity_and_verifies_workspace_echo():
     adapter = LegacyRagAdapter(
         base_url="http://legacy.internal",
         bearer_token="test-token",
+        shared_secret="rag-test-secret",
         client_factory=lambda **kwargs: httpx.Client(transport=transport, **kwargs),
     )
     result = adapter.retrieve(RagRequest(query="收入定义", scenario_id="charging_ops", context=rag_context()))
@@ -140,6 +145,8 @@ def test_legacy_rag_adapter_carries_identity_and_verifies_workspace_echo():
     assert result.citations[0].chunk_id == "chunk-1"
     assert observed["headers"]["x-chatbi-workspace-id"] == "workspace-a"
     assert observed["headers"]["authorization"] == "Bearer test-token"
+    assert observed["headers"]["x-chatbi-signature"]
+    assert observed["headers"]["x-chatbi-timestamp"]
     assert observed["body"]["trace_id"] == "TRACE-12345678"
     assert observed["body"]["chatbi_context"] == {
         "workspace_id": "workspace-a",
@@ -147,10 +154,10 @@ def test_legacy_rag_adapter_carries_identity_and_verifies_workspace_echo():
         "roles": ["ANALYST"],
         "allowed_datasources": ["datasource-a"],
         "allowed_semantic_models": ["model-a"],
-        "allowed_tools": ["knowledge.retrieve"],
+        "allowed_tools": ["RETRIEVE_KNOWLEDGE"],
         "trace_id": "TRACE-12345678",
         "timeout_ms": 1000,
-        "max_steps": 3,
+        "max_steps": 8,
         "token_budget": 1000,
     }
 
@@ -182,7 +189,22 @@ class RecordingExecutor:
 
     def execute(self, call, context):
         self.calls.append(call.tool_name)
-        return ToolResult(tool_name=call.tool_name, status="SUCCEEDED", output={"verified": True})
+        outputs = {
+            ToolName.QUERY_DATA.value: {
+                "id": "query-1", "status": "SUCCEEDED", "summary": "收入为100元。",
+                "guard": {"allowed": True}, "oracle": {"status": "PASSED"},
+                "execution": {"result_signature": "a" * 64},
+                "chart_spec": {"data_source_query_id": "query-1", "result_signature": "a" * 64},
+            },
+            ToolName.RETRIEVE_KNOWLEDGE.value: {
+                "citations": [{"citation_id": "c1", "document_id": "d1"}],
+            },
+            ToolName.VERIFY_RESULT.value: {"verified": True},
+            ToolName.VERIFY_CITATION.value: {"verified": True},
+            ToolName.GENERATE_CHART.value: {"verified": True},
+            ToolName.GENERATE_INSIGHT.value: {"answer": "收入为100元。"},
+        }
+        return ToolResult(tool_name=call.tool_name, status="SUCCEEDED", output=outputs[call.tool_name])
 
 
 def orchestration_request(context: AgentExecutionContext, **updates) -> OrchestrationRequest:
@@ -203,20 +225,87 @@ def test_bounded_orchestrator_has_finite_allowlisted_steps():
     executor = RecordingExecutor()
     result = BoundedAgentOrchestrator(executor).run(orchestration_request(agent_context()))
     assert result.status == "SUCCEEDED"
-    assert executor.calls == ["data.query", "knowledge.retrieve"]
-    assert len(result.steps) == 2
+    assert executor.calls == [item.value for item in ToolName]
+    assert len(result.steps) == 7
+    assert {step.agent_role.value for step in result.steps} == {
+        "PlannerAgent", "DataAnalystAgent", "KnowledgeAgent", "VerificationAgent", "InsightAgent",
+    }
+    assert result.tool_call_count == 6
+    assert result.trace_complete is True
 
 
 def test_bounded_orchestrator_rejects_step_limit_and_unauthorized_tool():
     executor = RecordingExecutor()
     limited = BoundedAgentOrchestrator(executor).run(orchestration_request(agent_context(max_steps=1)))
-    assert limited.error_code == "STEP_LIMIT_EXCEEDED"
+    assert limited.error_code == "AGENT_STEP_BUDGET_EXCEEDED"
     assert executor.calls == []
     unauthorized = BoundedAgentOrchestrator(executor).run(orchestration_request(
-        agent_context(allowed_tools=frozenset({"data.query"}))
+        agent_context(allowed_tools=frozenset({ToolName.QUERY_DATA.value}))
     ))
     assert unauthorized.error_code == "UNAUTHORIZED_TOOL_CALL"
-    assert executor.calls == ["data.query"]
+    assert executor.calls == [ToolName.QUERY_DATA.value]
+
+
+class SlowFirstToolExecutor(RecordingExecutor):
+    def execute(self, call, context):
+        if not self.calls:
+            time.sleep(0.11)
+        return super().execute(call, context)
+
+
+class MissingKnowledgeExecutor(RecordingExecutor):
+    def execute(self, call, context):
+        if call.tool_name == ToolName.RETRIEVE_KNOWLEDGE.value:
+            self.calls.append(call.tool_name)
+            return ToolResult(
+                tool_name=call.tool_name,
+                status="FAILED",
+                error_code="RAG_RUNTIME_UNAVAILABLE",
+            )
+        return super().execute(call, context)
+
+
+class RejectingVerificationExecutor(RecordingExecutor):
+    def execute(self, call, context):
+        if call.tool_name == ToolName.VERIFY_RESULT.value:
+            self.calls.append(call.tool_name)
+            return ToolResult(
+                tool_name=call.tool_name,
+                status="SUCCEEDED",
+                output={"verified": False},
+            )
+        return super().execute(call, context)
+
+
+def test_bounded_orchestrator_enforces_timeout_before_next_tool():
+    result = BoundedAgentOrchestrator(SlowFirstToolExecutor()).run(
+        orchestration_request(agent_context(timeout_ms=100))
+    )
+    assert result.status == "TIMEOUT"
+    assert result.error_code == "AGENT_TIMEOUT"
+    assert result.tool_call_count == 1
+    assert result.performance["total_latency_ms"] >= 100
+
+
+def test_missing_rag_evidence_degrades_to_verified_data_only():
+    result = BoundedAgentOrchestrator(MissingKnowledgeExecutor()).run(
+        orchestration_request(agent_context())
+    )
+    assert result.status == "PARTIAL"
+    assert result.fallback_used is True
+    assert result.verification == {"result_verified": True, "citation_verified": False}
+    assert result.knowledge_evidence is None
+    assert result.answer == "收入为100元。"
+
+
+def test_verification_agent_denial_cannot_be_bypassed():
+    executor = RejectingVerificationExecutor()
+    result = BoundedAgentOrchestrator(executor).run(orchestration_request(agent_context()))
+    assert result.status == "REFUSED"
+    assert result.error_code == "RESULT_VERIFICATION_FAILED"
+    assert result.answer is None
+    assert ToolName.GENERATE_CHART.value not in executor.calls
+    assert ToolName.GENERATE_INSIGHT.value not in executor.calls
 
 
 def test_cross_workspace_scope_is_rejected_before_orchestration():
@@ -225,16 +314,19 @@ def test_cross_workspace_scope_is_rejected_before_orchestration():
 
 
 def test_legacy_agent_adapter_refuses_remote_data_tools_by_default():
-    adapter = LegacyAgentOrchestratorAdapter(base_url="http://legacy.internal")
-    with pytest.raises(OrchestrationError, match="ToolExecutor callback"):
-        adapter.run(orchestration_request(agent_context()))
+    result = LegacyAgentOrchestratorAdapter().run(orchestration_request(agent_context()))
+    assert result.status == "REFUSED"
+    assert result.error_code == "LEGACY_AGENT_RUNTIME_DISABLED"
 
 
 def test_tool_executor_rejects_unknown_tool_without_direct_db_access(db_session):
     principal = type("PrincipalStub", (), {"workspace_id": "workspace-a", "user_id": "user-a"})()
     executor = ChatBIToolExecutor(db_session, principal, rag_adapter=None)
     result = executor.execute(
-        ToolCall(tool_name="database.connect", arguments={}, idempotency_key="tool-12345678"),
+        ToolCall(
+            tool_name="database.connect", agent_role=AgentRole.DATA_ANALYST,
+            arguments={}, idempotency_key="tool-12345678",
+        ),
         agent_context(),
     )
     assert executor.direct_db_access is False
@@ -300,9 +392,10 @@ def test_analysis_api_data_query_never_enters_agent(client, db_session, monkeypa
     assert response.json()["primary"]["oracle"]["status"] == "PASSED"
 
 
-def test_complex_route_is_off_by_default_and_falls_back(client, db_session, monkeypatch):
+def test_complex_route_uses_v1_bounded_agents_by_default(client, db_session, monkeypatch):
     datasource, model = prepare_catalog(db_session)
     fake_query_execution(monkeypatch)
+    monkeypatch.setattr(AnalysisService, "_rag_adapter_instance", lambda self: FakeRagAdapter())
     response = client.post("/api/v1/analysis", json={
         "question": "请综合分析收入",
         "route": "COMPLEX_ANALYSIS",
@@ -312,8 +405,11 @@ def test_complex_route_is_off_by_default_and_falls_back(client, db_session, monk
     assert response.status_code == 201
     body = response.json()
     assert body["route"] == "COMPLEX_ANALYSIS"
-    assert body["fallback_used"] is True
-    assert body["feature_modes"]["agent"] == "off"
+    assert body["fallback_used"] is False
+    assert body["feature_modes"]["agent"] == "on"
+    assert body["primary"]["status"] == "SUCCEEDED"
+    assert body["primary"]["tool_call_count"] == 6
+    assert body["primary"]["trace_complete"] is True
     assert body["security"] == {
         "AGENT_DIRECT_DB_ACCESS": 0,
         "AGENT_SQL_GUARD_BYPASS": 0,
@@ -358,3 +454,84 @@ def test_knowledge_route_on_publishes_only_verified_citations(db_session, monkey
     assert response.fallback_used is False
     assert response.primary["answer_guard"] == "PASSED"
     assert response.primary["citations"][0]["chunk_id"] == "k1"
+
+
+class FailingRagAdapter:
+    def retrieve(self, _request):
+        raise RagAdapterError("runtime unavailable")
+
+
+def test_knowledge_rag_failure_falls_back_to_verified_query(db_session, monkeypatch):
+    datasource, model = prepare_catalog(db_session)
+    fake_query_execution(monkeypatch)
+    response = AnalysisService(rag_adapter=FailingRagAdapter()).execute(
+        db_session,
+        AnalysisRequest(
+            question="收入口径定义",
+            route=QuestionRoute.KNOWLEDGE_QUERY,
+            datasource_id=datasource.id,
+            semantic_model_id=model.id,
+        ),
+        Principal(None, datasource.workspace_id, "admin@chatbi.local", "Admin", "ADMIN"),
+    )
+    assert response.status == "SUCCEEDED"
+    assert response.fallback_used is True
+    assert response.primary["oracle"]["status"] == "PASSED"
+    assert response.shadow["error_code"] == "RAG_RUNTIME_FAILED"
+
+
+def test_agent_timeout_uses_verified_query_fallback(client, db_session, monkeypatch):
+    datasource, model = prepare_catalog(db_session)
+    fake_query_execution(monkeypatch)
+
+    def timeout_result(_self, request):
+        return OrchestrationResult(
+            status="TIMEOUT",
+            route=QuestionRoute.COMPLEX_ANALYSIS,
+            trace_id=request.context.trace_id,
+            run_id="timeout-run",
+            steps=(),
+            fallback_used=True,
+            error_code="AGENT_TIMEOUT",
+            verification={"result_verified": False, "citation_verified": False},
+            performance={"ttft_ms": 0, "total_latency_ms": 30000, "tool_latency_ms": 29999},
+            trace_complete=False,
+        )
+
+    monkeypatch.setattr(BoundedAgentOrchestrator, "run", timeout_result)
+    response = client.post("/api/v1/analysis", json={
+        "question": "请综合分析收入",
+        "route": "COMPLEX_ANALYSIS",
+        "datasource_id": datasource.id,
+        "semantic_model_id": model.id,
+        "idempotency_key": "timeout-fallback-test",
+    })
+    assert response.status_code == 201
+    body = response.json()
+    assert body["status"] == "SUCCEEDED"
+    assert body["fallback_used"] is True
+    assert body["primary"]["oracle"]["status"] == "PASSED"
+    assert body["shadow"]["error_code"] == "AGENT_TIMEOUT"
+
+
+def test_failed_complex_query_returns_structured_failed_fallback(db_session):
+    datasource, model = prepare_catalog(db_session)
+    mysql = db_session.scalar(select(DataSource).where(DataSource.type == "mysql"))
+    response = AnalysisService(rag_adapter=FakeRagAdapter()).execute(
+        db_session,
+        AnalysisRequest(
+            question="请综合分析收入",
+            route=QuestionRoute.COMPLEX_ANALYSIS,
+            datasource_id=mysql.id,
+            semantic_model_id=model.id,
+            idempotency_key="failed-query-fallback-test",
+        ),
+        Principal(None, datasource.workspace_id, "admin@chatbi.local", "Admin", "ADMIN"),
+    )
+    assert response.status == "FAILED"
+    assert response.fallback_used is True
+    assert response.primary == {
+        "status": "FAILED",
+        "error_code": "AGENT_FALLBACK_QUERY_FAILED",
+    }
+    assert response.shadow["error_code"] == "TOOL_RUNTIME_VALUEERROR"

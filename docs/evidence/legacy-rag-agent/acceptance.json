@@ -1,5 +1,7 @@
 {
-  "status": "PARTIAL",
+  "status": "SUPERSEDED_HISTORICAL",
+  "superseded_by": "docs/evidence/day5/rag-multiagent-final-acceptance.json",
+  "historical_only": true,
   "scope": "LEGACY_RAG_AGENT_REUSE_INTEGRATION",
   "old_repository": "E:/新能源企业经营分析智能平台",
   "old_repository_read_only": true,

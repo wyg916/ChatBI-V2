@@ -1,9 +1,9 @@
 {
-  "timestamp": "2026-08-18T00:30:11.8127783+08:00",
+  "timestamp": "2026-08-18T00:29:36.7521198+08:00",
   "rollback_simulation": "PASS",
   "final_candidate": "20260817_0008",
-  "previous_safe_baseline_sha": "4ec4f0eb8e4060cec035d76b1ffbe32d8f80fce0",
-  "previous_safe_migration": "20260817_0007",
+  "previous_safe_baseline_sha": "d70125f6172dd170c419110fd75d47e87a7f121a",
+  "previous_safe_migration": "20260817_0006",
   "previous_start": "HTTP_200",
   "previous_ask": "SUCCEEDED_ORACLE_PASSED",
   "previous_evaluation": "GOLDEN50_PASS",

@@ -1,7 +1,7 @@
 {
-  "timestamp": "2026-08-18T00:31:12.3595904+08:00",
+  "timestamp": "2026-08-18T00:27:33.0067169+08:00",
   "cold_start": "PASS",
-  "duration_seconds": 55.9,
+  "duration_seconds": 83.5,
   "project_metadata": "ISOLATED_TEMPORARY_POSTGRES_SCHEMA",
   "demo_business_data": "EXISTING_REPRODUCIBLE_LOCAL_DATA_READ_ONLY",
   "local_external_database": "PRESERVED",

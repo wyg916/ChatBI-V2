@@ -7,8 +7,10 @@ $projectRoot = Split-Path -Parent $PSScriptRoot
 Set-Location -LiteralPath $projectRoot
 $backendPort = if($env:CHATBI_BACKEND_PORT) { $env:CHATBI_BACKEND_PORT } else { '8000' }
 $frontendPort = if($env:CHATBI_FRONTEND_PORT) { $env:CHATBI_FRONTEND_PORT } else { '5173' }
+$ragPort = if($env:CHATBI_RAG_PORT) { $env:CHATBI_RAG_PORT } else { '8001' }
 $backendHealth = "http://127.0.0.1:${backendPort}/health"
 $frontendHealth = "http://127.0.0.1:${frontendPort}/"
+$ragHealth = "http://127.0.0.1:${ragPort}/health"
 
 if (-not (Test-Path -LiteralPath (Join-Path $projectRoot '.env'))) {
   throw 'Missing local .env. Run scripts/bootstrap-local-databases.ps1 first.'
@@ -29,7 +31,8 @@ do {
   try {
     $backend = Invoke-WebRequest -UseBasicParsing -Uri $backendHealth -TimeoutSec 3
     $frontend = Invoke-WebRequest -UseBasicParsing -Uri $frontendHealth -TimeoutSec 3
-    if ($backend.StatusCode -eq 200 -and $frontend.StatusCode -eq 200) { break }
+    $rag = Invoke-RestMethod -Uri $ragHealth -TimeoutSec 3
+    if ($backend.StatusCode -eq 200 -and $frontend.StatusCode -eq 200 -and $rag.status -eq 'ok') { break }
   } catch {
     Start-Sleep -Seconds 3
   }

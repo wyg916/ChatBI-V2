@@ -6,8 +6,8 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 WORKDIR /app
 COPY backend/requirements.txt .
-COPY packages ./packages
 RUN pip install --no-cache-dir -r requirements.txt
+COPY packages ./packages
 RUN pip install --no-cache-dir \
     ./packages/rag-contracts \
     ./packages/rag-adapter \

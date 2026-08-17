@@ -1,33 +1,43 @@
 {
-  "checked_at": "2026-08-17T23:25:06+08:00",
-  "backend_pytest": { "passed": 118, "failed": 0, "duration_seconds": 73.69 },
+  "checked_at": "2026-08-18",
+  "backend_pytest": {"passed": 121, "failed": 0},
   "frontend": {
     "typecheck": "PASS",
-    "vitest_files": 10,
     "vitest_tests": 27,
     "build": "PASS",
-    "modules": 731,
-    "entry_js_kb": 273.08,
-    "entry_gzip_kb": 88.84,
-    "echarts_chunk_kb": 555.48,
-    "npm_production_vulnerabilities": 0
+    "echarts_chunk_kb": 555.48
   },
-  "serial_e2e": { "passed": 36, "failed": 0, "duration_minutes": 1.2 },
-  "parallel_e2e": { "workers": 5, "runs": 2, "passed": 72, "failed": 0, "retries": 0 },
+  "serial_e2e": {"passed": 50, "failed": 0, "duration_minutes": 2.5},
+  "parallel_e2e": {"workers": 5, "final_passed": 50, "final_failed": 0, "retries": 0, "duration_minutes": 1.5},
+  "rag": {
+    "live_bridge": "PASS",
+    "workspace_identity": "PASS",
+    "golden": "120/120",
+    "recall_at_10": 1.0,
+    "citation_accuracy": 1.0,
+    "unauthorized_retrieval": 0
+  },
+  "multi_agent": {
+    "fixed_roles": 5,
+    "allowlisted_tools": 6,
+    "complex_e2e": "10/10",
+    "trace_completeness": "100%",
+    "security_bypass_counts": 0
+  },
   "golden": {
     "manifest_sha256": "25580af42bc76ebddd3d49e6b9c16f8bfabba8ba485a835c453c29175ee2a64a",
     "original_golden20": "PASS",
-    "postgresql_execution": "50/50",
-    "postgresql_result": "50/50",
-    "postgresql_semantic": "50/50",
-    "mysql_execution": "10/10",
-    "mysql_result": "10/10"
+    "postgresql_execution_result_semantic": "50/50",
+    "mysql_execution_result": "10/10"
   },
-  "dangerous_sql": { "blocked": "38/38", "block_rate": "100%", "actual_write_succeeded": 0 },
-  "migration": { "single_head": true, "upgrade_base_upgrade": "PASS", "temporary_schema_removed": true, "head": "20260817_0007" },
-  "ui14": { "routes": "14/14", "viewports": ["1440x900", "1366x768", "1920x1080"] },
-  "runtime_errors": { "console": 0, "page": 0, "blocking_request": 0, "unexpected_4xx_5xx": 0 },
-  "secret_scan": "PASS",
+  "dangerous_sql": {"blocked": "38/38", "actual_write_succeeded": 0},
+  "migration": {"single_head": true, "upgrade_base_upgrade": "PASS", "temporary_schema_removed": true, "head": "20260817_0008"},
+  "ui14": {"routes": "14/14", "browser_regression": "PASS"},
+  "provider_live_smoke": "KIMI_MIMO_DEEPSEEK_PASS",
+  "cold_start": "2/2 PASS",
+  "rollback_simulation": "PASS",
+  "tracked_secret_matches": 0,
+  "old_source_code_copy": 0,
   "license_gate": "PASS",
   "result": "PASS"
 }

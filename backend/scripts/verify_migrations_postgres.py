@@ -16,7 +16,7 @@ from app.core.config import Settings
 
 
 SCHEMA = "chatbi_day5_migration_test"
-EXPECTED_HEAD = "20260817_0007"
+EXPECTED_HEAD = "20260817_0008"
 
 
 def main() -> int:

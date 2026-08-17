@@ -23,19 +23,20 @@ Windows 用户完成本机 PostgreSQL/MySQL 初始化后，可双击 `一键启�
 
 - Golden PostgreSQL：SQL/结果/语义 50/50；MySQL 10/10。
 - 危险 SQL：38/38 阻断，实际写入成功 0。
-- Serial E2E 36/36；5 workers 并行两轮 72/72，retries=0。
+- Backend 121/121、Frontend Vitest 27/27；Serial E2E 50/50、5 workers Parallel E2E 50/50，retries=0。
+- Live RAG Golden 120/120，Recall@10 1.0，Citation Accuracy 1.0，越权检索 0；Complex Analysis 10/10，Trace 完整率 100%。
 - 三模型 Final Smoke 均通过 Discovery、认证、Chat、SQLPlan 与 SQL Guard。
-- 隔离 metadata 冷启动与 Day4→Final 回滚恢复模拟通过。
+- 从停止状态的两次隔离 metadata 冷启动与 Day4→Final 回滚恢复模拟通过。
 
 最终 Backend、Frontend、Migration、两次一键启动、Git/Tag 数字以 `docs/releases/V1_FINAL_MANIFEST.md` 与 `docs/status/DAY5_STATUS.md` 为准。
 
-## 可选受控增强
+## V1 受控 RAG 与最小 Multi-Agent
 
-V1 含默认关闭/Shadow 的专业知识 RAG HTTP Adapter 与有限编排契约。它们不替代普通问数主链路，不允许 Agent 直连数据库，也不构成通用 Agent/RAG 平台。旧项目来源待补证的 120 条 RAG payload 不在公开发行包中。
+V1 含默认启用的专业知识 Live RAG Bridge 与固定五角色、六工具的复杂分析编排。RAG 使用签名 Workspace 身份、ACL、Citation/Answer Guard；Agent 数据工具全部经过 SQL Guard、Query Executor 与 Result Oracle。旧项目来源待补证的 120 条 payload 不在公开发行包中，当前 Golden 120 为独立编写并对 live bridge 实跑。
 
 ## Known Limitations
 
 - ECharts 为独立懒加载 chunk，压缩前约 555.48 kB，仍触发 Vite 500 kB 提示，但不增加首屏主入口体积。
 - V1 仅提供最小 ADMIN/ANALYST RBAC，不包含完整 SSO/OIDC/Vault 平台。
-- 可选旧 Agent HTTP 端点不支持注入 ChatBI ToolExecutor，因此保持关闭；完整 Multi-Agent Runtime 不属于 V1。
+- V1 仅提供 ChatBI 专用的有界五角色编排，不提供通用 Agent 平台、动态工具市场或开放式自治循环。
 - 外部模型受供应商网络、配额、价格和数据政策影响；默认演示与发布回归使用 deterministic Runtime。

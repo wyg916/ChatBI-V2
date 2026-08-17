@@ -41,7 +41,7 @@ Day 3 introduced no copied third-party source, logo, brand asset, or restricted 
 ## Legacy project two interoperability
 
 - Source repository: user-controlled frozen repository, audited at commit `b6be894a7153f7ce8d31dfc65da7222bd7af1b5f`.
-- Integration: HTTP-only `LegacyRagAdapter` and a disabled-by-default legacy assistant contract adapter; ChatBI does not import the old repository's internal Python classes.
+- Integration: independently authored `LiveRagAdapter`, RAG Runtime, contracts and bounded five-role orchestrator; ChatBI does not import or copy the old repository's internal Python classes.
 - Copied production source: none.
 - Evaluation provenance: `evaluation/legacy-rag/SOURCE.json` records the source commit, blob IDs, case counts and SHA-256 values for two internal 60-case RAG inputs. The payload JSON files are deliberately excluded from the public V1 repository.
 - License boundary: the old repository has no root LICENSE/NOTICE. No legacy production source or provenance-pending test payload is redistributed. No old brand, logo, UI, database dump, secret, or credential is included.

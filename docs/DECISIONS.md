@@ -131,3 +131,9 @@ Backend 以受信反向代理提供的 `X-ChatBI-Actor` 解析已持久化用户
 ## ADR-029：旧项目二 RAG 与有限编排只能受控复用
 
 P0 全部通过后，允许把专业知识 RAG 与复杂 ChatBI 分析的有限编排作为非阻断 P1，通过自有契约、Adapter、Feature Flag、Shadow/Canary、RBAC/ACL 与审计接入。普通 `DATA_QUERY` 永远优先走现有 NL2SQL、SQL Guard、只读执行与 Result Oracle；Agent 不持有数据源连接。旧项目二没有完整多 Agent Runtime，当前只复用其 RAG 运行时 HTTP 契约和已验证的 Tool/Skill/Model Gateway/RBAC/Audit 设计，补充最薄有界状态机，不宣称完整 Multi-Agent 复用通过。旧仓库缺少根许可证，生产源代码抽取在归属与许可证补齐前保持阻塞。完整决策见 `docs/decisions/ADR_LEGACY_RAG_AGENT_REUSE.md`。
+
+该早期结论已由 ADR-030 覆盖，仅保留为决策历史。
+
+## ADR-030：受控 RAG 与最小 Multi-Agent 是 V1/P0 必选能力
+
+最终产品决策冻结四类路由、真实 HMAC RAG Bridge、Workspace/用户/角色映射、ACL/Citation/Answer Guard，以及固定五角色、六工具、8/12/2/2/30s 硬预算的复杂分析编排。默认模式均为 `on`；通用 RAG/Agent 平台仍禁止。旧项目二生产源码复制数保持 0，六个 Prompt 独立改写并记录来源、用途和 checksum。完整决策见 `docs/decisions/ADR_030_RAG_MULTIAGENT_V1_REQUIRED.md`。

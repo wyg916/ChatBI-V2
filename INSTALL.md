@@ -68,23 +68,26 @@ Golden runner 必须报告冻结 SHA-256 `25580af42bc76ebddd3d49e6b9c16f8bfabba8
 
 默认 deterministic runtime 无需外部密钥。OpenAI-compatible 配置只允许放在本机环境变量中；不得写入、提交、打印或复制 API Key。
 
-## 可选旧 RAG 桥接与有限编排
+## V1 Live RAG Bridge 与最小 Multi-Agent
 
-初始配置保持 `CHATBI_RAG_MODE=shadow`、`CHATBI_AGENT_MODE=off`。旧服务 URL 和 token 只允许保存在 Git 忽略的本机 `.env` 或部署 Secret 中；前端不会接收这些值。没有配置旧服务时，ChatBI 的普通问数与构建发布不受影响。
+本机数据库初始化会在 Git 忽略的 `.env` 生成 `CHATBI_RAG_SHARED_SECRET`；前端不会接收该值。Compose 启动 Backend、独立 `rag-runtime` 和 Frontend，PostgreSQL/MySQL 仍使用本机服务，不创建数据库容器或数据卷。
 
 ```text
-CHATBI_RAG_MODE=shadow
-CHATBI_AGENT_MODE=off
-CHATBI_AGENT_ALLOWED_ROUTES=
+CHATBI_RAG_MODE=on
+CHATBI_AGENT_MODE=on
+CHATBI_AGENT_ALLOWED_ROUTES=COMPLEX_ANALYSIS
 CHATBI_RAG_FALLBACK_ENABLED=true
 CHATBI_AGENT_FALLBACK_ENABLED=true
-CHATBI_LEGACY_RAG_BASE_URL=
-CHATBI_LEGACY_RAG_BEARER_TOKEN=
-CHATBI_LEGACY_AGENT_BASE_URL=
-CHATBI_LEGACY_AGENT_BEARER_TOKEN=
+CHATBI_LEGACY_RAG_BASE_URL=http://rag-runtime:8001
+CHATBI_RAG_SHARED_SECRET=<GENERATED_LOCAL_RAG_BRIDGE_SIGNING_KEY>
+CHATBI_AGENT_TIMEOUT_MS=30000
+CHATBI_AGENT_MAX_STEPS=8
+CHATBI_AGENT_MAX_TOOL_CALLS=12
+CHATBI_AGENT_MAX_REPLAN=2
+CHATBI_AGENT_MAX_DEPTH=2
 ```
 
-只有在目标 Workspace、身份映射、旧 RAG ACL 和响应 Workspace 回显完成联调后，才可从 `shadow` 提升到 `canary`。旧 Agent HTTP 端点目前不能接受 ChatBI 的 `ToolExecutor` 回调，保持关闭；不得通过配置绕过这一安全限制。
+`GET /api/v1/query-capabilities` 必须显示 live bridge、签名身份映射和五角色编排均可用。`off/shadow/canary` 只用于诊断或事故回滚，不满足 V1 发布门禁。
 
 离线迁移只接受已脱敏 JSON 快照，不接受旧数据库 URL，默认 dry-run：
 

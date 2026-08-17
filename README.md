@@ -91,20 +91,21 @@ API Key 不得写入仓库。没有配置外部模型时，本地运行时仍可
 - `GET /api/v1/evaluation/cases/{case_id}`
 - `GET /api/v1/query-capabilities`
 - `POST /api/v1/analysis`
+- `POST /api/v1/analysis/stream`
 
-## 可选 RAG 与有限编排
+## V1 受控 RAG 与最小 Multi-Agent
 
-普通问数继续使用现有确定性 NL2SQL 主链路。专业知识检索和复杂分析只通过独立契约包、Backend Adapter、Feature Flag 与审计接入；Agent 不持有数据源连接，数据工具仍必须经过 SQL Guard、Query Executor 和 Result Oracle。
+普通问数继续使用现有确定性 NL2SQL 主链路。专业知识检索通过 HMAC 签名的 Live RAG Bridge、Workspace ACL、Citation/Answer Guard；复杂分析使用固定五角色和六工具的有界编排。Agent 不持有数据源连接，数据工具仍必须经过 SQL Guard、Query Executor 和 Result Oracle。
 
 ```text
-CHATBI_RAG_MODE=shadow
-CHATBI_AGENT_MODE=off
-CHATBI_AGENT_ALLOWED_ROUTES=
+CHATBI_RAG_MODE=on
+CHATBI_AGENT_MODE=on
+CHATBI_AGENT_ALLOWED_ROUTES=COMPLEX_ANALYSIS
 CHATBI_RAG_FALLBACK_ENABLED=true
 CHATBI_AGENT_FALLBACK_ENABLED=true
 ```
 
-模式支持 `off|shadow|canary|on`。默认值不会把 RAG 或有限编排结果发布给用户；未配置旧运行时或可选路径失败时，按配置回退普通问数。旧仓库没有完整 Multi-Agent Runtime，因此本仓库只提供有步数、超时、预算与工具白名单的最薄编排状态机，不建设通用 Agent 平台。详见 [`docs/decisions/ADR_LEGACY_RAG_AGENT_REUSE.md`](docs/decisions/ADR_LEGACY_RAG_AGENT_REUSE.md)。
+模式仍支持 `off|shadow|canary|on` 供诊断和事故处置，但 V1 发布默认必须为 `on`。RAG 运行时和五角色编排均由当前仓库独立实现，旧项目生产源码复制数为 0；通用 Agent/RAG 平台继续禁止。详见 [`ADR-030`](docs/decisions/ADR_030_RAG_MULTIAGENT_V1_REQUIRED.md)。
 
 ## 本地验证
 
