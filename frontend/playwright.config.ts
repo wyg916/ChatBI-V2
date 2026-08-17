@@ -5,6 +5,7 @@ export default defineConfig({
   timeout: 45_000,
   fullyParallel: false,
   retries: 0,
+  preserveOutput: 'always',
   reporter: [['list']],
   use: {
     baseURL: 'http://127.0.0.1:5173',

@@ -9,7 +9,22 @@ describe('UI route coverage', () => {
   it('declares all 14 approved pages without duplicate paths', () => {
     expect(routeManifest).toHaveLength(14);
     expect(new Set(routeManifest.map((route) => route.path)).size).toBe(14);
-    expect(routeManifest.map((route) => route.title)).toEqual(expect.arrayContaining(['问数据 - 空状态', '数据源列表', '语义模型编辑器', '用户角色与审计']));
+    expect(routeManifest).toEqual([
+      { path: '/login', title: '登录页' },
+      { path: '/', title: '问数据 - 空状态' },
+      { path: '/ask/results', title: '问数据 - 分析结果' },
+      { path: '/datasources', title: '数据源列表' },
+      { path: '/datasources/:id', title: '数据源详情与 Schema 管理' },
+      { path: '/semantic-models', title: '语义模型列表' },
+      { path: '/semantic-models/:id', title: '语义模型编辑器' },
+      { path: '/answers', title: '答案库' },
+      { path: '/dashboards', title: '看板列表' },
+      { path: '/dashboards/:id', title: '经营看板详情' },
+      { path: '/evaluation', title: '评测中心总览' },
+      { path: '/evaluation/:id', title: '评测用例详情' },
+      { path: '/settings/models', title: '系统设置与模型服务' },
+      { path: '/settings/security', title: '用户角色与审计' },
+    ]);
   });
 
   it('keeps exactly six top-level workspace navigation entries', () => {

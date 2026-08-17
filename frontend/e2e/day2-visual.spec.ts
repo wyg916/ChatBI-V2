@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 
-test('Day2 问数据结果页三视口无裁切并保存 1440x900 证据', async ({ page }) => {
+test('Day2 问数据结果页三视口无裁切并保存 1440x900 证据', async ({ page }, testInfo) => {
   const errors: string[] = [];
   page.on('console', (message) => { if (message.type() === 'error') errors.push(`console: ${message.text()}`); });
   page.on('pageerror', (error) => errors.push(`page: ${error.message}`));
@@ -15,7 +15,9 @@ test('Day2 问数据结果页三视口无裁切并保存 1440x900 证据', async
     await expect(page.getByTestId('query-success')).toBeVisible({ timeout: 30_000 });
     expect(await page.locator('body').evaluate((body) => body.scrollWidth <= window.innerWidth), `${viewport.width}x${viewport.height}`).toBe(true);
     if (viewport.width === 1440) {
-      await page.screenshot({ path: '../docs/evidence/day2/ask-result-1440x900.png', fullPage: false });
+      const screenshotPath = testInfo.outputPath('ask-result-1440x900.png');
+      await page.screenshot({ path: screenshotPath, fullPage: false });
+      await testInfo.attach('ask-result-1440x900', { path: screenshotPath, contentType: 'image/png' });
     }
   }
   expect(errors).toEqual([]);

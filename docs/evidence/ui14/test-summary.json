@@ -1,0 +1,60 @@
+{
+  "verified_at": "2026-08-17T16:33:23.3822918+08:00",
+  "base_head": "2199c1707fc33bd6b100afabc91c90509c0a9ffa",
+  "scope": "existing ChatBI V2 14-page React UI integration closure",
+  "ui": {
+    "page_count": 14,
+    "route_count": 14,
+    "react_components": "14/14",
+    "app_shell_routes": "13/13",
+    "login_standalone_route": "1/1",
+    "primary_navigation_items": 6,
+    "iframe_or_figma_embed": 0,
+    "static_html_bypass": 0
+  },
+  "frontend": {
+    "npm_ci": "PASS",
+    "npm_audit_vulnerabilities": 0,
+    "typecheck": "PASS",
+    "vitest_files": "10/10",
+    "vitest_tests": "26/26",
+    "production_build": "PASS",
+    "vite_modules": 728,
+    "existing_chunk_size_warning": true
+  },
+  "backend_regression": {
+    "pytest": "66/66",
+    "result": "PASS"
+  },
+  "playwright": {
+    "tests": "15/15",
+    "ui14_tests": "3/3",
+    "ui14_route_viewport_checks": "42/42",
+    "screenshot_captures": 42,
+    "viewports": {
+      "1440x900": "PASS",
+      "1366x768": "PASS",
+      "1920x1080": "PASS"
+    },
+    "console_errors": 0,
+    "page_errors": 0,
+    "blocking_request_failures": 0,
+    "route_white_screens": 0,
+    "page_horizontal_clipping": 0,
+    "critical_control_clipping_or_obstruction": 0
+  },
+  "day1_function_regression": {
+    "datasource_schema_semantic_e2e": "PASS",
+    "frontend_uses_backend_api": "PASS",
+    "compose_database_services": 0,
+    "compose_database_volumes": 0
+  },
+  "asset_audit": {
+    "base64_images": 0,
+    "duplicate_fonts": 0,
+    "large_frontend_assets_over_1_mib": 0,
+    "third_party_brand_asset_issues": 0,
+    "tracked_node_modules_or_dist": 0
+  },
+  "result": "PASS"
+}

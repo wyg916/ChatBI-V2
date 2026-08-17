@@ -2,6 +2,11 @@
 
 ## 2026-08-17
 
+- UI14 正式集成收口：14/14 React 页面与 14/14 Router 路由已按现有实现冻结；六个一级模块保持 ChatBI-first，系统设置仍是二级管理入口。本轮未重新设计或从 Figma 生成页面。
+- UI14 Gate：`npm ci` 0 vulnerabilities，Frontend TypeScript PASS，Vitest 10 files / 26 tests PASS，Vite production build PASS（728 modules），Playwright 15/15 PASS；专用 UI14 用例完成 42/42 路由-视口检查并生成 42 张忽略的运行截图。
+- 1440x900、1366x768、1920x1080 的页面级横向裁切、关键控件遮挡、Route 白屏、console error、page error、blocking request failure 均为 0；Day 1 数据源、Schema、语义模型真实浏览器链路继续 PASS。
+- 清理了未被引用且已被真实页面替代的 `SecondaryPages.tsx` 占位组件，并把视觉测试产物统一输出到 Git 忽略的 Playwright 目录；详见 `docs/status/UI14_INTEGRATION_STATUS.md` 与 `docs/evidence/ui14/`。
+
 - Day 2：Schema Linking、QueryContext、NL2SQL Router、结构化 SQLPlan、SQLGlot AST Guard、PostgreSQL/MySQL 只读执行、Result Oracle、真实结果页、反馈与答案保存已完成并通过门禁。
 - Golden 20 已冻结：PostgreSQL 执行/结果/语义 20/20，MySQL 基础兼容 5/5；38/38 危险 SQL 被阻断，两个只读账号真实写入成功数 0。
 - Backend 66/66、Frontend 26/26、Playwright 12/12；本机 PostgreSQL 迁移单 head 与 upgrade→base→upgrade PASS，Compose 两次冷启动 PASS。
