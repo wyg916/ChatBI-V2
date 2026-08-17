@@ -1,7 +1,12 @@
 import { defineConfig } from 'vitest/config';
 import react from '@vitejs/plugin-react';
 
-const proxyTarget = process.env.CHATBI_PROXY_TARGET ?? 'http://localhost:8000';
+const runtimeEnv = (
+  globalThis as typeof globalThis & {
+    process?: { env?: Record<string, string | undefined> };
+  }
+).process?.env;
+const proxyTarget = runtimeEnv?.CHATBI_PROXY_TARGET ?? 'http://localhost:8000';
 
 export default defineConfig({
   plugins: [react()],
