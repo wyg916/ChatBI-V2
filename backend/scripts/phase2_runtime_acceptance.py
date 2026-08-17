@@ -20,7 +20,7 @@ FILE_EXPECTATIONS = {
     "OE-F01": ("270", "180"),
     "OE-F02": ("150",),
     "OE-F03": ("100", "审批"),
-    "OE-F04": ("未",),
+    "OE-F04": ("风险事项",),
     "OE-F05": ("112.5",),
 }
 IMAGE_EXPECTATIONS = {
@@ -42,6 +42,7 @@ FOLLOW_UP_EXPECTATIONS = {
     "OE-FU09": ("依据",),
     "OE-FU10": ("订单量",),
 }
+NO_EVIDENCE_MARKERS = ("未", "没有", "无相关", "不存在", "未提及")
 
 
 def _conversation(client: httpx.Client, api: str, title: str) -> str:
@@ -186,7 +187,10 @@ def run(base_url: str, *, reuse: bool = False) -> dict:
     )
     file_failures = [
         item["id"] for item in results if item["id"] in FILE_EXPECTATIONS
-        and not all(value.lower() in item["content"].lower() for value in FILE_EXPECTATIONS[item["id"]])
+        and (
+            not all(value.lower() in item["content"].lower() for value in FILE_EXPECTATIONS[item["id"]])
+            or (item["id"] == "OE-F04" and not any(value in item["content"] for value in NO_EVIDENCE_MARKERS))
+        )
     ]
     image_failures = [
         item["id"] for item in results if item["id"] in IMAGE_EXPECTATIONS
