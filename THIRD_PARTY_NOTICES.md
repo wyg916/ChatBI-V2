@@ -12,6 +12,23 @@
 
 Other pre-existing runtime packages remain pinned in the relevant package manifests. No third-party logo, brand asset, UI source, or restricted project source was introduced in Day 2.
 
+## IBM Text-to-SQL Evaluation Toolkit design reference
+
+- Source repository: `https://github.com/IBM/text2sql-eval-toolkit`
+- Audited upstream revision: `60dd4515236adb335f2053b7c069397d7d88fe0a`
+- License: Apache-2.0
+- Project boundary: `backend/app/evaluation/ibm_adapter.py`
+- Purpose: adapter-level execution result comparison, multiple accepted ground truths, error analysis and release-gate reporting.
+- Modification/source use: no IBM source file, package, benchmark result bundle, logo or asset is copied or imported. The ChatBI adapter is independently authored behind the project-owned `EvaluationAdapter` boundary and operates only on results already produced by the guarded ChatBI QueryPipeline.
+
+## SQLBot product-flow reference
+
+- Source repository: `https://github.com/dataease/SQLBot`
+- Audited upstream revision: `0c885d5a677ed3f6551645a4c5a630ee4c4eb437`
+- License boundary: modified GPLv3 with additional logo/copyright conditions; reference-only.
+- Purpose: terminology, SQL-example and feedback-loop product concepts.
+- Source use: no SQLBot source, UI, logo, prompt, text or asset is copied. ChatBI's feedback workflow is independently implemented with existing project-owned `QueryFeedback`, `VerifiedAnswer`, `AnswerVersion`, SQL Guard and Result Oracle contracts.
+
 ## Direct runtime and test dependencies
 
 ChatBI V2 itself is released under Apache License 2.0. Direct dependencies are consumed as published packages; their source is not copied into this repository. Versions are pinned in `backend/requirements.txt` and `frontend/package-lock.json`.

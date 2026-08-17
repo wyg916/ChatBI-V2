@@ -137,3 +137,7 @@ P0 全部通过后，允许把专业知识 RAG 与复杂 ChatBI 分析的有限�
 ## ADR-030：受控 RAG 与最小 Multi-Agent 是 V1/P0 必选能力
 
 最终产品决策冻结四类路由、真实 HMAC RAG Bridge、Workspace/用户/角色映射、ACL/Citation/Answer Guard，以及固定五角色、六工具、8/12/2/2/30s 硬预算的复杂分析编排。默认模式均为 `on`；通用 RAG/Agent 平台仍禁止。旧项目二生产源码复制数保持 0，六个 Prompt 独立改写并记录来源、用途和 checksum。完整决策见 `docs/decisions/ADR_030_RAG_MULTIAGENT_V1_REQUIRED.md`。
+
+## ADR-031：V2.1 Evaluation 与反馈复用既有证据表，核心 QueryPipeline 保持冻结
+
+V2.1 的 IBM-compatible EvaluationAdapter 只比较 ChatBI 正式 QueryPipeline 已执行的结果，不持有数据库连接，也不以 SQL 文本相等代替正确性。Multiple Ground Truth、八类准确率、Result Diff 与错误分析进入 `EvaluationCaseResult.actual`；评测 Profile 暂存为 `EvaluationRun.trend_points` 的类型化 metadata，并在 API 输出时过滤。SQLBot 仅作产品流程参考，错误修正通过 `VerifiedAnswer.feedback` 与 `AnswerVersion` 保存，只有人工审核且 Oracle PASS 的 SQL 才能晋升；回放时 Verified SQL 仍重新进入 Context、NL2SQL、SQL Guard、只读 Query Executor 和 Result Oracle。专用表和每运行 Provider/Prompt/Engine 注入由 `docs/integration_requests/EVAL_FEEDBACK_INTEGRATION_REQUEST.md` 交给主控 Migration/Runtime 统一处理。
