@@ -163,7 +163,7 @@ class FeedbackRequest(BaseModel):
 
 class SaveAnswerRequest(BaseModel):
     owner_name: str = Field(default="当前用户", min_length=1, max_length=128)
-    status: Literal["DRAFT", "REVIEW", "PUBLISHED"] = "DRAFT"
+    status: Literal["DRAFT", "VERIFIED"] = "VERIFIED"
 
 
 class VerifyResultRequest(BaseModel):
@@ -185,6 +185,8 @@ class QueryResponse(BaseModel):
     guard: dict[str, Any]
     execution: dict[str, Any]
     oracle: dict[str, Any]
+    chart_spec: dict[str, Any]
+    narrative: dict[str, Any]
     summary: str
     kpis: list[dict[str, Any]]
     recommended_questions: list[str]

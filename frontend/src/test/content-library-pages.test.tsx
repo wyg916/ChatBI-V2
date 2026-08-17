@@ -9,10 +9,10 @@ import { DashboardListPage } from '../pages/DashboardListPage';
 import type { AnswerLibraryResponse, DashboardLibraryResponse } from '../types/api';
 
 const answers: AnswerLibraryResponse = {
-  summary: { total: 128, average_accuracy: 96.4, monthly_adoptions: 1284, pending_review: 14, favorites: 128, drafts: 14, published: 6 },
+  summary: { total: 128, average_accuracy: 96.4, monthly_adoptions: 1284, pending_review: 14, favorites: 128, drafts: 14, published: 1, verified: 1, rejected: 0, deprecated: 113 },
   items: [
-    { id: 'a1', question: '2026年二季度环比增长率入围多少?', module: '模块 C1.1.8', sql_synced: true, model_name: '全体收入', owner_name: '文心', status: 'PUBLISHED', accuracy_percent: 98, adoption_count: 432, is_favorite: true, updated_at: '2026-08-17T08:00:00Z' },
-    { id: 'a2', question: '过去 30 天退款笔数最高的商品', module: '模块 C1.1.8', sql_synced: true, model_name: '订单与发票', owner_name: '弘岳', status: 'REVIEW', accuracy_percent: 89, adoption_count: 182, is_favorite: true, updated_at: '2026-08-17T08:00:00Z' },
+    { id: 'a1', question: '2026年二季度环比增长率入围多少?', module: '模块 C1.1.8', sql_synced: true, model_name: '全体收入', owner_name: '文心', status: 'VERIFIED', accuracy_percent: 98, adoption_count: 432, is_favorite: true, semantic_intent: {}, sql_plan: {}, result_snapshot: {}, chart_spec: {}, narrative: {}, feedback: {}, created_at: '2026-08-17T08:00:00Z', updated_at: '2026-08-17T08:00:00Z' },
+    { id: 'a2', question: '过去 30 天退款笔数最高的商品', module: '模块 C1.1.8', sql_synced: true, model_name: '订单与发票', owner_name: '弘岳', status: 'DRAFT', accuracy_percent: 89, adoption_count: 182, is_favorite: true, semantic_intent: {}, sql_plan: {}, result_snapshot: {}, chart_spec: {}, narrative: {}, feedback: {}, created_at: '2026-08-17T08:00:00Z', updated_at: '2026-08-17T08:00:00Z' },
   ], total: 128, page: 1, page_size: 6,
 };
 
@@ -40,7 +40,7 @@ describe('答案库和看板列表高保真界面', () => {
     expect(await screen.findByText('1,284')).toBeVisible();
     expect(screen.getByText('96.4%')).toBeVisible();
     expect(screen.getAllByTestId('answer-row')).toHaveLength(2);
-    expect(screen.getByRole('tab', { name: '已发布 6' })).toBeVisible();
+    expect(screen.getByRole('tab', { name: '已验证 1' })).toBeVisible();
     expect(screen.getByText('过去 30 天退款笔数最高的商品')).toBeVisible();
   });
 

@@ -3,7 +3,8 @@ name: chatbi-v2
 services:
   backend:
     build:
-      context: ./backend
+      context: .
+      dockerfile: backend/Dockerfile
     environment:
       CHATBI_ENVIRONMENT: development
       CHATBI_DATABASE_URL: postgresql+psycopg://chatbi_app:${CHATBI_META_PASSWORD:?Run scripts/bootstrap-local-databases.ps1 first}@host.docker.internal:5432/chatbi_v2

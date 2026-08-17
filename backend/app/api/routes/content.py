@@ -3,17 +3,33 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.db.session import get_db
-from app.models import Dashboard, VerifiedAnswer
+from app.models import Dashboard, DashboardCard, VerifiedAnswer
+from app.query.contracts import AskRequest, QueryResponse
+from app.query.service import QueryPipeline, query_response
 from app.schemas.content import (
     AnswerCreate,
+    AnswerDetailResponse,
     AnswerLibraryResponse,
     AnswerRead,
+    AnswerStatusUpdate,
+    DashboardCardCreate,
+    DashboardCardRead,
     DashboardCreate,
     DashboardDetailResponse,
     DashboardLibraryResponse,
     DashboardRead,
 )
-from app.services.content import answer_summary, dashboard_detail, dashboard_summary, list_answers, list_dashboards
+from app.services.content import (
+    answer_summary,
+    create_dashboard_card,
+    dashboard_card_payload,
+    dashboard_detail,
+    dashboard_summary,
+    list_answers,
+    list_dashboards,
+    refresh_dashboard_card,
+    update_answer_status,
+)
 from app.services.datasources import default_workspace
 
 router = APIRouter(tags=["answers and dashboards"])
@@ -22,7 +38,7 @@ router = APIRouter(tags=["answers and dashboards"])
 @router.get("/answers", response_model=AnswerLibraryResponse)
 def get_answers(
     query: str = "",
-    tab: str = Query(default="all", pattern="^(all|favorites|drafts|published|review)$"),
+    tab: str = Query(default="all", pattern="^(all|favorites|drafts|published|verified|rejected|deprecated)$"),
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=6, ge=1, le=100),
     db: Session = Depends(get_db),
@@ -33,6 +49,8 @@ def get_answers(
 
 @router.post("/answers", response_model=AnswerRead, status_code=status.HTTP_201_CREATED)
 def create_answer(data: AnswerCreate, db: Session = Depends(get_db)):
+    if data.status != "DRAFT":
+        raise HTTPException(status_code=422, detail="Manually created answers must start as DRAFT")
     workspace = default_workspace(db)
     sort_order = (db.scalar(select(func.coalesce(func.max(VerifiedAnswer.sort_order), 0))) or 0) + 1
     answer = VerifiedAnswer(
@@ -50,6 +68,43 @@ def create_answer(data: AnswerCreate, db: Session = Depends(get_db)):
     db.commit()
     db.refresh(answer)
     return answer
+
+
+@router.get("/answers/{answer_id}", response_model=AnswerDetailResponse)
+def get_answer(answer_id: str, db: Session = Depends(get_db)):
+    answer = db.get(VerifiedAnswer, answer_id)
+    if answer is None:
+        raise HTTPException(status_code=404, detail="Answer not found")
+    return answer
+
+
+@router.patch("/answers/{answer_id}/status", response_model=AnswerRead)
+def set_answer_status(answer_id: str, data: AnswerStatusUpdate, db: Session = Depends(get_db)):
+    answer = db.get(VerifiedAnswer, answer_id)
+    if answer is None:
+        raise HTTPException(status_code=404, detail="Answer not found")
+    try:
+        return update_answer_status(db, answer, status=data.status, feedback=data.feedback)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+@router.post("/answers/{answer_id}/reuse", response_model=QueryResponse, status_code=status.HTTP_201_CREATED)
+def reuse_answer(answer_id: str, db: Session = Depends(get_db)):
+    answer = db.get(VerifiedAnswer, answer_id)
+    if answer is None:
+        raise HTTPException(status_code=404, detail="Answer not found")
+    if answer.status != "VERIFIED" or not answer.datasource_id or not answer.semantic_model_id:
+        raise HTTPException(status_code=422, detail="Only a complete VERIFIED answer can be reused")
+    run = QueryPipeline().execute(db, AskRequest(
+        question=answer.question,
+        datasource_id=answer.datasource_id,
+        semantic_model_id=answer.semantic_model_id,
+    ))
+    answer.adoption_count += 1
+    answer.monthly_adoption_count += 1
+    db.commit()
+    return query_response(run)
 
 
 @router.get("/dashboards", response_model=DashboardLibraryResponse)
@@ -92,3 +147,45 @@ def get_dashboard_detail(dashboard_id: str, db: Session = Depends(get_db)):
         return dashboard_detail(db, dashboard)
     except LookupError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+
+@router.post("/dashboards/{dashboard_id}/cards", response_model=DashboardCardRead, status_code=status.HTTP_201_CREATED)
+def add_dashboard_card(dashboard_id: str, data: DashboardCardCreate, db: Session = Depends(get_db)):
+    dashboard = db.get(Dashboard, dashboard_id)
+    if dashboard is None:
+        raise HTTPException(status_code=404, detail="Dashboard not found")
+    answer = db.get(VerifiedAnswer, data.answer_id)
+    if answer is None:
+        raise HTTPException(status_code=404, detail="Answer not found")
+    try:
+        card = create_dashboard_card(db, dashboard, answer=answer, data=data)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    return dashboard_card_payload(db, card)
+
+
+def _card_or_404(db: Session, dashboard_id: str, card_id: str) -> DashboardCard:
+    card = db.get(DashboardCard, card_id)
+    if card is None or card.dashboard_id != dashboard_id:
+        raise HTTPException(status_code=404, detail="Dashboard card not found")
+    return card
+
+
+@router.post("/dashboards/{dashboard_id}/cards/{card_id}/refresh", response_model=DashboardCardRead)
+def refresh_card(dashboard_id: str, card_id: str, db: Session = Depends(get_db)):
+    try:
+        card = refresh_dashboard_card(db, _card_or_404(db, dashboard_id, card_id))
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    return dashboard_card_payload(db, card)
+
+
+@router.delete("/dashboards/{dashboard_id}/cards/{card_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_card(dashboard_id: str, card_id: str, db: Session = Depends(get_db)):
+    card = _card_or_404(db, dashboard_id, card_id)
+    dashboard = db.get(Dashboard, dashboard_id)
+    db.delete(card)
+    db.flush()
+    if dashboard:
+        dashboard.card_count = len(list(db.scalars(select(DashboardCard.id).where(DashboardCard.dashboard_id == dashboard_id))))
+    db.commit()

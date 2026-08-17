@@ -1,5 +1,7 @@
 # ChatBI V2 验收标准
 
+Day 3 / V1 RC 候选的本次执行报告见 [`docs/ACCEPTANCE_REPORT_V1_RC.md`](ACCEPTANCE_REPORT_V1_RC.md)。只有该报告中的实现、测试、两次冷启动和 Git 发布 Gate 全部通过，才允许创建 RC Tag。
+
 ## 产品主链路
 
 - 数据源连接、Schema 同步、语义模型发布、自然语言问数、SQL 校验、查询执行、结果验证、图表、洞察、答案保存、看板和评测全部可用。

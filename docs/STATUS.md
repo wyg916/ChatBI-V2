@@ -2,6 +2,11 @@
 
 ## 2026-08-17
 
+- Day 3 V1 RC 候选产品闭环已实现：真实 Query Result 生成受控 ChartSpec/ECharts、证据绑定 Narrative、3～5 个推荐追问、Verified Answer/版本、Dashboard Card 和可持久化 Golden Evaluation。
+- 产品与测试 Gate：Chart Rule 19/19、Backend 85/85、Frontend Vitest 26/26、TypeScript/Build PASS、Playwright 34/34（Day 3 专用 19/19）、Golden SQL/结果/语义 20/20、MySQL 5/5、危险 SQL 38/38、真实写入成功 0、迁移单 head 与 upgrade→base→upgrade PASS、Secret Scan PASS。
+- 外部模型未配置，`LIVE_MODEL_SMOKE=NOT_CONFIGURED`；本地确定性 Runtime 与 Adapter 保持可用。
+- Day 3 / V1 RC 发布门禁已收口：两次从完整停止状态的一键构建与启动均 PASS；最终 Backend 85/85、Frontend 26/26、Playwright 34/34、Golden、安全、迁移与 Secret Scan 全部 PASS；main 与 origin/main 同步，annotated Tag `chatbi-v2-v1-rc1` 已推送并核验。项目进入 Day 4 Quality Hardening。详见 `docs/status/DAY3_STATUS.md` 与 `docs/evidence/day3/`。
+
 - UI14 正式集成收口：14/14 React 页面与 14/14 Router 路由已按现有实现冻结；六个一级模块保持 ChatBI-first，系统设置仍是二级管理入口。本轮未重新设计或从 Figma 生成页面。
 - UI14 Gate：`npm ci` 0 vulnerabilities，Frontend TypeScript PASS，Vitest 10 files / 26 tests PASS，Vite production build PASS（728 modules），Playwright 15/15 PASS；专用 UI14 用例完成 42/42 路由-视口检查并生成 42 张忽略的运行截图。
 - 1440x900、1366x768、1920x1080 的页面级横向裁切、关键控件遮挡、Route 白屏、console error、page error、blocking request failure 均为 0；Day 1 数据源、Schema、语义模型真实浏览器链路继续 PASS。

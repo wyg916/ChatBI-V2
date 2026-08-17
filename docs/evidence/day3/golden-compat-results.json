@@ -1,0 +1,297 @@
+{
+  "evaluated_at": "2026-08-17T10:27:55.417080+00:00",
+  "manifest_sha256": "d40bb690a4208240ecf347abe47e045cd74c8eb89b9162d5d53890ecf24bc282",
+  "postgresql": {
+    "total": 20,
+    "execution_pass": 20,
+    "result_pass": 20,
+    "semantic_pass": 20,
+    "execution_rate": 1.0,
+    "result_rate": 1.0,
+    "cases": [
+      {
+        "id": "G01",
+        "category": "simple_metric",
+        "status": "SUCCEEDED",
+        "execution_ok": true,
+        "result_ok": true,
+        "semantic_ok": true,
+        "semantic_reasons": [],
+        "query_id": "e8d022bc-3f44-4319-b746-65737304966c",
+        "signature": "178d1b593bd923261abc1efd86c94975a01f6e169e3b45ba1de4ac86460f2172",
+        "error_code": null
+      },
+      {
+        "id": "G02",
+        "category": "simple_metric",
+        "status": "SUCCEEDED",
+        "execution_ok": true,
+        "result_ok": true,
+        "semantic_ok": true,
+        "semantic_reasons": [],
+        "query_id": "89b72d82-0386-4f9f-b9f3-6fb76ee9f621",
+        "signature": "65e28a27212498d555cbae14d080932cd6bba271c8f9e6cdf8392897eef429e5",
+        "error_code": null
+      },
+      {
+        "id": "G03",
+        "category": "simple_metric",
+        "status": "SUCCEEDED",
+        "execution_ok": true,
+        "result_ok": true,
+        "semantic_ok": true,
+        "semantic_reasons": [],
+        "query_id": "5c436f5c-5e6d-4199-a474-3ed2b7d0a050",
+        "signature": "a05bcede04500d7a4c6872e133eeda3f94551656922cdcb8e63502f68c6fd38f",
+        "error_code": null
+      },
+      {
+        "id": "G04",
+        "category": "simple_metric",
+        "status": "SUCCEEDED",
+        "execution_ok": true,
+        "result_ok": true,
+        "semantic_ok": true,
+        "semantic_reasons": [],
+        "query_id": "d19c44b7-2626-4a3c-8ff4-9811a900cdf4",
+        "signature": "a463b271b534e4188c47e40505f89937196324e9db615e86cf9a80adddf50663",
+        "error_code": null
+      },
+      {
+        "id": "G05",
+        "category": "time",
+        "status": "SUCCEEDED",
+        "execution_ok": true,
+        "result_ok": true,
+        "semantic_ok": true,
+        "semantic_reasons": [],
+        "query_id": "02bd316f-c8ec-4939-b65f-dddaf8a6eb72",
+        "signature": "f666e7e471f36990c5c1c7bba52c4b492911c6b57d4c5849e224eeb474e46930",
+        "error_code": null
+      },
+      {
+        "id": "G06",
+        "category": "time",
+        "status": "SUCCEEDED",
+        "execution_ok": true,
+        "result_ok": true,
+        "semantic_ok": true,
+        "semantic_reasons": [],
+        "query_id": "58a23b09-771a-45bd-8bc5-9cb9e35722c0",
+        "signature": "e81d8c231a7d4d6d9e0e84aca9d7cfde76e74000724a32c013f4f3aba2c7005f",
+        "error_code": null
+      },
+      {
+        "id": "G07",
+        "category": "time",
+        "status": "SUCCEEDED",
+        "execution_ok": true,
+        "result_ok": true,
+        "semantic_ok": true,
+        "semantic_reasons": [],
+        "query_id": "fea59661-2213-49b1-8c66-3470516dfc53",
+        "signature": "2cadc151d63bbd52ec46d00bce5a2c20e1062ed942177d0c32d5742cb71d35c8",
+        "error_code": null
+      },
+      {
+        "id": "G08",
+        "category": "time",
+        "status": "SUCCEEDED",
+        "execution_ok": true,
+        "result_ok": true,
+        "semantic_ok": true,
+        "semantic_reasons": [],
+        "query_id": "9a21c31d-4bff-4675-a63a-c0e867c59f9d",
+        "signature": "a207d25ef0455bf1a73a726d98dc0fa4772ffa074734a1bf95f0ab63279838f3",
+        "error_code": null
+      },
+      {
+        "id": "G09",
+        "category": "filter_group_topn",
+        "status": "SUCCEEDED",
+        "execution_ok": true,
+        "result_ok": true,
+        "semantic_ok": true,
+        "semantic_reasons": [],
+        "query_id": "b287428c-d40e-4d4f-8090-27a5d38f20b0",
+        "signature": "39f71f66eb2d5af8e17286362f98a2c3c917f7e9767e121828c45abfe178e27e",
+        "error_code": null
+      },
+      {
+        "id": "G10",
+        "category": "filter_group_topn",
+        "status": "SUCCEEDED",
+        "execution_ok": true,
+        "result_ok": true,
+        "semantic_ok": true,
+        "semantic_reasons": [],
+        "query_id": "343f29e3-bf4c-4b30-9938-9d1e69d551e4",
+        "signature": "67e6689336d5a9b8821982be4899551aa0469c2f34ac1e8ef6c360a431e03c29",
+        "error_code": null
+      },
+      {
+        "id": "G11",
+        "category": "filter_group_topn",
+        "status": "SUCCEEDED",
+        "execution_ok": true,
+        "result_ok": true,
+        "semantic_ok": true,
+        "semantic_reasons": [],
+        "query_id": "815e327c-b224-47c2-9a2a-567707614ea4",
+        "signature": "b3535cb3bea08d55fe205adf08c1e6bea5a3e2dd6ac0ae308e53d8416a718b61",
+        "error_code": null
+      },
+      {
+        "id": "G12",
+        "category": "filter_group_topn",
+        "status": "SUCCEEDED",
+        "execution_ok": true,
+        "result_ok": true,
+        "semantic_ok": true,
+        "semantic_reasons": [],
+        "query_id": "17c58de8-2bc4-4ed6-a5f2-d22b134e957a",
+        "signature": "3e738a49fb5f3cef484ad22954d9cbaf859a5f7d5b6a9236328424ac36d3ce9e",
+        "error_code": null
+      },
+      {
+        "id": "G13",
+        "category": "join",
+        "status": "SUCCEEDED",
+        "execution_ok": true,
+        "result_ok": true,
+        "semantic_ok": true,
+        "semantic_reasons": [],
+        "query_id": "d0bcb1ff-2c6c-40e7-9c34-6e927ab52ee2",
+        "signature": "d7fbef0368e14fe6bfd22f601f68dff95b90d93df411d5e4cd61aa90f5483709",
+        "error_code": null
+      },
+      {
+        "id": "G14",
+        "category": "join",
+        "status": "SUCCEEDED",
+        "execution_ok": true,
+        "result_ok": true,
+        "semantic_ok": true,
+        "semantic_reasons": [],
+        "query_id": "3e86b97e-38da-4676-b2b8-00fecff431d3",
+        "signature": "b6ab716d8ebf38d2f14a449cbeca9c049e35211332f7c5f9b3fd0fd1ac6a9472",
+        "error_code": null
+      },
+      {
+        "id": "G15",
+        "category": "join",
+        "status": "SUCCEEDED",
+        "execution_ok": true,
+        "result_ok": true,
+        "semantic_ok": true,
+        "semantic_reasons": [],
+        "query_id": "f7f0b890-b4cb-4cff-be4c-adcb7d4fc4d6",
+        "signature": "135383ffa9dfa677bc895ac1eda7b9a427b9cdf744a42ea93f8cde380a48e74a",
+        "error_code": null
+      },
+      {
+        "id": "G16",
+        "category": "join",
+        "status": "SUCCEEDED",
+        "execution_ok": true,
+        "result_ok": true,
+        "semantic_ok": true,
+        "semantic_reasons": [],
+        "query_id": "0dc444b5-96f7-4d6c-a358-8090aac2ea3d",
+        "signature": "4034a4adca4dec59e0283ea5958563a721c7cb3d225581a82c1958dc73ff4fb5",
+        "error_code": null
+      },
+      {
+        "id": "G17",
+        "category": "join",
+        "status": "SUCCEEDED",
+        "execution_ok": true,
+        "result_ok": true,
+        "semantic_ok": true,
+        "semantic_reasons": [],
+        "query_id": "23386657-2b2b-4ec8-8a81-13dda6fea49d",
+        "signature": "45aa022db5cf1ee69c806c1e9465dc8b3207e02acf8a483c3ee3b00936fe0eec",
+        "error_code": null
+      },
+      {
+        "id": "G18",
+        "category": "composite",
+        "status": "SUCCEEDED",
+        "execution_ok": true,
+        "result_ok": true,
+        "semantic_ok": true,
+        "semantic_reasons": [],
+        "query_id": "6c376e34-1328-4732-af3a-4e090159c2f2",
+        "signature": "beb3490c7980b19c4c547a1777772b38f2bd73c758b4d1264531ff487f522381",
+        "error_code": null
+      },
+      {
+        "id": "G19",
+        "category": "composite",
+        "status": "SUCCEEDED",
+        "execution_ok": true,
+        "result_ok": true,
+        "semantic_ok": true,
+        "semantic_reasons": [],
+        "query_id": "19582857-7bd4-4635-8ad5-e33cac92d0d7",
+        "signature": "8a3f41dd71a33f1252d4bf70b4a0c490fef5f804446684e8bcaa0124f416d5f6",
+        "error_code": null
+      },
+      {
+        "id": "G20",
+        "category": "composite",
+        "status": "SUCCEEDED",
+        "execution_ok": true,
+        "result_ok": true,
+        "semantic_ok": true,
+        "semantic_reasons": [],
+        "query_id": "80c75ffe-325f-4af7-abf7-b14de8c5e612",
+        "signature": "e667c1e49bf6ef766d5e0a8c1904511e0b30fc19a86bdea19d08e6fa2434b016",
+        "error_code": null
+      }
+    ]
+  },
+  "mysql": {
+    "total": 5,
+    "execution_pass": 5,
+    "result_pass": 5,
+    "cases": [
+      {
+        "id": "G01",
+        "execution_ok": true,
+        "result_ok": true,
+        "query_id": "c3bf6ec0-2b1e-44e6-9315-2742b6b99594",
+        "error_code": null
+      },
+      {
+        "id": "G02",
+        "execution_ok": true,
+        "result_ok": true,
+        "query_id": "34d0e02c-3772-4d66-aabb-b55b8f1ba611",
+        "error_code": null
+      },
+      {
+        "id": "G03",
+        "execution_ok": true,
+        "result_ok": true,
+        "query_id": "38ba2a88-1b11-4043-b1eb-5cfb70b87d76",
+        "error_code": null
+      },
+      {
+        "id": "G04",
+        "execution_ok": true,
+        "result_ok": true,
+        "query_id": "9c27c546-491d-4a30-8c8a-75f10d09dca0",
+        "error_code": null
+      },
+      {
+        "id": "G05",
+        "execution_ok": true,
+        "result_ok": true,
+        "query_id": "ea132fc9-2c77-4a23-a3ab-075bfb2b4e2d",
+        "error_code": null
+      }
+    ]
+  },
+  "gate_pass": true
+}

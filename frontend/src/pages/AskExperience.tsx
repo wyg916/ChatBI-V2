@@ -1,9 +1,8 @@
-import { FormEvent, useEffect, useMemo, useState } from 'react';
-import type { EChartsCoreOption } from 'echarts/core';
+import { FormEvent, useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { queryApi } from '../api/queries';
-import { EChart } from '../components/EChart';
-import type { QueryResponse } from '../types/api';
+import { EChartsRenderer } from '../charting/EChartsRenderer';
+import type { ChartSpec, Narrative, QueryResponse } from '../types/api';
 import './ask.css';
 
 const DEFAULT_QUESTION = '2026年按地区按月统计已支付订单收入趋势';
@@ -87,9 +86,15 @@ function QueryDetailDialog({ result, onClose }: { result: QueryResponse; onClose
       <section className="query-dialog" role="dialog" aria-modal="true" aria-labelledby="query-detail-title" onMouseDown={(event) => event.stopPropagation()}>
         <header><div><span>可核验查询依据</span><h2 id="query-detail-title">SQL 与执行明细</h2></div><button type="button" aria-label="关闭查询明细" onClick={onClose}>×</button></header>
         <dl className="query-dialog-meta">
+          <div><dt>Query ID</dt><dd>{result.id}</dd></div>
           <div><dt>执行状态</dt><dd>{result.execution.status ?? result.status}</dd></div>
           <div><dt>耗时 / 行数</dt><dd>{result.execution.duration_ms ?? 0} ms / {result.execution.row_count ?? 0} 行</dd></div>
-          <div><dt>结果签名</dt><dd className="signature-value">{result.execution.result_signature?.slice(0, 16) ?? '—'}</dd></div>
+          <div><dt>结果签名</dt><dd className="signature-value">{result.execution.result_signature ?? '—'}</dd></div>
+          <div><dt>语义模型</dt><dd>{String(result.context.semantic_model_name ?? result.semantic_model_id)} v{result.semantic_model_version}</dd></div>
+          <div><dt>数据源</dt><dd>{String(result.context.datasource_name ?? result.datasource_id)}</dd></div>
+          <div><dt>Metric / Dimension</dt><dd>{result.plan.metrics?.join('、') || '明细'} / {result.plan.dimensions?.join('、') || '无分组'}</dd></div>
+          <div><dt>Time / Filter / Join</dt><dd>{result.plan.time_range?.kind ?? '全部时间'} / {result.plan.filters?.length ?? 0} / {Array.isArray(result.plan.joins) ? result.plan.joins.length : 0}</dd></div>
+          <div><dt>Result Oracle</dt><dd>{result.oracle.status}</dd></div>
         </dl>
         <pre><code>{result.guard.normalized_sql ?? result.plan.generated_sql ?? 'SQL 未生成'}</code></pre>
         <div className="query-detail-table-wrap">
@@ -102,38 +107,10 @@ function QueryDetailDialog({ result, onClose }: { result: QueryResponse; onClose
   );
 }
 
-function chartOption(result: QueryResponse): EChartsCoreOption | null {
-  const rows = result.execution.rows ?? [];
-  const metrics = result.plan.metrics ?? [];
-  const dimensions = result.plan.dimensions ?? [];
-  if (!rows.length || !metrics.length || !dimensions.length) return null;
-  const metric = metrics[0];
-  const category = dimensions.map((dimension) => formatValue(rows[0]?.[dimension])).join(' / ');
-  return {
-    animationDuration: 350,
-    grid: { left: 56, right: 18, top: 24, bottom: 48 },
-    tooltip: { trigger: 'axis' },
-    xAxis: {
-      type: 'category',
-      data: rows.map((row) => dimensions.map((dimension) => formatValue(row[dimension])).join(' · ')),
-      axisLabel: { color: '#7c8aa5', rotate: rows.length > 8 ? 26 : 0 },
-      axisLine: { lineStyle: { color: '#dfe5ef' } },
-    },
-    yAxis: { type: 'value', axisLabel: { color: '#7c8aa5' }, splitLine: { lineStyle: { color: '#e8ecf4' } } },
-    series: [{
-      name: metric, type: dimensions.includes('month') ? 'line' : 'bar',
-      data: rows.map((row) => Number(row[metric] ?? 0)), smooth: false,
-      itemStyle: { color: '#5b5cf6' }, lineStyle: { color: '#5b5cf6', width: 3 },
-    }],
-    aria: { enabled: true, description: `${category}维度的${metric}查询结果` },
-  };
-}
-
 function SuccessfulResult({ result, onAsk }: { result: QueryResponse; onAsk: (question: string) => void }) {
   const [showDetails, setShowDetails] = useState(false);
   const [feedback, setFeedback] = useState('');
   const [saved, setSaved] = useState(false);
-  const option = useMemo(() => chartOption(result), [result]);
   const rows = result.execution.rows ?? [];
   const columns = result.execution.columns ?? [];
   const confidence = Math.round(Number(result.oracle.confidence ?? 0) * 100);
@@ -141,6 +118,8 @@ function SuccessfulResult({ result, onAsk }: { result: QueryResponse; onAsk: (qu
   const dimensions = result.plan.dimensions ?? [];
   const filters = result.plan.filters ?? [];
   const checks = result.oracle.checks ?? [];
+  const chartSpec = 'chart_type' in result.chart_spec ? result.chart_spec as ChartSpec : null;
+  const narrative = 'conclusion' in result.narrative ? result.narrative as Narrative : null;
 
   async function recordFeedback(type: 'HELPFUL' | 'NOT_HELPFUL') {
     await queryApi.feedback(result.id, type);
@@ -164,32 +143,34 @@ function SuccessfulResult({ result, onAsk }: { result: QueryResponse; onAsk: (qu
         <article className="analysis-answer-card">
           <header className="analysis-answer-header"><span className="analysis-bi-mark" aria-hidden="true">BI</span><div><h1>分析结论</h1><p>{result.summary} · {result.execution.duration_ms ?? 0} ms</p></div><span className="confidence-badge">可信度 {confidence}%</span></header>
           <div className="analysis-kpi-grid">{runtimeKpis.slice(0, 4).map((kpi) => <section key={kpi.label}><span>{kpi.label}</span><strong>{formatValue(kpi.value)}{kpi.unit}</strong><small>{result.oracle.status === 'PASSED' ? '已通过结果校验' : '需复核'}</small></section>)}</div>
-          {option ? <section className="analysis-chart-card real-chart"><header><h3>{dimensions.join(' / ')} · {metrics.join(' / ')}</h3><span>数据库结果</span></header><EChart option={option} label="真实查询结果图表" className="analysis-chart" /></section> : <QueryState kind="empty" title="查询完成，无可绘制分组图表" detail="单值结果已显示在 KPI，明细仍可在下方核验。" />}
-          <section className="analysis-insight"><strong>校验结论：</strong><p>{checks.filter((check) => check.passed).length}/{checks.length} 项 Oracle 检查通过；当前仅陈述可由结果与口径直接核验的信息，不生成未经验证的高级洞察。</p></section>
+          {chartSpec ? <section className="analysis-chart-card real-chart"><header><h3>{chartSpec.title}</h3><span>{chartSpec.chart_type} · 绑定 Query {chartSpec.data_source_query_id.slice(0, 8)}</span></header><EChartsRenderer spec={chartSpec} execution={result.execution} label="真实查询结果图表" />{chartSpec.warnings.map((warning) => <small key={warning}>{warning}</small>)}</section> : <QueryState kind="empty" title="查询完成，无可绘制图表" detail="明细仍可在下方核验。" />}
+          <section className="analysis-insight"><strong>业务洞察：</strong><p>{narrative?.insights.length ? narrative.insights.join('；') : `${checks.filter((check) => check.passed).length}/${checks.length} 项 Oracle 检查通过，当前结果未发现可证明的趋势、贡献或异常。`}</p><small>证据：Query {result.id.slice(0, 8)} · Signature {result.execution.result_signature?.slice(0, 12) ?? '—'} · Semantic v{result.semantic_model_version}</small></section>
           <div className="query-inline-table"><table><thead><tr>{columns.map((column) => <th key={column}>{column}</th>)}</tr></thead><tbody>{rows.slice(0, 8).map((row, index) => <tr key={index}>{columns.map((column) => <td key={column}>{formatValue(row[column])}</td>)}</tr>)}</tbody></table></div>
+          <details className="query-evidence-inline"><summary>查询依据</summary><dl><div><dt>Metric</dt><dd>{metrics.join('、') || '明细查询'}</dd></div><div><dt>Dimension</dt><dd>{dimensions.join('、') || '无分组'}</dd></div><div><dt>Time</dt><dd>{result.plan.time_range?.kind ?? '全部时间'}</dd></div><div><dt>Filter</dt><dd>{filters.map((item) => `${item.field}${item.operator}${String(item.value)}`).join('、') || '无过滤'}</dd></div><div><dt>Join</dt><dd>{Array.isArray(result.plan.joins) ? `${result.plan.joins.length} 个` : '0 个'}</dd></div><div><dt>SQL</dt><dd>默认折叠，点击右侧查看</dd></div><div><dt>Semantic Model Version</dt><dd>v{result.semantic_model_version}</dd></div><div><dt>Datasource</dt><dd>{String(result.context.datasource_name ?? result.datasource_id)}</dd></div><div><dt>Execution Time</dt><dd>{result.execution.duration_ms ?? 0} ms</dd></div><div><dt>Result Oracle</dt><dd>{result.oracle.status}</dd></div><div><dt>Result Signature</dt><dd>{result.execution.result_signature ?? '—'}</dd></div></dl></details>
+          <section className="followup-suggestions"><h3>推荐追问</h3>{result.recommended_questions.slice(0, 5).map((question) => <button type="button" key={question} onClick={() => onAsk(question)}>{question}</button>)}</section>
         </article>
         <AskComposer compact onAsk={onAsk} />
       </div>
       <aside className="analysis-side-panel" aria-label="查询验证信息">
         <section className="trust-card"><h2>查询可信度</h2><div><span className="trust-ring" style={{ background: `conic-gradient(#5b5cf6 0 ${confidence}%, #eceefe ${confidence}% 100%)` }}><b>{confidence}%</b></span><p><strong>{result.oracle.status === 'PASSED' ? '结果通过校验' : '结果需复核'}</strong><small>指标、维度、过滤、Join 与结果签名</small></p></div></section>
         <section className="evidence-card"><h2>查询依据</h2><dl><div><dt>指标</dt><dd>{metrics.join('、') || '明细查询'}</dd></div><div><dt>维度</dt><dd>{dimensions.join('、') || '无分组'}</dd></div><div><dt>时间 / 过滤</dt><dd>{result.plan.time_range?.kind ?? '全部时间'}；{filters.map((item) => `${item.field}${item.operator}${String(item.value)}`).join('、') || '无过滤'}</dd></div><div><dt>SQL / Oracle</dt><dd>{result.guard.allowed ? '只读校验通过' : '未通过'}；{result.oracle.status}</dd></div></dl><button type="button" className="sql-detail-button" onClick={() => setShowDetails(true)}>查看 SQL 与执行明细</button></section>
-        <section className="recommend-card"><h2>反馈与追问</h2><div className="feedback-actions"><button type="button" onClick={() => recordFeedback('HELPFUL')}>结果有帮助</button><button type="button" onClick={() => recordFeedback('NOT_HELPFUL')}>需要改进</button></div>{feedback && <p className="action-status">{feedback}</p>}<button type="button" onClick={save}>{saved ? '已保存到答案库' : '保存为标准答案'}</button>{result.recommended_questions.slice(0, 2).map((question) => <button type="button" key={question} onClick={() => onAsk(question)}>{question}</button>)}</section>
+        <section className="recommend-card"><h2>反馈与沉淀</h2><div className="feedback-actions"><button type="button" onClick={() => recordFeedback('HELPFUL')}>结果有帮助</button><button type="button" onClick={() => recordFeedback('NOT_HELPFUL')}>需要改进</button></div>{feedback && <p className="action-status">{feedback}</p>}<button type="button" disabled={feedback !== '已记录“有帮助”' || saved} onClick={save}>{saved ? '已保存到答案库' : '保存为已验证答案'}</button></section>
       </aside>
       {showDetails && <QueryDetailDialog result={result} onClose={() => setShowDetails(false)} />}
     </section>
   );
 }
 
-function ResultAskPage({ question, onAsk }: { question: string; onAsk: (question: string) => void }) {
+function ResultAskPage({ question, queryId, onAsk }: { question: string; queryId?: string; onAsk: (question: string) => void }) {
   const [result, setResult] = useState<QueryResponse | null>(null);
   const [error, setError] = useState('');
   const [attempt, setAttempt] = useState(0);
   useEffect(() => {
     let active = true;
     setResult(null); setError('');
-    queryApi.ask(question).then((value) => { if (active) setResult(value); }).catch((reason: Error) => { if (active) setError(reason.message); });
+    (queryId ? queryApi.get(queryId) : queryApi.ask(question)).then((value) => { if (active) setResult(value); }).catch((reason: Error) => { if (active) setError(reason.message); });
     return () => { active = false; };
-  }, [question, attempt]);
+  }, [question, queryId, attempt]);
   if (error) return <QueryState kind="error" title="查询服务暂时不可用" detail={error} onRetry={() => setAttempt((value) => value + 1)} />;
   if (!result) return <QueryState kind="loading" title="正在生成并验证查询" detail="Schema Linking → SQLPlan → AST Guard → 只读执行 → Result Oracle" />;
   if (result.status === 'SECURITY_REJECTED') return <QueryState kind="security" title="查询已被安全策略拒绝" detail={`${result.error_code ?? 'SQL_GUARD_REJECTED'}：${result.error_message ?? '未访问数据库'}`} />;
@@ -203,6 +184,7 @@ export function AskPage({ results = false }: { results?: boolean }) {
   const navigate = useNavigate();
   const location = useLocation();
   const question = new URLSearchParams(location.search).get('q')?.trim() || DEFAULT_QUESTION;
+  const queryId = new URLSearchParams(location.search).get('query_id')?.trim() || undefined;
   const onAsk = (nextQuestion: string) => navigate(`/ask/results?q=${encodeURIComponent(nextQuestion)}`);
-  return results ? <ResultAskPage question={question} onAsk={onAsk} /> : <EmptyAskPage onAsk={onAsk} />;
+  return results ? <ResultAskPage question={question} queryId={queryId} onAsk={onAsk} /> : <EmptyAskPage onAsk={onAsk} />;
 }

@@ -45,6 +45,26 @@ class VerifiedAnswer(Base, TimestampMixin):
     sql_text: Mapped[str | None] = mapped_column(Text)
     result_signature: Mapped[str | None] = mapped_column(String(64))
     semantic_model_version: Mapped[int | None] = mapped_column(Integer)
+    semantic_intent: Mapped[dict] = mapped_column(JSON, default=dict)
+    sql_plan: Mapped[dict] = mapped_column(JSON, default=dict)
+    result_snapshot: Mapped[dict] = mapped_column(JSON, default=dict)
+    chart_spec: Mapped[dict] = mapped_column(JSON, default=dict)
+    narrative: Mapped[dict] = mapped_column(JSON, default=dict)
+    semantic_model_id: Mapped[str | None] = mapped_column(ForeignKey("semantic_model.id", ondelete="RESTRICT"), index=True)
+    datasource_id: Mapped[str | None] = mapped_column(ForeignKey("datasource.id", ondelete="RESTRICT"), index=True)
+    oracle_status: Mapped[str | None] = mapped_column(String(32), index=True)
+    feedback: Mapped[dict] = mapped_column(JSON, default=dict)
+    versions: Mapped[list["AnswerVersion"]] = relationship(cascade="all, delete-orphan", passive_deletes=True)
+
+
+class AnswerVersion(Base):
+    __tablename__ = "answer_version"
+    __table_args__ = (UniqueConstraint("answer_id", "version"),)
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uuid_str)
+    answer_id: Mapped[str] = mapped_column(ForeignKey("verified_answer.id", ondelete="CASCADE"), index=True)
+    version: Mapped[int] = mapped_column(Integer, nullable=False)
+    snapshot: Mapped[dict] = mapped_column(JSON, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
 
 class Dashboard(Base, TimestampMixin):
@@ -59,6 +79,23 @@ class Dashboard(Base, TimestampMixin):
     status: Mapped[str] = mapped_column(String(32), default="REALTIME")
     trend_variant: Mapped[int] = mapped_column(Integer, default=0)
     sort_order: Mapped[int] = mapped_column(Integer, default=0, index=True)
+    cards: Mapped[list["DashboardCard"]] = relationship(cascade="all, delete-orphan", passive_deletes=True)
+
+
+class DashboardCard(Base, TimestampMixin):
+    __tablename__ = "dashboard_card"
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uuid_str)
+    dashboard_id: Mapped[str] = mapped_column(ForeignKey("dashboard.id", ondelete="CASCADE"), index=True)
+    answer_id: Mapped[str] = mapped_column(ForeignKey("verified_answer.id", ondelete="RESTRICT"), index=True)
+    query_run_id: Mapped[str] = mapped_column(ForeignKey("query_run.id", ondelete="RESTRICT"), index=True)
+    chart_spec: Mapped[dict] = mapped_column(JSON, nullable=False)
+    title: Mapped[str] = mapped_column(String(255), nullable=False)
+    position: Mapped[dict] = mapped_column(JSON, default=dict)
+    size: Mapped[dict] = mapped_column(JSON, default=dict)
+    filter_context: Mapped[dict] = mapped_column(JSON, default=dict)
+    semantic_model_version: Mapped[int] = mapped_column(Integer, nullable=False)
+    result_signature: Mapped[str | None] = mapped_column(String(64), index=True)
+    refresh_policy: Mapped[str] = mapped_column(String(32), default="MANUAL")
 
 
 class EvaluationRun(Base, TimestampMixin):
@@ -80,6 +117,33 @@ class EvaluationRun(Base, TimestampMixin):
     completed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     duration_seconds: Mapped[int] = mapped_column(Integer, default=0)
     sort_order: Mapped[int] = mapped_column(Integer, default=0, index=True)
+    manifest_sha256: Mapped[str | None] = mapped_column(String(64), index=True)
+    sql_execution_pass_count: Mapped[int] = mapped_column(Integer, default=0)
+    result_value_pass_count: Mapped[int] = mapped_column(Integer, default=0)
+    semantic_pass_count: Mapped[int] = mapped_column(Integer, default=0)
+    dangerous_sql_total: Mapped[int] = mapped_column(Integer, default=0)
+    dangerous_sql_block_count: Mapped[int] = mapped_column(Integer, default=0)
+    cases: Mapped[list["EvaluationCaseResult"]] = relationship(cascade="all, delete-orphan", passive_deletes=True)
+
+
+class EvaluationCaseResult(Base, TimestampMixin):
+    __tablename__ = "evaluation_case_result"
+    __table_args__ = (UniqueConstraint("evaluation_run_id", "case_id"),)
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uuid_str)
+    evaluation_run_id: Mapped[str] = mapped_column(ForeignKey("evaluation_run.id", ondelete="CASCADE"), index=True)
+    case_id: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    category: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    question: Mapped[str] = mapped_column(Text, nullable=False)
+    status: Mapped[str] = mapped_column(String(32), nullable=False, index=True)
+    execution_ok: Mapped[bool] = mapped_column(Boolean, default=False)
+    result_ok: Mapped[bool] = mapped_column(Boolean, default=False)
+    semantic_ok: Mapped[bool] = mapped_column(Boolean, default=False)
+    expected: Mapped[dict] = mapped_column(JSON, default=dict)
+    actual: Mapped[dict] = mapped_column(JSON, default=dict)
+    generated_sql: Mapped[str | None] = mapped_column(Text)
+    result_diff: Mapped[list] = mapped_column(JSON, default=list)
+    error_category: Mapped[str | None] = mapped_column(String(64), index=True)
+    query_run_id: Mapped[str | None] = mapped_column(ForeignKey("query_run.id", ondelete="SET NULL"), index=True)
 
 
 class DataSource(Base, TimestampMixin):
@@ -244,6 +308,9 @@ class QueryRun(Base, TimestampMixin):
     guard_payload: Mapped[dict] = mapped_column(JSON, default=dict)
     execution_payload: Mapped[dict] = mapped_column(JSON, default=dict)
     oracle_payload: Mapped[dict] = mapped_column(JSON, default=dict)
+    chart_spec_payload: Mapped[dict] = mapped_column(JSON, default=dict)
+    narrative_payload: Mapped[dict] = mapped_column(JSON, default=dict)
+    follow_up_payload: Mapped[list] = mapped_column(JSON, default=list)
     generated_sql: Mapped[str | None] = mapped_column(Text)
     normalized_sql: Mapped[str | None] = mapped_column(Text)
     result_signature: Mapped[str | None] = mapped_column(String(64), index=True)

@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useNavigate, useParams } from 'react-router-dom';
 import type { EChartsCoreOption } from 'echarts/core';
 import { contentApi } from '../api/content';
+import { EChartsRenderer } from '../charting/EChartsRenderer';
 import { EChart } from '../components/EChart';
 import { ErrorNotice, Loading } from '../components/UI';
 import './dashboard-detail.css';
@@ -51,6 +52,16 @@ export function DashboardDetailPage() {
   if (result.isLoading) return <Loading />;
   if (!data) return <ErrorNotice error={result.error ?? new Error('看板不存在')} />;
   const dataTime = new Intl.DateTimeFormat('zh-CN', { year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(`${data.data_as_of}T00:00:00`));
+  async function refreshCard(cardId: string) {
+    await contentApi.refreshDashboardCard(id, cardId);
+    setNotice('卡片已从来源问题重新执行并刷新。');
+    await result.refetch();
+  }
+  async function deleteCard(cardId: string) {
+    await contentApi.deleteDashboardCard(id, cardId);
+    setNotice('卡片已删除。');
+    await result.refetch();
+  }
 
   return <div className="dashboard-detail-page" data-testid="dashboard-detail">
     <header className="detail-heading">
@@ -74,6 +85,7 @@ export function DashboardDetailPage() {
       <article className="detail-card chart-card"><header><div><h2>收入趋势图表</h2><p>单位：万元</p></div><span>总收入：{amount(data.kpis[0]?.value ?? 0)}</span></header><EChart option={revenueOption} label="收入趋势图表" /></article>
       <article className="detail-card chart-card"><header><div><h2>分区域收入图表</h2><p>Top {data.regions.length} 区域</p></div><small>万元</small></header><EChart option={regionOption} label="分区域收入图表" /></article>
     </section>
+    {(data.cards ?? []).length > 0 && <section className="verified-dashboard-cards" aria-label="已验证答案卡片"><header><div><h2>已验证答案卡片</h2><p>每张卡片都绑定来源 Query、结果签名与语义模型版本</p></div></header><div className="verified-card-grid">{(data.cards ?? []).map((card) => <article className="detail-card verified-card" key={card.id} data-testid="dashboard-answer-card"><header><div><h3>{card.title}</h3><p>来源问题：{card.source_question}</p></div><span>Semantic v{card.semantic_model_version}</span></header><EChartsRenderer spec={card.chart_spec} execution={card.result_snapshot} label={card.title} /><small>Query {card.query_run_id.slice(0, 8)} · Signature {card.result_signature?.slice(0, 12) ?? '—'}</small><footer><button type="button" onClick={() => navigate(`/ask/results?q=${encodeURIComponent(card.source_question)}&query_id=${encodeURIComponent(card.query_run_id)}`)}>查看来源问题</button><button type="button" onClick={() => refreshCard(card.id)}>刷新数据</button><button type="button" onClick={() => deleteCard(card.id)}>删除卡片</button></footer></article>)}</div></section>}
     <section className="detail-bottom-grid">
       <article className="detail-card region-table-card"><header><div><h2>重点区域经营表现</h2><p>按收入从高到低</p></div><button type="button" className="button small" onClick={() => setNotice(`当前共有 ${data.regions.length} 个区域经营记录。`)}>查看明细</button></header><div className="detail-table-scroll"><table><thead><tr><th>区域</th><th>订单数</th><th>收入</th><th>充电量</th><th>利润率</th><th>环比</th></tr></thead><tbody>{data.regions.slice(0, 4).map((row) => <tr key={row.region}><td><b>{row.region}区域营销中心</b></td><td>{number.format(row.order_count)}</td><td>{amount(row.revenue)}</td><td>{number.format(row.charging_kwh)} kWh</td><td>{number.format(row.margin_percent)}%</td><td className={row.change_percent < 0 ? 'negative' : 'positive'}>{row.change_percent >= 0 ? '+' : ''}{number.format(row.change_percent)}%</td></tr>)}</tbody></table></div></article>
       <article className="detail-card insight-card"><header><span>AI</span><h2>经营洞察</h2></header><p>{data.insight}</p><button type="button" onClick={() => navigate('/dashboards')}>基于该洞察返回看板列表</button></article>

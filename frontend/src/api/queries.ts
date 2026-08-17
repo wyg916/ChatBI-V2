@@ -12,6 +12,6 @@ export const queryApi = {
       method: 'POST', body: JSON.stringify({ feedback_type: feedbackType, comment }),
     }),
   save: (id: string) => api<VerifiedAnswer>(`/queries/${id}/save`, {
-    method: 'POST', body: JSON.stringify({ owner_name: '当前用户', status: 'DRAFT' }),
+    method: 'POST', body: JSON.stringify({ owner_name: '当前用户', status: 'VERIFIED' }),
   }),
 };

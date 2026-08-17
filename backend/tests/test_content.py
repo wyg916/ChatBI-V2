@@ -14,16 +14,19 @@ def test_answer_library_is_database_backed_and_summary_is_derived(client, db_ses
         "pending_review": 14,
         "favorites": 128,
         "drafts": 14,
-        "published": 6,
+        "published": 0,
+        "verified": 0,
+        "rejected": 0,
+        "deprecated": 114,
     }
     assert payload["total"] == 128
     assert len(payload["items"]) == 6
     assert payload["items"][0]["question"] == "2026年二季度环比增长率入围多少?"
 
-    review = client.get("/api/v1/answers", params={"tab": "review", "query": "退款"})
-    assert review.status_code == 200
-    assert review.json()["total"] == 1
-    assert review.json()["items"][0]["status"] == "REVIEW"
+    drafts = client.get("/api/v1/answers", params={"tab": "drafts", "query": "退款"})
+    assert drafts.status_code == 200
+    assert drafts.json()["total"] == 1
+    assert drafts.json()["items"][0]["status"] == "DRAFT"
 
 
 def test_answer_create_persists_through_api(client):
@@ -93,7 +96,8 @@ def test_evaluation_overview_is_database_backed(client, db_session):
     response = client.get("/api/v1/evaluation/overview")
     assert response.status_code == 200
     payload = response.json()
-    assert payload["current"]["release_name"] == "ChatBI Core v1.13"
-    assert payload["current"]["golden_set_count"] == 296
+    assert payload["current"]["release_name"] == "Day 2 Golden 20 Baseline"
+    assert payload["current"]["golden_set_count"] == 20
+    assert payload["current"]["dangerous_sql_block_count"] == 38
     assert len(payload["metrics"]) == 4
-    assert len(payload["comparisons"]) == 3
+    assert len(payload["comparisons"]) == 1

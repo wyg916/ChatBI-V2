@@ -25,9 +25,20 @@ function result(overrides: Partial<QueryResponse> = {}): QueryResponse {
       row_count: 1, duration_ms: 12, result_signature: 'abcdef0123456789abcdef0123456789',
     },
     oracle: { status: 'PASSED', confidence: 1, checks: [{ name: 'result', passed: true, message: 'PASS' }], mismatch_count: 0 },
+    chart_spec: {
+      version: '1.0', chart_type: 'BAR', title: '按region revenue', x_field: 'region', y_fields: ['revenue'],
+      series: [{ name: 'revenue', field: 'revenue', type: 'bar' }], aggregation: { revenue: 'SUM' }, unit: { revenue: '元' },
+      sort: [], limit: 20, legend: { show: false }, axis: {}, tooltip: {}, data_source_query_id: 'query-1',
+      result_signature: 'abcdef0123456789abcdef0123456789', bound_columns: ['region', 'revenue'], bound_row_count: 1, null_policy: 'PRESERVE', warnings: [],
+    },
+    narrative: {
+      conclusion: '华东收入为 128,000 元。', key_metrics: [], trends: [], contributions: ['华东收入最高'], anomalies: [], insights: ['华东收入最高'],
+      recommended_questions: ['查看最近30天趋势'], evidence: [{ statement: '华东收入最高', fields: ['region', 'revenue'], row_indexes: [0], evidence_type: 'CONTRIBUTION' }],
+      source_query_id: 'query-1', result_signature: 'abcdef0123456789abcdef0123456789', semantic_model_version: 2,
+    },
     summary: '查询完成，共返回 1 行结果。', kpis: [], recommended_questions: ['查看最近30天趋势'],
     ...overrides,
-  };
+  } as QueryResponse;
 }
 
 function renderAsk(initialEntry = '/') {
@@ -94,7 +105,7 @@ describe('问数据真实查询界面', () => {
     renderAsk('/ask/results');
     expect(await screen.findByTestId('query-success')).toBeVisible();
     await user.click(screen.getByRole('button', { name: '结果有帮助' }));
-    await user.click(screen.getByRole('button', { name: '保存为标准答案' }));
+    await user.click(screen.getByRole('button', { name: '保存为已验证答案' }));
     expect(apiMocks.feedback).toHaveBeenCalledWith('query-1', 'HELPFUL');
     expect(apiMocks.save).toHaveBeenCalledWith('query-1');
     expect(await screen.findByText('已保存到答案库')).toBeVisible();

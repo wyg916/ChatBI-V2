@@ -79,3 +79,27 @@ ADR-008 的固定 UI 演示态只适用于 Day 1。Day 2 起，问数据结果�
 ## ADR-016：UI14 基线以精确路由契约和可重复三视口 Gate 收口
 
 14 页高保真实现不再通过零散页面专项结论认定完成，而由精确的 14 项 Route Manifest、六项一级导航断言和 14 页 x 3 视口 Playwright Gate 共同冻结。每个直接 URL 必须返回页面并出现专属 React 标记；浏览器运行时错误、请求失败、页面级横向裁切和关键控件遮挡均为硬失败。截图与 trace 属于可再生测试产物，统一保存在 Git 忽略的 Playwright 输出目录，避免回归运行修改已提交证据文件。系统设置与安全审计继续作为二级 P1 界面壳，不能进入六个 ChatBI-first 一级模块，也不能把静态 UI 示例升级为后端能力已完成的证据。
+
+## ADR-017：ChartSpec 是后端生成的受控展示契约
+
+Chart Engine 只根据已执行 QueryRun 的字段、行形状、指标、维度和结果签名生成 `KPI/LINE/BAR/GROUPED_BAR/STACKED_BAR/DONUT/TABLE` 之一。前端 EChartsRenderer 只翻译该白名单契约，不执行模型生成的 JavaScript。ChartSpec 必须绑定 `data_source_query_id`、列、行数和 `result_signature`，从而阻止静态图、随机数据或与查询结果脱离的图表进入答案和看板。
+
+## ADR-018：Narrative 只能从 Oracle 通过的结果抽取可证明陈述
+
+NarrativeEngine 在 Result Oracle 未通过时不生成业务洞察；通过时只描述可由行值证明的指标、趋势、贡献、差异、集中或异常，并为陈述保存字段和行索引证据。它不得声称未经数据证明的因果关系。推荐追问由当前 Metric、Dimension、Filter 与结果形状确定性生成，保持 3～5 条并重新进入 Ask Pipeline。
+
+## ADR-019：答案与看板卡片保存完整证据快照而非仅保存 SQL
+
+只有 Oracle 通过且用户给出 `HELPFUL` 反馈的 QueryRun 才能保存为 VERIFIED Answer。AnswerVersion 保存语义意图、SQLPlan、SQL、结果签名/快照、ChartSpec、Narrative、数据源和语义模型版本；Dashboard Card 继续绑定 Answer、QueryRun 和结果签名，刷新时重新执行来源问题并生成新 QueryRun。
+
+## ADR-020：Evaluation Run 必须真正执行冻结 Golden Set
+
+评测 API 在运行前验证冻结清单数量和 SHA-256，在运行中逐条经过 Ask Pipeline 与 Result Oracle，并把 Expected、Actual、Generated SQL、ResultDiff 和错误分类持久化为 Case Result。Docker 镜像从仓库唯一冻结清单复制运行资产，不维护第二份 Golden 内容。前端只展示持久化记录，禁止写死 100% 或 20/20。
+
+## ADR-021：发布状态由全部 Gate 决定
+
+产品测试通过不等于 RC 已发布。两次从停止状态启动、Clean Worktree、远端同步和 annotated Tag 都是发布 Gate；若执行环境不允许访问 Docker 或 `.git`，必须保持 `PARTIAL` 并禁止创建 PASS/RC Tag。
+
+## ADR-022：共享状态 E2E 发布门禁串行执行
+
+Day 3 E2E 会同步 Schema、发布语义模型、保存 Answer/Dashboard Card 并运行 Golden Set，多个文件共享同一本机 PostgreSQL 元数据库。发布门禁因此使用 Playwright 单 worker 串行执行，避免 Schema Catalog 重建与查询 allowlist 构建发生测试级竞态。并行模式仍可作为压力探测，但其结果不得替代 34 项确定性发布 Gate；Schema Sync 与在线查询的并发隔离列入 Day 4 加固。

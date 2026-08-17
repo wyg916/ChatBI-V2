@@ -67,9 +67,28 @@ def test_query_api_full_chain_feedback_and_save(client, db_session, monkeypatch)
     feedback = client.post(f"/api/v1/queries/{query_id}/feedback", json={"feedback_type": "HELPFUL"})
     assert feedback.status_code == 201
     assert feedback.json()["recorded"] is True
-    answer = client.post(f"/api/v1/queries/{query_id}/save", json={"owner_name": "Tester", "status": "DRAFT"})
+    answer = client.post(f"/api/v1/queries/{query_id}/save", json={"owner_name": "Tester", "status": "VERIFIED"})
     assert answer.status_code == 201
     assert answer.json()["question"] == "按地区统计订单收入"
+    assert answer.json()["chart_spec"]["data_source_query_id"] == query_id
+    assert answer.json()["narrative"]["source_query_id"] == query_id
+    answer_id = answer.json()["id"]
+
+    detail = client.get(f"/api/v1/answers/{answer_id}")
+    assert detail.status_code == 200
+    assert len(detail.json()["versions"]) == 1
+
+    dashboard = client.post("/api/v1/dashboards", json={
+        "name": "真实答案看板", "description": "由已验证答案创建", "is_shared": False,
+    })
+    assert dashboard.status_code == 201
+    card = client.post(f"/api/v1/dashboards/{dashboard.json()['id']}/cards", json={"answer_id": answer_id})
+    assert card.status_code == 201
+    assert card.json()["source_question"] == "按地区统计订单收入"
+    assert card.json()["result_signature"] == "a" * 64
+
+    deleted = client.delete(f"/api/v1/dashboards/{dashboard.json()['id']}/cards/{card.json()['id']}")
+    assert deleted.status_code == 204
 
 
 def test_query_api_rejects_dangerous_sql_before_executor(client, db_session, monkeypatch):

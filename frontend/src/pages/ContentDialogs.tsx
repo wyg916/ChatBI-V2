@@ -27,7 +27,7 @@ export function NewAnswerDialog({ onClose, onSaved }: DialogProps) {
   return <Modal title="新建标准答案" onClose={onClose}><form className="form-grid" onSubmit={submit}>
     <Field label="标准问题"><textarea name="question" required minLength={2} placeholder="输入业务人员会提出的标准问题" /></Field>
     <div className="form-columns"><Field label="语义模型"><input name="model_name" required placeholder="例如：全体收入" /></Field><Field label="责任人"><input name="owner_name" required defaultValue="王迎港" /></Field></div>
-    <div className="form-columns"><Field label="模块"><input name="module" defaultValue="模块 C1.1.8" required /></Field><Field label="状态"><select name="status" defaultValue="DRAFT"><option value="DRAFT">草稿</option><option value="REVIEW">待审核</option><option value="PUBLISHED">已发布</option></select></Field></div>
+    <div className="form-columns"><Field label="模块"><input name="module" defaultValue="模块 C1.1.8" required /></Field><Field label="状态"><select name="status" defaultValue="DRAFT"><option value="DRAFT">草稿（需经问数校验后验证）</option></select></Field></div>
     <Field label="当前准确率（%）"><input name="accuracy_percent" type="number" min="0" max="100" step="0.1" defaultValue="0" /></Field>
     <ErrorNotice error={error} /><FormActions busy={busy} onCancel={onClose} submitLabel="保存标准答案" />
   </form></Modal>;

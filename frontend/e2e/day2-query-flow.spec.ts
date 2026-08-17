@@ -41,7 +41,8 @@ test('Day2-3 Join 查询展示地区维度与收入', async ({ page }) => {
   const errors = captureRuntimeErrors(page);
   await page.goto(`/ask/results?q=${encodeURIComponent('按地区统计订单收入')}`);
   await expect(page.getByTestId('query-success')).toBeVisible({ timeout: 30_000 });
-  await expect(page.getByText('region · revenue')).toBeVisible();
+  await expect(page.locator('.evidence-card')).toContainText('revenue');
+  await expect(page.locator('.evidence-card')).toContainText('region');
   await expect(page.getByRole('img', { name: '真实查询结果图表' })).toBeVisible();
   await page.getByRole('button', { name: '查看 SQL 与执行明细' }).click();
   await expect(page.getByRole('dialog', { name: 'SQL 与执行明细' })).toContainText('JOIN');
@@ -83,7 +84,7 @@ test('Day2-6 用户反馈与标准答案保存落入 Backend API', async ({ page
   await expect(page.getByTestId('query-success')).toBeVisible({ timeout: 30_000 });
   await page.getByRole('button', { name: '结果有帮助' }).click();
   await expect(page.getByText('已记录“有帮助”')).toBeVisible();
-  await page.getByRole('button', { name: '保存为标准答案' }).click();
+  await page.getByRole('button', { name: '保存为已验证答案' }).click();
   await expect(page.getByText('已保存到答案库')).toBeVisible();
   const answers = await request.get(`${apiBase}/answers?query=${encodeURIComponent('按产品统计订单收入前5名')}`);
   expect(answers.ok()).toBeTruthy();

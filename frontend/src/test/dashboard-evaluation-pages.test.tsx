@@ -19,11 +19,11 @@ const dashboard: DashboardDetail = {
   ],
   revenue_trend: [{ date: '2026-08-17', revenue: 32000000 }],
   regions: [{ region: '华东', order_count: 956, revenue: 36635000, charging_kwh: 82648, margin_percent: 12.8, change_percent: 8.6 }],
-  insight: '华东收入领先。',
+  insight: '华东收入领先。', cards: [],
 };
 
 const evaluation: EvaluationOverview = {
-  current: { id: 'e1', release_name: 'ChatBI Core v1.13', model_name: 'Render v1.2.0 + GPT-4.1', status: 'FULL_RELEASE', is_current: true, golden_set_count: 296, sql_generation_rate: 98.8, result_accuracy: 96.4, semantic_accuracy: 97.1, relevance_accuracy: 96.6, average_response_seconds: 3.2, error_distribution: [{ label: '数据库表', percent: 30, color: '#5b5cf6' }], trend_points: [{ date: '05/19', value: 97.4 }], completed_at: '2026-08-17T06:00:00Z', duration_seconds: 763 },
+  current: { id: 'e1', release_name: 'Day 3 Golden 20', model_name: 'Local Runtime Provider', status: 'PASS', is_current: true, golden_set_count: 20, sql_generation_rate: 100, result_accuracy: 100, semantic_accuracy: 100, relevance_accuracy: 100, average_response_seconds: 0.1, error_distribution: [{ label: '无错误', percent: 100, color: '#16a36a' }], trend_points: [{ date: '08/17', value: 100 }], completed_at: '2026-08-17T06:00:00Z', duration_seconds: 3, sql_execution_pass_count: 20, result_value_pass_count: 20, semantic_pass_count: 20, dangerous_sql_total: 38, dangerous_sql_block_count: 38 },
   metrics: [
     { key: 'sql_generation_rate', label: 'SQL 生成率', value: 98.8, unit: '%', change: 1.6 },
     { key: 'result_accuracy', label: '结果集准确率', value: 96.4, unit: '%', change: 1.2 },
@@ -53,6 +53,6 @@ test('评测中心总览渲染数据库评测记录', async () => {
   vi.spyOn(evaluationApi, 'overview').mockResolvedValue(evaluation);
   renderRoute('/evaluation', <EvaluationOverviewPage />);
   expect(await screen.findByTestId('evaluation-overview')).toBeInTheDocument();
-  expect(screen.getByText('ChatBI Core v1.13')).toBeInTheDocument();
-  expect(screen.getByText('模型评测表现对比')).toBeInTheDocument();
+  expect(screen.getAllByText('Day 3 Golden 20').length).toBeGreaterThan(0);
+  expect(screen.getByText('最近评测运行')).toBeInTheDocument();
 });

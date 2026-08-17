@@ -8,7 +8,7 @@ class AnswerCreate(BaseModel):
     model_name: str = Field(min_length=1, max_length=255)
     owner_name: str = Field(min_length=1, max_length=128)
     module: str = Field(default="模块 C1.1.8", max_length=64)
-    status: str = Field(default="DRAFT", pattern="^(DRAFT|REVIEW|PUBLISHED)$")
+    status: str = Field(default="DRAFT", pattern="^(DRAFT|VERIFIED|REJECTED|DEPRECATED)$")
     accuracy_percent: float = Field(default=0, ge=0, le=100)
 
 
@@ -25,7 +25,39 @@ class AnswerRead(BaseModel):
     accuracy_percent: float
     adoption_count: int
     is_favorite: bool
+    query_run_id: str | None = None
+    sql_text: str | None = None
+    result_signature: str | None = None
+    semantic_model_version: int | None = None
+    semantic_intent: dict = Field(default_factory=dict)
+    sql_plan: dict = Field(default_factory=dict)
+    result_snapshot: dict = Field(default_factory=dict)
+    chart_spec: dict = Field(default_factory=dict)
+    narrative: dict = Field(default_factory=dict)
+    semantic_model_id: str | None = None
+    datasource_id: str | None = None
+    oracle_status: str | None = None
+    feedback: dict = Field(default_factory=dict)
+    created_at: datetime
     updated_at: datetime
+
+
+class AnswerVersionRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    version: int
+    snapshot: dict
+    created_at: datetime
+
+
+class AnswerDetailResponse(AnswerRead):
+    versions: list[AnswerVersionRead] = Field(default_factory=list)
+
+
+class AnswerStatusUpdate(BaseModel):
+    status: str = Field(pattern="^(DRAFT|VERIFIED|REJECTED|DEPRECATED)$")
+    feedback: str | None = Field(default=None, max_length=2000)
 
 
 class AnswerSummary(BaseModel):
@@ -36,6 +68,9 @@ class AnswerSummary(BaseModel):
     favorites: int
     drafts: int
     published: int
+    verified: int
+    rejected: int
+    deprecated: int
 
 
 class AnswerLibraryResponse(BaseModel):
@@ -113,3 +148,34 @@ class DashboardDetailResponse(BaseModel):
     revenue_trend: list[DashboardTrendPoint]
     regions: list[DashboardRegionRow]
     insight: str
+    cards: list["DashboardCardRead"] = Field(default_factory=list)
+
+
+class DashboardCardCreate(BaseModel):
+    answer_id: str
+    title: str | None = Field(default=None, max_length=255)
+    position: dict = Field(default_factory=lambda: {"x": 0, "y": 0})
+    size: dict = Field(default_factory=lambda: {"w": 6, "h": 4})
+    filter_context: dict = Field(default_factory=dict)
+    refresh_policy: str = Field(default="MANUAL", pattern="^(MANUAL|ON_LOAD)$")
+
+
+class DashboardCardRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    dashboard_id: str
+    answer_id: str
+    query_run_id: str
+    chart_spec: dict
+    title: str
+    position: dict
+    size: dict
+    filter_context: dict
+    semantic_model_version: int
+    result_signature: str | None = None
+    refresh_policy: str
+    source_question: str = ""
+    result_snapshot: dict = Field(default_factory=dict)
+    created_at: datetime
+    updated_at: datetime

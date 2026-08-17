@@ -15,13 +15,13 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from app.core.config import get_settings
 
 
-SCHEMA = "chatbi_day2_migration_test"
+SCHEMA = "chatbi_day3_migration_test"
 
 
 def main() -> int:
     backend = Path(__file__).resolve().parents[1]
     root = backend.parent
-    output = root / "docs" / "evidence" / "day2" / "migration-results.json"
+    output = root / "docs" / "evidence" / "day3" / "migration-results.json"
     settings = get_settings()
     engine = create_engine(settings.database_url)
     results: list[dict] = []
@@ -50,7 +50,7 @@ def main() -> int:
             })
         passed = all(item["returncode"] == 0 for item in results)
         one_head = results[0]["stdout"].count("(head)") == 1
-        current_head = "20260817_0004" in results[-1]["stdout"]
+        current_head = "20260817_0005" in results[-1]["stdout"]
     finally:
         with engine.begin() as connection:
             connection.execute(text(f'DROP SCHEMA IF EXISTS "{SCHEMA}" CASCADE'))

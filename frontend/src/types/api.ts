@@ -43,17 +43,21 @@ export interface SemanticModel {
 
 export interface SemanticModelInput { name: string; description?: string; datasource_id: string }
 
-export type AnswerStatus = 'DRAFT' | 'REVIEW' | 'PUBLISHED' | 'ARCHIVED';
+export type AnswerStatus = 'DRAFT' | 'VERIFIED' | 'REJECTED' | 'DEPRECATED';
 export interface VerifiedAnswer {
   id: string; question: string; module: string; sql_synced: boolean; model_name: string; owner_name: string;
   status: AnswerStatus; accuracy_percent: number; adoption_count: number; is_favorite: boolean; updated_at: string;
+  query_run_id?: string; sql_text?: string; result_signature?: string; semantic_model_version?: number;
+  semantic_intent: Record<string, unknown>; sql_plan: Record<string, unknown>; result_snapshot: QueryExecution | Record<string, unknown>;
+  chart_spec: ChartSpec | Record<string, never>; narrative: Narrative | Record<string, never>;
+  semantic_model_id?: string; datasource_id?: string; oracle_status?: string; feedback: Record<string, unknown>; created_at: string;
 }
 export interface AnswerSummary {
   total: number; average_accuracy: number; monthly_adoptions: number; pending_review: number;
-  favorites: number; drafts: number; published: number;
+  favorites: number; drafts: number; published: number; verified: number; rejected: number; deprecated: number;
 }
 export interface AnswerLibraryResponse { summary: AnswerSummary; items: VerifiedAnswer[]; total: number; page: number; page_size: number }
-export interface AnswerInput { question: string; model_name: string; owner_name: string; module?: string; status?: 'DRAFT' | 'REVIEW' | 'PUBLISHED'; accuracy_percent?: number }
+export interface AnswerInput { question: string; model_name: string; owner_name: string; module?: string; status?: AnswerStatus; accuracy_percent?: number }
 
 export interface Dashboard {
   id: string; name: string; description: string; card_count: number; is_shared: boolean; refresh_count_today: number;
@@ -70,7 +74,14 @@ export interface DashboardRegionRow {
 }
 export interface DashboardDetail {
   dashboard: Dashboard; data_as_of: string; range_start: string; range_end: string;
-  kpis: DashboardKpi[]; revenue_trend: DashboardTrendPoint[]; regions: DashboardRegionRow[]; insight: string;
+  kpis: DashboardKpi[]; revenue_trend: DashboardTrendPoint[]; regions: DashboardRegionRow[]; insight: string; cards: DashboardCard[];
+}
+
+export interface DashboardCard {
+  id: string; dashboard_id: string; answer_id: string; query_run_id: string; chart_spec: ChartSpec; title: string;
+  position: Record<string, number>; size: Record<string, number>; filter_context: Record<string, unknown>;
+  semantic_model_version: number; result_signature?: string; refresh_policy: string; source_question: string;
+  result_snapshot: QueryExecution; created_at: string; updated_at: string;
 }
 
 export interface EvaluationRun {
@@ -78,15 +89,40 @@ export interface EvaluationRun {
   sql_generation_rate: number; result_accuracy: number; semantic_accuracy: number; relevance_accuracy: number;
   average_response_seconds: number; error_distribution: Array<{ label: string; percent: number; color: string }>;
   trend_points: Array<{ date: string; value: number }>; completed_at: string; duration_seconds: number;
+  manifest_sha256?: string; sql_execution_pass_count: number; result_value_pass_count: number; semantic_pass_count: number;
+  dangerous_sql_total: number; dangerous_sql_block_count: number;
 }
 export interface EvaluationMetric { key: string; label: string; value: number; unit: string; change: number }
 export interface EvaluationOverview { current: EvaluationRun; metrics: EvaluationMetric[]; comparisons: EvaluationRun[] }
+export interface EvaluationCaseResult {
+  id: string; evaluation_run_id: string; case_id: string; category: string; question: string; status: 'PASS' | 'FAIL';
+  execution_ok: boolean; result_ok: boolean; semantic_ok: boolean; expected: Record<string, unknown>; actual: Record<string, unknown>;
+  generated_sql?: string; result_diff: Array<Record<string, unknown>>; error_category?: string; query_run_id?: string;
+  created_at: string; updated_at: string;
+}
+export interface EvaluationRunDetail { run: EvaluationRun; cases: EvaluationCaseResult[] }
+export interface EvaluationCaseDetail { run: EvaluationRun; case: EvaluationCaseResult; previous_case_id?: string; next_case_id?: string }
 
 export interface QueryExecution {
   status?: 'SUCCEEDED' | 'FAILED' | 'TIMEOUT' | 'CONCURRENCY_LIMIT';
   columns?: string[]; column_types?: string[]; rows?: Array<Record<string, unknown>>;
   row_count?: number; truncated?: boolean; duration_ms?: number; normalized_sql?: string;
   result_signature?: string; error_code?: string; error_message?: string;
+}
+export type ChartType = 'KPI' | 'LINE' | 'BAR' | 'GROUPED_BAR' | 'STACKED_BAR' | 'DONUT' | 'TABLE';
+export interface ChartSpec {
+  version: string; chart_type: ChartType; title: string; x_field?: string; y_fields: string[];
+  series: Array<{ name: string; field: string; type: 'line' | 'bar' | 'pie' | 'kpi' | 'table'; stack?: string }>;
+  aggregation: Record<string, string>; unit: Record<string, string>; sort: string[]; limit: number;
+  legend: Record<string, unknown>; axis: Record<string, unknown>; tooltip: Record<string, unknown>;
+  data_source_query_id: string; result_signature?: string; bound_columns: string[]; bound_row_count: number;
+  null_policy: string; warnings: string[];
+}
+export interface Narrative {
+  conclusion: string; key_metrics: Array<{ label: string; value: unknown; unit?: string }>;
+  trends: string[]; contributions: string[]; anomalies: string[]; insights: string[]; recommended_questions: string[];
+  evidence: Array<{ statement: string; fields: string[]; row_indexes: number[]; evidence_type: string }>;
+  source_query_id: string; result_signature?: string; semantic_model_version: number;
 }
 export interface QueryResponse {
   id: string; question: string; status: 'PLANNING' | 'SUCCEEDED' | 'FAILED' | 'SECURITY_REJECTED' | 'ORACLE_MISMATCH';
@@ -104,6 +140,8 @@ export interface QueryResponse {
     status?: 'PASSED' | 'MISMATCH' | 'NOT_RUN'; confidence?: number;
     checks?: Array<{ name: string; passed: boolean; message: string }>; mismatch_count?: number;
   };
+  chart_spec: ChartSpec | Record<string, never>;
+  narrative: Narrative | Record<string, never>;
   summary: string; kpis: Array<{ label: string; value: unknown; unit?: string }>;
   recommended_questions: string[]; error_code?: string; error_message?: string;
 }

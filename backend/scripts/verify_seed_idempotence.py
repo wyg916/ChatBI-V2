@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import argparse
 import json
 import sys
 from datetime import datetime, timezone
@@ -27,7 +28,9 @@ def counts(db) -> dict[str, int]:
 
 def main() -> int:
     root = Path(__file__).resolve().parents[2]
-    output = root / "docs" / "evidence" / "day2" / "seed-idempotence.json"
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--output", type=Path, default=root / "docs" / "evidence" / "day2" / "seed-idempotence.json")
+    args = parser.parse_args()
     with SessionLocal() as db:
         seed_demo_semantic_model(db)
         first = counts(db)
@@ -39,8 +42,8 @@ def main() -> int:
         "second_run_counts": second,
         "idempotent": first == second,
     }
-    output.parent.mkdir(parents=True, exist_ok=True)
-    output.write_text(json.dumps(evidence, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    args.output.parent.mkdir(parents=True, exist_ok=True)
+    args.output.write_text(json.dumps(evidence, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     print(json.dumps(evidence, ensure_ascii=False, indent=2))
     return 0 if evidence["idempotent"] else 1
 

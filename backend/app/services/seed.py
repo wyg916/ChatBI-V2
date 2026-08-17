@@ -93,6 +93,7 @@ def _ensure_mysql_semantic_model(db: Session, datasource: DataSource, source: Se
         )
         db.add(model)
         db.flush()
+    model.status = "PUBLISHED"
     if db.scalar(select(SemanticEntity.id).where(SemanticEntity.semantic_model_id == model.id).limit(1)) is None:
         db.add_all([
             SemanticEntity(
@@ -136,12 +137,12 @@ def _ensure_mysql_semantic_model(db: Session, datasource: DataSource, source: Se
 def _seed_demo_content(db: Session, workspace_id: str) -> None:
     if db.scalar(select(VerifiedAnswer.id).limit(1)) is None:
         answer_rows = [
-            ("2026年二季度环比增长率入围多少?", "全体收入", "文心", "PUBLISHED", 98, 432, 84),
-            ("各负责人近三年利润总额趋势?", "共用收入", "弘岳", "PUBLISHED", 96, 321, 73),
-            ("各地区订单金额年度分布", "订单量 / 销售额", "文心", "PUBLISHED", 90, 252, 62),
-            ("过去 30 天退款笔数最高的商品", "订单与发票", "弘岳", "REVIEW", 89, 182, 58),
-            ("驾驶舱毛利率表现", "毛利率", "盘古内", "PUBLISHED", 97, 232, 55),
-            ("各省份营收完成率", "营业完成率", "钉钉", "REVIEW", 86, 92, 48),
+            ("2026年二季度环比增长率入围多少?", "全体收入", "文心", "DRAFT", 98, 432, 84),
+            ("各负责人近三年利润总额趋势?", "共用收入", "弘岳", "DRAFT", 96, 321, 73),
+            ("各地区订单金额年度分布", "订单量 / 销售额", "文心", "DRAFT", 90, 252, 62),
+            ("过去 30 天退款笔数最高的商品", "订单与发票", "弘岳", "DRAFT", 89, 182, 58),
+            ("驾驶舱毛利率表现", "毛利率", "盘古内", "DRAFT", 97, 232, 55),
+            ("各省份营收完成率", "营业完成率", "钉钉", "DRAFT", 86, 92, 48),
         ]
         db.add_all([
             VerifiedAnswer(
@@ -164,7 +165,7 @@ def _seed_demo_content(db: Session, workspace_id: str) -> None:
         generated_models = ["全体收入", "订单量 / 销售额", "客户增长", "毛利率", "区域经营"]
         generated_owners = ["文心", "弘岳", "盘古内", "钉钉"]
         for offset in range(122):
-            status = "REVIEW" if offset < 12 else "DRAFT" if offset < 26 else "PUBLISHED" if offset < 28 else "ARCHIVED"
+            status = "DRAFT" if offset < 8 else "DEPRECATED"
             db.add(VerifiedAnswer(
                 workspace_id=workspace_id,
                 question=f"经营分析标准问题 {offset + 7:03d}",
@@ -222,45 +223,18 @@ def _seed_demo_content(db: Session, workspace_id: str) -> None:
 
     if db.scalar(select(EvaluationRun.id).limit(1)) is None:
         now = utcnow()
-        common_errors = [
-            {"label": "数据库表", "percent": 30, "color": "#5b5cf6"},
-            {"label": "多表关联", "percent": 28, "color": "#2f80ed"},
-            {"label": "过滤条件", "percent": 17, "color": "#f59e0b"},
-            {"label": "聚合函数", "percent": 12, "color": "#f04444"},
-            {"label": "其他", "percent": 13, "color": "#c8cfdd"},
-        ]
-        db.add_all([
-            EvaluationRun(
-                workspace_id=workspace_id, release_name="ChatBI Core v1.13",
-                model_name="Render v1.2.0 + GPT-4.1", status="FULL_RELEASE", is_current=True,
-                golden_set_count=296, sql_generation_rate=98.8, result_accuracy=96.4,
-                semantic_accuracy=97.1, relevance_accuracy=96.6, average_response_seconds=3.2,
-                error_distribution=common_errors,
-                trend_points=[
-                    {"date": "04/21", "value": 89.0}, {"date": "04/25", "value": 91.2},
-                    {"date": "04/29", "value": 90.1}, {"date": "05/03", "value": 94.0},
-                    {"date": "05/07", "value": 92.5}, {"date": "05/11", "value": 96.1},
-                    {"date": "05/15", "value": 94.6}, {"date": "05/19", "value": 97.4},
-                ],
-                completed_at=now - timedelta(minutes=28), duration_seconds=763, sort_order=1,
-            ),
-            EvaluationRun(
-                workspace_id=workspace_id, release_name="ChatBI Core v1.12",
-                model_name="Render v1.1.0 + DeepSeek", status="COMPLETED", is_current=False,
-                golden_set_count=296, sql_generation_rate=95.7, result_accuracy=94.8,
-                semantic_accuracy=95.6, relevance_accuracy=94.4, average_response_seconds=2.9,
-                error_distribution=common_errors, trend_points=[],
-                completed_at=now - timedelta(days=7), duration_seconds=701, sort_order=2,
-            ),
-            EvaluationRun(
-                workspace_id=workspace_id, release_name="SQLAPI Baseline",
-                model_name="SQLAPI Shadow", status="BASELINE", is_current=False,
-                golden_set_count=296, sql_generation_rate=93.7, result_accuracy=92.3,
-                semantic_accuracy=93.8, relevance_accuracy=91.2, average_response_seconds=4.1,
-                error_distribution=common_errors, trend_points=[],
-                completed_at=now - timedelta(days=14), duration_seconds=918, sort_order=3,
-            ),
-        ])
+        db.add(EvaluationRun(
+            workspace_id=workspace_id, release_name="Day 2 Golden 20 Baseline",
+            model_name="Local Runtime Provider", status="PASS", is_current=True,
+            golden_set_count=20, sql_generation_rate=100, result_accuracy=100,
+            semantic_accuracy=100, relevance_accuracy=100, average_response_seconds=0,
+            error_distribution=[{"label": "无错误", "percent": 100, "color": "#16a36a"}],
+            trend_points=[{"date": "08/17", "value": 100}],
+            completed_at=now - timedelta(minutes=28), duration_seconds=0, sort_order=1,
+            manifest_sha256="d40bb690a4208240ecf347abe47e045cd74c8eb89b9162d5d53890ecf24bc282",
+            sql_execution_pass_count=20, result_value_pass_count=20, semantic_pass_count=20,
+            dangerous_sql_total=38, dangerous_sql_block_count=38,
+        ))
 
 
 def seed_demo_semantic_model(db: Session) -> SemanticModel:
@@ -303,6 +277,7 @@ def seed_demo_semantic_model(db: Session) -> SemanticModel:
 
     existing = db.scalar(select(SemanticModel).where(SemanticModel.name == DEMO_MODEL_NAME))
     if existing:
+        existing.status = "PUBLISHED"
         _ensure_day2_semantic_resources(db, existing)
         db.flush()
         _ensure_mysql_semantic_model(db, mysql_datasource, existing)
@@ -315,6 +290,7 @@ def seed_demo_semantic_model(db: Session) -> SemanticModel:
         datasource_id=datasource.id,
         name=DEMO_MODEL_NAME,
         description="可复现的 Day 1 演示语义模型",
+        status="PUBLISHED",
     )
     db.add(model)
     db.flush()

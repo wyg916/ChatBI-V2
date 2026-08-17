@@ -1,4 +1,5 @@
 from app.models.entities import (
+    AnswerVersion,
     BusinessTerm,
     DataSource,
     DataSourceColumn,
@@ -6,6 +7,8 @@ from app.models.entities import (
     DataSourceSchema,
     DataSourceTable,
     Dashboard,
+    DashboardCard,
+    EvaluationCaseResult,
     EvaluationRun,
     Dimension,
     Metric,
@@ -24,6 +27,7 @@ __all__ = [
     "Workspace", "DataSource", "DataSourceSchema", "DataSourceTable",
     "DataSourceColumn", "DataSourceRelation", "SemanticModel",
     "SemanticEntity", "Metric", "Dimension", "SemanticRelation",
-    "BusinessTerm", "SemanticVersion", "VerifiedAnswer", "Dashboard", "EvaluationRun",
+    "BusinessTerm", "SemanticVersion", "VerifiedAnswer", "AnswerVersion",
+    "Dashboard", "DashboardCard", "EvaluationRun", "EvaluationCaseResult",
     "QueryRun", "QueryAuditEvent", "QueryFeedback",
 ]

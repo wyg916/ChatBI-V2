@@ -3,7 +3,7 @@ from datetime import timedelta
 from sqlalchemy import case, func, or_, select
 from sqlalchemy.orm import Session
 
-from app.models import Dashboard, DataSource, VerifiedAnswer
+from app.models import AnswerVersion, Dashboard, DashboardCard, DataSource, QueryRun, VerifiedAnswer
 from app.services.datasources import build_connector
 
 
@@ -13,10 +13,12 @@ def answer_summary(db: Session) -> dict[str, int | float]:
             func.count(VerifiedAnswer.id),
             func.coalesce(func.avg(VerifiedAnswer.accuracy_percent), 0),
             func.coalesce(func.sum(VerifiedAnswer.monthly_adoption_count), 0),
-            func.coalesce(func.sum(case((VerifiedAnswer.status == "REVIEW", 1), else_=0)), 0),
+            func.coalesce(func.sum(case((VerifiedAnswer.status == "DRAFT", 1), else_=0)), 0),
             func.coalesce(func.sum(case((VerifiedAnswer.is_favorite.is_(True), 1), else_=0)), 0),
             func.coalesce(func.sum(case((VerifiedAnswer.status == "DRAFT", 1), else_=0)), 0),
-            func.coalesce(func.sum(case((VerifiedAnswer.status == "PUBLISHED", 1), else_=0)), 0),
+            func.coalesce(func.sum(case((VerifiedAnswer.status == "VERIFIED", 1), else_=0)), 0),
+            func.coalesce(func.sum(case((VerifiedAnswer.status == "REJECTED", 1), else_=0)), 0),
+            func.coalesce(func.sum(case((VerifiedAnswer.status == "DEPRECATED", 1), else_=0)), 0),
         )
     ).one()
     return {
@@ -27,6 +29,9 @@ def answer_summary(db: Session) -> dict[str, int | float]:
         "favorites": row[4],
         "drafts": row[5],
         "published": row[6],
+        "verified": row[6],
+        "rejected": row[7],
+        "deprecated": row[8],
     }
 
 
@@ -50,10 +55,12 @@ def list_answers(
         statement = statement.where(VerifiedAnswer.is_favorite.is_(True))
     elif tab == "drafts":
         statement = statement.where(VerifiedAnswer.status == "DRAFT")
-    elif tab == "published":
-        statement = statement.where(VerifiedAnswer.status == "PUBLISHED")
-    elif tab == "review":
-        statement = statement.where(VerifiedAnswer.status == "REVIEW")
+    elif tab in {"published", "verified"}:
+        statement = statement.where(VerifiedAnswer.status == "VERIFIED")
+    elif tab == "rejected":
+        statement = statement.where(VerifiedAnswer.status == "REJECTED")
+    elif tab == "deprecated":
+        statement = statement.where(VerifiedAnswer.status == "DEPRECATED")
 
     total = db.scalar(select(func.count()).select_from(statement.subquery())) or 0
     items = list(db.scalars(
@@ -212,6 +219,28 @@ def dashboard_detail(db: Session, dashboard: Dashboard) -> dict:
             f"{focus['region']}环比{focus['change_percent']:+.1f}%，建议结合订单量与利润率继续核查区域增长质量。"
         )
 
+    cards = []
+    for card in db.scalars(select(DashboardCard).where(DashboardCard.dashboard_id == dashboard.id).order_by(DashboardCard.created_at)):
+        answer = db.get(VerifiedAnswer, card.answer_id)
+        run = db.get(QueryRun, card.query_run_id)
+        cards.append({
+            "id": card.id,
+            "dashboard_id": card.dashboard_id,
+            "answer_id": card.answer_id,
+            "query_run_id": card.query_run_id,
+            "chart_spec": card.chart_spec,
+            "title": card.title,
+            "position": card.position,
+            "size": card.size,
+            "filter_context": card.filter_context,
+            "semantic_model_version": card.semantic_model_version,
+            "result_signature": card.result_signature,
+            "refresh_policy": card.refresh_policy,
+            "source_question": answer.question if answer else "",
+            "result_snapshot": run.execution_payload if run else {},
+            "created_at": card.created_at,
+            "updated_at": card.updated_at,
+        })
     return {
         "dashboard": dashboard,
         "data_as_of": summary["max_date"].isoformat(),
@@ -226,4 +255,103 @@ def dashboard_detail(db: Session, dashboard: Dashboard) -> dict:
         "revenue_trend": [{"date": row["kpi_date"].isoformat(), "revenue": round(_number(row["revenue"]), 2)} for row in trend],
         "regions": region_rows,
         "insight": insight,
+        "cards": cards,
+    }
+
+
+def answer_version_snapshot(answer: VerifiedAnswer) -> dict:
+    return {
+        "question": answer.question,
+        "status": answer.status,
+        "semantic_intent": answer.semantic_intent,
+        "sql_plan": answer.sql_plan,
+        "sql": answer.sql_text,
+        "result_snapshot": answer.result_snapshot,
+        "result_signature": answer.result_signature,
+        "chart_spec": answer.chart_spec,
+        "narrative": answer.narrative,
+        "semantic_model_id": answer.semantic_model_id,
+        "semantic_model_version": answer.semantic_model_version,
+        "datasource_id": answer.datasource_id,
+        "oracle_status": answer.oracle_status,
+        "feedback": answer.feedback,
+    }
+
+
+def update_answer_status(db: Session, answer: VerifiedAnswer, *, status: str, feedback: str | None) -> VerifiedAnswer:
+    if status == "VERIFIED" and answer.oracle_status != "PASSED":
+        raise ValueError("Only an Oracle-passed answer can be VERIFIED")
+    answer.status = status
+    if feedback is not None:
+        answer.feedback = {**(answer.feedback or {}), "status_comment": feedback}
+    next_version = (db.scalar(select(func.coalesce(func.max(AnswerVersion.version), 0)).where(AnswerVersion.answer_id == answer.id)) or 0) + 1
+    db.flush()
+    db.add(AnswerVersion(answer_id=answer.id, version=next_version, snapshot=answer_version_snapshot(answer)))
+    db.commit()
+    db.refresh(answer)
+    return answer
+
+
+def create_dashboard_card(db: Session, dashboard: Dashboard, *, answer: VerifiedAnswer, data) -> DashboardCard:
+    if answer.status != "VERIFIED" or answer.oracle_status != "PASSED":
+        raise ValueError("Only a VERIFIED Oracle-passed answer can become a dashboard card")
+    if not answer.query_run_id or not answer.chart_spec:
+        raise ValueError("Answer has no bound query result or ChartSpec")
+    card = DashboardCard(
+        dashboard_id=dashboard.id,
+        answer_id=answer.id,
+        query_run_id=answer.query_run_id,
+        chart_spec=answer.chart_spec,
+        title=data.title or answer.question[:255],
+        position=data.position,
+        size=data.size,
+        filter_context=data.filter_context,
+        semantic_model_version=answer.semantic_model_version or 1,
+        result_signature=answer.result_signature,
+        refresh_policy=data.refresh_policy,
+    )
+    db.add(card)
+    db.flush()
+    dashboard.card_count = len(list(db.scalars(select(DashboardCard.id).where(DashboardCard.dashboard_id == dashboard.id))))
+    db.commit()
+    db.refresh(card)
+    return card
+
+
+def refresh_dashboard_card(db: Session, card: DashboardCard) -> DashboardCard:
+    from app.query.contracts import AskRequest
+    from app.query.service import QueryPipeline
+
+    answer = db.get(VerifiedAnswer, card.answer_id)
+    if answer is None or not answer.datasource_id or not answer.semantic_model_id:
+        raise ValueError("Card source answer is incomplete")
+    run = QueryPipeline().execute(db, AskRequest(
+        question=answer.question,
+        datasource_id=answer.datasource_id,
+        semantic_model_id=answer.semantic_model_id,
+    ))
+    if run.status != "SUCCEEDED":
+        raise ValueError(f"Card refresh query failed: {run.status}")
+    card.query_run_id = run.id
+    card.chart_spec = run.chart_spec_payload
+    card.result_signature = run.result_signature
+    card.semantic_model_version = run.semantic_model_version
+    dashboard = db.get(Dashboard, card.dashboard_id)
+    if dashboard:
+        dashboard.refresh_count_today += 1
+    db.commit()
+    db.refresh(card)
+    return card
+
+
+def dashboard_card_payload(db: Session, card: DashboardCard) -> dict:
+    answer = db.get(VerifiedAnswer, card.answer_id)
+    run = db.get(QueryRun, card.query_run_id)
+    return {
+        **{name: getattr(card, name) for name in (
+            "id", "dashboard_id", "answer_id", "query_run_id", "chart_spec", "title", "position", "size",
+            "filter_context", "semantic_model_version", "result_signature", "refresh_policy", "created_at", "updated_at",
+        )},
+        "source_question": answer.question if answer else "",
+        "result_snapshot": run.execution_payload if run else {},
     }

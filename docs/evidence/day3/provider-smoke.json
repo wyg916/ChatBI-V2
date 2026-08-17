@@ -1,0 +1,13 @@
+{
+  "verified_at": "2026-08-17T17:37:00+08:00",
+  "configured_provider": "deterministic",
+  "runtime_provider": "deterministic-semantic-v1",
+  "runtime_available": true,
+  "dialects": ["postgresql", "mysql"],
+  "structured_output": true,
+  "external_model": false,
+  "model_name_configured": false,
+  "base_url_configured": false,
+  "api_key_configured": false,
+  "live_model_smoke": "NOT_CONFIGURED"
+}

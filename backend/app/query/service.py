@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
 from app.models import (
+    AnswerVersion,
     DataSource,
     QueryAuditEvent,
     QueryFeedback,
@@ -12,6 +13,8 @@ from app.models import (
     SemanticModel,
     VerifiedAnswer,
 )
+from app.chart import ChartEngine
+from app.insight import NarrativeEngine
 from app.query.context_builder import ContextBuilder
 from app.query.contracts import (
     AskRequest,
@@ -102,7 +105,11 @@ def _summary(run: QueryRun) -> tuple[str, list[dict], list[str]]:
 
 
 def query_response(run: QueryRun) -> QueryResponse:
-    summary, kpis, recommendations = _summary(run)
+    fallback_summary, fallback_kpis, fallback_recommendations = _summary(run)
+    narrative = run.narrative_payload or {}
+    summary = narrative.get("conclusion") or fallback_summary
+    kpis = narrative.get("key_metrics") or fallback_kpis
+    recommendations = run.follow_up_payload or narrative.get("recommended_questions") or fallback_recommendations
     return QueryResponse(
         id=run.id,
         question=run.question,
@@ -116,6 +123,8 @@ def query_response(run: QueryRun) -> QueryResponse:
         guard=run.guard_payload or {},
         execution=run.execution_payload or {},
         oracle=run.oracle_payload or {},
+        chart_spec=run.chart_spec_payload or {},
+        narrative=narrative,
         summary=summary,
         kpis=kpis,
         recommended_questions=recommendations,
@@ -131,6 +140,24 @@ class QueryPipeline:
         self.guard = SqlGuard()
         self.executor = QueryExecutor()
         self.oracle = ResultOracle()
+        self.chart_engine = ChartEngine()
+        self.narrative_engine = NarrativeEngine()
+
+    def _build_presentation(self, run: QueryRun) -> None:
+        if not run.plan_payload or not run.execution_payload:
+            return
+        chart = self.chart_engine.plan(query_id=run.id, plan=run.plan_payload, execution=run.execution_payload)
+        narrative = self.narrative_engine.generate(
+            query_id=run.id,
+            semantic_model_version=run.semantic_model_version,
+            plan=run.plan_payload,
+            execution=run.execution_payload,
+            oracle=run.oracle_payload or {},
+            chart_spec=chart,
+        )
+        run.chart_spec_payload = _json(chart)
+        run.narrative_payload = _json(narrative)
+        run.follow_up_payload = narrative.recommended_questions
 
     def execute(self, db: Session, request: AskRequest) -> QueryRun:
         settings = get_settings()
@@ -208,6 +235,7 @@ class QueryPipeline:
                 _audit(db, run, "RESULT_ORACLE", oracle.status, {
                     "confidence": oracle.confidence, "mismatch_count": oracle.mismatch_count,
                 })
+                self._build_presentation(run)
             db.commit()
             db.refresh(run)
             return run
@@ -231,6 +259,7 @@ class QueryPipeline:
         oracle = self.oracle.verify(plan=plan, guard=guard, execution=execution, expected=expected)
         run.oracle_payload = _json(oracle)
         run.status = "SUCCEEDED" if oracle.status == "PASSED" else "ORACLE_MISMATCH"
+        self._build_presentation(run)
         _audit(db, run, "RESULT_ORACLE_REVERIFY", oracle.status, {
             "confidence": oracle.confidence, "mismatch_count": oracle.mismatch_count,
         })
@@ -258,7 +287,21 @@ def save_feedback(db: Session, run: QueryRun, data: FeedbackRequest) -> QueryFee
 def save_verified_answer(db: Session, run: QueryRun, data: SaveAnswerRequest) -> VerifiedAnswer:
     if run.status != "SUCCEEDED":
         raise ValueError("Only an Oracle-passed query can be saved as an answer")
+    helpful = db.scalar(select(QueryFeedback).where(
+        QueryFeedback.query_run_id == run.id,
+        QueryFeedback.feedback_type == "HELPFUL",
+    ))
+    if data.status == "VERIFIED" and helpful is None:
+        raise ValueError("A positive user verification is required before saving a VERIFIED answer")
     sort_order = len(list(db.scalars(select(VerifiedAnswer.id)))) + 1
+    semantic_intent = {
+        "intent": (run.plan_payload or {}).get("intent"),
+        "entities": (run.plan_payload or {}).get("selected_entities", []),
+        "metrics": (run.plan_payload or {}).get("metrics", []),
+        "dimensions": (run.plan_payload or {}).get("dimensions", []),
+        "filters": (run.plan_payload or {}).get("filters", []),
+        "time_range": (run.plan_payload or {}).get("time_range"),
+    }
     answer = VerifiedAnswer(
         workspace_id=run.workspace_id,
         question=run.question,
@@ -273,8 +316,32 @@ def save_verified_answer(db: Session, run: QueryRun, data: SaveAnswerRequest) ->
         sql_text=run.normalized_sql,
         result_signature=run.result_signature,
         semantic_model_version=run.semantic_model_version,
+        semantic_intent=semantic_intent,
+        sql_plan=run.plan_payload or {},
+        result_snapshot=run.execution_payload or {},
+        chart_spec=run.chart_spec_payload or {},
+        narrative=run.narrative_payload or {},
+        semantic_model_id=run.semantic_model_id,
+        datasource_id=run.datasource_id,
+        oracle_status=(run.oracle_payload or {}).get("status"),
+        feedback={"type": "HELPFUL", "comment": helpful.comment if helpful else None},
     )
     db.add(answer)
+    db.flush()
+    db.add(AnswerVersion(
+        answer_id=answer.id,
+        version=1,
+        snapshot={
+            "question": answer.question,
+            "semantic_intent": semantic_intent,
+            "sql_plan": run.plan_payload or {},
+            "sql": run.normalized_sql,
+            "result_snapshot": run.execution_payload or {},
+            "chart_spec": run.chart_spec_payload or {},
+            "narrative": run.narrative_payload or {},
+            "oracle_status": (run.oracle_payload or {}).get("status"),
+        },
+    ))
     _audit(db, run, "ANSWER_SAVED", "PASS", {"answer_status": data.status})
     db.commit()
     db.refresh(answer)

@@ -56,7 +56,7 @@ test('14 个路由可访问且目标视口无页面级横向裁切', async ({ pa
   const routes = [
     '/login', '/', '/ask/results', '/datasources', `/datasources/${sourceId}`,
     '/semantic-models', `/semantic-models/${modelId}`, '/answers', '/dashboards',
-    `/dashboards/${dashboardId}`, '/evaluation', '/evaluation/day1-demo',
+    `/dashboards/${dashboardId}`, '/evaluation', '/evaluation/G01',
     '/settings/models', '/settings/security',
   ];
 
@@ -140,7 +140,7 @@ test('内容中心、经营看板详情与评测总览由 API 驱动并适配三
 
     await page.goto('/evaluation');
     await expect(page.getByTestId('evaluation-overview')).toBeVisible();
-    await expect(page.getByText('模型评测表现对比')).toBeVisible();
+    await expect(page.getByText('最近评测运行')).toBeVisible();
     expect(await page.locator('body').evaluate((body) => body.scrollWidth <= window.innerWidth), `evaluation @ ${viewport.width}x${viewport.height}`).toBe(true);
   }
 

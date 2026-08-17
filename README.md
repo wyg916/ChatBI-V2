@@ -1,6 +1,6 @@
 # ChatBI V2
 
-ChatBI V2 是围绕“数据源 → Schema → 语义层 → 问数 → 可验证结果”构建的开源企业级 ChatBI 产品。当前已完成 Day 2 问数主链路：Schema Linking、QueryContext、结构化 SQLPlan、SQLGlot AST Guard、只读 Query Executor、Result Oracle、真实结果页、反馈与答案保存。
+ChatBI V2 是围绕“数据源 → Schema → 语义层 → 问数 → 可验证结果 → 图表与洞察 → 答案 → 看板 → 评测”构建的开源企业级 ChatBI 产品。V1 RC 候选已实现完整的真实产品闭环；当前发布 Gate 与未完成项以 [`docs/status/DAY3_STATUS.md`](docs/status/DAY3_STATUS.md) 为准。
 
 ## 一键启动
 
@@ -38,14 +38,14 @@ cd "ChatBI-V2"
 frontend/     React + TypeScript + Vite
 backend/      FastAPI + SQLAlchemy + Alembic
 database/     本机 PostgreSQL/MySQL 可复现模拟业务数据
-evaluation/   后续评测资产入口
+  evaluation/   冻结 Golden Set 与评测资产
 scripts/      Windows 一键启动、停止、状态和验证
 docs/         产品、架构、验收、UI 与状态文档
 ```
 
 后端统一使用 `/api/v1`，语义层业务代码只依赖 ChatBI 自有 `SemanticEngine` 接口。当前使用可运行的 `LocalSemanticEngine`，并保留隔离且如实报告不可用的 `WrenSemanticAdapter` seam；Day 2 主链路不依赖未配置的 Wren runtime。
 
-## Day 2 问数链路
+## V1 RC 产品闭环
 
 ```text
 自然语言问题
@@ -54,7 +54,11 @@ docs/         产品、架构、验收、UI 与状态文档
 → SQLGlot AST Guard
 → PostgreSQL/MySQL 只读执行
 → Result Oracle
-→ Backend API 结果、反馈、标准答案
+→ 受控 ChartSpec / ECharts
+→ 证据绑定 Narrative / 推荐追问
+→ Verified Answer / AnswerVersion
+→ Dashboard Card
+→ Golden Evaluation / Case Detail
 ```
 
 默认 `CHATBI_MODEL_PROVIDER=deterministic` 使用基于语义对象与通用分析意图的本地运行时，不使用“完整问题 → 固定 SQL”字典。可选 OpenAI-compatible Provider 仅通过环境变量配置：
@@ -75,6 +79,11 @@ API Key 不得写入仓库。没有配置外部模型时，本地运行时仍可
 - `POST /api/v1/queries/{id}/verify`
 - `POST /api/v1/queries/{id}/feedback`
 - `POST /api/v1/queries/{id}/save`
+- `GET /api/v1/answers/{id}`
+- `POST /api/v1/answers/{id}/reuse`
+- `POST /api/v1/dashboards/{id}/cards`
+- `POST /api/v1/evaluation/runs`
+- `GET /api/v1/evaluation/cases/{case_id}`
 - `GET /api/v1/query-capabilities`
 
 ## 本地验证
@@ -82,7 +91,7 @@ API Key 不得写入仓库。没有配置外部模型时，本地运行时仍可
 ```powershell
 cd backend
 .\.venv\Scripts\python.exe -m pytest -q
-.\.venv\Scripts\python.exe scripts\run_day2_golden.py
+.\.venv\Scripts\python.exe scripts\run_day3_golden.py
 
 cd ..\frontend
 npm ci
@@ -92,4 +101,4 @@ npm run build
 npm run e2e
 ```
 
-Day 2 Golden 20 冻结清单位于 [`evaluation/golden/day2-golden-20.json`](evaluation/golden/day2-golden-20.json)，验收结果与已知边界见 [`docs/status/DAY2_STATUS.md`](docs/status/DAY2_STATUS.md)。
+Golden 20 冻结清单位于 [`evaluation/golden/day2-golden-20.json`](evaluation/golden/day2-golden-20.json)，V1 RC 候选验收结果见 [`docs/status/DAY3_STATUS.md`](docs/status/DAY3_STATUS.md)，15 分钟演示见 [`DEMO.md`](DEMO.md)，完整安装说明见 [`INSTALL.md`](INSTALL.md)。

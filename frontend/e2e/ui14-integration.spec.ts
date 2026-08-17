@@ -27,6 +27,9 @@ function captureRuntimeErrors(page: Page) {
   page.on('requestfailed', (request) => {
     errors.push(`request: ${request.method()} ${request.url()} ${request.failure()?.errorText ?? ''}`);
   });
+  page.on('response', (response) => {
+    if (response.status() >= 400) errors.push(`response: ${response.status()} ${response.url()}`);
+  });
   return errors;
 }
 
@@ -51,8 +54,8 @@ async function pageTargets(request: APIRequestContext): Promise<PageTarget[]> {
     { id: '08', title: '答案库', path: '/answers', appShell: true, ready: (page) => page.getByTestId('answer-row').first(), criticalControl: (page) => page.getByRole('button', { name: '＋ 新建标准答案' }) },
     { id: '09', title: '看板列表', path: '/dashboards', appShell: true, ready: (page) => page.getByTestId('dashboard-card').first(), criticalControl: (page) => page.getByRole('button', { name: '＋ 新建看板' }) },
     { id: '10', title: '经营看板详情', path: `/dashboards/${dashboards[0].id}`, appShell: true, ready: (page) => page.getByTestId('dashboard-detail'), criticalControl: (page) => page.getByRole('button', { name: /刷新/ }) },
-    { id: '11', title: '评测中心总览', path: '/evaluation', appShell: true, ready: (page) => page.getByTestId('evaluation-overview'), criticalControl: (page) => page.getByRole('button', { name: /运行全部评测/ }) },
-    { id: '12', title: '评测用例详情', path: '/evaluation/ui14-case', appShell: true, ready: (page) => page.getByRole('heading', { name: '评测用例详情' }), criticalControl: (page) => page.getByRole('button', { name: '重新运行' }) },
+    { id: '11', title: '评测中心总览', path: '/evaluation', appShell: true, ready: (page) => page.getByTestId('evaluation-overview'), criticalControl: (page) => page.getByRole('button', { name: /运行 Golden 20/ }) },
+    { id: '12', title: '评测用例详情', path: '/evaluation/G01', appShell: true, ready: (page) => page.getByRole('heading', { name: '评测用例详情' }), criticalControl: (page) => page.getByRole('button', { name: '重新运行' }) },
     { id: '13', title: '系统设置与模型服务', path: '/settings/models', appShell: true, ready: (page) => page.getByTestId('settings-models-page'), criticalControl: (page) => page.getByRole('button', { name: '保存全部设置' }) },
     { id: '14', title: '用户角色与审计', path: '/settings/security', appShell: true, ready: (page) => page.getByTestId('security-audit-page'), criticalControl: (page) => page.getByRole('button', { name: '＋ 邀请成员' }) },
   ];
