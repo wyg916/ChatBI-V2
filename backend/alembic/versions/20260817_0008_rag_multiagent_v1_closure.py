@@ -20,10 +20,6 @@ def upgrade() -> None:
     op.add_column("orchestration_profile", sa.Column("max_tool_calls", sa.Integer(), nullable=False, server_default="12"))
     op.add_column("orchestration_profile", sa.Column("max_replan", sa.Integer(), nullable=False, server_default="2"))
     op.add_column("orchestration_profile", sa.Column("max_agent_depth", sa.Integer(), nullable=False, server_default="2"))
-    op.alter_column("orchestration_profile", "max_steps", server_default="8")
-    op.alter_column("orchestration_profile", "timeout_ms", server_default="30000")
-    op.alter_column("orchestration_profile", "token_budget", server_default="6000")
-
     op.add_column("orchestration_run", sa.Column("ttft_ms", sa.Integer(), nullable=False, server_default="0"))
     op.add_column("orchestration_run", sa.Column("total_latency_ms", sa.Integer(), nullable=False, server_default="0"))
     op.add_column("orchestration_run", sa.Column("tool_latency_ms", sa.Integer(), nullable=False, server_default="0"))
