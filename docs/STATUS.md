@@ -2,10 +2,41 @@
 
 ## 2026-08-17
 
+- Day 2：Schema Linking、QueryContext、NL2SQL Router、结构化 SQLPlan、SQLGlot AST Guard、PostgreSQL/MySQL 只读执行、Result Oracle、真实结果页、反馈与答案保存已完成并通过门禁。
+- Golden 20 已冻结：PostgreSQL 执行/结果/语义 20/20，MySQL 基础兼容 5/5；38/38 危险 SQL 被阻断，两个只读账号真实写入成功数 0。
+- Backend 66/66、Frontend 26/26、Playwright 12/12；本机 PostgreSQL 迁移单 head 与 upgrade→base→upgrade PASS，Compose 两次冷启动 PASS。
+- Docker 仍仅有 Backend/Frontend，数据库服务 0、数据库卷 0；默认查询使用本机 PostgreSQL，MySQL 仅作兼容验证。
+- Day 2 详细结论与证据见 `docs/status/DAY2_STATUS.md`、`docs/evidence/day2/`。
+
 - Phase 0：PASS，GitHub 基线已建立。
 - Day 1：基础工程、数据源、Schema Metadata、Semantic Layer MVP、14 个 UI 路由和一键启动已实现并通过本地门禁。
 - 数据运行基线：本机 PostgreSQL 主、MySQL 辅；Docker 数据库服务与旧模拟数据卷均为 0。
 - 当前范围保持 ChatBI-first；未进入 NL2SQL、Result Oracle、复杂 Dashboard、Agent、RAG 或长期 Memory。
 - 详细证据与 Day 2 输入见 `docs/status/DAY1_STATUS.md`。
+- 语义模型列表与编辑器已按批准的 Figma 节点 `19:3`、`19:5` 落地：列表卡片、状态统计和最近变更读取 Backend API；编辑器支持实体、度量、维度、关系和业务术语的选择、添加、配置保存、发布与预览。
+- 语义模型列表 API 返回真实资源集合以支持卡片计数；前端未写死模型业务数据，也未直连数据库。
+- 本次 UI 验收：Frontend 11/11、Backend 14/14、E2E 4/4；1366×768、1440×900、1920×1080 无页面级横向裁切，两个目标页面的 console/page/blocking request error 均为 0。
+- P0“问数据”空状态与分析结果页已按批准的 Figma/PNG 参考完成高保真实现：自然语言提交、推荐问题、ECharts 趋势/区域图、查询依据、推荐追问及默认折叠的 SQL/明细弹层可用。
+- 本轮前端验收：Vitest 5 个测试文件、11 个测试全部通过；TypeScript/Vite 生产构建通过；生产依赖审计 0 个已知漏洞；1366×768、1440×900、1920×1080 两个问数据路由均无横向裁切，浏览器 error/warning 为 0。
+- Day 1 分析结果曾明确标记为“UI 结果演示”；该临时状态已由 Day 2 真实 `/api/v1/ask`、SQL Guard、Query Executor 与 Result Oracle 结果替换。
 - 登录页已按 Figma 节点 `5:73` 与 `docs/ui/01_登录页.png` 完成高保真实现；Figma 光晕与开关资源已本地化，表单具备可访问标签、键盘焦点、记住登录交互，并在演示校验通过后进入“问数据”。
 - 登录页专项验收：Vitest 2/2、Playwright E2E 1/1；1440×900、1366×768、1920×1080 三个目标视口均无页面级横向裁切，浏览器 console error/warn 为 0。
+- P0“答案库”和“看板列表”已按批准的 Figma 节点 `20:2`、`22:2` 与 `docs/ui/08_答案库.png`、`docs/ui/09_看板列表.png` 落地。统计、筛选、分页/视图切换、创建和 JSON 导入均通过 Backend API 使用 PostgreSQL 元数据，浏览器不直连数据库。
+- 新增 Alembic 版本 `20260817_0002`，本机 PostgreSQL 已迁移并写入可复现演示元数据：128 条标准答案、18 个看板；答案与看板首屏各返回 6 条，统计值由数据库聚合生成。看板趋势图使用从 Figma 节点下载并本地化的 12 个 SVG 资源。
+- 本轮综合验收：Backend 17/17、Frontend 16/16、Playwright E2E 5/5、TypeScript/Vite 生产构建通过；1366×768、1440×900、1920×1080 下无页面级横向裁切，答案库/看板列表 console error、page error、blocking request failure 均为 0。1440×900 实机截图保存于独立验收目录，未写入仓库。
+- 同日答案库、看板、数据源、语义模型等 UI/API 变更已纳入 Day 2 全量回归；E2E 继续通过浏览器同源 `/api/v1` 使用 Backend。
+- P0“数据源列表”和“数据源详情与 Schema 管理”已按批准的 Figma 节点 `8:2`、`1:25` 与 `docs/ui/04_数据源列表.png`、`docs/ui/05_数据源详情与Schema管理.png` 完成高保真实现。列表统计、搜索、类型/状态筛选、全量同步和新增连接均读取或写入 Backend API；详情页支持真实 Schema/表切换、字段角色展示、样例值预览、连接测试和设置更新，前端不保存或回显已有密码。
+- 数据源列表与详情使用元数据聚合得到真实表/字段数量；本机 PostgreSQL 当前同步结果为 9 张表、56 个字段。未同步样例值时显示明确空状态，不用 Figma 示例行或硬编码总数伪装业务结果；Figma 中非 P0 的数据源类型也未被添加为虚假能力。
+- 本轮验收：Backend 17/17、Frontend 16/16、Playwright E2E 5/5、TypeScript/Vite 生产构建通过（712 个模块）；1366×768、1440×900、1920×1080 均无页面级横向裁切，数据源列表/详情浏览器 error/warning 为 0。构建仍有既存的单个 JavaScript chunk 超过 500 kB 警告，未作为本轮 P0 UI 阻塞项。
+- 按用户明确优先级完成 P1“评测用例详情”高保真 UI：依据批准的 Figma 节点 `29:12` 与 `docs/ui/12_评测用例详情.png` 落地用例概览、Golden/Generated SQL 对照、结果集对比、错误分类、业务语义与修复建议；时间线装饰资源从 Figma 下载并本地化。
+- 评测详情尚未接入单用例执行/重跑/修复任务 Backend API，因此页面统一显示“UI 演示 · 未执行”，指标标注为示例，写操作只返回真实状态提示；不把设计稿中的 PASS、准确率、SQL 或结果差异伪装为当前 Golden Set 验证证据。
+- 本轮最终验收：Backend 19/19、Frontend 20/20、Playwright E2E 5/5、TypeScript/Vite 生产构建通过（721 个模块）；1366×768、1440×900、1920×1080 均无页面级横向裁切或结果表内部横向溢出，评测详情浏览器 console error/warning 为 0。构建仍保留既存的单个 JavaScript chunk 超过 500 kB 警告。
+- 评测详情 UI 变更与答案库、看板、数据源、语义模型回归已统一进入 Day 2 集成门禁；评测单用例执行 API 仍如实保持未接入状态。
+- 按用户明确优先级完成 P1“系统设置与模型服务”“用户、角色与审计”高保真 UI：依据批准的 Figma 节点 `42:11`、`45:11` 与 `docs/ui/13_系统设置与模型服务.png`、`docs/ui/14_用户角色与审计.png`，落地模型提供商卡片、路由策略、服务健康样例、成员/角色/权限策略视图、角色摘要、审计时间线、搜索筛选和邀请表单；4 个 Figma SVG 资源已下载并本地化。
+- 两个设置页面当前统一显示“UI 演示”边界。模型开关、配置保存、成员邀请、权限编辑和审计导出只更新页面状态或返回未接入提示，不伪造模型调用、用户写入、权限同步或审计成功；设计稿中的健康指标、成员与审计记录均明确标注为静态样例，后续只能通过 Backend API 替换。
+- 本轮最终验收：Frontend 10 个测试文件、22/22 测试通过；Playwright E2E 5/5；TypeScript/Vite 生产构建通过（728 个模块）；1440×900、1366×768、1920×1080 两个目标页面均无横向溢出，浏览器 console error/warning 为 0。构建仍保留既存的单个 JavaScript chunk 超过 500 kB 警告。
+- 模型服务、细粒度 RBAC 和审计仍只保留明确标识的 P1 前端界面壳，不被 Day 2 P0 主链路 PASS 误标为后端已完成能力。
+- P0“经营看板详情”和“评测中心总览”已按批准的 Figma 节点 `4:2`、`7:2` 与 `docs/ui/10_经营看板详情.png`、`docs/ui/11_评测中心总览.png` 完成开发落地。经营看板详情通过 Backend API 使用已保存的只读 PostgreSQL 数据源连接，实时聚合最近 30 天及上一周期的收入、利润、利润率、活跃客户、日期趋势和区域表现；前端没有直连数据库或写死业务指标。
+- 新增 Alembic 版本 `20260817_0003` 与评测运行元数据。评测中心总览的 Golden Set、SQL 生成率、结果集准确率、语义理解准确率、相关性、响应时间、错误分布、趋势和版本对比均由 `/api/v1/evaluation/overview` 返回数据库记录；“运行全部评测”等尚未连接评测执行器的写操作只显示真实未接入提示，不伪造运行成功。
+- 本轮专项验收：经营看板/评测 Backend API 测试 5/5、目标页面 Vitest 2/2、目标流程 Playwright E2E 1/1、TypeScript 与 Vite 生产构建通过；E2E 覆盖 1366×768、1440×900、1920×1080，均无页面级横向裁切，两页各渲染 2 个 ECharts，浏览器 console error/warning 为 0。构建保留既存的单个 JavaScript chunk 超过 500 kB 警告。
+- 同日集成期间发现的语义资源数量旧断言和问数据 UI 演示断言已按真实 Day 2 契约更新；最终 Backend 66/66、Frontend 26/26、Playwright 12/12 全部通过。

@@ -6,7 +6,13 @@ import { DatasourcesPage } from './pages/DatasourcesPage';
 import { DatasourceDetailPage } from './pages/DatasourceDetailPage';
 import { SemanticModelsPage } from './pages/SemanticModelsPage';
 import { SemanticEditorPage } from './pages/SemanticEditorPage';
-import { LibraryPage, DashboardDetailPage, EvaluationDetailPage } from './pages/SecondaryPages';
+import { AnswerLibraryPage } from './pages/AnswerLibraryPage';
+import { DashboardListPage } from './pages/DashboardListPage';
+import { EvaluationDetailPage } from './pages/EvaluationDetailPage';
+import { DashboardDetailPage } from './pages/DashboardDetailPage';
+import { EvaluationOverviewPage } from './pages/EvaluationOverviewPage';
+import { SettingsModelsPage } from './pages/SettingsModelsPage';
+import { SecurityAuditPage } from './pages/SecurityAuditPage';
 
 export const routeManifest = [
   { path: '/login', title: '登录页' },
@@ -36,13 +42,13 @@ export const router = createBrowserRouter([
       { path: '/datasources/:id', element: <DatasourceDetailPage /> },
       { path: '/semantic-models', element: <SemanticModelsPage /> },
       { path: '/semantic-models/:id', element: <SemanticEditorPage /> },
-      { path: '/answers', element: <LibraryPage kind="answers" /> },
-      { path: '/dashboards', element: <LibraryPage kind="dashboards" /> },
+      { path: '/answers', element: <AnswerLibraryPage /> },
+      { path: '/dashboards', element: <DashboardListPage /> },
       { path: '/dashboards/:id', element: <DashboardDetailPage /> },
-      { path: '/evaluation', element: <LibraryPage kind="evaluation" /> },
+      { path: '/evaluation', element: <EvaluationOverviewPage /> },
       { path: '/evaluation/:id', element: <EvaluationDetailPage /> },
-      { path: '/settings/models', element: <LibraryPage kind="settings" /> },
-      { path: '/settings/security', element: <LibraryPage kind="security" /> },
+      { path: '/settings/models', element: <SettingsModelsPage /> },
+      { path: '/settings/security', element: <SecurityAuditPage /> },
     ],
   },
   { path: '*', element: <Navigate to="/" replace /> },

@@ -42,6 +42,8 @@ class DataSourceRead(BaseModel):
     schema_name: str | None = Field(validation_alias="schema", serialization_alias="schema")
     status: str
     last_sync_at: datetime | None
+    table_count: int = 0
+    column_count: int = 0
     created_at: datetime
     updated_at: datetime
 
@@ -73,6 +75,7 @@ class SchemaRead(BaseModel):
     id: str
     name: str
     qualified_name: str
+    table_count: int = 0
 
 
 class TableRead(BaseModel):
@@ -82,6 +85,7 @@ class TableRead(BaseModel):
     name: str
     qualified_name: str
     comment: str | None
+    column_count: int = 0
 
 
 class ColumnRead(BaseModel):

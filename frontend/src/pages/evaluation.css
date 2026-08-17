@@ -1,0 +1,58 @@
+.page.evaluation-detail-canvas{padding:0;background:#f5f7fb}
+.evaluation-detail-page{width:100%;max-width:1500px;min-height:calc(100vh - 68px);margin:0 auto;padding:22px 26px 0;color:#111a2e}
+.evaluation-page-heading{height:68px;display:flex;align-items:flex-start;justify-content:space-between;gap:20px}
+.evaluation-page-heading p{margin:0;color:#7f8aa3;font-size:12px;line-height:22px}
+.evaluation-page-heading p span{margin-left:8px;padding:3px 8px;border:1px solid #ded9ff;border-radius:10px;background:#f1efff;color:#5647f5;font-size:10px;font-weight:700;white-space:nowrap}
+.evaluation-page-heading h1{margin:4px 0 0;font-size:25px;line-height:34px}
+.evaluation-heading-actions{display:flex;align-items:center;gap:9px;padding-top:9px}
+.evaluation-heading-actions button{height:38px;padding:0 16px;border:1px solid #dfe5ef;border-radius:10px;background:#fff;color:#465268;font-size:12px;font-weight:700}
+.evaluation-heading-actions button:disabled{cursor:not-allowed;color:#9aa5b8;background:#fafbfe}
+.evaluation-heading-actions button.primary{border-color:#5b5cf6;background:#5b5cf6;color:#fff}
+.evaluation-heading-actions button.primary:hover,.repair-card>button:hover{transform:translateY(-1px);box-shadow:0 6px 14px #5b5cf629}
+.evaluation-notice{margin:-4px 0 10px;padding:9px 12px;border:1px solid #ded9ff;border-radius:10px;background:#f7f5ff;color:#5647f5;font-size:11px;line-height:18px}
+.evaluation-layout{display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:14px;align-items:start}
+.evaluation-main-column,.evaluation-side-column{display:flex;min-width:0;flex-direction:column;gap:14px}
+.evaluation-summary-card,.evaluation-sql-card,.evaluation-comparison-card,.evaluation-side-card{border:1px solid #dfe5ef;border-radius:14px;background:#fff;box-shadow:0 1px 1px #14213d08}
+.evaluation-summary-card{height:159px;padding:15px}
+.evaluation-question-row{height:60px;display:flex;align-items:flex-start;justify-content:space-between;gap:16px}
+.evaluation-question-row>div:first-child{min-width:0}
+.evaluation-question-row span{color:#7f8aa3;font-size:12px;line-height:20px}
+.evaluation-question-row h2{margin:5px 0 0;font-size:16px;line-height:25px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.evaluation-badges{display:flex;flex:0 0 auto;gap:8px;padding-top:6px}
+.evaluation-badges span,.evaluation-sql-card header span,.comparison-status{height:26px;padding:0 10px;display:inline-flex;align-items:center;border:1px solid #ded9ff;border-radius:13px;background:#f1efff;color:#5647f5;font-size:10px;font-weight:700;white-space:nowrap}
+.evaluation-badges span.danger,.evaluation-sql-card header span.danger{border-color:#ffcaca;background:#fff0f0;color:#f04444}
+.evaluation-metric-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px}
+.evaluation-metric{height:67px;padding:12px 13px;border:1px solid #dfe5ef;border-radius:11px;background:#fbfcff}
+.evaluation-metric span{display:block;color:#7f8aa3;font-size:11px;line-height:20px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.evaluation-metric strong{display:block;margin-top:3px;font-size:17px;line-height:26px}
+.evaluation-metric.success strong{color:#07835e}.evaluation-metric.danger strong{color:#f04444}
+.evaluation-sql-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
+.evaluation-sql-card{height:288px;padding:14px}
+.evaluation-sql-card header{height:31px;display:flex;align-items:flex-start;justify-content:space-between}
+.evaluation-sql-card h2{margin:0;font-size:17px;line-height:26px}
+.evaluation-sql-card header span.success,.comparison-status.success{border-color:#b9eedc;background:#e9fbf5;color:#07835e}
+.evaluation-sql{height:229px;margin:0;padding:15px;overflow:auto;border-radius:11px;background:#0d1728;color:#d5deee;font:11px/1.65 "Cascadia Code",Consolas,monospace;white-space:pre-wrap;tab-size:2}
+.sql-keyword{color:#b79cff;font-weight:600}.sql-value{color:#9be481}.sql-value-mismatch{color:#ff7d7d;font-weight:700}
+.evaluation-comparison-card{height:266px;overflow:hidden}
+.evaluation-comparison-card>header{height:63px;padding:12px 13px;display:flex;align-items:flex-start;justify-content:space-between}
+.evaluation-comparison-card h2{margin:0;font-size:17px;line-height:25px}
+.evaluation-comparison-card p{margin:1px 0 0;color:#7f8aa3;font-size:11px;line-height:20px}
+.evaluation-comparison-card>header>span{height:25px;padding:0 12px;display:inline-flex;align-items:center;border:1px solid #ffcaca;border-radius:13px;background:#fff0f0;color:#f04444;font-size:11px;font-weight:700;white-space:nowrap}
+.evaluation-table-scroll{overflow:auto}
+.evaluation-comparison-card table{width:100%;min-width:760px;border-collapse:collapse;table-layout:fixed}
+.evaluation-comparison-card th,.evaluation-comparison-card td{height:47px;padding:0 12px;border-top:1px solid #e5e9f2;color:#465268;font-size:11px;text-align:left;white-space:nowrap}
+.evaluation-comparison-card th{height:38px;border-top:0;background:#f7f9fc;color:#7f8aa3;font-weight:500}
+.evaluation-comparison-card th:nth-child(1){width:12%}.evaluation-comparison-card th:nth-child(2),.evaluation-comparison-card th:nth-child(3){width:17%}.evaluation-comparison-card th:nth-child(4){width:16%}.evaluation-comparison-card th:nth-child(5),.evaluation-comparison-card th:nth-child(6){width:14%}.evaluation-comparison-card th:nth-child(7){width:12%}
+.evaluation-comparison-card td strong,.evaluation-comparison-card td.emphasis{color:#111a2e;font-weight:700}
+.comparison-status{height:25px;font-size:11px}.comparison-status.danger{border-color:#ffcaca;background:#fff0f0;color:#f04444}
+.evaluation-side-card{padding:13px}.evaluation-side-card h2{margin:0;font-size:17px;line-height:28px}
+.error-card{height:143px}.error-card>strong{height:35px;margin-top:5px;padding:0 13px;display:flex;align-items:center;border-radius:10px;background:#fff0f0;color:#f04444;font-size:12px}
+.error-card p{margin:10px 0 0;color:#7f8aa3;font-size:10px;line-height:18px}
+.semantics-card{height:272px}.semantics-card dl{margin:7px 0 0}.semantics-card dl div{height:62px;margin-top:11px;padding:9px 11px;border:1px solid #e5e9f2;border-radius:10px;background:#fbfcff}
+.semantics-card dt{color:#7f8aa3;font-size:11px;line-height:20px}.semantics-card dd{margin:2px 0 0;font-size:12px;line-height:20px;font-weight:700}
+.repair-card{height:299px}.repair-timeline{position:relative;margin-top:10px;padding-left:4px}
+.repair-timeline:before{content:"";position:absolute;left:10px;top:7px;bottom:24px;width:2px;background:#d8ddf0}
+.repair-step{position:relative;min-height:52px;display:flex;align-items:flex-start;gap:12px}.repair-step img{position:relative;z-index:1;width:14px;height:14px;margin-top:3px;flex:0 0 14px}.repair-step p{margin:0}.repair-step strong,.repair-step span{display:block}.repair-step strong{font-size:12px;line-height:20px}.repair-step span{color:#7f8aa3;font-size:10px;line-height:20px}
+.repair-card>button{width:100%;height:38px;margin-top:10px;border:1px solid #ded9ff;border-radius:10px;background:#f1efff;color:#5647f5;font-size:13px;font-weight:700}
+@media(max-width:1380px){.evaluation-detail-page{padding-inline:20px}.evaluation-layout{grid-template-columns:minmax(0,1fr) 284px;gap:12px}.evaluation-main-column,.evaluation-side-column{gap:12px}.evaluation-metric-grid,.evaluation-sql-grid{gap:10px}.evaluation-question-row h2{font-size:15px}.evaluation-sql{padding:13px;font-size:10px}.evaluation-side-card{padding:12px}}
+@media(min-width:1800px){.evaluation-detail-page{max-width:1560px}.evaluation-layout{grid-template-columns:minmax(0,1fr) 330px}.evaluation-sql{font-size:12px}}

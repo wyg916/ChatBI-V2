@@ -1,0 +1,25 @@
+{
+  "verified_at": "2026-08-17T15:57:10.2640737+08:00",
+  "cycles": 2,
+  "from_stopped_state": true,
+  "cycle_1": {
+    "frontend_http": 200,
+    "backend_http": 200,
+    "backend_version": "0.2.0-day2",
+    "local_metadata_postgres": "READY",
+    "local_demo_postgres": "READY",
+    "local_demo_mysql": "READY"
+  },
+  "cycle_2": {
+    "frontend_http": 200,
+    "backend_http": 200,
+    "backend_version": "0.2.0-day2",
+    "local_metadata_postgres": "READY",
+    "local_demo_postgres": "READY",
+    "local_demo_mysql": "READY"
+  },
+  "compose_services": ["backend", "frontend"],
+  "database_services": 0,
+  "database_volumes": 0,
+  "result": "PASS"
+}

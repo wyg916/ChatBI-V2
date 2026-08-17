@@ -1,0 +1,110 @@
+.visually-hidden{position:absolute!important;width:1px!important;height:1px!important;padding:0!important;margin:-1px!important;overflow:hidden!important;clip:rect(0,0,0,0)!important;white-space:nowrap!important;border:0!important}
+
+.semantic-list-page,.semantic-editor-page{color:#111827}
+.semantic-list-heading,.semantic-editor-heading{display:flex;align-items:flex-start;justify-content:space-between;gap:24px;margin-bottom:20px}
+.semantic-list-heading h1,.semantic-editor-heading h1{margin:0;font-size:28px;line-height:42px;letter-spacing:-.5px}
+.semantic-list-heading p{margin:2px 0 0;color:#64748b;font-size:13px;line-height:28px}
+.semantic-heading-actions{display:flex;align-items:center;gap:10px;flex:none}
+.semantic-heading-actions .button{font-size:13px;min-width:84px}
+.semantic-heading-actions .button.primary{min-width:126px;background:#5546f4;border-color:#5546f4}
+
+.semantic-filters{display:grid;grid-template-columns:minmax(240px,320px) 92px 112px minmax(220px,1fr);gap:12px;align-items:center;margin-bottom:14px}
+.semantic-search{height:40px;display:flex;align-items:center;border:1px solid #dde4ef;background:#fff;border-radius:10px;overflow:hidden}
+.semantic-search>span{width:40px;text-align:center;color:#8c9ab2;font-size:18px;flex:none}
+.semantic-search input{height:100%;min-width:0;width:100%;padding:0 12px 0 0;border:0;outline:0;color:#334155;font-size:12px}
+.semantic-filters select{height:40px;border:1px solid #dde4ef;background:#fff;border-radius:10px;color:#263248;padding:0 10px;font-size:12px;outline:0}
+.semantic-filters select:focus,.semantic-search:focus-within{border-color:#7868ff;box-shadow:0 0 0 3px rgba(85,70,244,.09)}
+.semantic-counts{justify-self:end;display:flex;align-items:center;gap:10px}
+.semantic-status{display:inline-flex;align-items:center;justify-content:center;height:26px;padding:0 12px;border:1px solid transparent;border-radius:999px;white-space:nowrap;font-size:11px;font-weight:700}
+.semantic-counts .semantic-status{height:28px;font-size:12px}
+.semantic-status-published{color:#079c72;background:#ecfdf5;border-color:#b9eedc}
+.semantic-status-draft{color:#d87800;background:#fffbeb;border-color:#ffd585}
+.semantic-status-deprecated{color:#64748b;background:#f1f5f9;border-color:#dbe2eb}
+
+.semantic-model-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;margin-bottom:16px}
+.semantic-model-card{height:168px;min-width:0;padding:15px;background:#fff;border:1px solid #dde4ef;border-radius:14px;box-shadow:0 4px 7px rgba(15,23,41,.035);display:flex;flex-direction:column}
+.semantic-model-card:hover{border-color:#bdb8ff;box-shadow:0 10px 24px rgba(15,23,41,.08);transform:translateY(-1px)}
+.semantic-card-head{display:grid;grid-template-columns:44px minmax(0,1fr) auto;gap:12px;align-items:start}
+.semantic-model-mark{width:44px;height:44px;border-radius:12px;background:#eeecff;color:#5546f4;display:grid;place-items:center;font-size:15px;font-weight:800}
+.semantic-card-copy{min-width:0;padding-top:2px}
+.semantic-card-copy h2{font-size:14px;line-height:22px;margin:0 0 2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.semantic-card-copy p{font-size:11px;line-height:17px;color:#64748b;margin:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.semantic-card-head>.semantic-status{margin-top:2px}
+.semantic-card-stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-top:14px}
+.semantic-card-stats>span{height:60px;background:#f7f9fc;border-radius:9px;padding:8px 10px}
+.semantic-card-stats strong{display:block;font-size:17px;line-height:24px}
+.semantic-card-stats small{display:block;color:#7c8aa5;font-size:11px;line-height:20px}
+.semantic-model-card footer{display:flex;align-items:center;justify-content:space-between;color:#7c8aa5;font-size:10px;line-height:18px;margin-top:6px}
+.semantic-model-card footer b{color:#5546f4;font-weight:700}
+.semantic-empty{min-height:220px;margin-bottom:16px;border:1px dashed #cdd6e5;border-radius:14px;background:#fff;display:flex;align-items:center;justify-content:center;flex-direction:column;text-align:center}
+.semantic-empty>span{width:48px;height:48px;border-radius:14px;background:#eeecff;color:#5546f4;display:grid;place-items:center;font-weight:800}
+.semantic-empty h2{font-size:17px;margin:12px 0 4px}.semantic-empty p{font-size:12px;color:#64748b;margin:0 0 14px}
+
+.semantic-history{background:#fff;border:1px solid #dde4ef;border-radius:14px;overflow:hidden}
+.semantic-history>header{height:72px;padding:13px 15px;display:flex;justify-content:space-between;align-items:center}
+.semantic-history h2{font-size:18px;line-height:26px;margin:0}.semantic-history header p{font-size:12px;color:#64748b;margin:2px 0 0}
+.semantic-history .button{height:40px;font-size:12px}
+.semantic-history-scroll{overflow:auto}
+.semantic-history table{width:100%;min-width:850px;border-collapse:collapse;table-layout:fixed}
+.semantic-history th{height:40px;padding:0 12px;text-align:left;background:#f7f9fc;color:#64748b;font-size:11px;font-weight:700}
+.semantic-history td{height:56px;padding:0 12px;border-top:1px solid #e4e9f1;color:#445066;font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.semantic-history th:nth-child(1){width:15%}.semantic-history th:nth-child(2){width:9%}.semantic-history th:nth-child(3){width:40%}.semantic-history th:nth-child(4){width:12%}.semantic-history th:nth-child(5){width:12%}.semantic-history th:nth-child(6){width:12%}
+.semantic-history td:first-child{color:#253047;font-weight:700}.semantic-history-empty{text-align:center!important;color:#7c8aa5!important}
+
+.semantic-editor-heading{align-items:center;margin-bottom:14px}
+.semantic-editor-title{display:flex;align-items:center;gap:10px}
+.semantic-editor-title>span{height:28px;padding:0 13px;border:1px solid #ffd585;background:#fffbeb;border-radius:999px;color:#d87800;display:flex;align-items:center;font-size:11px;font-weight:700}
+.semantic-editor-message{padding:9px 14px;margin:-4px 0 10px;border-radius:9px;background:#ecfdf5;color:#078c67;font-size:12px}
+.semantic-editor-shell{height:734px;display:grid;grid-template-columns:230px minmax(0,1fr) 270px;background:#fff;border:1px solid #dde4ef;border-radius:14px;overflow:hidden}
+.semantic-resource-panel{padding:14px;border-right:1px solid #dde4ef;background:#fff;overflow:auto}
+.semantic-resource-title{height:28px;display:flex;align-items:center;justify-content:space-between;font-size:13px}
+.semantic-resource-title button{width:28px;height:28px;border:0;background:transparent;color:#111827;font-size:24px;line-height:1}
+.semantic-search.compact{margin-top:12px;width:100%}.semantic-search.compact input{font-size:11px}
+.semantic-panel-caption{color:#7c8aa5;font-size:11px;line-height:20px;margin:15px 0 3px}
+.semantic-resource-kinds{display:flex;flex-direction:column;gap:4px}
+.semantic-resource-kinds button{height:40px;width:100%;padding:0 12px;border:0;border-radius:9px;background:transparent;display:flex;align-items:center;justify-content:space-between;color:#64748b;font-size:12px;text-align:left}
+.semantic-resource-kinds button.active{background:#eeecff;color:#5546f4;font-weight:700}
+.semantic-resource-kinds button b{min-width:22px;height:20px;padding:0 6px;border:1px solid #e0e5ed;background:#fff;border-radius:10px;display:grid;place-items:center;font-size:10px;color:#64748b}
+.semantic-resource-tags,.semantic-process-list{display:flex;flex-direction:column;gap:9px}
+.semantic-resource-tags span,.semantic-process-list span{display:flex;align-items:center;gap:7px;color:#111827;font-size:11px;line-height:18px}
+.semantic-resource-tags img{width:8px;height:8px;flex:none}
+
+.semantic-graph{position:relative;min-width:0;background-color:#fff;background-repeat:repeat;background-size:24px 24px;overflow:hidden}
+.semantic-graph-nodes{position:relative;z-index:2;display:grid;grid-template-columns:repeat(2,minmax(180px,220px));justify-content:center;align-content:start;gap:16px 42px;height:100%;padding:70px 18px 190px}
+.semantic-node{height:144px;padding:0;border:1px solid #dde4ef;border-radius:12px;background:#fff;box-shadow:0 7px 18px rgba(15,23,41,.06);overflow:hidden;text-align:left;color:#111827}
+.semantic-node.active{border:2px solid #6556ff;box-shadow:0 0 0 3px rgba(85,70,244,.06),0 10px 22px rgba(15,23,41,.08)}
+.semantic-node header{height:44px;padding:0 12px;border-bottom:1px solid #dde4ef;display:flex;align-items:center;justify-content:space-between;gap:8px}
+.semantic-node header strong{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px}
+.semantic-node header span{height:25px;padding:0 10px;border:1px solid #dad5ff;border-radius:999px;background:#eeecff;color:#5546f4;display:flex;align-items:center;font-size:10px;font-weight:700}
+.semantic-node-row{height:32px;padding:0 12px;display:flex;align-items:center;justify-content:space-between;gap:8px;color:#59667e;font-size:10px}
+.semantic-node-row>span{min-width:0;display:flex;align-items:center;gap:5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.semantic-node-row i{font-style:normal;color:#7b87a0}.semantic-node-row small{flex:none;color:#7c8aa5;font-size:9px}
+.semantic-node:nth-child(3){transform:translateX(36px)}
+.semantic-node:nth-child(4){transform:translate(-36px,8px)}
+.semantic-connectors{position:absolute;z-index:1;inset:0;pointer-events:none}
+.semantic-connectors span{position:absolute;left:47%;top:24%;width:21%;height:2px;background:#5546f4;border-radius:2px;transform:rotate(-7deg)}
+.semantic-connectors span:nth-child(2){top:30%;transform:rotate(24deg)}.semantic-connectors span:nth-child(3){left:38%;top:45%;transform:rotate(31deg)}
+.semantic-connectors img{position:absolute;right:-4px;top:-3px;width:7px;height:7px}
+.semantic-graph-empty{position:absolute;z-index:3;inset:80px 20px 170px;display:flex;align-items:center;justify-content:center;flex-direction:column;text-align:center}
+.semantic-graph-empty>span{width:48px;height:48px;border-radius:14px;background:#eeecff;color:#5546f4;display:grid;place-items:center;font-weight:800}.semantic-graph-empty h2{font-size:16px;margin:12px 0 3px}.semantic-graph-empty p{font-size:11px;color:#64748b;margin:0 0 13px}
+.semantic-more-resources{position:absolute;right:20px;top:20px;height:26px;padding:0 10px;border-radius:999px;background:#fff;border:1px solid #dde4ef;color:#64748b;display:flex;align-items:center;font-size:10px}
+.semantic-alignment{position:absolute;z-index:4;left:14px;right:14px;bottom:12px;height:148px;padding:12px;background:#fff;border:1px solid #dde4ef;border-radius:12px}
+.semantic-alignment>header{display:grid;grid-template-columns:minmax(0,1fr) auto auto;align-items:start;gap:8px}.semantic-alignment h2{font-size:13px;margin:0 0 4px}.semantic-alignment header p{font-size:10px;color:#64748b;margin:0}.semantic-alignment header>span{height:28px;padding:0 12px;border:1px solid #b9eedc;background:#ecfdf5;color:#079c72;border-radius:999px;display:flex;align-items:center;font-size:10px;font-weight:700}.semantic-alignment .button{height:36px;padding:0 13px;font-size:11px}
+.semantic-alignment>div{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:12px}.semantic-alignment article{height:64px;padding:8px 10px;border:1px solid #e1e6ee;border-radius:10px;background:#f9fafd}.semantic-alignment article small{display:block;color:#7c8aa5;font-size:10px}.semantic-alignment article strong{display:block;margin-top:5px;font-size:19px}
+
+.semantic-config-panel{padding:14px;border-left:1px solid #dde4ef;background:#fff;overflow:auto}
+.semantic-config-panel h2{font-size:18px;line-height:34px;margin:0 0 8px}.semantic-config-panel>label{display:flex;flex-direction:column;gap:6px;margin-bottom:12px}.semantic-config-panel label>span{font-size:12px;font-weight:700}.semantic-config-panel input{height:42px;width:100%;padding:0 11px;border:1px solid #dde4ef;border-radius:10px;outline:0;color:#475569;font-size:12px}.semantic-config-panel input:focus{border-color:#6556ff;box-shadow:0 0 0 3px rgba(85,70,244,.08)}
+.semantic-config-panel hr{border:0;border-top:1px solid #dde4ef;margin:16px 0}.semantic-config-empty{min-height:250px;color:#7c8aa5;font-size:12px;line-height:1.7}
+.semantic-policy{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:13px 0}.semantic-policy strong,.semantic-policy small{display:block}.semantic-policy strong{font-size:12px}.semantic-policy small{margin-top:5px;color:#7c8aa5;font-size:10px}.semantic-policy>button{width:40px;height:22px;padding:0;border:0;border-radius:11px;background:#dfe4ed;flex:none;overflow:hidden}.semantic-policy button img{display:block;width:40px;height:22px}.semantic-policy button>span{display:block;width:16px;height:16px;margin-left:3px;border-radius:50%;background:#fff}
+.semantic-scope{display:flex;gap:7px;flex-wrap:wrap}.semantic-scope button{height:28px;padding:0 11px;border:1px solid #dde4ef;border-radius:999px;background:#f7f9fc;color:#64748b;font-size:10px;font-weight:700}.semantic-scope button.active{border-color:#d7d1ff;background:#eeecff;color:#5546f4}
+.semantic-preview>p{font-size:13px}.semantic-preview>div{display:grid;grid-template-columns:120px 1fr;gap:12px;padding:10px 0;border-bottom:1px solid #e6ebf2;font-size:12px}.semantic-preview small{color:#7c8aa5}.semantic-preview span{overflow-wrap:anywhere;color:#334155}
+
+@media(max-width:1450px){
+  .semantic-list-heading,.semantic-editor-heading{margin-bottom:14px}.semantic-list-heading h1,.semantic-editor-heading h1{font-size:25px}.semantic-list-heading p{font-size:12px}
+  .semantic-model-grid{gap:12px}.semantic-model-card{padding:13px}.semantic-card-head{grid-template-columns:42px minmax(0,1fr) auto;gap:10px}.semantic-model-mark{width:42px;height:42px}
+  .semantic-editor-shell{grid-template-columns:210px minmax(0,1fr) 250px;height:700px}.semantic-resource-panel,.semantic-config-panel{padding:12px}.semantic-graph-nodes{grid-template-columns:repeat(2,minmax(170px,205px));gap:14px 28px;padding-left:12px;padding-right:12px}.semantic-node:nth-child(3){transform:translateX(22px)}.semantic-node:nth-child(4){transform:translate(-22px,8px)}
+}
+
+@media(max-width:1260px){
+  .semantic-filters{grid-template-columns:minmax(220px,1fr) 92px 112px}.semantic-counts{grid-column:1/-1;justify-self:end;margin-top:-2px}.semantic-model-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .semantic-editor-shell{grid-template-columns:190px minmax(0,1fr) 225px}.semantic-graph-nodes{grid-template-columns:minmax(180px,230px);padding-top:30px;overflow:auto}.semantic-node:nth-child(n){transform:none}.semantic-node:nth-child(n+4){display:none}.semantic-connectors{display:none}.semantic-alignment{height:142px}.semantic-alignment article{height:58px}
+}

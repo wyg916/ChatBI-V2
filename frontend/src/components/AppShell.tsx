@@ -1,4 +1,5 @@
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
+import onlineIcon from '../assets/semantic/online.svg';
 
 const navItems = [
   { to: '/', label: '问数据', icon: '问', exact: true },
@@ -10,18 +11,59 @@ const navItems = [
 ] as const;
 
 const titles: Record<string, [string, string]> = {
-  '/': ['默认工作空间', '问数据'], '/ask/results': ['默认工作空间', '问数据'],
+  '/': ['默认工作空间', '问数据'], '/ask/results': ['新能源经营分析工作空间', '问数据'],
   '/datasources': ['数据管理 / 数据源管理', '数据源'],
   '/semantic-models': ['语义层管理 / 语义模型', '语义模型'],
-  '/answers': ['知识沉淀 / 已验证答案', '答案库'], '/dashboards': ['数据洞察 / 经营看板', '看板'],
-  '/evaluation': ['质量中心 / 自动评测', '评测中心'],
-  '/settings/models': ['系统管理 / 模型服务', '系统设置'], '/settings/security': ['系统管理 / 安全与审计', '用户角色与审计'],
+  '/answers': ['工作空间 / 智能问答', '答案库'], '/dashboards': ['看板列表 / 经营看板', '看板'],
+  '/evaluation': ['评测与优化 / 评测中心', '评测中心'],
+  '/settings/models': ['管理 / 系统设置', '系统设置'], '/settings/security': ['系统设置 / 用户角色与审计', '系统设置'],
 };
 
 export function AppShell() {
   const { pathname } = useLocation();
   const key = Object.keys(titles).find((path) => path !== '/' && pathname.startsWith(path)) ?? '/';
   const [crumb, title] = titles[key];
+  const isAskRoute = pathname === '/' || pathname.startsWith('/ask/');
+  const isSemanticEditor = /^\/semantic-models\/[^/]+$/.test(pathname);
+  const isContentLibrary = pathname === '/answers' || pathname === '/dashboards';
+  const isDashboardDetail = /^\/dashboards\/[^/]+$/.test(pathname);
+  const isEvaluation = pathname === '/evaluation';
+  const datasourceId = pathname.match(/^\/datasources\/([^/]+)$/)?.[1] ?? '';
+  const isDatasourceDetail = Boolean(datasourceId);
+  const isEvaluationDetail = /^\/evaluation\/[^/]+$/.test(pathname);
+  const isSettings = pathname.startsWith('/settings/');
+  const headerCrumb = isSemanticEditor
+    ? '语义模型 / 模型管理'
+    : isDashboardDetail
+      ? '看板 / 经营看板列表'
+    : isDatasourceDetail
+      ? '数据源 / Schema 管理'
+      : isEvaluationDetail
+        ? '评测中心 / 用例详情'
+        : crumb;
+  const contextLabel = isSemanticEditor
+      ? '数据已保存：刚刚'
+    : pathname === '/semantic-models'
+      ? '数据时效：近 24 小时'
+      : isEvaluationDetail
+        ? 'Golden Set · UI 演示'
+      : isDatasourceDetail
+        ? '数据源：连接状态⌄'
+        : pathname === '/datasources'
+          ? '数据引擎：本机分析引擎⌄'
+          : isDashboardDetail
+            ? '数据时效：业务数据最新日'
+          : pathname === '/dashboards'
+            ? '全部看板实时可用'
+            : pathname === '/answers'
+              ? '数据环境：正式发布版⌄'
+              : isEvaluation
+                ? '数据范围：近 30 天⌄'
+                : pathname === '/settings/models'
+                  ? '系统配置 · UI 演示'
+                  : pathname === '/settings/security'
+                    ? '权限策略 · UI 演示'
+                    : '数据环境：正式分析库⌄';
   return (
     <div className="app-shell">
       <aside className="sidebar">
@@ -32,14 +74,14 @@ export function AppShell() {
           {navItems.map((item) => <NavLink key={item.to} to={item.to} end={'exact' in item && item.exact} className={({ isActive }) => isActive ? 'nav-item active' : 'nav-item'}><span>{item.icon}</span>{item.label}</NavLink>)}
         </nav>
         <div className="nav-caption manage">管理</div>
-        <NavLink to="/settings/models" className={({ isActive }) => isActive ? 'nav-item active' : 'nav-item'}><span>设</span>系统设置</NavLink>
+        <NavLink to="/settings/models" className={isSettings ? 'nav-item active' : 'nav-item'}><span>设</span>系统设置</NavLink>
         <div className="side-spacer" />
         <NavLink to="/settings/security" className="user-card"><span>王</span><div><strong>王迎港</strong><small>管理员 · 数据分析部</small></div></NavLink>
-        <small className="version">v2.0.0 · 开源企业版</small>
+        <small className="version">v1.0.0 · 开源企业版</small>
       </aside>
       <div className="app-frame">
-        <header className="topbar"><div><small>{crumb}</small><h2>{title}</h2></div><div className="header-actions"><button className="context-pill"><i />数据环境：开发分析库⌄</button><button className="icon-button" aria-label="帮助">?</button></div></header>
-        <main className="page"><Outlet /></main>
+        <header className="topbar"><div><small>{headerCrumb}</small><h2>{title}</h2></div><div className="header-actions"><button className="context-pill"><img src={onlineIcon} alt="" />{contextLabel}</button><button className="icon-button" aria-label={isDashboardDetail ? '返回看板列表' : '帮助'} onClick={isDashboardDetail ? () => history.back() : undefined}>{isDashboardDetail ? '←' : '?'}</button>{(isContentLibrary || isDashboardDetail || isEvaluation || isSettings) && <button className="icon-button" aria-label="更多操作">{isDashboardDetail || isEvaluation ? '↑' : '⋯'}</button>}</div></header>
+        <main className={isAskRoute ? 'page ask-page-canvas' : isContentLibrary ? 'page content-library-canvas' : isDashboardDetail ? 'page dashboard-detail-canvas' : isEvaluation ? 'page evaluation-canvas' : isEvaluationDetail ? 'page evaluation-detail-canvas' : 'page'}><Outlet /></main>
       </div>
     </div>
   );

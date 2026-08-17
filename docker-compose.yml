@@ -20,6 +20,14 @@ services:
       CHATBI_DEMO_MYSQL_DATABASE: chatbi_demo_business
       CHATBI_DEMO_MYSQL_USERNAME: chatbi_reader
       CHATBI_DEMO_MYSQL_PASSWORD: ${CHATBI_DEMO_MYSQL_PASSWORD:?Run scripts/bootstrap-local-databases.ps1 first}
+      CHATBI_MODEL_PROVIDER: ${CHATBI_MODEL_PROVIDER:-deterministic}
+      CHATBI_MODEL_BASE_URL: ${CHATBI_MODEL_BASE_URL:-}
+      CHATBI_MODEL_API_KEY: ${CHATBI_MODEL_API_KEY:-}
+      CHATBI_MODEL_NAME: ${CHATBI_MODEL_NAME:-}
+      CHATBI_QUERY_TIMEOUT_MS: ${CHATBI_QUERY_TIMEOUT_MS:-8000}
+      CHATBI_QUERY_ROW_LIMIT: ${CHATBI_QUERY_ROW_LIMIT:-500}
+      CHATBI_QUERY_CONCURRENCY: ${CHATBI_QUERY_CONCURRENCY:-4}
+      CHATBI_CONTEXT_TOKEN_BUDGET: ${CHATBI_CONTEXT_TOKEN_BUDGET:-6000}
     extra_hosts:
       - "host.docker.internal:host-gateway"
     ports:
@@ -40,7 +48,7 @@ services:
       backend:
         condition: service_healthy
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://localhost/ >/dev/null || exit 1"]
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1/ >/dev/null || exit 1"]
       interval: 4s
       timeout: 4s
       retries: 30

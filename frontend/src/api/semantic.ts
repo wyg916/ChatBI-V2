@@ -9,5 +9,7 @@ export const semanticApi = {
   update: (id: string, input: Partial<SemanticModel>) => api<SemanticModel>(`/semantic-models/${id}`, { method: 'PUT', body: JSON.stringify(input) }),
   add: <T extends SemanticEntity | Metric | Dimension | Relationship | BusinessTerm>(id: string, kind: ResourceKind, input: T) =>
     api<T>(`/semantic-models/${id}/${kind}`, { method: 'POST', body: JSON.stringify(input) }),
+  updateResource: <T extends SemanticEntity | Metric | Dimension | Relationship | BusinessTerm>(id: string, kind: ResourceKind, resourceId: string, input: T) =>
+    api<T>(`/semantic-models/${id}/${kind}/${resourceId}`, { method: 'PUT', body: JSON.stringify(input) }),
   publish: (id: string) => api<{ success: boolean; message: string; status: string; version: number }>(`/semantic-models/${id}/publish`, { method: 'POST' }),
 };

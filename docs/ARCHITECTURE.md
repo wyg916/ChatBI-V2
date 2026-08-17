@@ -44,3 +44,16 @@
 - EvaluationAdapter
 
 任何第三方组件只能位于适配器之后。
+
+## 5. Day 2 查询运行时
+
+`app/query/` 保持 ChatBI 自有契约：
+
+- `ContextBuilder` 从 Workspace、Datasource Catalog、Semantic Model、Business Term/Synonym 和 Verified SQL 构建有预算、可截断、可追踪的 `QueryContext`。
+- `Nl2SqlRouter` 通过 `ModelProviderAdapter` 选择本地确定性语义运行时或 OpenAI-compatible Provider，输出强校验的 `SQLPlan`。
+- `SqlGuard` 在 SQLGlot AST 上执行单语句、SELECT/CTE、Schema/Table/Column allowlist、危险函数与行数上限校验。
+- `QueryExecutor` 只使用 Backend 保存的只读账号，按 PostgreSQL/MySQL 设置超时、只读事务、并发上限和结果截断。
+- `ResultOracle` 独立校验执行状态、指标/维度、时间、过滤、Join、列集合、空值形状、容差值与顺序无关签名，不比较 SQL 字符串是否相等。
+- `QueryRun`、`QueryAuditEvent`、`QueryFeedback` 和保存后的 `VerifiedAnswer` 均位于本机 PostgreSQL 元数据库。
+
+浏览器仍只访问 `/api/v1`；SQL 执行连接、数据库凭据、Guard 与 Oracle 均不下放到前端。

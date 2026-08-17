@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime, timezone
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, JSON, String, Text, UniqueConstraint
+from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Integer, JSON, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
@@ -24,6 +24,62 @@ class Workspace(Base, TimestampMixin):
     __tablename__ = "workspace"
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uuid_str)
     name: Mapped[str] = mapped_column(String(255), unique=True, nullable=False)
+
+
+class VerifiedAnswer(Base, TimestampMixin):
+    __tablename__ = "verified_answer"
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uuid_str)
+    workspace_id: Mapped[str] = mapped_column(ForeignKey("workspace.id", ondelete="CASCADE"), index=True)
+    question: Mapped[str] = mapped_column(String(512), nullable=False)
+    module: Mapped[str] = mapped_column(String(64), nullable=False)
+    sql_synced: Mapped[bool] = mapped_column(Boolean, default=True)
+    model_name: Mapped[str] = mapped_column(String(255), nullable=False)
+    owner_name: Mapped[str] = mapped_column(String(128), nullable=False)
+    status: Mapped[str] = mapped_column(String(32), default="DRAFT", index=True)
+    accuracy_percent: Mapped[float] = mapped_column(Float, default=0)
+    adoption_count: Mapped[int] = mapped_column(Integer, default=0)
+    monthly_adoption_count: Mapped[int] = mapped_column(Integer, default=0)
+    is_favorite: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
+    sort_order: Mapped[int] = mapped_column(Integer, default=0, index=True)
+    query_run_id: Mapped[str | None] = mapped_column(String(36), index=True)
+    sql_text: Mapped[str | None] = mapped_column(Text)
+    result_signature: Mapped[str | None] = mapped_column(String(64))
+    semantic_model_version: Mapped[int | None] = mapped_column(Integer)
+
+
+class Dashboard(Base, TimestampMixin):
+    __tablename__ = "dashboard"
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uuid_str)
+    workspace_id: Mapped[str] = mapped_column(ForeignKey("workspace.id", ondelete="CASCADE"), index=True)
+    name: Mapped[str] = mapped_column(String(255), nullable=False)
+    description: Mapped[str] = mapped_column(Text, nullable=False)
+    card_count: Mapped[int] = mapped_column(Integer, default=0)
+    is_shared: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
+    refresh_count_today: Mapped[int] = mapped_column(Integer, default=0)
+    status: Mapped[str] = mapped_column(String(32), default="REALTIME")
+    trend_variant: Mapped[int] = mapped_column(Integer, default=0)
+    sort_order: Mapped[int] = mapped_column(Integer, default=0, index=True)
+
+
+class EvaluationRun(Base, TimestampMixin):
+    __tablename__ = "evaluation_run"
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uuid_str)
+    workspace_id: Mapped[str] = mapped_column(ForeignKey("workspace.id", ondelete="CASCADE"), index=True)
+    release_name: Mapped[str] = mapped_column(String(255), nullable=False)
+    model_name: Mapped[str] = mapped_column(String(255), nullable=False)
+    status: Mapped[str] = mapped_column(String(32), default="COMPLETED", index=True)
+    is_current: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
+    golden_set_count: Mapped[int] = mapped_column(Integer, default=0)
+    sql_generation_rate: Mapped[float] = mapped_column(Float, default=0)
+    result_accuracy: Mapped[float] = mapped_column(Float, default=0)
+    semantic_accuracy: Mapped[float] = mapped_column(Float, default=0)
+    relevance_accuracy: Mapped[float] = mapped_column(Float, default=0)
+    average_response_seconds: Mapped[float] = mapped_column(Float, default=0)
+    error_distribution: Mapped[list] = mapped_column(JSON, default=list)
+    trend_points: Mapped[list] = mapped_column(JSON, default=list)
+    completed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    duration_seconds: Mapped[int] = mapped_column(Integer, default=0)
+    sort_order: Mapped[int] = mapped_column(Integer, default=0, index=True)
 
 
 class DataSource(Base, TimestampMixin):
@@ -171,3 +227,46 @@ class SemanticVersion(Base):
     version: Mapped[int] = mapped_column(Integer, nullable=False)
     snapshot: Mapped[dict] = mapped_column(JSON, nullable=False)
     published_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class QueryRun(Base, TimestampMixin):
+    __tablename__ = "query_run"
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uuid_str)
+    workspace_id: Mapped[str] = mapped_column(ForeignKey("workspace.id", ondelete="CASCADE"), index=True)
+    datasource_id: Mapped[str] = mapped_column(ForeignKey("datasource.id", ondelete="RESTRICT"), index=True)
+    semantic_model_id: Mapped[str] = mapped_column(ForeignKey("semantic_model.id", ondelete="RESTRICT"), index=True)
+    semantic_model_version: Mapped[int] = mapped_column(Integer, nullable=False)
+    question: Mapped[str] = mapped_column(Text, nullable=False)
+    status: Mapped[str] = mapped_column(String(32), nullable=False, index=True)
+    provider: Mapped[str] = mapped_column(String(64), nullable=False)
+    context_payload: Mapped[dict] = mapped_column(JSON, default=dict)
+    plan_payload: Mapped[dict] = mapped_column(JSON, default=dict)
+    guard_payload: Mapped[dict] = mapped_column(JSON, default=dict)
+    execution_payload: Mapped[dict] = mapped_column(JSON, default=dict)
+    oracle_payload: Mapped[dict] = mapped_column(JSON, default=dict)
+    generated_sql: Mapped[str | None] = mapped_column(Text)
+    normalized_sql: Mapped[str | None] = mapped_column(Text)
+    result_signature: Mapped[str | None] = mapped_column(String(64), index=True)
+    duration_ms: Mapped[int | None] = mapped_column(Integer)
+    error_code: Mapped[str | None] = mapped_column(String(64))
+    error_message: Mapped[str | None] = mapped_column(Text)
+
+
+class QueryAuditEvent(Base):
+    __tablename__ = "query_audit_event"
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uuid_str)
+    query_run_id: Mapped[str] = mapped_column(ForeignKey("query_run.id", ondelete="CASCADE"), index=True)
+    event_type: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    status: Mapped[str] = mapped_column(String(32), nullable=False)
+    details: Mapped[dict] = mapped_column(JSON, default=dict)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, index=True)
+
+
+class QueryFeedback(Base):
+    __tablename__ = "query_feedback"
+    __table_args__ = (UniqueConstraint("query_run_id", "feedback_type"),)
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uuid_str)
+    query_run_id: Mapped[str] = mapped_column(ForeignKey("query_run.id", ondelete="CASCADE"), index=True)
+    feedback_type: Mapped[str] = mapped_column(String(32), nullable=False)
+    comment: Mapped[str | None] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)

@@ -1,0 +1,53 @@
+{
+  "verified_at": "2026-08-17T16:04:39.5762050+08:00",
+  "backend": {
+    "pytest_pass": 66,
+    "pytest_fail": 0,
+    "pip_check": "PASS",
+    "openapi_paths": 32,
+    "openapi_operations": 45
+  },
+  "frontend": {
+    "typecheck": "PASS",
+    "vitest_files_pass": 10,
+    "vitest_tests_pass": 26,
+    "build": "PASS",
+    "vite_modules": 728,
+    "npm_audit_vulnerabilities": 0
+  },
+  "playwright": {
+    "tests_pass": 12,
+    "tests_fail": 0,
+    "day2_required_cases": "6/6",
+    "viewport_checks": ["1366x768", "1440x900", "1920x1080"],
+    "console_errors": 0,
+    "page_errors": 0,
+    "blocking_request_failures": 0
+  },
+  "golden": {
+    "manifest_sha256": "d40bb690a4208240ecf347abe47e045cd74c8eb89b9162d5d53890ecf24bc282",
+    "postgresql_execution": "20/20",
+    "postgresql_result": "20/20",
+    "postgresql_semantic": "20/20",
+    "mysql_execution": "5/5",
+    "mysql_result": "5/5"
+  },
+  "security": {
+    "dangerous_sql": "38/38",
+    "block_rate": 1.0,
+    "actual_write_attempt_succeeded": 0
+  },
+  "migration": {
+    "heads": 1,
+    "head": "20260817_0004",
+    "local_postgresql_upgrade_base_upgrade": "PASS"
+  },
+  "runtime": {
+    "provider": "deterministic-semantic-v1",
+    "live_model_smoke": "NOT_CONFIGURED",
+    "cold_starts": "2/2",
+    "database_services_in_compose": 0,
+    "database_volumes_in_compose": 0
+  },
+  "result": "PASS"
+}

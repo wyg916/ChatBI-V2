@@ -77,13 +77,27 @@ def test_schema_sync_and_metadata_catalog(client, datasource_id, monkeypatch):
 
     schemas = client.get(f"/api/v1/datasources/{datasource_id}/schemas").json()
     assert schemas[0]["qualified_name"] == f"{datasource_id}.public"
+    assert schemas[0]["table_count"] == 2
 
     tables = client.get(f"/api/v1/datasources/{datasource_id}/tables?schema=public").json()
     assert {item["name"] for item in tables} == {"customers", "orders"}
+    assert {item["name"]: item["column_count"] for item in tables} == {"customers": 2, "orders": 3}
 
     columns = client.get(f"/api/v1/datasources/{datasource_id}/tables/orders/columns?schema=public").json()
     assert len(columns) == 3
     assert all(item["qualified_name"].startswith(f"{datasource_id}.public.orders.") for item in columns)
+
+    detail = client.get(f"/api/v1/datasources/{datasource_id}").json()
+    assert detail["table_count"] == 2
+    assert detail["column_count"] == 5
+
+    listed = client.get("/api/v1/datasources").json()
+    assert listed[0]["table_count"] == 2
+    assert listed[0]["column_count"] == 5
+
+    updated = client.put(f"/api/v1/datasources/{datasource_id}", json={"name": "Updated catalog"}).json()
+    assert updated["table_count"] == 2
+    assert updated["column_count"] == 5
 
 
 def test_connection_failure_is_sanitized(client, datasource_id, monkeypatch):

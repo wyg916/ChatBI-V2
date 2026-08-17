@@ -1,0 +1,325 @@
+.evaluation-canvas {
+  padding: 18px 26px 12px;
+}
+.evaluation-page {
+  max-width: 1600px;
+  margin: 0 auto;
+  color: #172033;
+}
+.evaluation-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 20px;
+  margin-bottom: 14px;
+}
+.evaluation-heading h1 {
+  font-size: 28px;
+  line-height: 1.3;
+  margin: 0 0 8px;
+}
+.evaluation-heading p {
+  font-size: 14px;
+  color: #74819a;
+  margin: 0;
+}
+.evaluation-heading > div:last-child {
+  display: flex;
+  gap: 9px;
+}
+.evaluation-kpis {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 13px;
+  margin-bottom: 14px;
+}
+.evaluation-kpis article {
+  height: 102px;
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 13px 18px;
+  display: grid;
+  grid-template-columns: 40px minmax(0, 1fr);
+  grid-template-rows: 28px 34px 16px;
+  position: relative;
+}
+.evaluation-kpis article > span {
+  grid-row: 1/2;
+  width: 32px;
+  height: 32px;
+  background: #eeedff;
+  color: #5b5cf6;
+  border-radius: 9px;
+  display: grid;
+  place-items: center;
+  font-size: 14px;
+}
+.evaluation-kpis article:first-child > span {
+  font-size: 12px;
+}
+.evaluation-kpis small {
+  color: #74819a;
+  font-size: 12px;
+  padding-top: 4px;
+}
+.evaluation-kpis strong {
+  grid-column: 1/3;
+  grid-row: 2;
+  font-size: 27px;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+.evaluation-kpis em {
+  grid-column: 1/3;
+  grid-row: 3;
+  font-style: normal;
+  color: #08a878;
+  font-size: 12px;
+  font-weight: 750;
+  align-self: end;
+}
+.evaluation-kpis em.worse {
+  color: #f04444;
+}
+.evaluation-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 300px;
+  gap: 14px;
+}
+.evaluation-main-column {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.evaluation-chart-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.45fr) minmax(310px, 1fr);
+  gap: 14px;
+}
+.evaluation-card {
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  min-width: 0;
+}
+.evaluation-card > header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  padding: 16px 16px 0;
+}
+.evaluation-card h2 {
+  font-size: 17px;
+  margin: 0;
+}
+.evaluation-card header p {
+  font-size: 12px;
+  color: #74819a;
+  margin: 7px 0 0;
+}
+.evaluation-chart-card {
+  height: 270px;
+}
+.evaluation-chart-card header > span {
+  padding: 5px 10px;
+  border-radius: 999px;
+  background: #e7f8f1;
+  color: #059b70;
+  font-size: 12px;
+  font-weight: 750;
+}
+.evaluation-chart-card .data-echart {
+  height: 204px;
+  width: 100%;
+}
+.comparison-card {
+  height: 330px;
+}
+.comparison-scroll {
+  overflow: auto;
+  padding-top: 16px;
+}
+.comparison-card table {
+  border-collapse: collapse;
+  width: 100%;
+  font-size: 12px;
+}
+.comparison-card th {
+  background: #f7f9fc;
+  color: #718096;
+  font-size: 10px;
+  font-weight: 650;
+}
+.comparison-card th,
+.comparison-card td {
+  padding: 12px 15px;
+  text-align: left;
+  border-bottom: 1px solid #e5eaf2;
+  white-space: nowrap;
+}
+.rank-badge {
+  display: inline-flex;
+  padding: 5px 10px;
+  border-radius: 999px;
+  background: #eef1f5;
+  color: #667289;
+  font-size: 11px;
+  font-weight: 750;
+}
+.rank-0 {
+  background: #e7f8f1;
+  color: #059b70;
+}
+.rank-1 {
+  background: #eaf3ff;
+  color: #2f80ed;
+}
+.current-model-panel {
+  height: 612px;
+  background: #111d33;
+  border: 1px solid #26354d;
+  border-radius: 14px;
+  color: #fff;
+  padding: 20px 18px;
+}
+.current-model-panel > small {
+  display: block;
+  color: #8694aa;
+  font-size: 11px;
+}
+.current-model-panel > h2 {
+  font-size: 25px;
+  line-height: 1.35;
+  margin: 18px 0 16px;
+}
+.release-state {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.release-state > span {
+  width: 54px;
+  height: 54px;
+  border-radius: 14px;
+  background: #12b886;
+  display: grid;
+  place-items: center;
+  font-size: 30px;
+}
+.release-state b,
+.release-state small {
+  display: block;
+}
+.release-state b {
+  font-size: 18px;
+}
+.release-state small {
+  font-size: 11px;
+  color: #8694aa;
+  margin-top: 7px;
+}
+.current-model-panel hr {
+  border: 0;
+  border-top: 1px solid #314057;
+  margin: 20px 0 16px;
+}
+.current-model-panel dl {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin: 0;
+}
+.current-model-panel dl > div {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+}
+.current-model-panel dt {
+  color: #9cabc1;
+}
+.current-model-panel dd {
+  margin: 0;
+  color: #37d7a8;
+  font-weight: 750;
+}
+.current-model-panel dd.plain {
+  color: #fff;
+}
+.current-model-panel > button {
+  width: 100%;
+  height: 42px;
+  border: 0;
+  border-radius: 10px;
+  background: #5b4dff;
+  color: #fff;
+  font-weight: 750;
+  margin: 18px 0;
+}
+.current-model-panel > section {
+  height: 100px;
+  border: 1px solid #34445d;
+  background: #1d2940;
+  border-radius: 12px;
+  padding: 14px;
+}
+.current-model-panel > section small,
+.current-model-panel > section b,
+.current-model-panel > section span {
+  display: block;
+}
+.current-model-panel > section small {
+  color: #8694aa;
+  font-size: 11px;
+}
+.current-model-panel > section b {
+  font-size: 12px;
+  margin: 18px 0 9px;
+}
+.current-model-panel > section span {
+  color: #9cabc1;
+  font-size: 11px;
+}
+@media (max-width: 1280px) {
+  .evaluation-heading .button {
+    padding: 0 12px;
+  }
+  .evaluation-layout {
+    grid-template-columns: minmax(0, 1fr) 280px;
+  }
+  .evaluation-chart-grid {
+    grid-template-columns: minmax(0, 1.3fr) minmax(280px, 1fr);
+  }
+  .comparison-card th,
+  .comparison-card td {
+    padding-left: 10px;
+    padding-right: 10px;
+  }
+  .current-model-panel {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+}
+@media (max-width: 1180px) {
+  .evaluation-heading {
+    flex-direction: column;
+  }
+  .evaluation-kpis {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .evaluation-layout {
+    grid-template-columns: 1fr;
+  }
+  .current-model-panel {
+    height: auto;
+  }
+  .evaluation-chart-grid {
+    grid-template-columns: 1fr;
+  }
+  .evaluation-chart-card,
+  .comparison-card {
+    height: auto;
+    min-height: 282px;
+  }
+}

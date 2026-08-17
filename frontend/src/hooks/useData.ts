@@ -4,6 +4,7 @@ import { semanticApi } from '../api/semantic';
 
 export const useDatasources = () => useQuery({ queryKey: ['datasources'], queryFn: datasourceApi.list });
 export const useDatasource = (id: string) => useQuery({ queryKey: ['datasource', id], queryFn: () => datasourceApi.get(id), enabled: Boolean(id) });
+export const useSchemas = (id: string) => useQuery({ queryKey: ['schemas', id], queryFn: () => datasourceApi.schemas(id), enabled: Boolean(id) });
 export const useTables = (id: string, schema?: string) => useQuery({ queryKey: ['tables', id, schema], queryFn: () => datasourceApi.tables(id, schema), enabled: Boolean(id && schema) });
 export const useColumns = (id: string, table: string, schema?: string) => useQuery({ queryKey: ['columns', id, schema, table], queryFn: () => datasourceApi.columns(id, table, schema), enabled: Boolean(id && schema && table) });
 export const useSemanticModels = () => useQuery({ queryKey: ['semantic-models'], queryFn: semanticApi.list });

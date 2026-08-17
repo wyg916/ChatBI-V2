@@ -56,6 +56,11 @@ def test_semantic_children_and_publish(client, datasource_id):
     assert len(detail["relationships"]) == 1
     assert len(detail["business_terms"]) == 1
 
+    listed = client.get("/api/v1/semantic-models").json()[0]
+    assert len(listed["entities"]) == 2
+    assert len(listed["metrics"]) == 1
+    assert len(listed["relationships"]) == 1
+
     published = client.post(f"/api/v1/semantic-models/{model_id}/publish")
     assert published.status_code == 200
     assert published.json()["status"] == "PUBLISHED"

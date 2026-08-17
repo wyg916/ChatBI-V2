@@ -1,0 +1,1055 @@
+{
+  "name": "ChatBI V2 Day 2 Golden 20",
+  "version": "2026-08-17.1",
+  "frozen": true,
+  "frozen_at": "2026-08-17T07:25:45.190233+00:00",
+  "manifest_sha256": "d40bb690a4208240ecf347abe47e045cd74c8eb89b9162d5d53890ecf24bc282",
+  "cases": [
+    {
+      "id": "G01",
+      "category": "simple_metric",
+      "question": "统计全部订单收入",
+      "expected_entities": [
+        "orders"
+      ],
+      "expected_metrics": [
+        "revenue"
+      ],
+      "expected_dimensions": [],
+      "expected_filters": [],
+      "expected_time_range": null,
+      "expected_sql": "SELECT SUM(o.revenue) AS revenue FROM demo_business.orders o",
+      "mysql_expected_sql": "SELECT SUM(o.revenue) AS revenue FROM orders o",
+      "expected_result": [
+        {
+          "revenue": 1725750.0
+        }
+      ],
+      "expected_signature": "178d1b593bd923261abc1efd86c94975a01f6e169e3b45ba1de4ac86460f2172",
+      "mysql_expected_result": [
+        {
+          "revenue": 1725750.0
+        }
+      ],
+      "mysql_expected_signature": "178d1b593bd923261abc1efd86c94975a01f6e169e3b45ba1de4ac86460f2172",
+      "expected_outcome": "PASSED"
+    },
+    {
+      "id": "G02",
+      "category": "simple_metric",
+      "question": "统计全部订单成本",
+      "expected_entities": [
+        "orders"
+      ],
+      "expected_metrics": [
+        "cost"
+      ],
+      "expected_dimensions": [],
+      "expected_filters": [],
+      "expected_time_range": null,
+      "expected_sql": "SELECT SUM(o.cost) AS cost FROM demo_business.orders o",
+      "mysql_expected_sql": "SELECT SUM(o.cost) AS cost FROM orders o",
+      "expected_result": [
+        {
+          "cost": 952455.0
+        }
+      ],
+      "expected_signature": "65e28a27212498d555cbae14d080932cd6bba271c8f9e6cdf8392897eef429e5",
+      "mysql_expected_result": [
+        {
+          "cost": 952455.0
+        }
+      ],
+      "mysql_expected_signature": "65e28a27212498d555cbae14d080932cd6bba271c8f9e6cdf8392897eef429e5",
+      "expected_outcome": "PASSED"
+    },
+    {
+      "id": "G03",
+      "category": "simple_metric",
+      "question": "统计全部订单量",
+      "expected_entities": [
+        "orders"
+      ],
+      "expected_metrics": [
+        "order_count"
+      ],
+      "expected_dimensions": [],
+      "expected_filters": [],
+      "expected_time_range": null,
+      "expected_sql": "SELECT COUNT(o.order_id) AS order_count FROM demo_business.orders o",
+      "mysql_expected_sql": "SELECT COUNT(o.order_id) AS order_count FROM orders o",
+      "expected_result": [
+        {
+          "order_count": 1095
+        }
+      ],
+      "expected_signature": "a05bcede04500d7a4c6872e133eeda3f94551656922cdcb8e63502f68c6fd38f",
+      "mysql_expected_result": [
+        {
+          "order_count": 1095
+        }
+      ],
+      "mysql_expected_signature": "a05bcede04500d7a4c6872e133eeda3f94551656922cdcb8e63502f68c6fd38f",
+      "expected_outcome": "PASSED"
+    },
+    {
+      "id": "G04",
+      "category": "simple_metric",
+      "question": "统计全部订单利润",
+      "expected_entities": [
+        "orders"
+      ],
+      "expected_metrics": [
+        "profit"
+      ],
+      "expected_dimensions": [],
+      "expected_filters": [],
+      "expected_time_range": null,
+      "expected_sql": "SELECT SUM(o.revenue - o.cost) AS profit FROM demo_business.orders o",
+      "mysql_expected_sql": "SELECT SUM(o.revenue - o.cost) AS profit FROM orders o",
+      "expected_result": [
+        {
+          "profit": 773295.0
+        }
+      ],
+      "expected_signature": "a463b271b534e4188c47e40505f89937196324e9db615e86cf9a80adddf50663",
+      "mysql_expected_result": [
+        {
+          "profit": 773295.0
+        }
+      ],
+      "mysql_expected_signature": "a463b271b534e4188c47e40505f89937196324e9db615e86cf9a80adddf50663",
+      "expected_outcome": "PASSED"
+    },
+    {
+      "id": "G05",
+      "category": "time",
+      "question": "按月统计2026年收入趋势",
+      "expected_entities": [
+        "orders"
+      ],
+      "expected_metrics": [
+        "revenue"
+      ],
+      "expected_dimensions": [
+        "month"
+      ],
+      "expected_filters": [],
+      "expected_time_range": {
+        "start": "2026-01-01",
+        "end_exclusive": "2027-01-01"
+      },
+      "expected_sql": "SELECT DATE_TRUNC('month', o.order_date) AS month, SUM(o.revenue) AS revenue FROM demo_business.orders o WHERE o.order_date >= DATE '2026-01-01' AND o.order_date < DATE '2027-01-01' GROUP BY DATE_TRUNC('month', o.order_date) ORDER BY month ASC",
+      "mysql_expected_sql": "SELECT DATE_FORMAT(o.order_date, '%Y-%m-01') AS month, SUM(o.revenue) AS revenue FROM orders o WHERE o.order_date >= '2026-01-01' AND o.order_date < '2027-01-01' GROUP BY DATE_FORMAT(o.order_date, '%Y-%m-01') ORDER BY month ASC",
+      "expected_result": [
+        {
+          "month": "2026-01-01T00:00:00+08:00",
+          "revenue": 147337.5
+        },
+        {
+          "month": "2026-02-01T00:00:00+08:00",
+          "revenue": 125475.0
+        },
+        {
+          "month": "2026-03-01T00:00:00+08:00",
+          "revenue": 150375.0
+        },
+        {
+          "month": "2026-04-01T00:00:00+08:00",
+          "revenue": 161437.5
+        },
+        {
+          "month": "2026-05-01T00:00:00+08:00",
+          "revenue": 129712.5
+        },
+        {
+          "month": "2026-06-01T00:00:00+08:00",
+          "revenue": 141187.5
+        },
+        {
+          "month": "2026-07-01T00:00:00+08:00",
+          "revenue": 164175.0
+        },
+        {
+          "month": "2026-08-01T00:00:00+08:00",
+          "revenue": 66675.0
+        }
+      ],
+      "expected_signature": "f666e7e471f36990c5c1c7bba52c4b492911c6b57d4c5849e224eeb474e46930",
+      "mysql_expected_result": [
+        {
+          "month": "2026-01-01",
+          "revenue": 147337.5
+        },
+        {
+          "month": "2026-02-01",
+          "revenue": 125475.0
+        },
+        {
+          "month": "2026-03-01",
+          "revenue": 150375.0
+        },
+        {
+          "month": "2026-04-01",
+          "revenue": 161437.5
+        },
+        {
+          "month": "2026-05-01",
+          "revenue": 129712.5
+        },
+        {
+          "month": "2026-06-01",
+          "revenue": 141187.5
+        },
+        {
+          "month": "2026-07-01",
+          "revenue": 164175.0
+        },
+        {
+          "month": "2026-08-01",
+          "revenue": 66675.0
+        }
+      ],
+      "mysql_expected_signature": "7841ad471e48f1b71837536b1b29d435aba23674bab3e01b92e61b2461226daa",
+      "expected_outcome": "PASSED"
+    },
+    {
+      "id": "G06",
+      "category": "time",
+      "question": "按月统计2026年订单量趋势",
+      "expected_entities": [
+        "orders"
+      ],
+      "expected_metrics": [
+        "order_count"
+      ],
+      "expected_dimensions": [
+        "month"
+      ],
+      "expected_filters": [],
+      "expected_time_range": {
+        "start": "2026-01-01",
+        "end_exclusive": "2027-01-01"
+      },
+      "expected_sql": "SELECT DATE_TRUNC('month', o.order_date) AS month, COUNT(o.order_id) AS order_count FROM demo_business.orders o WHERE o.order_date >= DATE '2026-01-01' AND o.order_date < DATE '2027-01-01' GROUP BY DATE_TRUNC('month', o.order_date) ORDER BY month ASC",
+      "expected_result": [
+        {
+          "month": "2026-01-01T00:00:00+08:00",
+          "order_count": 93
+        },
+        {
+          "month": "2026-02-01T00:00:00+08:00",
+          "order_count": 84
+        },
+        {
+          "month": "2026-03-01T00:00:00+08:00",
+          "order_count": 93
+        },
+        {
+          "month": "2026-04-01T00:00:00+08:00",
+          "order_count": 90
+        },
+        {
+          "month": "2026-05-01T00:00:00+08:00",
+          "order_count": 93
+        },
+        {
+          "month": "2026-06-01T00:00:00+08:00",
+          "order_count": 90
+        },
+        {
+          "month": "2026-07-01T00:00:00+08:00",
+          "order_count": 93
+        },
+        {
+          "month": "2026-08-01T00:00:00+08:00",
+          "order_count": 51
+        }
+      ],
+      "expected_signature": "e81d8c231a7d4d6d9e0e84aca9d7cfde76e74000724a32c013f4f3aba2c7005f",
+      "expected_outcome": "PASSED"
+    },
+    {
+      "id": "G07",
+      "category": "time",
+      "question": "按月统计2026年成本趋势",
+      "expected_entities": [
+        "orders"
+      ],
+      "expected_metrics": [
+        "cost"
+      ],
+      "expected_dimensions": [
+        "month"
+      ],
+      "expected_filters": [],
+      "expected_time_range": {
+        "start": "2026-01-01",
+        "end_exclusive": "2027-01-01"
+      },
+      "expected_sql": "SELECT DATE_TRUNC('month', o.order_date) AS month, SUM(o.cost) AS cost FROM demo_business.orders o WHERE o.order_date >= DATE '2026-01-01' AND o.order_date < DATE '2027-01-01' GROUP BY DATE_TRUNC('month', o.order_date) ORDER BY month ASC",
+      "expected_result": [
+        {
+          "month": "2026-01-01T00:00:00+08:00",
+          "cost": 86047.5
+        },
+        {
+          "month": "2026-02-01T00:00:00+08:00",
+          "cost": 68943.0
+        },
+        {
+          "month": "2026-03-01T00:00:00+08:00",
+          "cost": 81049.5
+        },
+        {
+          "month": "2026-04-01T00:00:00+08:00",
+          "cost": 86152.5
+        },
+        {
+          "month": "2026-05-01T00:00:00+08:00",
+          "cost": 73552.5
+        },
+        {
+          "month": "2026-06-01T00:00:00+08:00",
+          "cost": 78680.0
+        },
+        {
+          "month": "2026-07-01T00:00:00+08:00",
+          "cost": 88963.0
+        },
+        {
+          "month": "2026-08-01T00:00:00+08:00",
+          "cost": 41947.5
+        }
+      ],
+      "expected_signature": "2cadc151d63bbd52ec46d00bce5a2c20e1062ed942177d0c32d5742cb71d35c8",
+      "expected_outcome": "PASSED"
+    },
+    {
+      "id": "G08",
+      "category": "time",
+      "question": "按月统计2026年利润趋势",
+      "expected_entities": [
+        "orders"
+      ],
+      "expected_metrics": [
+        "profit"
+      ],
+      "expected_dimensions": [
+        "month"
+      ],
+      "expected_filters": [],
+      "expected_time_range": {
+        "start": "2026-01-01",
+        "end_exclusive": "2027-01-01"
+      },
+      "expected_sql": "SELECT DATE_TRUNC('month', o.order_date) AS month, SUM(o.revenue - o.cost) AS profit FROM demo_business.orders o WHERE o.order_date >= DATE '2026-01-01' AND o.order_date < DATE '2027-01-01' GROUP BY DATE_TRUNC('month', o.order_date) ORDER BY month ASC",
+      "expected_result": [
+        {
+          "month": "2026-01-01T00:00:00+08:00",
+          "profit": 61290.0
+        },
+        {
+          "month": "2026-02-01T00:00:00+08:00",
+          "profit": 56532.0
+        },
+        {
+          "month": "2026-03-01T00:00:00+08:00",
+          "profit": 69325.5
+        },
+        {
+          "month": "2026-04-01T00:00:00+08:00",
+          "profit": 75285.0
+        },
+        {
+          "month": "2026-05-01T00:00:00+08:00",
+          "profit": 56160.0
+        },
+        {
+          "month": "2026-06-01T00:00:00+08:00",
+          "profit": 62507.5
+        },
+        {
+          "month": "2026-07-01T00:00:00+08:00",
+          "profit": 75212.0
+        },
+        {
+          "month": "2026-08-01T00:00:00+08:00",
+          "profit": 24727.5
+        }
+      ],
+      "expected_signature": "a207d25ef0455bf1a73a726d98dc0fa4772ffa074734a1bf95f0ab63279838f3",
+      "expected_outcome": "PASSED"
+    },
+    {
+      "id": "G09",
+      "category": "filter_group_topn",
+      "question": "统计已支付订单收入",
+      "expected_entities": [
+        "orders"
+      ],
+      "expected_metrics": [
+        "revenue"
+      ],
+      "expected_dimensions": [],
+      "expected_filters": [
+        {
+          "field": "orders.status",
+          "value": "PAID"
+        }
+      ],
+      "expected_time_range": null,
+      "expected_sql": "SELECT SUM(o.revenue) AS revenue FROM demo_business.orders o WHERE o.status = 'PAID'",
+      "expected_result": [
+        {
+          "revenue": 1633387.5
+        }
+      ],
+      "expected_signature": "39f71f66eb2d5af8e17286362f98a2c3c917f7e9767e121828c45abfe178e27e",
+      "expected_outcome": "PASSED"
+    },
+    {
+      "id": "G10",
+      "category": "filter_group_topn",
+      "question": "按产品统计已退款订单量前5名",
+      "expected_entities": [
+        "orders",
+        "products"
+      ],
+      "expected_metrics": [
+        "order_count"
+      ],
+      "expected_dimensions": [
+        "product"
+      ],
+      "expected_filters": [
+        {
+          "field": "orders.status",
+          "value": "REFUNDED"
+        }
+      ],
+      "expected_time_range": null,
+      "expected_sql": "SELECT p.product_name AS product, COUNT(o.order_id) AS order_count FROM demo_business.orders o JOIN demo_business.products p ON p.product_id = o.product_id WHERE o.status = 'REFUNDED' GROUP BY p.product_name ORDER BY order_count DESC LIMIT 5",
+      "expected_result": [
+        {
+          "product": "储能柜",
+          "order_count": 12
+        },
+        {
+          "product": "能源管理终端",
+          "order_count": 12
+        },
+        {
+          "product": "运维服务包",
+          "order_count": 11
+        },
+        {
+          "product": "商用充电桩",
+          "order_count": 11
+        },
+        {
+          "product": "家用充电桩",
+          "order_count": 11
+        }
+      ],
+      "expected_signature": "67e6689336d5a9b8821982be4899551aa0469c2f34ac1e8ef6c360a431e03c29",
+      "expected_outcome": "PASSED"
+    },
+    {
+      "id": "G11",
+      "category": "filter_group_topn",
+      "question": "按状态统计订单收入",
+      "expected_entities": [
+        "orders"
+      ],
+      "expected_metrics": [
+        "revenue"
+      ],
+      "expected_dimensions": [
+        "status"
+      ],
+      "expected_filters": [],
+      "expected_time_range": null,
+      "expected_sql": "SELECT o.status AS status, SUM(o.revenue) AS revenue FROM demo_business.orders o GROUP BY o.status ORDER BY revenue DESC",
+      "expected_result": [
+        {
+          "status": "PAID",
+          "revenue": 1633387.5
+        },
+        {
+          "status": "REFUNDED",
+          "revenue": 92362.5
+        }
+      ],
+      "expected_signature": "b3535cb3bea08d55fe205adf08c1e6bea5a3e2dd6ac0ae308e53d8416a718b61",
+      "expected_outcome": "PASSED"
+    },
+    {
+      "id": "G12",
+      "category": "filter_group_topn",
+      "question": "按品类统计订单成本前4名",
+      "expected_entities": [
+        "orders",
+        "products"
+      ],
+      "expected_metrics": [
+        "cost"
+      ],
+      "expected_dimensions": [
+        "category"
+      ],
+      "expected_filters": [],
+      "expected_time_range": null,
+      "expected_sql": "SELECT p.category AS category, SUM(o.cost) AS cost FROM demo_business.orders o JOIN demo_business.products p ON p.product_id = o.product_id GROUP BY p.category ORDER BY cost DESC LIMIT 4",
+      "expected_result": [
+        {
+          "category": "充电设备",
+          "cost": 375126.5
+        },
+        {
+          "category": "软件与终端",
+          "cost": 200977.0
+        },
+        {
+          "category": "储能设备",
+          "cost": 195611.5
+        },
+        {
+          "category": "服务",
+          "cost": 180740.0
+        }
+      ],
+      "expected_signature": "3e738a49fb5f3cef484ad22954d9cbaf859a5f7d5b6a9236328424ac36d3ce9e",
+      "expected_outcome": "PASSED"
+    },
+    {
+      "id": "G13",
+      "category": "join",
+      "question": "按地区统计订单收入",
+      "expected_entities": [
+        "orders",
+        "regions"
+      ],
+      "expected_metrics": [
+        "revenue"
+      ],
+      "expected_dimensions": [
+        "region"
+      ],
+      "expected_filters": [],
+      "expected_time_range": null,
+      "expected_sql": "SELECT r.region_name AS region, SUM(o.revenue) AS revenue FROM demo_business.orders o JOIN demo_business.regions r ON r.region_id = o.region_id GROUP BY r.region_name ORDER BY revenue DESC",
+      "expected_result": [
+        {
+          "region": "西部",
+          "revenue": 361237.5
+        },
+        {
+          "region": "华南",
+          "revenue": 353025.0
+        },
+        {
+          "region": "华东",
+          "revenue": 344812.5
+        },
+        {
+          "region": "华北",
+          "revenue": 336600.0
+        },
+        {
+          "region": "华中",
+          "revenue": 330075.0
+        }
+      ],
+      "expected_signature": "d7fbef0368e14fe6bfd22f601f68dff95b90d93df411d5e4cd61aa90f5483709",
+      "expected_outcome": "PASSED"
+    },
+    {
+      "id": "G14",
+      "category": "join",
+      "question": "按客户统计订单量前5名",
+      "expected_entities": [
+        "orders",
+        "customers"
+      ],
+      "expected_metrics": [
+        "order_count"
+      ],
+      "expected_dimensions": [
+        "customer"
+      ],
+      "expected_filters": [],
+      "expected_time_range": null,
+      "expected_sql": "SELECT c.customer_name AS customer, COUNT(o.order_id) AS order_count FROM demo_business.orders o JOIN demo_business.customers c ON c.customer_id = o.customer_id GROUP BY c.customer_name ORDER BY order_count DESC LIMIT 5",
+      "expected_result": [
+        {
+          "customer": "客户-007",
+          "order_count": 19
+        },
+        {
+          "customer": "客户-004",
+          "order_count": 19
+        },
+        {
+          "customer": "客户-008",
+          "order_count": 19
+        },
+        {
+          "customer": "客户-011",
+          "order_count": 19
+        },
+        {
+          "customer": "客户-010",
+          "order_count": 19
+        }
+      ],
+      "expected_signature": "b6ab716d8ebf38d2f14a449cbeca9c049e35211332f7c5f9b3fd0fd1ac6a9472",
+      "expected_outcome": "PASSED"
+    },
+    {
+      "id": "G15",
+      "category": "join",
+      "question": "按产品统计订单收入前5名",
+      "expected_entities": [
+        "orders",
+        "products"
+      ],
+      "expected_metrics": [
+        "revenue"
+      ],
+      "expected_dimensions": [
+        "product"
+      ],
+      "expected_filters": [],
+      "expected_time_range": null,
+      "expected_sql": "SELECT p.product_name AS product, SUM(o.revenue) AS revenue FROM demo_business.orders o JOIN demo_business.products p ON p.product_id = o.product_id GROUP BY p.product_name ORDER BY revenue DESC LIMIT 5",
+      "expected_result": [
+        {
+          "product": "能源管理终端",
+          "revenue": 361237.5
+        },
+        {
+          "product": "储能柜",
+          "revenue": 353025.0
+        },
+        {
+          "product": "商用充电桩",
+          "revenue": 344812.5
+        },
+        {
+          "product": "家用充电桩",
+          "revenue": 336600.0
+        },
+        {
+          "product": "运维服务包",
+          "revenue": 330075.0
+        }
+      ],
+      "expected_signature": "135383ffa9dfa677bc895ac1eda7b9a427b9cdf744a42ea93f8cde380a48e74a",
+      "expected_outcome": "PASSED"
+    },
+    {
+      "id": "G16",
+      "category": "join",
+      "question": "按客户类型统计客单价",
+      "expected_entities": [
+        "orders",
+        "customers"
+      ],
+      "expected_metrics": [
+        "avg_order_value"
+      ],
+      "expected_dimensions": [
+        "customer_type"
+      ],
+      "expected_filters": [],
+      "expected_time_range": null,
+      "expected_sql": "SELECT c.customer_type AS customer_type, AVG(o.revenue) AS avg_order_value FROM demo_business.orders o JOIN demo_business.customers c ON c.customer_id = o.customer_id GROUP BY c.customer_type ORDER BY avg_order_value DESC",
+      "expected_result": [
+        {
+          "customer_type": "渠道",
+          "avg_order_value": 1577.5684931506848
+        },
+        {
+          "customer_type": "个人",
+          "avg_order_value": 1576.027397260274
+        },
+        {
+          "customer_type": "企业",
+          "avg_order_value": 1574.486301369863
+        }
+      ],
+      "expected_signature": "4034a4adca4dec59e0283ea5958563a721c7cb3d225581a82c1958dc73ff4fb5",
+      "expected_outcome": "PASSED"
+    },
+    {
+      "id": "G17",
+      "category": "join",
+      "question": "按地区统计订单利润",
+      "expected_entities": [
+        "orders",
+        "regions"
+      ],
+      "expected_metrics": [
+        "profit"
+      ],
+      "expected_dimensions": [
+        "region"
+      ],
+      "expected_filters": [],
+      "expected_time_range": null,
+      "expected_sql": "SELECT r.region_name AS region, SUM(o.revenue - o.cost) AS profit FROM demo_business.orders o JOIN demo_business.regions r ON r.region_id = o.region_id GROUP BY r.region_name ORDER BY profit DESC",
+      "expected_result": [
+        {
+          "region": "西部",
+          "profit": 160260.5
+        },
+        {
+          "region": "华南",
+          "profit": 157413.5
+        },
+        {
+          "region": "华东",
+          "profit": 154566.5
+        },
+        {
+          "region": "华北",
+          "profit": 151719.5
+        },
+        {
+          "region": "华中",
+          "profit": 149335.0
+        }
+      ],
+      "expected_signature": "45aa022db5cf1ee69c806c1e9465dc8b3207e02acf8a483c3ee3b00936fe0eec",
+      "expected_outcome": "PASSED"
+    },
+    {
+      "id": "G18",
+      "category": "composite",
+      "question": "2026年按地区按月统计已支付订单收入趋势",
+      "expected_entities": [
+        "orders",
+        "regions"
+      ],
+      "expected_metrics": [
+        "revenue"
+      ],
+      "expected_dimensions": [
+        "region",
+        "month"
+      ],
+      "expected_filters": [
+        {
+          "field": "orders.status",
+          "value": "PAID"
+        }
+      ],
+      "expected_time_range": {
+        "start": "2026-01-01",
+        "end_exclusive": "2027-01-01"
+      },
+      "expected_sql": "SELECT r.region_name AS region, DATE_TRUNC('month', o.order_date) AS month, SUM(o.revenue) AS revenue FROM demo_business.orders o JOIN demo_business.regions r ON r.region_id = o.region_id WHERE o.status = 'PAID' AND o.order_date >= DATE '2026-01-01' AND o.order_date < DATE '2027-01-01' GROUP BY r.region_name, DATE_TRUNC('month', o.order_date) ORDER BY month ASC, revenue DESC",
+      "expected_result": [
+        {
+          "region": "西部",
+          "month": "2026-01-01T00:00:00+08:00",
+          "revenue": 32100.0
+        },
+        {
+          "region": "华东",
+          "month": "2026-01-01T00:00:00+08:00",
+          "revenue": 27750.0
+        },
+        {
+          "region": "华北",
+          "month": "2026-01-01T00:00:00+08:00",
+          "revenue": 27075.0
+        },
+        {
+          "region": "华南",
+          "month": "2026-01-01T00:00:00+08:00",
+          "revenue": 26512.5
+        },
+        {
+          "region": "华中",
+          "month": "2026-01-01T00:00:00+08:00",
+          "revenue": 25650.0
+        },
+        {
+          "region": "西部",
+          "month": "2026-02-01T00:00:00+08:00",
+          "revenue": 26400.0
+        },
+        {
+          "region": "华南",
+          "month": "2026-02-01T00:00:00+08:00",
+          "revenue": 24600.0
+        },
+        {
+          "region": "华中",
+          "month": "2026-02-01T00:00:00+08:00",
+          "revenue": 23737.5
+        },
+        {
+          "region": "华东",
+          "month": "2026-02-01T00:00:00+08:00",
+          "revenue": 23250.0
+        },
+        {
+          "region": "华北",
+          "month": "2026-02-01T00:00:00+08:00",
+          "revenue": 21187.5
+        },
+        {
+          "region": "华南",
+          "month": "2026-03-01T00:00:00+08:00",
+          "revenue": 29362.5
+        },
+        {
+          "region": "华北",
+          "month": "2026-03-01T00:00:00+08:00",
+          "revenue": 29137.5
+        },
+        {
+          "region": "西部",
+          "month": "2026-03-01T00:00:00+08:00",
+          "revenue": 28650.0
+        },
+        {
+          "region": "华东",
+          "month": "2026-03-01T00:00:00+08:00",
+          "revenue": 27937.5
+        },
+        {
+          "region": "华中",
+          "month": "2026-03-01T00:00:00+08:00",
+          "revenue": 26475.0
+        },
+        {
+          "region": "华南",
+          "month": "2026-04-01T00:00:00+08:00",
+          "revenue": 32700.0
+        },
+        {
+          "region": "华东",
+          "month": "2026-04-01T00:00:00+08:00",
+          "revenue": 31312.5
+        },
+        {
+          "region": "西部",
+          "month": "2026-04-01T00:00:00+08:00",
+          "revenue": 30712.5
+        },
+        {
+          "region": "华北",
+          "month": "2026-04-01T00:00:00+08:00",
+          "revenue": 29925.0
+        },
+        {
+          "region": "华中",
+          "month": "2026-04-01T00:00:00+08:00",
+          "revenue": 28537.5
+        },
+        {
+          "region": "西部",
+          "month": "2026-05-01T00:00:00+08:00",
+          "revenue": 28537.5
+        },
+        {
+          "region": "华南",
+          "month": "2026-05-01T00:00:00+08:00",
+          "revenue": 24262.5
+        },
+        {
+          "region": "华中",
+          "month": "2026-05-01T00:00:00+08:00",
+          "revenue": 23775.0
+        },
+        {
+          "region": "华东",
+          "month": "2026-05-01T00:00:00+08:00",
+          "revenue": 22875.0
+        },
+        {
+          "region": "华北",
+          "month": "2026-05-01T00:00:00+08:00",
+          "revenue": 22575.0
+        },
+        {
+          "region": "西部",
+          "month": "2026-06-01T00:00:00+08:00",
+          "revenue": 27712.5
+        },
+        {
+          "region": "华东",
+          "month": "2026-06-01T00:00:00+08:00",
+          "revenue": 27562.5
+        },
+        {
+          "region": "华北",
+          "month": "2026-06-01T00:00:00+08:00",
+          "revenue": 26925.0
+        },
+        {
+          "region": "华南",
+          "month": "2026-06-01T00:00:00+08:00",
+          "revenue": 26325.0
+        },
+        {
+          "region": "华中",
+          "month": "2026-06-01T00:00:00+08:00",
+          "revenue": 25537.5
+        },
+        {
+          "region": "华南",
+          "month": "2026-07-01T00:00:00+08:00",
+          "revenue": 33675.0
+        },
+        {
+          "region": "西部",
+          "month": "2026-07-01T00:00:00+08:00",
+          "revenue": 32475.0
+        },
+        {
+          "region": "华东",
+          "month": "2026-07-01T00:00:00+08:00",
+          "revenue": 32250.0
+        },
+        {
+          "region": "华中",
+          "month": "2026-07-01T00:00:00+08:00",
+          "revenue": 30337.5
+        },
+        {
+          "region": "华北",
+          "month": "2026-07-01T00:00:00+08:00",
+          "revenue": 28987.5
+        },
+        {
+          "region": "华东",
+          "month": "2026-08-01T00:00:00+08:00",
+          "revenue": 12937.5
+        },
+        {
+          "region": "西部",
+          "month": "2026-08-01T00:00:00+08:00",
+          "revenue": 12862.5
+        },
+        {
+          "region": "华北",
+          "month": "2026-08-01T00:00:00+08:00",
+          "revenue": 12562.5
+        },
+        {
+          "region": "华南",
+          "month": "2026-08-01T00:00:00+08:00",
+          "revenue": 11775.0
+        },
+        {
+          "region": "华中",
+          "month": "2026-08-01T00:00:00+08:00",
+          "revenue": 11437.5
+        }
+      ],
+      "expected_signature": "beb3490c7980b19c4c547a1777772b38f2bd73c758b4d1264531ff487f522381",
+      "expected_outcome": "PASSED"
+    },
+    {
+      "id": "G19",
+      "category": "composite",
+      "question": "2026年按产品统计已退款订单收入前5名",
+      "expected_entities": [
+        "orders",
+        "products"
+      ],
+      "expected_metrics": [
+        "revenue"
+      ],
+      "expected_dimensions": [
+        "product"
+      ],
+      "expected_filters": [
+        {
+          "field": "orders.status",
+          "value": "REFUNDED"
+        }
+      ],
+      "expected_time_range": {
+        "start": "2026-01-01",
+        "end_exclusive": "2027-01-01"
+      },
+      "expected_sql": "SELECT p.product_name AS product, SUM(o.revenue) AS revenue FROM demo_business.orders o JOIN demo_business.products p ON p.product_id = o.product_id WHERE o.status = 'REFUNDED' AND o.order_date >= DATE '2026-01-01' AND o.order_date < DATE '2027-01-01' GROUP BY p.product_name ORDER BY revenue DESC LIMIT 5",
+      "expected_result": [
+        {
+          "product": "家用充电桩",
+          "revenue": 12862.5
+        },
+        {
+          "product": "运维服务包",
+          "revenue": 12600.0
+        },
+        {
+          "product": "储能柜",
+          "revenue": 12300.0
+        },
+        {
+          "product": "商用充电桩",
+          "revenue": 10500.0
+        },
+        {
+          "product": "能源管理终端",
+          "revenue": 9712.5
+        }
+      ],
+      "expected_signature": "8a3f41dd71a33f1252d4bf70b4a0c490fef5f804446684e8bcaa0124f416d5f6",
+      "expected_outcome": "PASSED"
+    },
+    {
+      "id": "G20",
+      "category": "composite",
+      "question": "2026年按品类统计已支付订单利润前4名",
+      "expected_entities": [
+        "orders",
+        "products"
+      ],
+      "expected_metrics": [
+        "profit"
+      ],
+      "expected_dimensions": [
+        "category"
+      ],
+      "expected_filters": [
+        {
+          "field": "orders.status",
+          "value": "PAID"
+        }
+      ],
+      "expected_time_range": {
+        "start": "2026-01-01",
+        "end_exclusive": "2027-01-01"
+      },
+      "expected_sql": "SELECT p.category AS category, SUM(o.revenue - o.cost) AS profit FROM demo_business.orders o JOIN demo_business.products p ON p.product_id = o.product_id WHERE o.status = 'PAID' AND o.order_date >= DATE '2026-01-01' AND o.order_date < DATE '2027-01-01' GROUP BY p.category ORDER BY profit DESC LIMIT 4",
+      "expected_result": [
+        {
+          "category": "充电设备",
+          "profit": 179007.5
+        },
+        {
+          "category": "软件与终端",
+          "profit": 98374.5
+        },
+        {
+          "category": "储能设备",
+          "profit": 92526.0
+        },
+        {
+          "category": "服务",
+          "profit": 85290.0
+        }
+      ],
+      "expected_signature": "e667c1e49bf6ef766d5e0a8c1904511e0b30fc19a86bdea19d08e6fa2434b016",
+      "expected_outcome": "PASSED"
+    }
+  ]
+}
