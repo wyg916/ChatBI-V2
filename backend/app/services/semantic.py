@@ -17,6 +17,10 @@ def get_semantic_model(db: Session, model_id: str) -> SemanticModel | None:
     return db.scalar(select(SemanticModel).where(SemanticModel.id == model_id).options(*SEMANTIC_LOADS))
 
 
+def list_semantic_models(db: Session) -> list[SemanticModel]:
+    return list(db.scalars(select(SemanticModel).options(*SEMANTIC_LOADS).order_by(SemanticModel.created_at.desc())))
+
+
 def semantic_payload(model: SemanticModel) -> dict:
     return {
         "id": model.id,

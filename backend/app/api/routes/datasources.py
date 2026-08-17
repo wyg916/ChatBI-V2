@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, Response, status
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.db.session import get_db
@@ -25,6 +25,30 @@ def _get_or_404(db: Session, datasource_id: str) -> DataSource:
     return datasource
 
 
+def _datasource_counts(db: Session) -> tuple[dict[str, int], dict[str, int]]:
+    table_rows = db.execute(
+        select(DataSourceSchema.datasource_id, func.count(DataSourceTable.id))
+        .outerjoin(DataSourceTable, DataSourceTable.schema_id == DataSourceSchema.id)
+        .group_by(DataSourceSchema.datasource_id)
+    )
+    column_rows = db.execute(
+        select(DataSourceSchema.datasource_id, func.count(DataSourceColumn.id))
+        .join(DataSourceTable, DataSourceTable.schema_id == DataSourceSchema.id)
+        .outerjoin(DataSourceColumn, DataSourceColumn.table_id == DataSourceTable.id)
+        .group_by(DataSourceSchema.datasource_id)
+    )
+    table_counts = {datasource_id: count for datasource_id, count in table_rows}
+    column_counts = {datasource_id: count for datasource_id, count in column_rows}
+    return table_counts, column_counts
+
+
+def _read_datasource(datasource: DataSource, table_count: int = 0, column_count: int = 0) -> DataSourceRead:
+    return DataSourceRead.model_validate(datasource).model_copy(update={
+        "table_count": table_count,
+        "column_count": column_count,
+    })
+
+
 @router.post("", response_model=DataSourceRead, status_code=status.HTTP_201_CREATED)
 def create_datasource(data: DataSourceCreate, db: Session = Depends(get_db)):
     return service.create_datasource(db, data)
@@ -32,17 +56,30 @@ def create_datasource(data: DataSourceCreate, db: Session = Depends(get_db)):
 
 @router.get("", response_model=list[DataSourceRead])
 def list_datasources(db: Session = Depends(get_db)):
-    return list(db.scalars(select(DataSource).order_by(DataSource.created_at.desc())))
+    datasources = list(db.scalars(select(DataSource).order_by(DataSource.created_at.desc())))
+    table_counts, column_counts = _datasource_counts(db)
+    return [
+        _read_datasource(item, table_counts.get(item.id, 0), column_counts.get(item.id, 0))
+        for item in datasources
+    ]
 
 
 @router.get("/{datasource_id}", response_model=DataSourceRead)
 def get_datasource(datasource_id: str, db: Session = Depends(get_db)):
-    return _get_or_404(db, datasource_id)
+    datasource = _get_or_404(db, datasource_id)
+    table_counts, column_counts = _datasource_counts(db)
+    return _read_datasource(datasource, table_counts.get(datasource_id, 0), column_counts.get(datasource_id, 0))
 
 
 @router.put("/{datasource_id}", response_model=DataSourceRead)
 def update_datasource(datasource_id: str, data: DataSourceUpdate, db: Session = Depends(get_db)):
-    return service.update_datasource(db, _get_or_404(db, datasource_id), data)
+    datasource = service.update_datasource(db, _get_or_404(db, datasource_id), data)
+    table_counts, column_counts = _datasource_counts(db)
+    return _read_datasource(
+        datasource,
+        table_counts.get(datasource_id, 0),
+        column_counts.get(datasource_id, 0),
+    )
 
 
 @router.delete("/{datasource_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -76,23 +113,42 @@ def sync_datasource(datasource_id: str, db: Session = Depends(get_db)):
 @router.get("/{datasource_id}/schemas", response_model=list[SchemaRead])
 def list_schemas(datasource_id: str, db: Session = Depends(get_db)):
     _get_or_404(db, datasource_id)
-    return list(db.scalars(select(DataSourceSchema).where(DataSourceSchema.datasource_id == datasource_id).order_by(DataSourceSchema.name)))
+    rows = db.execute(
+        select(DataSourceSchema, func.count(DataSourceTable.id))
+        .outerjoin(DataSourceTable, DataSourceTable.schema_id == DataSourceSchema.id)
+        .where(DataSourceSchema.datasource_id == datasource_id)
+        .group_by(DataSourceSchema.id)
+        .order_by(DataSourceSchema.name)
+    )
+    return [
+        SchemaRead.model_validate(schema).model_copy(update={"table_count": table_count})
+        for schema, table_count in rows
+    ]
 
 
 @router.get("/{datasource_id}/tables", response_model=list[TableRead])
 def list_tables(datasource_id: str, schema: str | None = None, db: Session = Depends(get_db)):
     _get_or_404(db, datasource_id)
     query = (
-        select(DataSourceTable, DataSourceSchema.name)
+        select(DataSourceTable, DataSourceSchema.name, func.count(DataSourceColumn.id))
         .join(DataSourceSchema, DataSourceTable.schema_id == DataSourceSchema.id)
+        .outerjoin(DataSourceColumn, DataSourceColumn.table_id == DataSourceTable.id)
         .where(DataSourceSchema.datasource_id == datasource_id)
+        .group_by(DataSourceTable.id, DataSourceSchema.name)
         .order_by(DataSourceSchema.name, DataSourceTable.name)
     )
     if schema:
         query = query.where(DataSourceSchema.name == schema)
     return [
-        TableRead(id=table.id, schema_name=schema_name, name=table.name, qualified_name=table.qualified_name, comment=table.comment)
-        for table, schema_name in db.execute(query)
+        TableRead(
+            id=table.id,
+            schema_name=schema_name,
+            name=table.name,
+            qualified_name=table.qualified_name,
+            comment=table.comment,
+            column_count=column_count,
+        )
+        for table, schema_name, column_count in db.execute(query)
     ]
 
 

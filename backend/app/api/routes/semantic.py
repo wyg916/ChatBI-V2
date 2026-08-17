@@ -1,5 +1,4 @@
 from fastapi import APIRouter, Depends, HTTPException, Response, status
-from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.db.session import get_db
@@ -31,7 +30,7 @@ from app.schemas.semantic import (
 )
 from app.semantic import LocalSemanticEngine
 from app.services.datasources import default_workspace
-from app.services.semantic import get_semantic_model, semantic_payload
+from app.services.semantic import get_semantic_model, list_semantic_models, semantic_payload
 
 router = APIRouter(prefix="/semantic-models", tags=["semantic models"])
 
@@ -55,9 +54,9 @@ def create_model(data: SemanticModelCreate, db: Session = Depends(get_db)):
     return model
 
 
-@router.get("", response_model=list[SemanticModelRead])
+@router.get("", response_model=list[SemanticModelDetail])
 def list_models(db: Session = Depends(get_db)):
-    return list(db.scalars(select(SemanticModel).order_by(SemanticModel.created_at.desc())))
+    return [semantic_payload(model) for model in list_semantic_models(db)]
 
 
 @router.get("/{model_id}", response_model=SemanticModelDetail)

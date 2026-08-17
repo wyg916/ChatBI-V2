@@ -1,3 +1,5 @@
+from typing import Any
+
 from sqlalchemy import URL, create_engine, inspect, text
 
 from app.connectors.base import (
@@ -36,6 +38,17 @@ class SQLAlchemyConnector(DataSourceConnector):
         try:
             with engine.connect() as connection:
                 connection.execute(text("SELECT 1"))
+        finally:
+            engine.dispose()
+
+    def read_rows(self, statement: str, parameters: dict[str, Any] | None = None) -> list[dict[str, Any]]:
+        normalized = statement.strip().rstrip(";")
+        if not normalized.upper().startswith(("SELECT ", "WITH ")) or ";" in normalized:
+            raise ValueError("Only one SELECT or WITH ... SELECT statement is allowed")
+        engine = self._engine()
+        try:
+            with engine.connect() as connection:
+                return [dict(row) for row in connection.execute(text(normalized), parameters or {}).mappings()]
         finally:
             engine.dispose()
 

@@ -5,7 +5,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
     app_name: str = "ChatBI V2"
-    app_version: str = "0.1.0-day1"
+    app_version: str = "0.2.0-day2"
     environment: str = "development"
     database_url: str = "postgresql+psycopg://chatbi_app@127.0.0.1:5432/chatbi_v2"
     datasource_secret_key: str = ""
@@ -21,6 +21,14 @@ class Settings(BaseSettings):
     demo_mysql_database: str = "chatbi_demo_business"
     demo_mysql_username: str = "chatbi_reader"
     demo_mysql_password: str = ""
+    model_provider: str = "deterministic"
+    model_base_url: str = ""
+    model_api_key: str = ""
+    model_name: str = ""
+    query_timeout_ms: int = 8000
+    query_row_limit: int = 500
+    query_concurrency: int = 4
+    context_token_budget: int = 6000
 
     model_config = SettingsConfigDict(
         env_file=".env",
