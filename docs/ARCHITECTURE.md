@@ -42,6 +42,9 @@
 - NL2SQLEngineAdapter
 - ChartEngineAdapter
 - EvaluationAdapter
+- RagAdapter / EmbeddingProvider / RerankProvider / CitationVerifier
+- AgentOrchestratorAdapter / ToolExecutor
+- PromptRegistry
 
 任何第三方组件只能位于适配器之后。
 
@@ -59,3 +62,16 @@
 - `QueryRun`、`QueryAuditEvent`、`QueryFeedback` 和保存后的 `VerifiedAnswer` 均位于本机 PostgreSQL 元数据库。
 
 浏览器仍只访问 `/api/v1`；SQL 执行连接、数据库凭据、Guard 与 Oracle 均不下放到前端。
+
+## 6. 受控 RAG 与有限分析编排
+
+`POST /api/v1/analysis` 先由确定性 Question Router 分类：
+
+- `DATA_QUERY`：直接进入既有 `QueryPipeline`，不默认进入 Agent。
+- `KNOWLEDGE_QUERY`：按 RAG Feature Flag 调用 `RagAdapter`，随后执行 Citation/Answer Guard；失败可回退 `QueryPipeline`。
+- `HYBRID_ANALYSIS`：合并 Oracle 已通过的数据结果与验证过的知识证据；RAG shadow 结果不向用户发布。
+- `COMPLEX_ANALYSIS`：仅在路由白名单和 Agent Feature Flag 同时允许时进入有限状态机，否则回退 `DATA_QUERY`。
+
+契约位于根目录 `packages/`，业务代码不引用冻结旧仓库的内部类或绝对路径。每次 Adapter/Tool 调用携带 Workspace、用户、角色、允许的数据源/语义模型/工具、Trace、超时、最大步数与 token 预算。Agent 只能持有 `ToolExecutor`，不能获得数据库连接或 Connector；数据工具仍执行 `Semantic Context → NL2SQL → SQL Guard → Query Executor → Result Oracle`。
+
+旧项目二没有可验证的完整 Multi-Agent Runtime。当前 `agent-orchestrator` 是用于复杂分析的最薄确定性状态机，具备工具白名单、超时、步数和预算边界，不是通用 Agent 平台。旧 Agent HTTP Adapter 因无法注入 ChatBI `ToolExecutor` 而拒绝远程数据执行，直到兼容协议与对应安全测试补齐。

@@ -127,3 +127,7 @@ Backend 以受信反向代理提供的 `X-ChatBI-Actor` 解析已持久化用户
 ## ADR-028：前端页面按路由加载，图表库保持独立非阻断 chunk
 
 14 个页面改为 React Router lazy route，入口 JS 从 963.34 kB 降到 273.08 kB。ECharts 被隔离到只有图表页面才加载的 555.48 kB chunk；该独立 chunk 仍触发 Vite 500 kB warning，但规范明确其为非阻断 P1，不为消除 warning 引入大规模图表重构。
+
+## ADR-029：旧项目二 RAG 与有限编排只能受控复用
+
+P0 全部通过后，允许把专业知识 RAG 与复杂 ChatBI 分析的有限编排作为非阻断 P1，通过自有契约、Adapter、Feature Flag、Shadow/Canary、RBAC/ACL 与审计接入。普通 `DATA_QUERY` 永远优先走现有 NL2SQL、SQL Guard、只读执行与 Result Oracle；Agent 不持有数据源连接。旧项目二没有完整多 Agent Runtime，当前只复用其 RAG 运行时 HTTP 契约和已验证的 Tool/Skill/Model Gateway/RBAC/Audit 设计，补充最薄有界状态机，不宣称完整 Multi-Agent 复用通过。旧仓库缺少根许可证，生产源代码抽取在归属与许可证补齐前保持阻塞。完整决策见 `docs/decisions/ADR_LEGACY_RAG_AGENT_REUSE.md`。

@@ -7,7 +7,7 @@ services:
       dockerfile: backend/Dockerfile
     environment:
       CHATBI_ENVIRONMENT: development
-      CHATBI_DATABASE_URL: postgresql+psycopg://chatbi_app:${CHATBI_META_PASSWORD:?Run scripts/bootstrap-local-databases.ps1 first}@host.docker.internal:5432/chatbi_v2
+      CHATBI_DATABASE_URL: ${CHATBI_DATABASE_URL:-postgresql+psycopg://chatbi_app:${CHATBI_META_PASSWORD:?Run scripts/bootstrap-local-databases.ps1 first}@host.docker.internal:5432/chatbi_v2}
       CHATBI_DATASOURCE_SECRET_KEY: ${CHATBI_DATASOURCE_SECRET_KEY:?Run scripts/bootstrap-local-databases.ps1 first}
       CHATBI_SEED_DEMO_SEMANTIC_MODEL: "true"
       CHATBI_DEMO_POSTGRES_HOST: host.docker.internal
@@ -38,10 +38,23 @@ services:
       CHATBI_QUERY_ROW_LIMIT: ${CHATBI_QUERY_ROW_LIMIT:-500}
       CHATBI_QUERY_CONCURRENCY: ${CHATBI_QUERY_CONCURRENCY:-4}
       CHATBI_CONTEXT_TOKEN_BUDGET: ${CHATBI_CONTEXT_TOKEN_BUDGET:-6000}
+      CHATBI_RAG_MODE: ${CHATBI_RAG_MODE:-shadow}
+      CHATBI_AGENT_MODE: ${CHATBI_AGENT_MODE:-off}
+      CHATBI_AGENT_ALLOWED_ROUTES: ${CHATBI_AGENT_ALLOWED_ROUTES:-}
+      CHATBI_RAG_FALLBACK_ENABLED: ${CHATBI_RAG_FALLBACK_ENABLED:-true}
+      CHATBI_AGENT_FALLBACK_ENABLED: ${CHATBI_AGENT_FALLBACK_ENABLED:-true}
+      CHATBI_LEGACY_RAG_BASE_URL: ${CHATBI_LEGACY_RAG_BASE_URL:-}
+      CHATBI_LEGACY_RAG_BEARER_TOKEN: ${CHATBI_LEGACY_RAG_BEARER_TOKEN:-}
+      CHATBI_LEGACY_RAG_REQUIRE_WORKSPACE_ECHO: ${CHATBI_LEGACY_RAG_REQUIRE_WORKSPACE_ECHO:-true}
+      CHATBI_LEGACY_AGENT_BASE_URL: ${CHATBI_LEGACY_AGENT_BASE_URL:-}
+      CHATBI_LEGACY_AGENT_BEARER_TOKEN: ${CHATBI_LEGACY_AGENT_BEARER_TOKEN:-}
+      CHATBI_AGENT_TIMEOUT_MS: ${CHATBI_AGENT_TIMEOUT_MS:-15000}
+      CHATBI_AGENT_MAX_STEPS: ${CHATBI_AGENT_MAX_STEPS:-4}
+      CHATBI_AGENT_TOKEN_BUDGET: ${CHATBI_AGENT_TOKEN_BUDGET:-4000}
     extra_hosts:
       - "host.docker.internal:host-gateway"
     ports:
-      - "8000:8000"
+      - "${CHATBI_BACKEND_PORT:-8000}:8000"
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health', timeout=2)"]
       interval: 4s
@@ -53,7 +66,7 @@ services:
     build:
       context: ./frontend
     ports:
-      - "5173:80"
+      - "${CHATBI_FRONTEND_PORT:-5173}:80"
     depends_on:
       backend:
         condition: service_healthy

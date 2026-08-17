@@ -1,0 +1,27 @@
+{
+  "checked_at": "2026-08-17T23:25:06+08:00",
+  "candidate_version": "1.0.0",
+  "run1": {
+    "full_stop_before_start": true,
+    "duration_seconds": 34.7,
+    "backend_http": 200,
+    "frontend_http": 200,
+    "metadata_postgresql": "READY",
+    "demo_postgresql": "READY",
+    "demo_mysql": "READY",
+    "result": "PASS"
+  },
+  "full_stop_between_runs": true,
+  "run2": {
+    "full_stop_before_start": true,
+    "duration_seconds": 23.7,
+    "backend_http": 200,
+    "frontend_http": 200,
+    "metadata_postgresql": "READY",
+    "demo_postgresql": "READY",
+    "demo_mysql": "READY",
+    "result": "PASS"
+  },
+  "run2_left_running_for_demo": true,
+  "result": "PASS"
+}

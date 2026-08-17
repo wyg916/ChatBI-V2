@@ -5,6 +5,10 @@ param(
 $ErrorActionPreference = 'Stop'
 $projectRoot = Split-Path -Parent $PSScriptRoot
 Set-Location -LiteralPath $projectRoot
+$backendPort = if($env:CHATBI_BACKEND_PORT) { $env:CHATBI_BACKEND_PORT } else { '8000' }
+$frontendPort = if($env:CHATBI_FRONTEND_PORT) { $env:CHATBI_FRONTEND_PORT } else { '5173' }
+$backendHealth = "http://127.0.0.1:${backendPort}/health"
+$frontendHealth = "http://127.0.0.1:${frontendPort}/"
 
 if (-not (Test-Path -LiteralPath (Join-Path $projectRoot '.env'))) {
   throw 'Missing local .env. Run scripts/bootstrap-local-databases.ps1 first.'
@@ -23,8 +27,8 @@ if ($LASTEXITCODE -ne 0) { throw 'docker compose up failed' }
 $deadline = (Get-Date).AddMinutes(4)
 do {
   try {
-    $backend = Invoke-WebRequest -UseBasicParsing -Uri 'http://localhost:8000/health' -TimeoutSec 3
-    $frontend = Invoke-WebRequest -UseBasicParsing -Uri 'http://localhost:5173/' -TimeoutSec 3
+    $backend = Invoke-WebRequest -UseBasicParsing -Uri $backendHealth -TimeoutSec 3
+    $frontend = Invoke-WebRequest -UseBasicParsing -Uri $frontendHealth -TimeoutSec 3
     if ($backend.StatusCode -eq 200 -and $frontend.StatusCode -eq 200) { break }
   } catch {
     Start-Sleep -Seconds 3

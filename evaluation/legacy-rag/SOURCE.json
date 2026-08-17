@@ -1,0 +1,27 @@
+{
+  "schema_version": "legacy-rag-golden-source-v1",
+  "source_repository": "legacy-project-two",
+  "source_branch": "codex/integration-4.1-full",
+  "source_commit": "b6be894a7153f7ce8d31dfc65da7222bd7af1b5f",
+  "files": [
+    {
+      "path": "rag_60.json",
+      "source_path": "backend/tests/golden/rag_60.json",
+      "git_blob": "350e16db0c8c4ef7ef7f967ae2d84fb16e24f0f2",
+      "sha256": "0bed9c04a69684a103d35c3b1f69f54b820425bac9bc68bd441ed4113e318e4b",
+      "cases": 60,
+      "distributed": false
+    },
+    {
+      "path": "rag_hybrid_60.json",
+      "source_path": "backend/tests/golden/rag_hybrid_60.json",
+      "git_blob": "308fa2446384540a877ca2b41868f949bc81049e",
+      "sha256": "36916fdb26d0bce7219b8fc2f3ebdbfe2b7cf5fe0974c25a4a5b4f10cf676b35",
+      "cases": 60,
+      "distributed": false
+    }
+  ],
+  "copied_production_source": false,
+  "payloads_in_public_release": false,
+  "license_status": "PROVENANCE_PENDING_NOT_REDISTRIBUTED"
+}

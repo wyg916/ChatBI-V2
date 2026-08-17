@@ -35,6 +35,12 @@
 
 - 复杂长期记忆、遗忘策略、通用 RAG 生命周期、通用 Agent/Skills、预测建模、复杂告警、通用报表引擎、插件市场、深度 OIDC/Vault、跨行业工作流。
 
+### 受控复用例外（ADR-029）
+
+- P0 全部门禁通过后，允许把面向专业业务知识的受控 RAG、面向复杂 ChatBI 分析的有限 Agent Orchestration，以及旧项目二已验证的 RAG/Agent 内核作为非阻断 P1 增强接入。
+- 只允许通过自有 Contract、Adapter、Feature Flag、Shadow 和 Canary 接入；普通问数仍走确定性 NL2SQL、SQL Guard、Query Executor 与 Result Oracle 主链路。
+- 继续禁止通用知识库平台、通用 Agent 管理平台、Skills 市场、复杂长期记忆/遗忘平台、与 ChatBI 主链路无关的 Agent、整仓复制旧项目，以及让 RAG/Agent 成为 P0 阻断项。
+
 ## 4. 与其他项目的边界
 
 - 项目一是电力预测、交易决策和垂直行业分析应用；不得把预测算法、RAG 平台或行业工作流迁入 ChatBI Core。

@@ -1,0 +1,19 @@
+{
+  "timestamp": "2026-08-17T23:06:24.0191854+08:00",
+  "rollback_simulation": "PASS",
+  "final_candidate": "20260817_0007",
+  "previous_safe_baseline_sha": "d70125f6172dd170c419110fd75d47e87a7f121a",
+  "previous_safe_migration": "20260817_0006",
+  "previous_start": "HTTP_200",
+  "previous_ask": "SUCCEEDED_ORACLE_PASSED",
+  "previous_evaluation": "GOLDEN50_PASS",
+  "restore_migration": "PASS",
+  "final_start": "HTTP_200",
+  "final_ask": "SUCCEEDED_ORACLE_PASSED",
+  "final_evaluation": "GOLDEN50_PASS",
+  "temporary_metadata_cleanup": "PASS",
+  "temporary_source_cleanup": "PASS",
+  "real_project_data": "PRESERVED",
+  "secrets_recorded": false,
+  "stage": "COMPLETE"
+}

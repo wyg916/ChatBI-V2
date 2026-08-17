@@ -1,0 +1,68 @@
+{
+  "status": "PARTIAL",
+  "scope": "LEGACY_RAG_AGENT_REUSE_INTEGRATION",
+  "old_repository": "E:/新能源企业经营分析智能平台",
+  "old_repository_read_only": true,
+  "old_branch": "codex/integration-4.1-full",
+  "old_branch_head": "b2573a9dc1881a54581c5c556fb4a8c34046f9c3",
+  "old_product_head": "b6be894a7153f7ce8d31dfc65da7222bd7af1b5f",
+  "old_audit_head": "ce0764be9c92c7433fae54a62e247736708ea7e5",
+  "old_rag_baseline": "81f0adadc992ae8be7897c491bc243131e52e610",
+  "legacy_rag": {
+    "focused_pytest": "15/15 PASS",
+    "golden_cases_exercised_by_suite": "120/120 PASS",
+    "historical_recall_at_10": 1.0,
+    "historical_citation_accuracy": 1.0,
+    "historical_unauthorized_retrieval": 0,
+    "historical_prompt_injection_evidence_used": 0,
+    "chatbi_http_runtime_configured": false,
+    "mode": "shadow"
+  },
+  "multi_agent": {
+    "assets_found": true,
+    "runtime_found": false,
+    "tests_found": false,
+    "reuse": "PARTIAL",
+    "mode": "off"
+  },
+  "chatbi_gates": {
+    "integration_pytest": "19/19 PASS",
+    "backend_pytest": "118/118 PASS",
+    "frontend_vitest": "27/27 PASS",
+    "frontend_typecheck": "PASS",
+    "frontend_build": "PASS",
+    "browser_e2e": "36/36 PASS",
+    "golden_postgresql": "50/50 PASS",
+    "golden_mysql": "10/10 PASS",
+    "postgresql_migration_single_head": true,
+    "postgresql_migration_upgrade_base_upgrade": "PASS",
+    "postgresql_temporary_schema_removed": true,
+    "docker_consecutive_stopped_starts": "2/2 PASS",
+    "docker_final_rebuilt_start": "PASS",
+    "console_errors": 0,
+    "page_errors": 0,
+    "blocking_request_errors": 0
+  },
+  "security": {
+    "AGENT_DIRECT_DB_ACCESS": 0,
+    "AGENT_SQL_GUARD_BYPASS": 0,
+    "AGENT_RESULT_ORACLE_BYPASS": 0,
+    "UNAUTHORIZED_TOOL_CALL": 0,
+    "CROSS_WORKSPACE_LEAK": 0,
+    "INFINITE_LOOP": 0,
+    "UNBOUNDED_TOOL_CALL": 0,
+    "TRACE_COMPLETENESS": "PASS"
+  },
+  "migration": {
+    "target_table_count": 15,
+    "dry_run": "PASS",
+    "non_empty_apply_idempotency": "PASS",
+    "batch_rollback_idempotency": "PASS",
+    "old_database_connected": false
+  },
+  "blockers": [
+    "The old repository has no root LICENSE or THIRD_PARTY_NOTICES, so direct production-source extraction is not releaseable yet.",
+    "The old Agent endpoint cannot accept the ChatBI ToolExecutor callback and is not a complete Multi-Agent Runtime.",
+    "No approved live legacy RAG service URL, token, and workspace identity mapping were configured for this turn."
+  ]
+}

@@ -12,24 +12,34 @@ from sqlalchemy.engine import make_url
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from app.core.config import get_settings
+from app.core.config import Settings
 
 
-SCHEMA = "chatbi_day3_migration_test"
+SCHEMA = "chatbi_day5_migration_test"
+EXPECTED_HEAD = "20260817_0007"
 
 
 def main() -> int:
     backend = Path(__file__).resolve().parents[1]
     root = backend.parent
-    output = root / "docs" / "evidence" / "day3" / "migration-results.json"
-    settings = get_settings()
-    engine = create_engine(settings.database_url)
+    output = root / "docs" / "evidence" / "day5" / "migration-results.json"
+    settings = Settings(_env_file=root / ".env")
+    database_url = make_url(settings.database_url)
+    if database_url.password is None:
+        database_url = database_url.set(password=settings.meta_password.get_secret_value())
+    engine = create_engine(database_url)
     results: list[dict] = []
+    one_head = False
+    current_head = False
+    passed = False
+    schema_created = False
+    temporary_schema_removed = False
     try:
         with engine.begin() as connection:
             connection.execute(text(f'DROP SCHEMA IF EXISTS "{SCHEMA}" CASCADE'))
             connection.execute(text(f'CREATE SCHEMA "{SCHEMA}"'))
-        isolated_url = make_url(settings.database_url).update_query_dict({"options": f"-csearch_path={SCHEMA}"})
+        schema_created = True
+        isolated_url = database_url.update_query_dict({"options": f"-csearch_path={SCHEMA}"})
         env = os.environ.copy()
         env["CHATBI_DATABASE_URL"] = isolated_url.render_as_string(hide_password=False)
         commands = [
@@ -50,15 +60,23 @@ def main() -> int:
             })
         passed = all(item["returncode"] == 0 for item in results)
         one_head = results[0]["stdout"].count("(head)") == 1
-        current_head = "20260817_0005" in results[-1]["stdout"]
+        current_head = EXPECTED_HEAD in results[-1]["stdout"]
+    except Exception as exc:
+        results.append({
+            "command": "database setup",
+            "returncode": 1,
+            "error_type": type(exc).__name__,
+        })
     finally:
-        with engine.begin() as connection:
-            connection.execute(text(f'DROP SCHEMA IF EXISTS "{SCHEMA}" CASCADE'))
+        if schema_created:
+            with engine.begin() as connection:
+                connection.execute(text(f'DROP SCHEMA IF EXISTS "{SCHEMA}" CASCADE'))
+            temporary_schema_removed = True
         engine.dispose()
     evidence = {
         "verified_at": datetime.now(timezone.utc).isoformat(),
         "database": "local PostgreSQL isolated temporary schema",
-        "temporary_schema_removed": True,
+        "temporary_schema_removed": temporary_schema_removed,
         "single_head": one_head,
         "upgrade_base_upgrade_pass": passed and current_head,
         "commands": results,

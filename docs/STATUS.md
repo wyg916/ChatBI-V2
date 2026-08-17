@@ -2,13 +2,17 @@
 
 ## 2026-08-17
 
+- Day 5 Final Release candidate 全部门禁 PASS：隔离 metadata 冷启动 44.2 秒；正式一键启动 Run1 34.7 秒、完整停止后 Run2 23.7 秒；Backend 118/118、Frontend 27/27、Serial E2E 36/36、5 workers 两轮 72/72（retries=0）、Golden PostgreSQL 50/50 与 MySQL 10/10、三家 Provider Live Smoke、Migration、Secret Scan、License 与安全回滚模拟均通过。最终 Git/远端/annotated tag 以 `docs/status/DAY5_STATUS.md` 和发布返回为准。
+
+- 旧项目二 RAG/Agent 受控复用接入状态为 `PARTIAL`：已完成只读 Git/资产盘点、ADR-029、5 个独立契约/Adapter 包、四类分析路由、Feature Flag、15 张可选元数据表、离线快照迁移与回滚脚本，以及 SQL Guard/Result Oracle/ACL/工具白名单/Workspace 隔离边界。旧 RAG 120 条固定集历史证据与本轮现场回归均通过；ChatBI Backend 当前 118/118、Frontend 27/27、E2E 36/36、Golden PostgreSQL 50/50 与 MySQL 10/10，Compose 连续两次完整停止后启动成功。
+- 该接入不改变普通问数：默认 `CHATBI_RAG_MODE=shadow`、`CHATBI_AGENT_MODE=off`，未配置旧运行时也可独立构建、启动和发布。旧项目不存在完整 Multi-Agent Runtime 或对应测试，旧 Agent HTTP 端点也不能注入 ChatBI `ToolExecutor`，因此 Multi-Agent 复用不得标记 PASS；旧仓库缺少根 LICENSE，直接源代码抽取同样保持延期。详见 `docs/migration/LEGACY_RAG_AGENT_ASSET_INVENTORY.md` 与 `docs/migration/LEGACY_RAG_AGENT_MIGRATION_MANIFEST.md`。
 - Day 4 Quality Hardening 全部 Gate PASS：Parallel E2E 5 workers 连续三轮 36/36、Golden 50 PostgreSQL 执行/结果/语义 50/50、MySQL 10/10、原 Golden 20 回归 PASS、危险 SQL 38/38、Backend 99/99、Frontend 27/27、串行 E2E 36/36、两次完整停止后的一键启动均 PASS；main 已推送并完成 live remote verify，annotated quality tag 由最终发布收口创建。
 - Day 4 完成共享状态竞态加固、NL2SQL/Result Oracle 扩展、语义模型版本/发布/回滚、ADMIN/ANALYST 最小 RBAC、资源授权与真实审计；UI14 的 Loading/Empty/Error/Permission/Success 状态均由真实 API 或真实错误状态驱动。前端 route-level lazy loading 将入口 JS 从 963.34 kB 降至 273.08 kB，ECharts 独立按需 chunk 的非阻断 warning 保留为 P1。
 - 新增根目录双击入口 `一键启动-ChatBI-V2.cmd`：自动检查 Docker Desktop，复用既有本机数据库启动/验证链，构建 Backend/Frontend 并打开 ChatBI 首页；失败时保留可读错误，不 reset、不提交当前 Day 4 工作树。
 - Day 4 模型 Provider 子任务保持完成：Kimi `kimi-k2.6`、MiMo `mimo-v2.5`、DeepSeek `deepseek-v4-flash` 已通过项目自有 Adapter 接入；密钥只在 Git 忽略的本机 `.env`，前端通过只读 Backend API 展示真实配置状态，默认回归路由仍为 deterministic。本轮遵循负责人授权，没有重复开发 Provider 或输出密钥。
 - Day 3 V1 RC 候选产品闭环已实现：真实 Query Result 生成受控 ChartSpec/ECharts、证据绑定 Narrative、3～5 个推荐追问、Verified Answer/版本、Dashboard Card 和可持久化 Golden Evaluation。
 - 产品与测试 Gate：Chart Rule 19/19、Backend 85/85、Frontend Vitest 26/26、TypeScript/Build PASS、Playwright 34/34（Day 3 专用 19/19）、Golden SQL/结果/语义 20/20、MySQL 5/5、危险 SQL 38/38、真实写入成功 0、迁移单 head 与 upgrade→base→upgrade PASS、Secret Scan PASS。
-- 外部模型未配置，`LIVE_MODEL_SMOKE=NOT_CONFIGURED`；本地确定性 Runtime 与 Adapter 保持可用。
+- Day 3 时外部模型尚未配置；Day 5 已完成 Kimi、MiMo、DeepSeek Discovery/Auth/Chat/SQLPlan/Guard Live Smoke，发布默认 Runtime 仍为 deterministic。
 - Day 3 / V1 RC 发布门禁已收口：两次从完整停止状态的一键构建与启动均 PASS；最终 Backend 85/85、Frontend 26/26、Playwright 34/34、Golden、安全、迁移与 Secret Scan 全部 PASS；main 与 origin/main 同步，annotated Tag `chatbi-v2-v1-rc1` 已推送并核验。项目进入 Day 4 Quality Hardening。详见 `docs/status/DAY3_STATUS.md` 与 `docs/evidence/day3/`。
 
 - UI14 正式集成收口：14/14 React 页面与 14/14 Router 路由已按现有实现冻结；六个一级模块保持 ChatBI-first，系统设置仍是二级管理入口。本轮未重新设计或从 Figma 生成页面。

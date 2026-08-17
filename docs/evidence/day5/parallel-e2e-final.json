@@ -1,0 +1,13 @@
+{
+  "checked_at": "2026-08-17T23:25:06+08:00",
+  "workers": 5,
+  "playwright_retries": 0,
+  "runtime_race": 0,
+  "runs": [
+    { "run": 1, "passed": 36, "failed": 0, "duration_seconds": 63.3 },
+    { "run": 2, "passed": 36, "failed": 0, "duration_seconds": 70.7 }
+  ],
+  "total_passed": 72,
+  "total_failed": 0,
+  "result": "PASS"
+}

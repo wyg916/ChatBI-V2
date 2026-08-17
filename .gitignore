@@ -12,6 +12,7 @@ venv/
 __pycache__/
 .pytest_cache/
 .mypy_cache/
+*.egg-info/
 
 .idea/
 .vscode/
@@ -22,6 +23,11 @@ temp/
 
 playwright-report/
 test-results/
+
+# Legacy project evaluation payloads are provenance-restricted and are not
+# redistributed in the public V1 source release. SOURCE.json retains hashes.
+evaluation/legacy-rag/rag_60.json
+evaluation/legacy-rag/rag_hybrid_60.json
 
 .DS_Store
 Thumbs.db
