@@ -13,6 +13,7 @@ from app.query.contracts import (
 )
 from app.query.nl2sql import Nl2SqlRouter
 from app.query.service import QueryPipeline, query_response, save_feedback, save_verified_answer
+from app.core.config import get_settings
 from app.schemas.content import AnswerRead
 
 router = APIRouter(tags=["query pipeline"])
@@ -27,10 +28,22 @@ def _run_or_404(db: Session, query_id: str) -> QueryRun:
 
 @router.get("/query-capabilities")
 def query_capabilities():
+    settings = get_settings()
     return {
         "nl2sql": Nl2SqlRouter().capabilities(),
         "sql_guard": {"engine": "sqlglot", "ast_validation": True},
         "result_oracle": {"version": "v1", "sql_string_equality": False},
+        "controlled_rag": {
+            "mode": settings.rag_mode,
+            "configured": bool(settings.legacy_rag_base_url),
+            "fallback_enabled": settings.rag_fallback_enabled,
+        },
+        "bounded_orchestration": {
+            "mode": settings.agent_mode,
+            "allowed_routes": sorted(settings.agent_route_allowlist),
+            "fallback_enabled": settings.agent_fallback_enabled,
+            "legacy_multi_agent_runtime_found": False,
+        },
     }
 
 

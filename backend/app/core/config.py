@@ -1,5 +1,7 @@
 from functools import lru_cache
 
+from typing import Literal
+
 from pydantic import SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -39,6 +41,23 @@ class Settings(BaseSettings):
     query_row_limit: int = 500
     query_concurrency: int = 4
     context_token_budget: int = 6000
+    rag_mode: Literal["off", "shadow", "canary", "on"] = "shadow"
+    agent_mode: Literal["off", "shadow", "canary", "on"] = "off"
+    agent_allowed_routes: str = ""
+    rag_fallback_enabled: bool = True
+    agent_fallback_enabled: bool = True
+    legacy_rag_base_url: str = ""
+    legacy_rag_bearer_token: SecretStr = SecretStr("")
+    legacy_rag_require_workspace_echo: bool = True
+    legacy_agent_base_url: str = ""
+    legacy_agent_bearer_token: SecretStr = SecretStr("")
+    agent_timeout_ms: int = 15000
+    agent_max_steps: int = 4
+    agent_token_budget: int = 4000
+
+    @property
+    def agent_route_allowlist(self) -> frozenset[str]:
+        return frozenset(item.strip() for item in self.agent_allowed_routes.split(",") if item.strip())
 
     model_config = SettingsConfigDict(
         env_file=".env",

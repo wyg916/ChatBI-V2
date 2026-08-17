@@ -16,6 +16,18 @@ if (-not (Test-Path -LiteralPath $venvPython)) {
   if ($LASTEXITCODE -ne 0) { throw 'Unable to install backend dependencies' }
 }
 
+$localPackages = @(
+  'rag-contracts',
+  'rag-adapter',
+  'agent-contracts',
+  'agent-orchestrator',
+  'prompt-registry'
+)
+foreach ($package in $localPackages) {
+  & $venvPython -m pip install --no-deps -e (Join-Path $projectRoot "packages\$package")
+  if ($LASTEXITCODE -ne 0) { throw "Unable to install local package $package" }
+}
+
 $postgresAdmin = $env:CHATBI_LOCAL_POSTGRES_ADMIN_PASSWORD
 $mysqlAdmin = $env:CHATBI_LOCAL_MYSQL_ADMIN_PASSWORD
 $postgresBstr = [IntPtr]::Zero

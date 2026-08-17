@@ -23,6 +23,15 @@ Other pre-existing runtime packages remain pinned in the relevant package manife
 
 Day 3 introduced no copied third-party source, logo, brand asset, or restricted UI code. The Chart Engine, Narrative Engine, Answer/Dashboard evidence contracts, and Evaluation runner are project-owned code.
 
+## Legacy project two interoperability
+
+- Source repository: user-controlled frozen repository, audited at commit `b6be894a7153f7ce8d31dfc65da7222bd7af1b5f`.
+- Integration: HTTP-only `LegacyRagAdapter` and a disabled-by-default legacy assistant contract adapter; ChatBI does not import the old repository's internal Python classes.
+- Copied production source: none.
+- Evaluation provenance: `evaluation/legacy-rag/SOURCE.json` records the source commit, blob IDs, case counts and SHA-256 values for two internal 60-case RAG inputs. The payload JSON files are deliberately excluded from the public V1 repository.
+- License boundary: the old repository has no root LICENSE/NOTICE. No legacy production source or provenance-pending test payload is redistributed. No old brand, logo, UI, database dump, secret, or credential is included.
+- Published dependencies used by the new adapters: `httpx` (BSD-3-Clause), Pydantic (MIT), SQLAlchemy (MIT), and Alembic (MIT). No dependency source was copied or modified.
+
 ## External model API integrations
 
 - Services: Moonshot Kimi API, Xiaomi MiMo API, DeepSeek API.

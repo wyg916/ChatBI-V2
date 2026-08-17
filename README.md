@@ -41,8 +41,9 @@ cd "ChatBI-V2"
 ```text
 frontend/     React + TypeScript + Vite
 backend/      FastAPI + SQLAlchemy + Alembic
+packages/     RAG、有限编排与 Prompt 的独立契约/Adapter 包
 database/     本机 PostgreSQL/MySQL 可复现模拟业务数据
-  evaluation/   冻结 Golden Set 与评测资产
+evaluation/   冻结 Golden Set 与评测资产
 scripts/      Windows 一键启动、停止、状态和验证
 docs/         产品、架构、验收、UI 与状态文档
 ```
@@ -89,6 +90,21 @@ API Key 不得写入仓库。没有配置外部模型时，本地运行时仍可
 - `POST /api/v1/evaluation/runs`
 - `GET /api/v1/evaluation/cases/{case_id}`
 - `GET /api/v1/query-capabilities`
+- `POST /api/v1/analysis`
+
+## 可选 RAG 与有限编排
+
+普通问数继续使用现有确定性 NL2SQL 主链路。专业知识检索和复杂分析只通过独立契约包、Backend Adapter、Feature Flag 与审计接入；Agent 不持有数据源连接，数据工具仍必须经过 SQL Guard、Query Executor 和 Result Oracle。
+
+```text
+CHATBI_RAG_MODE=shadow
+CHATBI_AGENT_MODE=off
+CHATBI_AGENT_ALLOWED_ROUTES=
+CHATBI_RAG_FALLBACK_ENABLED=true
+CHATBI_AGENT_FALLBACK_ENABLED=true
+```
+
+模式支持 `off|shadow|canary|on`。默认值不会把 RAG 或有限编排结果发布给用户；未配置旧运行时或可选路径失败时，按配置回退普通问数。旧仓库没有完整 Multi-Agent Runtime，因此本仓库只提供有步数、超时、预算与工具白名单的最薄编排状态机，不建设通用 Agent 平台。详见 [`docs/decisions/ADR_LEGACY_RAG_AGENT_REUSE.md`](docs/decisions/ADR_LEGACY_RAG_AGENT_REUSE.md)。
 
 ## 本地验证
 

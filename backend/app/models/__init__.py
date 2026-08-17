@@ -25,6 +25,23 @@ from app.models.entities import (
     VerifiedAnswer,
     Workspace,
 )
+from app.models.integration_entities import (
+    Citation,
+    KnowledgeAcl,
+    KnowledgeChunk,
+    KnowledgeDocument,
+    KnowledgeDocumentVersion,
+    KnowledgeIngestionRun,
+    KnowledgeRetrievalRun,
+    KnowledgeSource,
+    OrchestrationProfile,
+    OrchestrationRun,
+    OrchestrationStep,
+    PromptTemplate,
+    PromptVersion,
+    ToolBinding,
+    ToolCall,
+)
 
 __all__ = [
     "Workspace", "AppUser", "ResourceGrant", "AuditEvent", "DataSource", "DataSourceSchema", "DataSourceTable",
@@ -33,4 +50,7 @@ __all__ = [
     "BusinessTerm", "SemanticVersion", "VerifiedAnswer", "AnswerVersion",
     "Dashboard", "DashboardCard", "EvaluationRun", "EvaluationCaseResult",
     "QueryRun", "QueryAuditEvent", "QueryFeedback",
+    "KnowledgeSource", "KnowledgeDocument", "KnowledgeDocumentVersion", "KnowledgeChunk", "KnowledgeAcl",
+    "KnowledgeIngestionRun", "KnowledgeRetrievalRun", "Citation", "OrchestrationProfile",
+    "OrchestrationRun", "OrchestrationStep", "ToolBinding", "ToolCall", "PromptTemplate", "PromptVersion",
 ]

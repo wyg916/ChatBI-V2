@@ -67,3 +67,28 @@ Golden runner 必须报告冻结 SHA-256 `d40bb690a4208240ecf347abe47e045cd74c8e
 ## 外部模型
 
 默认 deterministic runtime 无需外部密钥。OpenAI-compatible 配置只允许放在本机环境变量中；不得写入、提交、打印或复制 API Key。
+
+## 可选旧 RAG 桥接与有限编排
+
+初始配置保持 `CHATBI_RAG_MODE=shadow`、`CHATBI_AGENT_MODE=off`。旧服务 URL 和 token 只允许保存在 Git 忽略的本机 `.env` 或部署 Secret 中；前端不会接收这些值。没有配置旧服务时，ChatBI 的普通问数与构建发布不受影响。
+
+```text
+CHATBI_RAG_MODE=shadow
+CHATBI_AGENT_MODE=off
+CHATBI_AGENT_ALLOWED_ROUTES=
+CHATBI_RAG_FALLBACK_ENABLED=true
+CHATBI_AGENT_FALLBACK_ENABLED=true
+CHATBI_LEGACY_RAG_BASE_URL=
+CHATBI_LEGACY_RAG_TOKEN=
+CHATBI_LEGACY_AGENT_BASE_URL=
+CHATBI_LEGACY_AGENT_TOKEN=
+```
+
+只有在目标 Workspace、身份映射、旧 RAG ACL 和响应 Workspace 回显完成联调后，才可从 `shadow` 提升到 `canary`。旧 Agent HTTP 端点目前不能接受 ChatBI 的 `ToolExecutor` 回调，保持关闭；不得通过配置绕过这一安全限制。
+
+离线迁移只接受已脱敏 JSON 快照，不接受旧数据库 URL，默认 dry-run：
+
+```powershell
+cd backend
+.\.venv\Scripts\python.exe scripts\migrate_legacy_rag_agent_snapshot.py --snapshot tests\fixtures\legacy_migration_empty.json
+```
