@@ -100,6 +100,17 @@ def test_schema_sync_and_metadata_catalog(client, datasource_id, monkeypatch):
     assert updated["column_count"] == 5
 
 
+def test_repeated_schema_sync_atomically_replaces_catalog(client, datasource_id, monkeypatch):
+    monkeypatch.setattr("app.services.datasources.build_connector", lambda _: FakeConnector())
+    first = client.post(f"/api/v1/datasources/{datasource_id}/sync")
+    second = client.post(f"/api/v1/datasources/{datasource_id}/sync")
+    assert first.status_code == 200 and first.json()["success"] is True
+    assert second.status_code == 200 and second.json()["success"] is True
+    assert first.json()["tables"] == second.json()["tables"] == 2
+    assert len(client.get(f"/api/v1/datasources/{datasource_id}/schemas").json()) == 1
+    assert len(client.get(f"/api/v1/datasources/{datasource_id}/tables?schema=public").json()) == 2
+
+
 def test_connection_failure_is_sanitized(client, datasource_id, monkeypatch):
     class BrokenConnector(FakeConnector):
         def test_connection(self):

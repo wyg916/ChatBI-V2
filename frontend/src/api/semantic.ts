@@ -1,5 +1,5 @@
 import { api, unwrapList } from './client';
-import type { BusinessTerm, Dimension, Metric, Relationship, SemanticEntity, SemanticModel, SemanticModelInput } from '../types/api';
+import type { BusinessTerm, Dimension, Metric, Relationship, SemanticEntity, SemanticModel, SemanticModelInput, SemanticVersion } from '../types/api';
 
 type ResourceKind = 'entities' | 'metrics' | 'dimensions' | 'relationships' | 'business-terms';
 export const semanticApi = {
@@ -12,4 +12,6 @@ export const semanticApi = {
   updateResource: <T extends SemanticEntity | Metric | Dimension | Relationship | BusinessTerm>(id: string, kind: ResourceKind, resourceId: string, input: T) =>
     api<T>(`/semantic-models/${id}/${kind}/${resourceId}`, { method: 'PUT', body: JSON.stringify(input) }),
   publish: (id: string) => api<{ success: boolean; message: string; status: string; version: number }>(`/semantic-models/${id}/publish`, { method: 'POST' }),
+  versions: (id: string) => api<SemanticVersion[]>(`/semantic-models/${id}/versions`),
+  rollback: (id: string, version: number) => api<{ success: boolean; message: string; status: string; version: number }>(`/semantic-models/${id}/versions/${version}/rollback`, { method: 'POST' }),
 };

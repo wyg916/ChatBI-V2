@@ -42,6 +42,8 @@ async function pageTargets(request: APIRequestContext): Promise<PageTarget[]> {
   expect(sources.length, 'UI14 requires a seeded datasource').toBeGreaterThan(0);
   expect(models.length, 'UI14 requires a seeded semantic model').toBeGreaterThan(0);
   expect(dashboards.length, 'UI14 requires a seeded dashboard').toBeGreaterThan(0);
+  const primaryModel = models.find((item: any) => item.name === '新能源经营分析');
+  expect(primaryModel, 'UI14 requires the stable PostgreSQL semantic model').toBeTruthy();
 
   return [
     { id: '01', title: '登录页', path: '/login', appShell: false, ready: (page) => page.getByRole('heading', { name: '登录工作空间' }), criticalControl: (page) => page.getByRole('button', { name: '登录 ChatBI Studio' }) },
@@ -50,11 +52,11 @@ async function pageTargets(request: APIRequestContext): Promise<PageTarget[]> {
     { id: '04', title: '数据源列表', path: '/datasources', appShell: true, ready: (page) => page.getByTestId('datasource-card').first(), criticalControl: (page) => page.getByTestId('create-datasource') },
     { id: '05', title: '数据源详情与 Schema 管理', path: `/datasources/${sources[0].id}`, appShell: true, ready: (page) => page.getByRole('heading', { name: 'Schema 与字段管理' }), criticalControl: (page) => page.getByTestId('sync-schema') },
     { id: '06', title: '语义模型列表', path: '/semantic-models', appShell: true, ready: (page) => page.getByTestId('semantic-model-card').first(), criticalControl: (page) => page.getByTestId('create-model') },
-    { id: '07', title: '语义模型编辑器', path: `/semantic-models/${models[0].id}`, appShell: true, ready: (page) => page.getByRole('heading', { name: '模型编辑器' }), criticalControl: (page) => page.getByTestId('save-model') },
+    { id: '07', title: '语义模型编辑器', path: `/semantic-models/${primaryModel!.id}`, appShell: true, ready: (page) => page.getByRole('heading', { name: '模型编辑器' }), criticalControl: (page) => page.getByTestId('save-model') },
     { id: '08', title: '答案库', path: '/answers', appShell: true, ready: (page) => page.getByTestId('answer-row').first(), criticalControl: (page) => page.getByRole('button', { name: '＋ 新建标准答案' }) },
     { id: '09', title: '看板列表', path: '/dashboards', appShell: true, ready: (page) => page.getByTestId('dashboard-card').first(), criticalControl: (page) => page.getByRole('button', { name: '＋ 新建看板' }) },
     { id: '10', title: '经营看板详情', path: `/dashboards/${dashboards[0].id}`, appShell: true, ready: (page) => page.getByTestId('dashboard-detail'), criticalControl: (page) => page.getByRole('button', { name: /刷新/ }) },
-    { id: '11', title: '评测中心总览', path: '/evaluation', appShell: true, ready: (page) => page.getByTestId('evaluation-overview'), criticalControl: (page) => page.getByRole('button', { name: /运行 Golden 20/ }) },
+    { id: '11', title: '评测中心总览', path: '/evaluation', appShell: true, ready: (page) => page.getByTestId('evaluation-overview'), criticalControl: (page) => page.getByRole('button', { name: /运行 Golden 50/ }) },
     { id: '12', title: '评测用例详情', path: '/evaluation/G01', appShell: true, ready: (page) => page.getByRole('heading', { name: '评测用例详情' }), criticalControl: (page) => page.getByRole('button', { name: '重新运行' }) },
     { id: '13', title: '系统设置与模型服务', path: '/settings/models', appShell: true, ready: (page) => page.getByTestId('settings-models-page'), criticalControl: (page) => page.getByRole('button', { name: '保存全部设置' }) },
     { id: '14', title: '用户角色与审计', path: '/settings/security', appShell: true, ready: (page) => page.getByTestId('security-audit-page'), criticalControl: (page) => page.getByRole('button', { name: '＋ 邀请成员' }) },

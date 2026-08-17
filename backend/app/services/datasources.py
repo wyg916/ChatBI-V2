@@ -85,6 +85,14 @@ def test_datasource(db: Session, datasource: DataSource) -> None:
 
 
 def store_metadata(db: Session, datasource: DataSource, metadata: ConnectorMetadata) -> dict[str, int]:
+    # Serialize refreshes of the same datasource. The row lock covers multiple API
+    # workers while the single transaction keeps the previous catalog visible to
+    # readers until the complete replacement commits.
+    locked = db.scalar(select(DataSource).where(DataSource.id == datasource.id).with_for_update())
+    if locked is None:
+        raise LookupError("Datasource not found during metadata synchronization")
+    datasource = locked
+    db.expire(datasource, ["schemas"])
     db.execute(delete(DataSourceRelation).where(DataSourceRelation.datasource_id == datasource.id))
     for schema in list(datasource.schemas):
         db.delete(schema)

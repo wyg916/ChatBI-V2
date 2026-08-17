@@ -2,6 +2,10 @@
 
 ## 2026-08-17
 
+- Day 4 Quality Hardening 功能与运行 Gate 已全部通过，进入 Git 收口：Parallel E2E 5 workers 连续三轮 36/36、Golden 50 PostgreSQL 执行/结果/语义 50/50、MySQL 10/10、原 Golden 20 回归 PASS、危险 SQL 38/38、Backend 99/99、Frontend 27/27、串行 E2E 36/36、两次完整停止后的一键启动均 PASS。
+- Day 4 完成共享状态竞态加固、NL2SQL/Result Oracle 扩展、语义模型版本/发布/回滚、ADMIN/ANALYST 最小 RBAC、资源授权与真实审计；UI14 的 Loading/Empty/Error/Permission/Success 状态均由真实 API 或真实错误状态驱动。前端 route-level lazy loading 将入口 JS 从 963.34 kB 降至 273.08 kB，ECharts 独立按需 chunk 的非阻断 warning 保留为 P1。
+- 新增根目录双击入口 `一键启动-ChatBI-V2.cmd`：自动检查 Docker Desktop，复用既有本机数据库启动/验证链，构建 Backend/Frontend 并打开 ChatBI 首页；失败时保留可读错误，不 reset、不提交当前 Day 4 工作树。
+- Day 4 模型 Provider 子任务保持完成：Kimi `kimi-k2.6`、MiMo `mimo-v2.5`、DeepSeek `deepseek-v4-flash` 已通过项目自有 Adapter 接入；密钥只在 Git 忽略的本机 `.env`，前端通过只读 Backend API 展示真实配置状态，默认回归路由仍为 deterministic。本轮遵循负责人授权，没有重复开发 Provider 或输出密钥。
 - Day 3 V1 RC 候选产品闭环已实现：真实 Query Result 生成受控 ChartSpec/ECharts、证据绑定 Narrative、3～5 个推荐追问、Verified Answer/版本、Dashboard Card 和可持久化 Golden Evaluation。
 - 产品与测试 Gate：Chart Rule 19/19、Backend 85/85、Frontend Vitest 26/26、TypeScript/Build PASS、Playwright 34/34（Day 3 专用 19/19）、Golden SQL/结果/语义 20/20、MySQL 5/5、危险 SQL 38/38、真实写入成功 0、迁移单 head 与 upgrade→base→upgrade PASS、Secret Scan PASS。
 - 外部模型未配置，`LIVE_MODEL_SMOKE=NOT_CONFIGURED`；本地确定性 Runtime 与 Adapter 保持可用。

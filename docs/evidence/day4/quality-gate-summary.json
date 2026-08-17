@@ -1,0 +1,19 @@
+{
+  "checked_at": "2026-08-17T21:03:39+08:00",
+  "backend_pytest": { "passed": 99, "failed": 0, "duration_seconds": 49.21 },
+  "frontend_vitest": { "files_passed": 10, "tests_passed": 27, "failed": 0 },
+  "frontend_typecheck": "PASS",
+  "frontend_build": { "status": "PASS", "modules": 731, "entry_js_kb": 273.08, "entry_gzip_kb": 88.84 },
+  "serial_e2e": { "passed": 36, "failed": 0, "duration_seconds": 90.0 },
+  "parallel_e2e": "3 x 36/36 PASS at 5 workers",
+  "golden50": "PostgreSQL 50/50 execution/result/semantic; MySQL 10/10 execution/result",
+  "dangerous_sql": "38/38 BLOCKED",
+  "actual_write_attempt_succeeded": 0,
+  "migration": "single head; upgrade-base-upgrade PASS; live PostgreSQL current=head",
+  "ui14": "14/14 PASS at 1440x900, 1366x768, 1920x1080",
+  "runtime_errors": { "console": 0, "page": 0, "blocking_request": 0, "unexpected_4xx_5xx": 0 },
+  "one_click_start": "Run1 PASS; full stop; Run2 PASS",
+  "p2_scope_added": 0,
+  "functional_gate": "PASS",
+  "day4_status": "READY_FOR_GIT_CLOSURE"
+}

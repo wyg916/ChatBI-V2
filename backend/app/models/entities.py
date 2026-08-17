@@ -26,6 +26,42 @@ class Workspace(Base, TimestampMixin):
     name: Mapped[str] = mapped_column(String(255), unique=True, nullable=False)
 
 
+class AppUser(Base, TimestampMixin):
+    __tablename__ = "app_user"
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uuid_str)
+    workspace_id: Mapped[str] = mapped_column(ForeignKey("workspace.id", ondelete="CASCADE"), index=True)
+    email: Mapped[str] = mapped_column(String(255), unique=True, nullable=False, index=True)
+    display_name: Mapped[str] = mapped_column(String(128), nullable=False)
+    role: Mapped[str] = mapped_column(String(32), nullable=False, index=True)
+    status: Mapped[str] = mapped_column(String(32), default="ACTIVE", index=True)
+    last_active_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class ResourceGrant(Base, TimestampMixin):
+    __tablename__ = "resource_grant"
+    __table_args__ = (UniqueConstraint("user_id", "resource_type", "resource_id"),)
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uuid_str)
+    user_id: Mapped[str] = mapped_column(ForeignKey("app_user.id", ondelete="CASCADE"), index=True)
+    resource_type: Mapped[str] = mapped_column(String(32), nullable=False, index=True)
+    resource_id: Mapped[str] = mapped_column(String(36), nullable=False, index=True)
+    can_read: Mapped[bool] = mapped_column(Boolean, default=True)
+    can_query: Mapped[bool] = mapped_column(Boolean, default=False)
+
+
+class AuditEvent(Base):
+    __tablename__ = "audit_event"
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uuid_str)
+    workspace_id: Mapped[str | None] = mapped_column(ForeignKey("workspace.id", ondelete="SET NULL"), index=True)
+    actor_user_id: Mapped[str | None] = mapped_column(ForeignKey("app_user.id", ondelete="SET NULL"), index=True)
+    actor_email: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
+    action: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    resource_type: Mapped[str] = mapped_column(String(32), nullable=False, index=True)
+    resource_id: Mapped[str | None] = mapped_column(String(64), index=True)
+    status: Mapped[str] = mapped_column(String(32), nullable=False, index=True)
+    details: Mapped[dict] = mapped_column(JSON, default=dict)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, index=True)
+
+
 class VerifiedAnswer(Base, TimestampMixin):
     __tablename__ = "verified_answer"
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uuid_str)

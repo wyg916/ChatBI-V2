@@ -1,0 +1,594 @@
+{
+  "evaluated_at": "2026-08-17T13:00:09.122955+00:00",
+  "manifest_sha256": "25580af42bc76ebddd3d49e6b9c16f8bfabba8ba485a835c453c29175ee2a64a",
+  "source_manifest_sha256": "d40bb690a4208240ecf347abe47e045cd74c8eb89b9162d5d53890ecf24bc282",
+  "original_golden20_regression": "PASS",
+  "postgresql": {
+    "total": 50,
+    "execution_pass": 50,
+    "result_pass": 50,
+    "semantic_pass": 50,
+    "execution_rate": 1.0,
+    "result_rate": 1.0,
+    "cases": [
+      {
+        "id": "G01",
+        "execution_ok": true,
+        "result_ok": true,
+        "semantic_ok": true,
+        "semantic_reasons": [],
+        "query_id": "95660770-a578-4fbc-8bad-1af183bbc036",
+        "error_code": null,
+        "actual_signature": "178d1b593bd923261abc1efd86c94975a01f6e169e3b45ba1de4ac86460f2172"
+      },
+      {
+        "id": "G02",
+        "execution_ok": true,
+        "result_ok": true,
+        "semantic_ok": true,
+        "semantic_reasons": [],
+        "query_id": "d99a397d-5af6-47bc-999e-ebe4199c03d9",
+        "error_code": null,
+        "actual_signature": "65e28a27212498d555cbae14d080932cd6bba271c8f9e6cdf8392897eef429e5"
+      },
+      {
+        "id": "G03",
+        "execution_ok": true,
+        "result_ok": true,
+        "semantic_ok": true,
+        "semantic_reasons": [],
+        "query_id": "195ec5a9-34f1-4554-9b46-44810344b444",
+        "error_code": null,
+        "actual_signature": "a05bcede04500d7a4c6872e133eeda3f94551656922cdcb8e63502f68c6fd38f"
+      },
+      {
+        "id": "G04",
+        "execution_ok": true,
+        "result_ok": true,
+        "semantic_ok": true,
+        "semantic_reasons": [],
+        "query_id": "16f6aeeb-8d6c-4b0f-b580-a59f009037a4",
+        "error_code": null,
+        "actual_signature": "a463b271b534e4188c47e40505f89937196324e9db615e86cf9a80adddf50663"
+      },
+      {
+        "id": "G05",
+        "execution_ok": true,
+        "result_ok": true,
+        "semantic_ok": true,
+        "semantic_reasons": [],
+        "query_id": "e9751b33-b7e8-4acc-aae5-451abca80346",
+        "error_code": null,
+        "actual_signature": "f666e7e471f36990c5c1c7bba52c4b492911c6b57d4c5849e224eeb474e46930"
+      },
+      {
+        "id": "G06",
+        "execution_ok": true,
+        "result_ok": true,
+        "semantic_ok": true,
+        "semantic_reasons": [],
+        "query_id": "123def9e-dc72-4327-ad43-442bd7e2e94f",
+        "error_code": null,
+        "actual_signature": "e81d8c231a7d4d6d9e0e84aca9d7cfde76e74000724a32c013f4f3aba2c7005f"
+      },
+      {
+        "id": "G07",
+        "execution_ok": true,
+        "result_ok": true,
+        "semantic_ok": true,
+        "semantic_reasons": [],
+        "query_id": "7eac544c-95b0-4f78-a12b-27d3bbcbb1f1",
+        "error_code": null,
+        "actual_signature": "2cadc151d63bbd52ec46d00bce5a2c20e1062ed942177d0c32d5742cb71d35c8"
+      },
+      {
+        "id": "G08",
+        "execution_ok": true,
+        "result_ok": true,
+        "semantic_ok": true,
+        "semantic_reasons": [],
+        "query_id": "268b8a39-dd95-4523-9392-2bf8ac01df45",
+        "error_code": null,
+        "actual_signature": "a207d25ef0455bf1a73a726d98dc0fa4772ffa074734a1bf95f0ab63279838f3"
+      },
+      {
+        "id": "G09",
+        "execution_ok": true,
+        "result_ok": true,
+        "semantic_ok": true,
+        "semantic_reasons": [],
+        "query_id": "453945f9-fa3e-4430-9042-434bce7198c9",
+        "error_code": null,
+        "actual_signature": "39f71f66eb2d5af8e17286362f98a2c3c917f7e9767e121828c45abfe178e27e"
+      },
+      {
+        "id": "G10",
+        "execution_ok": true,
+        "result_ok": true,
+        "semantic_ok": true,
+        "semantic_reasons": [],
+        "query_id": "bda784ea-1544-4c35-81ca-24ee785f2ac1",
+        "error_code": null,
+        "actual_signature": "67e6689336d5a9b8821982be4899551aa0469c2f34ac1e8ef6c360a431e03c29"
+      },
+      {
+        "id": "G11",
+        "execution_ok": true,
+        "result_ok": true,
+        "semantic_ok": true,
+        "semantic_reasons": [],
+        "query_id": "6c0fde58-6d98-4ea8-8e62-0f6f82adb89a",
+        "error_code": null,
+        "actual_signature": "b3535cb3bea08d55fe205adf08c1e6bea5a3e2dd6ac0ae308e53d8416a718b61"
+      },
+      {
+        "id": "G12",
+        "execution_ok": true,
+        "result_ok": true,
+        "semantic_ok": true,
+        "semantic_reasons": [],
+        "query_id": "817a40dc-362a-4b29-82c7-31fd88f4054b",
+        "error_code": null,
+        "actual_signature": "3e738a49fb5f3cef484ad22954d9cbaf859a5f7d5b6a9236328424ac36d3ce9e"
+      },
+      {
+        "id": "G13",
+        "execution_ok": true,
+        "result_ok": true,
+        "semantic_ok": true,
+        "semantic_reasons": [],
+        "query_id": "df3ea269-9a95-4483-88f0-7c6489dfef36",
+        "error_code": null,
+        "actual_signature": "d7fbef0368e14fe6bfd22f601f68dff95b90d93df411d5e4cd61aa90f5483709"
+      },
+      {
+        "id": "G14",
+        "execution_ok": true,
+        "result_ok": true,
+        "semantic_ok": true,
+        "semantic_reasons": [],
+        "query_id": "537ca91c-8542-4c7c-b8b2-276e03b4e8a3",
+        "error_code": null,
+        "actual_signature": "b6ab716d8ebf38d2f14a449cbeca9c049e35211332f7c5f9b3fd0fd1ac6a9472"
+      },
+      {
+        "id": "G15",
+        "execution_ok": true,
+        "result_ok": true,
+        "semantic_ok": true,
+        "semantic_reasons": [],
+        "query_id": "fe61244a-cf11-496c-9a95-93bf2f883dc1",
+        "error_code": null,
+        "actual_signature": "135383ffa9dfa677bc895ac1eda7b9a427b9cdf744a42ea93f8cde380a48e74a"
+      },
+      {
+        "id": "G16",
+        "execution_ok": true,
+        "result_ok": true,
+        "semantic_ok": true,
+        "semantic_reasons": [],
+        "query_id": "3e0ae462-4985-4581-9d58-26f649f52162",
+        "error_code": null,
+        "actual_signature": "4034a4adca4dec59e0283ea5958563a721c7cb3d225581a82c1958dc73ff4fb5"
+      },
+      {
+        "id": "G17",
+        "execution_ok": true,
+        "result_ok": true,
+        "semantic_ok": true,
+        "semantic_reasons": [],
+        "query_id": "702e03ec-ebbb-4440-8d84-803f25124d53",
+        "error_code": null,
+        "actual_signature": "45aa022db5cf1ee69c806c1e9465dc8b3207e02acf8a483c3ee3b00936fe0eec"
+      },
+      {
+        "id": "G18",
+        "execution_ok": true,
+        "result_ok": true,
+        "semantic_ok": true,
+        "semantic_reasons": [],
+        "query_id": "35a6bd55-dd58-46d5-92f4-7e1ad5248f7a",
+        "error_code": null,
+        "actual_signature": "beb3490c7980b19c4c547a1777772b38f2bd73c758b4d1264531ff487f522381"
+      },
+      {
+        "id": "G19",
+        "execution_ok": true,
+        "result_ok": true,
+        "semantic_ok": true,
+        "semantic_reasons": [],
+        "query_id": "3e742b41-83e1-407a-8b3f-213ccd015976",
+        "error_code": null,
+        "actual_signature": "8a3f41dd71a33f1252d4bf70b4a0c490fef5f804446684e8bcaa0124f416d5f6"
+      },
+      {
+        "id": "G20",
+        "execution_ok": true,
+        "result_ok": true,
+        "semantic_ok": true,
+        "semantic_reasons": [],
+        "query_id": "928353d0-304c-4621-987d-8543aa1703be",
+        "error_code": null,
+        "actual_signature": "e667c1e49bf6ef766d5e0a8c1904511e0b30fc19a86bdea19d08e6fa2434b016"
+      },
+      {
+        "id": "G21",
+        "execution_ok": true,
+        "result_ok": true,
+        "semantic_ok": true,
+        "semantic_reasons": [],
+        "query_id": "52e59637-a62c-44ba-ac0e-e225d8b4e08f",
+        "error_code": null,
+        "actual_signature": "65e28a27212498d555cbae14d080932cd6bba271c8f9e6cdf8392897eef429e5"
+      },
+      {
+        "id": "G22",
+        "execution_ok": true,
+        "result_ok": true,
+        "semantic_ok": true,
+        "semantic_reasons": [],
+        "query_id": "a6748e86-f2ce-45d2-8067-8882e4a736fc",
+        "error_code": null,
+        "actual_signature": "a463b271b534e4188c47e40505f89937196324e9db615e86cf9a80adddf50663"
+      },
+      {
+        "id": "G23",
+        "execution_ok": true,
+        "result_ok": true,
+        "semantic_ok": true,
+        "semantic_reasons": [],
+        "query_id": "8e66f1d2-f201-4d8d-850d-6dd47534357d",
+        "error_code": null,
+        "actual_signature": "90cbe5adbc652fa6a199dd0dc267e639197a6e687bcb28deb484c2c305edfdda"
+      },
+      {
+        "id": "G24",
+        "execution_ok": true,
+        "result_ok": true,
+        "semantic_ok": true,
+        "semantic_reasons": [],
+        "query_id": "a775e3aa-90c9-4c0a-9c90-44ccda79b5cf",
+        "error_code": null,
+        "actual_signature": "a05bcede04500d7a4c6872e133eeda3f94551656922cdcb8e63502f68c6fd38f"
+      },
+      {
+        "id": "G25",
+        "execution_ok": true,
+        "result_ok": true,
+        "semantic_ok": true,
+        "semantic_reasons": [],
+        "query_id": "5a02ae5c-5736-4da6-bab4-01e63ddfd789",
+        "error_code": null,
+        "actual_signature": "41e4c4fd0ec92d2d1588db720d53dc8c200930a37bb007a54b28b65fee2ea9d1"
+      },
+      {
+        "id": "G26",
+        "execution_ok": true,
+        "result_ok": true,
+        "semantic_ok": true,
+        "semantic_reasons": [],
+        "query_id": "7374795f-ef43-48fe-ae35-14080652efba",
+        "error_code": null,
+        "actual_signature": "efad5a46dc44fd5610799bc29ff2902ebb28ca2a362563fcf3515f0f9a33cd7d"
+      },
+      {
+        "id": "G27",
+        "execution_ok": true,
+        "result_ok": true,
+        "semantic_ok": true,
+        "semantic_reasons": [],
+        "query_id": "48042c78-5333-41fa-ac87-d6758ac69c5b",
+        "error_code": null,
+        "actual_signature": "b42eca23312ed385bc45263292bd98632d5839c7660aab9493ccc00fb4e1cebc"
+      },
+      {
+        "id": "G28",
+        "execution_ok": true,
+        "result_ok": true,
+        "semantic_ok": true,
+        "semantic_reasons": [],
+        "query_id": "b410a3c4-76fb-4df9-8f0c-a83694c1f007",
+        "error_code": null,
+        "actual_signature": "47d84e28824b2919ec2a023dbcf826105e35df11e2cafcfee0f95404ef59d7e8"
+      },
+      {
+        "id": "G29",
+        "execution_ok": true,
+        "result_ok": true,
+        "semantic_ok": true,
+        "semantic_reasons": [],
+        "query_id": "7e6ef212-e56c-48bf-be54-73fe71917aa7",
+        "error_code": null,
+        "actual_signature": "f86c12a92413d6ede38c06dea9a602022ceebc7528751e93725be979eff765e5"
+      },
+      {
+        "id": "G30",
+        "execution_ok": true,
+        "result_ok": true,
+        "semantic_ok": true,
+        "semantic_reasons": [],
+        "query_id": "97aef132-1650-4a13-b74b-a8631ed0c99f",
+        "error_code": null,
+        "actual_signature": "214cc3972e49f771baa21edf5c63c7bb381d0fd72fb91b8ab27af7987a70056f"
+      },
+      {
+        "id": "G31",
+        "execution_ok": true,
+        "result_ok": true,
+        "semantic_ok": true,
+        "semantic_reasons": [],
+        "query_id": "e88a03f8-d9e2-4766-85f3-6a1d1ecd7c03",
+        "error_code": null,
+        "actual_signature": "2cadc151d63bbd52ec46d00bce5a2c20e1062ed942177d0c32d5742cb71d35c8"
+      },
+      {
+        "id": "G32",
+        "execution_ok": true,
+        "result_ok": true,
+        "semantic_ok": true,
+        "semantic_reasons": [],
+        "query_id": "76840271-e352-4fbb-a5b5-d5a8c93c4f39",
+        "error_code": null,
+        "actual_signature": "687113a3a6645ab8a8734633e492faafb2f3f6d59aaec9a1fa34ef6005f8c379"
+      },
+      {
+        "id": "G33",
+        "execution_ok": true,
+        "result_ok": true,
+        "semantic_ok": true,
+        "semantic_reasons": [],
+        "query_id": "1466f89f-e610-4708-a427-05aeddbdf486",
+        "error_code": null,
+        "actual_signature": "ca4e2b020417b77b22ae350e466d144187e6036296b790b24766b59b6902e20d"
+      },
+      {
+        "id": "G34",
+        "execution_ok": true,
+        "result_ok": true,
+        "semantic_ok": true,
+        "semantic_reasons": [],
+        "query_id": "fd6a5ebb-d049-4ccf-9490-e00fbefdc191",
+        "error_code": null,
+        "actual_signature": "c4351f3768bfd030b5fe332f560a1fcff836118ff1d42c4c0983a100d91bf5c7"
+      },
+      {
+        "id": "G35",
+        "execution_ok": true,
+        "result_ok": true,
+        "semantic_ok": true,
+        "semantic_reasons": [],
+        "query_id": "1169c709-6e9b-4423-83b5-0ddd3d8131b0",
+        "error_code": null,
+        "actual_signature": "b4172e008e8655d12e268af5bd71b213300fe0f04a28f33abd04b49e307b13e8"
+      },
+      {
+        "id": "G36",
+        "execution_ok": true,
+        "result_ok": true,
+        "semantic_ok": true,
+        "semantic_reasons": [],
+        "query_id": "8eec8b2d-92f7-4d6a-b89d-b214f94508b8",
+        "error_code": null,
+        "actual_signature": "0631b28d5d91d1d373aedc881bb3a7861671a5dfe97302ead802e3cbe30b07ad"
+      },
+      {
+        "id": "G37",
+        "execution_ok": true,
+        "result_ok": true,
+        "semantic_ok": true,
+        "semantic_reasons": [],
+        "query_id": "c3d751e3-2d87-4cfc-a816-94528451b8e2",
+        "error_code": null,
+        "actual_signature": "4c497b6ffc4ab4eb14ee5278008fcd9167dc4f41f00415b290c05599d5fad5bf"
+      },
+      {
+        "id": "G38",
+        "execution_ok": true,
+        "result_ok": true,
+        "semantic_ok": true,
+        "semantic_reasons": [],
+        "query_id": "91161bb1-b356-41be-b870-5a07ea4aeba5",
+        "error_code": null,
+        "actual_signature": "c64c288f1a0765cb3dbcfd882397dce2f7d857a2d6d535cda1b04d517662e572"
+      },
+      {
+        "id": "G39",
+        "execution_ok": true,
+        "result_ok": true,
+        "semantic_ok": true,
+        "semantic_reasons": [],
+        "query_id": "63e8f27e-584b-4fc7-b8d0-477d672fe83a",
+        "error_code": null,
+        "actual_signature": "b2bbcb4bf2ab7fe3491e87f84f1d86ed67acb1ed940c23b4b77d6952c70a6d39"
+      },
+      {
+        "id": "G40",
+        "execution_ok": true,
+        "result_ok": true,
+        "semantic_ok": true,
+        "semantic_reasons": [],
+        "query_id": "be8ab88d-0c56-4f48-bd50-3f2322d7ea53",
+        "error_code": null,
+        "actual_signature": "a71215dafab38ede342251eed220a542d717da48b6afc53b73eca430bc921c1f"
+      },
+      {
+        "id": "G41",
+        "execution_ok": true,
+        "result_ok": true,
+        "semantic_ok": true,
+        "semantic_reasons": [],
+        "query_id": "ef70db00-a8af-48ef-a4cb-b91a5f69c1b4",
+        "error_code": null,
+        "actual_signature": "a9c49dd7ddfcde750ca93ea17315aa9d403ca605e685b1ba11bdcfed97874644"
+      },
+      {
+        "id": "G42",
+        "execution_ok": true,
+        "result_ok": true,
+        "semantic_ok": true,
+        "semantic_reasons": [],
+        "query_id": "2723a81b-f4fc-4feb-aec8-77cae9341614",
+        "error_code": null,
+        "actual_signature": "894571a72c8e05e2556792d095a039b1f09196903a9937ecc7edd18d14bf8a06"
+      },
+      {
+        "id": "G43",
+        "execution_ok": true,
+        "result_ok": true,
+        "semantic_ok": true,
+        "semantic_reasons": [],
+        "query_id": "fc3e6e13-27f8-4777-8483-2527c1b76fdd",
+        "error_code": null,
+        "actual_signature": "21c7aabb4089e21a0c565abbf66664c4dc0ed7a0f9e6c8f3281bd7344001c3c9"
+      },
+      {
+        "id": "G44",
+        "execution_ok": true,
+        "result_ok": true,
+        "semantic_ok": true,
+        "semantic_reasons": [],
+        "query_id": "5788da46-411c-4735-b3f8-677869873be7",
+        "error_code": null,
+        "actual_signature": "6262882b39841a88f2b2682811c42251725033366671dffaeef0f3e594bfe246"
+      },
+      {
+        "id": "G45",
+        "execution_ok": true,
+        "result_ok": true,
+        "semantic_ok": true,
+        "semantic_reasons": [],
+        "query_id": "4ff156ec-0e11-4a0a-bfab-c775bcaf4510",
+        "error_code": null,
+        "actual_signature": "5b8552728afc7fbf6dc7b105afdc6e2932cb062809265a1f8a7208a78a9ff3de"
+      },
+      {
+        "id": "G46",
+        "execution_ok": true,
+        "result_ok": true,
+        "semantic_ok": true,
+        "semantic_reasons": [],
+        "query_id": "9070108e-4206-49cd-a1f0-868015414dc5",
+        "error_code": null,
+        "actual_signature": "44d8efd75a1ec1686c922a88751448681645f31ceb4992b928d19e712891c3d9"
+      },
+      {
+        "id": "G47",
+        "execution_ok": true,
+        "result_ok": true,
+        "semantic_ok": true,
+        "semantic_reasons": [],
+        "query_id": "2a5493e2-f436-463b-abd9-0b68b44a38aa",
+        "error_code": null,
+        "actual_signature": "6eb29e1cdbc59668576c5e387676cd2e143615d3d8d7975516c9ebe9b1856a4c"
+      },
+      {
+        "id": "G48",
+        "execution_ok": true,
+        "result_ok": true,
+        "semantic_ok": true,
+        "semantic_reasons": [],
+        "query_id": "89b585d6-8144-4f5a-a049-18ee4390e9c8",
+        "error_code": null,
+        "actual_signature": "f76e8f842decebb4530b9e3bee1f67fc7fecdcd3502f1188b353553a54831a12"
+      },
+      {
+        "id": "G49",
+        "execution_ok": true,
+        "result_ok": true,
+        "semantic_ok": true,
+        "semantic_reasons": [],
+        "query_id": "866eedd2-fbf6-457c-8681-5d97546e6265",
+        "error_code": null,
+        "actual_signature": "7621e6d7abcf08a7c363445701b52fa9c845d4ebcd1ecf2dd0cc98f56ea14198"
+      },
+      {
+        "id": "G50",
+        "execution_ok": true,
+        "result_ok": true,
+        "semantic_ok": true,
+        "semantic_reasons": [],
+        "query_id": "f0873585-9d4f-47ba-9f03-7c3ba194ef03",
+        "error_code": null,
+        "actual_signature": "803fc8dea91fa9dd4200b64dd6e17f317574fe219c8b1d06a6156ee3e4138d62"
+      }
+    ]
+  },
+  "mysql": {
+    "total": 10,
+    "execution_pass": 10,
+    "result_pass": 10,
+    "cases": [
+      {
+        "id": "G01",
+        "execution_ok": true,
+        "result_ok": true,
+        "query_id": "69e27365-df4c-4d70-886b-0d4431cf0380",
+        "error_code": null
+      },
+      {
+        "id": "G02",
+        "execution_ok": true,
+        "result_ok": true,
+        "query_id": "280c603a-5022-485b-9262-199c5f506566",
+        "error_code": null
+      },
+      {
+        "id": "G03",
+        "execution_ok": true,
+        "result_ok": true,
+        "query_id": "b41b9559-b828-4d09-87ec-86f03fe9b808",
+        "error_code": null
+      },
+      {
+        "id": "G04",
+        "execution_ok": true,
+        "result_ok": true,
+        "query_id": "900410f2-6a1d-4d27-bdae-7c79de2db7f1",
+        "error_code": null
+      },
+      {
+        "id": "G05",
+        "execution_ok": true,
+        "result_ok": true,
+        "query_id": "c63d873e-9cfc-40bb-a02f-8f7eb53c4c6b",
+        "error_code": null
+      },
+      {
+        "id": "G21",
+        "execution_ok": true,
+        "result_ok": true,
+        "query_id": "12d8c3a2-766e-450d-95d6-beafdaf5b96e",
+        "error_code": null
+      },
+      {
+        "id": "G22",
+        "execution_ok": true,
+        "result_ok": true,
+        "query_id": "91ed902f-8077-4ca8-bcba-09de69645487",
+        "error_code": null
+      },
+      {
+        "id": "G23",
+        "execution_ok": true,
+        "result_ok": true,
+        "query_id": "867f9418-d063-41be-90cc-284eec2b5e93",
+        "error_code": null
+      },
+      {
+        "id": "G24",
+        "execution_ok": true,
+        "result_ok": true,
+        "query_id": "9bed48bf-0159-49df-8fb0-82b54b00f6bc",
+        "error_code": null
+      },
+      {
+        "id": "G25",
+        "execution_ok": true,
+        "result_ok": true,
+        "query_id": "594c3280-3003-4e6d-bc5b-0cdb431d0eb9",
+        "error_code": null
+      }
+    ]
+  },
+  "gate_pass": true
+}

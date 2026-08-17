@@ -8,11 +8,11 @@ import type { EvaluationCaseDetail, EvaluationRunDetail } from '../types/api';
 import { EvaluationDetailPage } from '../pages/EvaluationDetailPage';
 
 const run = {
-  id: 'run-1', release_name: 'Day 3 Golden 20', model_name: 'Local Runtime Provider', status: 'PASS', is_current: true,
-  golden_set_count: 20, sql_generation_rate: 100, result_accuracy: 100, semantic_accuracy: 100, relevance_accuracy: 100,
+  id: 'run-1', release_name: 'Day 4 Golden 50', model_name: 'Local Runtime Provider', status: 'PASS', is_current: true,
+  golden_set_count: 50, sql_generation_rate: 100, result_accuracy: 100, semantic_accuracy: 100, relevance_accuracy: 100,
   average_response_seconds: 0.1, error_distribution: [{ label: '无错误', percent: 100, color: '#16a36a' }], trend_points: [],
   completed_at: '2026-08-17T08:00:00Z', duration_seconds: 2, manifest_sha256: 'd40bb690a4208240',
-  sql_execution_pass_count: 20, result_value_pass_count: 20, semantic_pass_count: 20, dangerous_sql_total: 38, dangerous_sql_block_count: 38,
+  sql_execution_pass_count: 50, result_value_pass_count: 50, semantic_pass_count: 50, dangerous_sql_total: 38, dangerous_sql_block_count: 38,
 };
 const detail: EvaluationCaseDetail = {
   run,
@@ -48,7 +48,7 @@ describe('评测用例详情真实证据界面', () => {
     expect(screen.getByRole('link', { name: '下一条' })).toHaveAttribute('href', '/evaluation/G02');
   });
 
-  it('重新运行调用真实 Golden 20 API', async () => {
+  it('重新运行调用真实 Golden 50 API', async () => {
     const user = userEvent.setup();
     const runGolden = vi.spyOn(evaluationApi, 'runGolden').mockResolvedValue({ run, cases: [detail.case] } as EvaluationRunDetail);
     renderDetail();

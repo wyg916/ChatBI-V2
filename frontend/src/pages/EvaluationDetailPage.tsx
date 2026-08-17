@@ -28,7 +28,7 @@ export function EvaluationDetailPage() {
 
   return <section className="evaluation-detail-page" data-testid="evaluation-case-detail">
     <header className="evaluation-page-heading">
-      <div><p>评测中心 / Golden 20 / {item?.case_id ?? id}</p><h1>评测用例详情</h1></div>
+      <div><p>评测中心 / Golden 50 / {item?.case_id ?? id}</p><h1>评测用例详情</h1></div>
       <div className="evaluation-heading-actions">
         {data?.previous_case_id ? <Link to={`/evaluation/${data.previous_case_id}`}>上一条</Link> : <button type="button" disabled>上一条</button>}
         {data?.next_case_id ? <Link to={`/evaluation/${data.next_case_id}`}>下一条</Link> : <button type="button" disabled>下一条</button>}
@@ -37,7 +37,7 @@ export function EvaluationDetailPage() {
     </header>
 
     {detail.isLoading && <div className="evaluation-notice" role="status">正在读取持久化评测证据……</div>}
-    {detail.isError && <div className="evaluation-notice" role="status">当前引用尚无持久化 Case 证据；请先在评测中心运行 Golden 20。</div>}
+    {detail.isError && <div className="evaluation-notice" role="status">当前引用尚无持久化 Case 证据；请先在评测中心运行 Golden 50。</div>}
     {rerun.isError && <div className="evaluation-notice" role="status">评测运行失败：{(rerun.error as Error).message}</div>}
 
     {item && data && <div className="evaluation-layout">

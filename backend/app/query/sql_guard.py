@@ -49,7 +49,14 @@ class SqlGuard:
                 object_name=forbidden.key,
             ))
 
-        cte_names = {cte.alias_or_name.lower() for cte in statement.find_all(exp.CTE)}
+        cte_nodes = list(statement.find_all(exp.CTE))
+        cte_names = {cte.alias_or_name.lower() for cte in cte_nodes}
+        cte_output_columns = {
+            expression.alias_or_name.lower()
+            for cte in cte_nodes
+            for expression in getattr(cte.this, "expressions", [])
+            if expression.alias_or_name
+        }
         tables: list[str] = []
         alias_to_table: dict[str, str] = {}
         allowed_tables = {value.lower() for value in policy.allowed_tables}
@@ -82,7 +89,7 @@ class SqlGuard:
                 allowed = set(policy.allowed_columns.get(source_table, []))
                 if name not in allowed:
                     issues.append(GuardIssue(code="COLUMN_NOT_AUTHORIZED", message="Column is outside the table allowlist", object_name=f"{source_table}.{name}"))
-            elif name not in allowed_column_union and name not in cte_names:
+            elif name not in allowed_column_union and name not in cte_names and name not in cte_output_columns:
                 # SQL aliases are legal in ORDER BY; allow explicit select aliases only.
                 select_aliases = {item.alias.lower() for item in statement.expressions if item.alias}
                 if name not in select_aliases:

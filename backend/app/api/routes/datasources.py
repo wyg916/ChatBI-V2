@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, Response, status
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from app.core.access import Principal, ensure_resource_access, has_resource_access, record_audit, require_permission
 from app.db.session import get_db
 from app.models import DataSource, DataSourceColumn, DataSourceSchema, DataSourceTable
 from app.schemas.datasource import (
@@ -50,13 +51,14 @@ def _read_datasource(datasource: DataSource, table_count: int = 0, column_count:
 
 
 @router.post("", response_model=DataSourceRead, status_code=status.HTTP_201_CREATED)
-def create_datasource(data: DataSourceCreate, db: Session = Depends(get_db)):
+def create_datasource(data: DataSourceCreate, db: Session = Depends(get_db), _: Principal = Depends(require_permission("datasource.manage"))):
     return service.create_datasource(db, data)
 
 
 @router.get("", response_model=list[DataSourceRead])
-def list_datasources(db: Session = Depends(get_db)):
+def list_datasources(db: Session = Depends(get_db), principal: Principal = Depends(require_permission("datasource.read"))):
     datasources = list(db.scalars(select(DataSource).order_by(DataSource.created_at.desc())))
+    datasources = [item for item in datasources if has_resource_access(db, principal, resource_type="DATASOURCE", resource_id=item.id)]
     table_counts, column_counts = _datasource_counts(db)
     return [
         _read_datasource(item, table_counts.get(item.id, 0), column_counts.get(item.id, 0))
@@ -65,14 +67,15 @@ def list_datasources(db: Session = Depends(get_db)):
 
 
 @router.get("/{datasource_id}", response_model=DataSourceRead)
-def get_datasource(datasource_id: str, db: Session = Depends(get_db)):
+def get_datasource(datasource_id: str, db: Session = Depends(get_db), principal: Principal = Depends(require_permission("datasource.read"))):
+    ensure_resource_access(db, principal, resource_type="DATASOURCE", resource_id=datasource_id)
     datasource = _get_or_404(db, datasource_id)
     table_counts, column_counts = _datasource_counts(db)
     return _read_datasource(datasource, table_counts.get(datasource_id, 0), column_counts.get(datasource_id, 0))
 
 
 @router.put("/{datasource_id}", response_model=DataSourceRead)
-def update_datasource(datasource_id: str, data: DataSourceUpdate, db: Session = Depends(get_db)):
+def update_datasource(datasource_id: str, data: DataSourceUpdate, db: Session = Depends(get_db), _: Principal = Depends(require_permission("datasource.manage"))):
     datasource = service.update_datasource(db, _get_or_404(db, datasource_id), data)
     table_counts, column_counts = _datasource_counts(db)
     return _read_datasource(
@@ -83,14 +86,15 @@ def update_datasource(datasource_id: str, data: DataSourceUpdate, db: Session = 
 
 
 @router.delete("/{datasource_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_datasource(datasource_id: str, db: Session = Depends(get_db)):
+def delete_datasource(datasource_id: str, db: Session = Depends(get_db), _: Principal = Depends(require_permission("datasource.manage"))):
     db.delete(_get_or_404(db, datasource_id))
     db.commit()
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @router.post("/{datasource_id}/test", response_model=OperationResult)
-def test_datasource(datasource_id: str, db: Session = Depends(get_db)):
+def test_datasource(datasource_id: str, db: Session = Depends(get_db), principal: Principal = Depends(require_permission("datasource.read"))):
+    ensure_resource_access(db, principal, resource_type="DATASOURCE", resource_id=datasource_id)
     datasource = _get_or_404(db, datasource_id)
     try:
         service.test_datasource(db, datasource)
@@ -100,18 +104,30 @@ def test_datasource(datasource_id: str, db: Session = Depends(get_db)):
 
 
 @router.post("/{datasource_id}/sync", response_model=OperationResult)
-def sync_datasource(datasource_id: str, db: Session = Depends(get_db)):
+def sync_datasource(
+    datasource_id: str,
+    db: Session = Depends(get_db),
+    principal: Principal = Depends(require_permission("datasource.manage")),
+):
     datasource = _get_or_404(db, datasource_id)
     try:
         counts = service.sync_datasource(db, datasource)
+        record_audit(db, principal, action="SYNC", resource_type="DATASOURCE", resource_id=datasource_id, details=counts)
+        db.commit()
         return OperationResult(success=True, message="Metadata synchronized", **counts)
     except Exception as exc:
         db.rollback()
+        record_audit(
+            db, principal, action="SYNC", resource_type="DATASOURCE", resource_id=datasource_id,
+            status="FAILED", details={"error_type": type(exc).__name__},
+        )
+        db.commit()
         return OperationResult(success=False, message=f"Metadata synchronization failed: {type(exc).__name__}")
 
 
 @router.get("/{datasource_id}/schemas", response_model=list[SchemaRead])
-def list_schemas(datasource_id: str, db: Session = Depends(get_db)):
+def list_schemas(datasource_id: str, db: Session = Depends(get_db), principal: Principal = Depends(require_permission("datasource.read"))):
+    ensure_resource_access(db, principal, resource_type="DATASOURCE", resource_id=datasource_id)
     _get_or_404(db, datasource_id)
     rows = db.execute(
         select(DataSourceSchema, func.count(DataSourceTable.id))
@@ -127,7 +143,8 @@ def list_schemas(datasource_id: str, db: Session = Depends(get_db)):
 
 
 @router.get("/{datasource_id}/tables", response_model=list[TableRead])
-def list_tables(datasource_id: str, schema: str | None = None, db: Session = Depends(get_db)):
+def list_tables(datasource_id: str, schema: str | None = None, db: Session = Depends(get_db), principal: Principal = Depends(require_permission("datasource.read"))):
+    ensure_resource_access(db, principal, resource_type="DATASOURCE", resource_id=datasource_id)
     _get_or_404(db, datasource_id)
     query = (
         select(DataSourceTable, DataSourceSchema.name, func.count(DataSourceColumn.id))
@@ -153,7 +170,8 @@ def list_tables(datasource_id: str, schema: str | None = None, db: Session = Dep
 
 
 @router.get("/{datasource_id}/tables/{table}/columns", response_model=list[ColumnRead])
-def list_columns(datasource_id: str, table: str, schema: str | None = None, db: Session = Depends(get_db)):
+def list_columns(datasource_id: str, table: str, schema: str | None = None, db: Session = Depends(get_db), principal: Principal = Depends(require_permission("datasource.read"))):
+    ensure_resource_access(db, principal, resource_type="DATASOURCE", resource_id=datasource_id)
     _get_or_404(db, datasource_id)
     query = (
         select(DataSourceColumn)

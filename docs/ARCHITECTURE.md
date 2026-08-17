@@ -6,7 +6,7 @@
 - API：FastAPI、Pydantic、SQLAlchemy、Alembic。
 - Metadata DB：本机 PostgreSQL，数据库 `chatbi_v2`；应用使用项目专用账号，管理员账号只用于首次初始化。
 - SQL 解析与方言：SQLGlot 或等价 AST 解析器。
-- 模型：通过 ModelGatewayAdapter 接入 OpenAI 兼容服务、本地或第三方模型。
+- 模型：通过 `ModelProviderAdapter` 接入本地确定性语义运行时与命名的 OpenAI-compatible 服务；当前包含 Kimi `kimi-k2.6`、MiMo `mimo-v2.5`、DeepSeek `deepseek-v4-flash`，供应商差异封装在 Adapter 内。
 - 评测：IBM Text-to-SQL Evaluation Toolkit + 自研 Business Result Oracle。
 - 部署：Docker Compose 只承载 Backend/Frontend；开发数据库运行在本机，不创建 Docker 数据库容器或数据卷。CI 执行 Backend、Frontend、E2E、Golden Set。
 
@@ -44,6 +44,8 @@
 - EvaluationAdapter
 
 任何第三方组件只能位于适配器之后。
+
+外部模型密钥只允许由 Backend 环境变量提供。`GET /api/v1/model-providers` 只返回 Provider、模型、协议、配置状态与当前路由，不返回密钥；前端不得提供密钥回显或把凭据保存到浏览器。
 
 ## 5. Day 2 查询运行时
 

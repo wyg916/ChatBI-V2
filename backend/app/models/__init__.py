@@ -1,5 +1,7 @@
 from app.models.entities import (
+    AppUser,
     AnswerVersion,
+    AuditEvent,
     BusinessTerm,
     DataSource,
     DataSourceColumn,
@@ -15,6 +17,7 @@ from app.models.entities import (
     QueryAuditEvent,
     QueryFeedback,
     QueryRun,
+    ResourceGrant,
     SemanticEntity,
     SemanticModel,
     SemanticRelation,
@@ -24,7 +27,7 @@ from app.models.entities import (
 )
 
 __all__ = [
-    "Workspace", "DataSource", "DataSourceSchema", "DataSourceTable",
+    "Workspace", "AppUser", "ResourceGrant", "AuditEvent", "DataSource", "DataSourceSchema", "DataSourceTable",
     "DataSourceColumn", "DataSourceRelation", "SemanticModel",
     "SemanticEntity", "Metric", "Dimension", "SemanticRelation",
     "BusinessTerm", "SemanticVersion", "VerifiedAnswer", "AnswerVersion",

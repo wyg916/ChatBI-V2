@@ -3,6 +3,7 @@ from __future__ import annotations
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.core.access import Principal, ensure_resource_access, record_audit
 from app.core.config import get_settings
 from app.models import (
     AnswerVersion,
@@ -53,14 +54,14 @@ def _select_runtime(db: Session, request: AskRequest) -> tuple[DataSource, Seman
         model = db.scalar(
             select(SemanticModel)
             .where(SemanticModel.datasource_id == request.datasource_id)
-            .order_by((SemanticModel.status == "PUBLISHED").desc(), SemanticModel.updated_at.desc())
+            .order_by((SemanticModel.status == "PUBLISHED").desc(), SemanticModel.created_at.asc(), SemanticModel.id.asc())
         )
     else:
         model = db.scalar(
             select(SemanticModel)
             .join(DataSource, DataSource.id == SemanticModel.datasource_id)
             .where(DataSource.type == "postgresql")
-            .order_by((SemanticModel.status == "PUBLISHED").desc(), SemanticModel.updated_at.desc())
+            .order_by((SemanticModel.status == "PUBLISHED").desc(), SemanticModel.created_at.asc(), SemanticModel.id.asc())
         )
     if model is None:
         raise LookupError("No semantic model is available")
@@ -159,10 +160,13 @@ class QueryPipeline:
         run.narrative_payload = _json(narrative)
         run.follow_up_payload = narrative.recommended_questions
 
-    def execute(self, db: Session, request: AskRequest) -> QueryRun:
+    def execute(self, db: Session, request: AskRequest, principal: Principal | None = None) -> QueryRun:
         settings = get_settings()
         workspace = default_workspace(db)
         datasource, model = _select_runtime(db, request)
+        if principal is not None:
+            ensure_resource_access(db, principal, resource_type="DATASOURCE", resource_id=datasource.id, query=True)
+            ensure_resource_access(db, principal, resource_type="SEMANTIC_MODEL", resource_id=model.id, query=True)
         row_limit = min(request.row_limit or settings.query_row_limit, settings.query_row_limit)
         run = QueryRun(
             workspace_id=workspace.id,
@@ -207,6 +211,12 @@ class QueryPipeline:
                 run.oracle_payload = _json(OracleResult(status="NOT_RUN", confidence=0))
                 db.commit()
                 db.refresh(run)
+                if principal is not None:
+                    record_audit(
+                        db, principal, action="QUERY_RUN", resource_type="QUERY_RUN", resource_id=run.id,
+                        status=run.status, details={"error_code": run.error_code},
+                    )
+                    db.commit()
                 return run
 
             run.normalized_sql = guard.normalized_sql
@@ -238,6 +248,13 @@ class QueryPipeline:
                 self._build_presentation(run)
             db.commit()
             db.refresh(run)
+            if principal is not None:
+                record_audit(
+                    db, principal, action="QUERY_RUN", resource_type="QUERY_RUN", resource_id=run.id,
+                    status="SUCCESS" if run.status == "SUCCEEDED" else run.status,
+                    details={"datasource_id": run.datasource_id, "semantic_model_id": run.semantic_model_id},
+                )
+                db.commit()
             return run
         except Exception as exc:
             run.status = "FAILED"
@@ -246,6 +263,12 @@ class QueryPipeline:
             _audit(db, run, "QUERY_PIPELINE", "FAIL", {"error_type": type(exc).__name__})
             db.commit()
             db.refresh(run)
+            if principal is not None:
+                record_audit(
+                    db, principal, action="QUERY_RUN", resource_type="QUERY_RUN", resource_id=run.id,
+                    status="FAILED", details={"error_code": run.error_code},
+                )
+                db.commit()
             return run
 
     def verify(self, db: Session, run: QueryRun, expected: ExpectedResult) -> QueryRun:

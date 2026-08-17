@@ -1,0 +1,33 @@
+{
+  "timestamp": "2026-08-17T19:21:17+08:00",
+  "scope": "named_model_provider_connectivity",
+  "active_release_provider": "deterministic",
+  "secrets_recorded": false,
+  "results": [
+    {
+      "provider": "kimi",
+      "model": "kimi-k2.6",
+      "models_http": 200,
+      "target_model_listed": true,
+      "chat_http": 200,
+      "json_output_valid": true
+    },
+    {
+      "provider": "mimo",
+      "model": "mimo-v2.5",
+      "models_http": 200,
+      "target_model_listed": true,
+      "chat_http": 200,
+      "json_output_valid": true
+    },
+    {
+      "provider": "deepseek",
+      "model": "deepseek-v4-flash",
+      "models_http": 200,
+      "target_model_listed": true,
+      "chat_http": 200,
+      "json_output_valid": true
+    }
+  ],
+  "result": "PASS"
+}

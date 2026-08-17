@@ -119,3 +119,13 @@ class PublishResult(BaseModel):
     message: str
     status: str
     version: int
+
+
+class SemanticVersionRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: str
+    semantic_model_id: str
+    version: int
+    snapshot: dict
+    published_at: datetime
+    is_current: bool = False

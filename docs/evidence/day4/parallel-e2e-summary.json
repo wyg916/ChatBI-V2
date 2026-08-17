@@ -1,0 +1,18 @@
+{
+  "checked_at": "2026-08-17T21:03:39+08:00",
+  "workers": 5,
+  "playwright_retries": 0,
+  "tests_per_run": 36,
+  "run1": { "passed": 36, "failed": 0, "duration_seconds": 60.0 },
+  "run2": { "passed": 36, "failed": 0, "duration_seconds": 55.5 },
+  "run3": { "passed": 36, "failed": 0, "duration_seconds": 59.2 },
+  "race_root_cause": "Workers mutated a shared catalog and selected the newest published semantic model while other workers queried it.",
+  "race_fix": [
+    "Global PostgreSQL/MySQL catalog setup before workers",
+    "Datasource row lock and transactional metadata replacement",
+    "Per-worker mutable semantic model with cleanup",
+    "Stable primary runtime selection for cross-worker read paths"
+  ],
+  "product_runtime_race_found": true,
+  "gate": "PASS"
+}
