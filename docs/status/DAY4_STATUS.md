@@ -2,13 +2,14 @@
 
 ## Current status
 
-- `DAY_4_STATUS=READY_FOR_GIT_CLOSURE`
+- `DAY_4_STATUS=PASS`
 - `DAY_4_FUNCTIONAL_GATE=PASS`
+- `GIT_CLOSURE=PASS`
 - `BASE_HEAD=b0616f653cdabcd45a9255707442004948aaed7b`
 - `DELIVERY_BRANCH=flex/day4-quality-hardening`
 - `P2_SCOPE_ADDED=0`
 
-功能、数据、Security、Migration、E2E 与两次冷启动 Gate 已全部通过。最终 `DAY_4_STATUS=PASS` 仍以 Commit、Merge main、Push、Live Remote Verify、annotated quality tag 和 clean worktree 全部完成为条件。
+功能、数据、Security、Migration、E2E、两次冷启动与 Git 收口 Gate 已全部通过；最终远端提交与 annotated quality tag 由发布核验返回记录。
 
 ## Gate evidence
 
