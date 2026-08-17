@@ -27,7 +27,7 @@ IMAGE_EXPECTATIONS = {
     "OE-M01": ("华东", "18"),
     "OE-M02": ("1.84",),
     "OE-M03": ("上升",),
-    "OE-M04": ("下降",),
+    "OE-M04": ("上半年", "8月"),
     "OE-M05": ("华东", "华南"),
 }
 FOLLOW_UP_EXPECTATIONS = {

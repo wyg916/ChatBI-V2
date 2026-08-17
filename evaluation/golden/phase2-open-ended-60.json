@@ -67,7 +67,7 @@
     {"id":"OE-M01","category":"MULTIMODAL_QUERY","question":"区域变化图里最高柱下方的区域标签和柱顶数字分别是什么","attachment_kinds":["IMAGE"],"expected_route":"MULTIMODAL_QUERY"},
     {"id":"OE-M02","category":"MULTIMODAL_QUERY","question":"识别这张经营截图里的主要数字","attachment_kinds":["IMAGE"],"expected_route":"MULTIMODAL_QUERY"},
     {"id":"OE-M03","category":"MULTIMODAL_QUERY","question":"这张折线图的变化趋势怎样","attachment_kinds":["IMAGE"],"expected_route":"MULTIMODAL_QUERY"},
-    {"id":"OE-M04","category":"MULTIMODAL_QUERY","question":"图片是否存在明显异常点","attachment_kinds":["IMAGE"],"expected_route":"MULTIMODAL_QUERY"},
+    {"id":"OE-M04","category":"MULTIMODAL_QUERY","question":"图片的查询时间范围与折线图横轴是否一致？请指出具体差异","attachment_kinds":["IMAGE"],"expected_route":"MULTIMODAL_QUERY"},
     {"id":"OE-M05","category":"MULTIMODAL_QUERY","question":"比较图中华东和华南两个区域的表现","attachment_kinds":["IMAGE"],"expected_route":"MULTIMODAL_QUERY"}
   ]
 }
