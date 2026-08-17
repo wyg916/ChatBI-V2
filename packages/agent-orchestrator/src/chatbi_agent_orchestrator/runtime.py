@@ -213,6 +213,34 @@ class BoundedAgentOrchestrator:
                 )
                 continue
 
+            if assignment.tool.value not in request.context.allowed_tools:
+                steps.append(
+                    OrchestrationStep(
+                        ordinal=len(steps) + 1,
+                        code=assignment.tool.value,
+                        agent_role=assignment.role,
+                        tool_name=assignment.tool.value,
+                        status="REFUSED",
+                        detail={"error_code": "UNAUTHORIZED_TOOL_CALL"},
+                    )
+                )
+                progress(ProgressStage.COMPLETED, status="REFUSED")
+                return self._terminal_result(
+                    request,
+                    run_id,
+                    started,
+                    first_progress_ms,
+                    status="REFUSED",
+                    steps=tuple(steps),
+                    data_evidence=data_evidence,
+                    knowledge_evidence=knowledge_evidence,
+                    error_code="UNAUTHORIZED_TOOL_CALL",
+                    result_verified=result_verified,
+                    citation_verified=citation_verified,
+                    tool_latency_ms=tool_latency_ms,
+                    tool_call_count=tool_call_count,
+                )
+
             progress(
                 _stage_for(assignment.tool),
                 role=assignment.role.value,

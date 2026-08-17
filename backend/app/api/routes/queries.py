@@ -15,6 +15,8 @@ from app.query.nl2sql import Nl2SqlRouter
 from app.query.service import QueryPipeline, query_response, save_feedback, save_verified_answer
 from app.core.config import get_settings
 from app.schemas.content import AnswerRead
+from chatbi_agent_contracts import AgentRole, ToolName
+from chatbi_rag_adapter import LiveRagAdapter
 
 router = APIRouter(tags=["query pipeline"])
 
@@ -29,6 +31,11 @@ def _run_or_404(db: Session, query_id: str) -> QueryRun:
 @router.get("/query-capabilities")
 def query_capabilities():
     settings = get_settings()
+    rag = LiveRagAdapter(
+        base_url=settings.legacy_rag_base_url,
+        shared_secret=settings.rag_shared_secret.get_secret_value(),
+        retry_count=settings.rag_retry_count,
+    )
     return {
         "nl2sql": Nl2SqlRouter().capabilities(),
         "sql_guard": {"engine": "sqlglot", "ast_validation": True},
@@ -36,13 +43,24 @@ def query_capabilities():
         "controlled_rag": {
             "mode": settings.rag_mode,
             "configured": bool(settings.legacy_rag_base_url),
+            "live_bridge": rag.health(timeout_ms=settings.rag_health_timeout_ms),
+            "workspace_identity_signed": bool(settings.rag_shared_secret.get_secret_value()),
+            "fail_closed": True,
             "fallback_enabled": settings.rag_fallback_enabled,
         },
         "bounded_orchestration": {
             "mode": settings.agent_mode,
             "allowed_routes": sorted(settings.agent_route_allowlist),
             "fallback_enabled": settings.agent_fallback_enabled,
-            "legacy_multi_agent_runtime_found": False,
+            "roles": [role.value for role in AgentRole],
+            "tools": [tool.value for tool in ToolName],
+            "budgets": {
+                "max_steps": settings.agent_max_steps,
+                "max_tool_calls": settings.agent_max_tool_calls,
+                "max_replan": settings.agent_max_replan,
+                "max_agent_depth": settings.agent_max_depth,
+                "timeout_ms": settings.agent_timeout_ms,
+            },
         },
     }
 
