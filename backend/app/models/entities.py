@@ -35,6 +35,8 @@ class AppUser(Base, TimestampMixin):
     role: Mapped[str] = mapped_column(String(32), nullable=False, index=True)
     status: Mapped[str] = mapped_column(String(32), default="ACTIVE", index=True)
     last_active_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    password_hash: Mapped[str | None] = mapped_column(String(512))
+    password_changed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 
 class ResourceGrant(Base, TimestampMixin):

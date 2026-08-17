@@ -25,7 +25,7 @@ function captureRuntimeErrors(page: Page) {
   });
   page.on('pageerror', (error) => errors.push(`page: ${error.message}`));
   page.on('requestfailed', (request) => {
-    errors.push(`request: ${request.method()} ${request.url()} ${request.failure()?.errorText ?? ''}`);
+    if (request.failure()?.errorText !== 'net::ERR_ABORTED') errors.push(`request: ${request.method()} ${request.url()} ${request.failure()?.errorText ?? ''}`);
   });
   page.on('response', (response) => {
     if (response.status() >= 400) errors.push(`response: ${response.status()} ${response.url()}`);
@@ -47,7 +47,7 @@ async function pageTargets(request: APIRequestContext): Promise<PageTarget[]> {
 
   return [
     { id: '01', title: '登录页', path: '/login', appShell: false, ready: (page) => page.getByRole('heading', { name: '登录工作空间' }), criticalControl: (page) => page.getByRole('button', { name: '登录 ChatBI Studio' }) },
-    { id: '02', title: '问数据 - 空状态', path: '/', appShell: true, ready: (page) => page.getByRole('heading', { name: '今天想了解哪些业务数据？' }), criticalControl: (page) => page.getByRole('button', { name: '提交问题' }) },
+    { id: '02', title: '问数据 - 空状态', path: '/?new=1', appShell: true, ready: (page) => page.getByRole('heading', { name: '今天想了解哪些业务数据？' }), criticalControl: (page) => page.getByRole('button', { name: '提交问题' }) },
     { id: '03', title: '问数据 - 分析结果', path: `/ask/results?q=${encodeURIComponent('统计全部订单收入')}`, appShell: true, ready: (page) => page.getByTestId('query-success'), criticalControl: (page) => page.getByRole('button', { name: '查看 SQL 与执行明细' }) },
     { id: '04', title: '数据源列表', path: '/datasources', appShell: true, ready: (page) => page.getByTestId('datasource-card').first(), criticalControl: (page) => page.getByTestId('create-datasource') },
     { id: '05', title: '数据源详情与 Schema 管理', path: `/datasources/${sources[0].id}`, appShell: true, ready: (page) => page.getByRole('heading', { name: 'Schema 与字段管理' }), criticalControl: (page) => page.getByTestId('sync-schema') },

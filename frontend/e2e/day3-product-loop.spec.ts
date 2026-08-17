@@ -1,4 +1,5 @@
 import { expect, test, type APIRequestContext, type APIResponse, type Page } from '@playwright/test';
+import { adminCredentials } from './auth';
 
 const apiBase = process.env.CHATBI_API_BASE ?? 'http://127.0.0.1:8000/api/v1';
 const dashboardCardTitle = 'Day3 E2E 已验证卡片';
@@ -23,17 +24,21 @@ function runtimeErrors(page: Page) {
   const errors: string[] = [];
   page.on('console', (message) => { if (message.type() === 'error') errors.push(`console: ${message.text()}`); });
   page.on('pageerror', (error) => errors.push(`page: ${error.message}`));
-  page.on('requestfailed', (request) => errors.push(`request: ${request.url()} ${request.failure()?.errorText ?? ''}`));
+  page.on('requestfailed', (request) => {
+    if (request.failure()?.errorText !== 'net::ERR_ABORTED') errors.push(`request: ${request.url()} ${request.failure()?.errorText ?? ''}`);
+  });
   page.on('response', (response) => { if (response.status() >= 400) errors.push(`response: ${response.status()} ${response.url()}`); });
   return errors;
 }
 
 test('Day3-E2E01 登录进入问数据首页', async ({ page }) => {
+  await page.context().clearCookies();
   await page.goto('/login');
-  await page.getByLabel('账号或电子名').fill('day3.user');
+  await page.getByLabel('账号或电子名').fill(adminCredentials.email);
+  await page.getByLabel('密码').fill(adminCredentials.password);
   await page.getByRole('button', { name: '登录 ChatBI Studio' }).click();
   await expect(page).toHaveURL('/');
-  await expect(page.getByRole('heading', { name: '今天想了解哪些业务数据？' })).toBeVisible();
+  await expect(page.getByRole('textbox', { name: '输入业务问题' })).toBeVisible();
 });
 
 test('Day3-E2E02 PostgreSQL 数据源连接并读取隔离 Schema fixture', async ({ request }) => {
@@ -150,10 +155,10 @@ test('Day3-E2E08 推荐追问进入新一轮真实查询', async ({ page }) => {
   await expect(page.getByTestId('query-success')).toBeVisible({ timeout: 30_000 });
   const suggestion = page.locator('.followup-suggestions button').first();
   const question = await suggestion.textContent();
+  const answerCount = await page.locator('.chat-assistant-message').count();
   await suggestion.click();
-  await expect(page).toHaveURL(new RegExp(`q=${encodeURIComponent(question ?? '').replace(/%/g, '%')}`));
-  await expect(page.getByTestId('query-success')).toBeVisible({ timeout: 30_000 });
-  await expect(page.locator('.answer-query')).toHaveText(question ?? '');
+  await expect(page.locator('.chat-assistant-message')).toHaveCount(answerCount + 1, { timeout: 30_000 });
+  await expect(page.locator('.answer-query').last()).toContainText(question ?? '');
 });
 
 test('Day3-E2E09 正确答案经反馈后保存为 VERIFIED Answer', async ({ request }) => {

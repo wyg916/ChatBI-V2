@@ -296,7 +296,7 @@ class DeterministicTestProvider(ModelProviderAdapter, Nl2SqlEngine):
         growth_metric = next((item for item in metrics if item in {"revenue_mom", "revenue_yoy"}), None)
         if growth_metric:
             return self._render_growth_sql(
-                context=context, metric=growth_metric, time_range=time_range,
+                context=context, metric=growth_metric, time_range=time_range, filters=filters,
                 limit=limit, table_name=table("orders"),
             )
 
@@ -408,6 +408,7 @@ class DeterministicTestProvider(ModelProviderAdapter, Nl2SqlEngine):
         context: QueryContext,
         metric: str,
         time_range: QueryTimeRange | None,
+        filters: list[QueryFilter],
         limit: int,
         table_name: str,
     ) -> tuple[str, list[str], list[str], list[str], list[dict[str, Any]], list[str], list[str]]:
@@ -416,15 +417,53 @@ class DeterministicTestProvider(ModelProviderAdapter, Nl2SqlEngine):
             else "DATE_FORMAT(o.order_date, '%Y-%m-01')"
         )
         where_parts: list[str] = []
+        join_lines: list[str] = []
+        joins: list[dict[str, Any]] = []
+        selected_tables = ["orders"]
+        selected_entities = ["orders"]
+        selected_columns = ["orders.order_date", "orders.revenue"]
+        aliases = {"orders": "o", "regions": "r", "products": "p", "customers": "c"}
+        join_specs = {
+            "regions": ("regions", "r", "r.region_id = o.region_id", "orders.region_id", "regions.region_id"),
+            "products": ("products", "p", "p.product_id = o.product_id", "orders.product_id", "products.product_id"),
+            "customers": ("customers", "c", "c.customer_id = o.customer_id", "orders.customer_id", "customers.customer_id"),
+        }
+        schema = context.schema_name
+
+        def related_table(name: str) -> str:
+            return f"{schema}.{name}" if schema and context.dialect == "postgresql" else name
+
+        for item in filters:
+            entity, column = item.field.split(".", 1)
+            if entity in join_specs and entity not in selected_tables:
+                table, alias, condition, left, right = join_specs[entity]
+                join_lines.append(f"JOIN {related_table(table)} {alias} ON {condition}")
+                selected_tables.append(entity)
+                selected_entities.append(entity)
+                selected_columns.extend([left, right])
+                joins.append({"left": left, "right": right, "type": "INNER"})
+            selected_columns.append(item.field)
+            alias = aliases[entity]
+            if item.operator.upper() in {"IS", "IS NOT"} and item.value is None:
+                where_parts.append(f"{alias}.{column} {item.operator.upper()} NULL")
+            else:
+                escaped = str(item.value).replace("'", "''")
+                where_parts.append(f"{alias}.{column} {item.operator} '{escaped}'")
         if time_range and time_range.start and time_range.end_exclusive:
+            start = time_range.start
+            if metric == "revenue_yoy":
+                start_date = date.fromisoformat(str(start))
+                start = start_date.replace(year=start_date.year - 1)
             if context.dialect == "postgresql":
                 where_parts = [
-                    f"o.order_date >= DATE '{time_range.start}'",
+                    *where_parts,
+                    f"o.order_date >= DATE '{start}'",
                     f"o.order_date < DATE '{time_range.end_exclusive}'",
                 ]
             else:
                 where_parts = [
-                    f"o.order_date >= '{time_range.start}'",
+                    *where_parts,
+                    f"o.order_date >= '{start}'",
                     f"o.order_date < '{time_range.end_exclusive}'",
                 ]
         offset = 1 if metric == "revenue_mom" else 12
@@ -434,6 +473,7 @@ class DeterministicTestProvider(ModelProviderAdapter, Nl2SqlEngine):
             f"  SELECT {month_expression} AS month, SUM(o.revenue) AS revenue",
             f"  FROM {table_name} o",
         ]
+        lines.extend(f"  {line}" for line in join_lines)
         if where_parts:
             lines.append("  WHERE " + " AND ".join(where_parts))
         lines.extend([
@@ -442,12 +482,16 @@ class DeterministicTestProvider(ModelProviderAdapter, Nl2SqlEngine):
             "SELECT month, revenue,",
             f"  ROUND((revenue - {lag}) * 100.0 / NULLIF({lag}, 0), 4) AS {metric}",
             "FROM monthly",
-            "ORDER BY month ASC",
-            f"LIMIT {limit}",
         ])
+        if time_range and time_range.start and time_range.end_exclusive:
+            if context.dialect == "postgresql":
+                lines.append(f"WHERE month >= DATE '{time_range.start}' AND month < DATE '{time_range.end_exclusive}'")
+            else:
+                lines.append(f"WHERE month >= '{time_range.start}' AND month < '{time_range.end_exclusive}'")
+        lines.extend(["ORDER BY month ASC", f"LIMIT {limit}"])
         return (
-            "\n".join(lines), ["orders"], ["orders.order_date", "orders.revenue"],
-            ["orders"], [], [month_expression], ["month ASC"],
+            "\n".join(lines), selected_tables, list(dict.fromkeys(selected_columns)),
+            selected_entities, joins, [month_expression], ["month ASC"],
         )
 
 
@@ -535,6 +579,12 @@ class OpenAICompatibleProvider(ModelProviderAdapter):
 def build_model_provider(settings: Settings | None = None) -> ModelProviderAdapter:
     settings = settings or get_settings()
     selected = settings.model_provider.strip().lower()
+    if selected == "auto":
+        selected = next((
+            definition.provider_id
+            for definition in PROVIDER_DEFINITIONS
+            if all(_provider_values(settings, definition))
+        ), "deterministic")
     for definition in PROVIDER_DEFINITIONS:
         if selected != definition.provider_id:
             continue
@@ -557,6 +607,12 @@ def build_model_provider(settings: Settings | None = None) -> ModelProviderAdapt
 def model_provider_catalog(settings: Settings | None = None) -> dict[str, Any]:
     settings = settings or get_settings()
     selected = settings.model_provider.strip().lower()
+    if selected == "auto":
+        selected = next((
+            definition.provider_id
+            for definition in PROVIDER_DEFINITIONS
+            if all(_provider_values(settings, definition))
+        ), "deterministic")
     entries: list[dict[str, Any]] = []
     selected_is_configured = selected == "deterministic"
     for definition in PROVIDER_DEFINITIONS:

@@ -1,0 +1,304 @@
+from __future__ import annotations
+
+import base64
+import json
+import re
+from datetime import datetime, timezone
+from time import perf_counter
+from typing import Callable
+
+from chatbi_agent_contracts import QuestionRoute
+from fastapi import HTTPException
+from sqlalchemy import select
+from sqlalchemy.orm import Session
+
+from app.core.access import Principal, record_audit
+from app.core.config import get_settings
+from app.integration.contracts import AnalysisRequest
+from app.integration.model_gateway import ModelGateway, ModelUnavailable, VisionModelUnavailable
+from app.integration.question_router import QuestionRouter
+from app.integration.service import AnalysisService
+from app.models import Attachment, ChatMessage, Conversation
+from app.schemas.chat import ChatRequest, ChatResponse, ConversationRead, MessageRead
+from app.services.attachments import attachment_path, get_attachment
+from app.services.conversations import extract_slots, get_conversation, list_messages, refresh_conversation_summary
+
+
+def _message(item: ChatMessage) -> MessageRead:
+    return MessageRead.model_validate(item)
+
+
+def _conversation(item: Conversation) -> ConversationRead:
+    return ConversationRead.model_validate(item)
+
+
+def _history(messages: list[ChatMessage]) -> list[dict[str, str]]:
+    limit = get_settings().chat_recent_message_limit
+    return [
+        {"role": item.role, "content": item.content[:2_000]}
+        for item in messages[-limit:]
+        if item.role in {"user", "assistant"} and item.content.strip()
+    ]
+
+
+def _analysis_answer(route: QuestionRoute, primary: dict) -> str:
+    if route == QuestionRoute.DATA_QUERY:
+        return str(primary.get("summary") or primary.get("error_message") or "数据查询未返回可发布结论。")
+    if route == QuestionRoute.KNOWLEDGE_QUERY:
+        return str(primary.get("summary") or primary.get("error_code") or "没有找到可引用的授权知识证据。")
+    if route == QuestionRoute.HYBRID_ANALYSIS:
+        data = primary.get("data") if isinstance(primary.get("data"), dict) else primary
+        knowledge = primary.get("knowledge") if isinstance(primary.get("knowledge"), dict) else {}
+        parts = [str(data.get("summary") or "数据部分未形成可发布结论。")]
+        if knowledge.get("summary"):
+            parts.append(f"知识依据：{knowledge['summary']}")
+        return "\n\n".join(parts)
+    return str(primary.get("answer") or primary.get("summary") or primary.get("error_code") or "复杂分析未形成可发布结论。")
+
+
+def _comparative_answer(question: str, answer: str, primary: dict) -> str:
+    if not re.search(r"两者|相差|差距|最大", question):
+        return answer
+    rows = ((primary.get("execution") or {}).get("rows") or []) if isinstance(primary, dict) else []
+    if len(rows) == 2 and "region" in rows[0]:
+        metric = next((key for key in ("revenue", "profit", "cost", "order_count") if key in rows[0]), None)
+        if metric:
+            left, right = rows
+            difference = abs(float(left[metric] or 0) - float(right[metric] or 0))
+            return f"{left['region']}与{right['region']}的{metric}相差 {difference:,.2f}。"
+    return answer
+
+
+class ChatService:
+    def __init__(self, gateway: ModelGateway | None = None):
+        self.gateway = gateway or ModelGateway()
+        self.router = QuestionRouter(self.gateway)
+
+    def execute(
+        self,
+        db: Session,
+        request: ChatRequest,
+        principal: Principal,
+        progress: Callable[[str, dict], None] | None = None,
+    ) -> ChatResponse:
+        started = perf_counter()
+        conversation = get_conversation(db, request.conversation_id, principal)
+        duplicate = db.scalar(select(ChatMessage).where(
+            ChatMessage.conversation_id == conversation.id,
+            ChatMessage.client_message_id == request.client_message_id,
+        ))
+        if duplicate is not None:
+            raise HTTPException(status_code=409, detail="DUPLICATE_MESSAGE")
+        if request.parent_message_id:
+            parent = db.get(ChatMessage, request.parent_message_id)
+            if parent is None or parent.conversation_id != conversation.id:
+                raise HTTPException(status_code=422, detail="Invalid parent message")
+
+        attachments: list[Attachment] = []
+        attachment_ids = list(dict.fromkeys(request.attachment_ids or conversation.active_attachment_ids))
+        for attachment_id in attachment_ids:
+            item = get_attachment(db, attachment_id, principal)
+            if item.conversation_id != conversation.id:
+                raise HTTPException(status_code=403, detail="Attachment belongs to another conversation")
+            if item.status != "READY":
+                raise HTTPException(status_code=422, detail=item.error_code or "ATTACHMENT_NOT_READY")
+            attachments.append(item)
+
+        prior_messages = list_messages(db, conversation.id)
+        content = request.content.strip() or "请分析当前附件。"
+        slots, resolved_question = extract_slots(content, conversation.slot_state)
+        route = self.router.classify(
+            resolved_question,
+            request.route,
+            history_summary=conversation.summary,
+            attachment_kinds={item.kind for item in attachments},
+        )
+        if progress:
+            progress("UNDERSTANDING", {"route": route.value})
+
+        user_message = ChatMessage(
+            conversation_id=conversation.id,
+            workspace_id=principal.workspace_id,
+            user_id=principal.user_id,
+            parent_message_id=request.parent_message_id,
+            client_message_id=request.client_message_id,
+            role="user",
+            content=content,
+            route=route.value,
+            attachment_ids=[item.id for item in attachments],
+            context_payload={"resolved_question": resolved_question, "slots": slots},
+            status="COMPLETED",
+        )
+        db.add(user_message)
+        db.flush()
+
+        status = "SUCCEEDED"
+        error_code = None
+        response_payload: dict = {}
+        trace_id = f"CHAT-{user_message.id}"
+        model_provider = None
+        model_name = None
+        query_run_id = None
+        retrieved_sources: list[dict] = []
+        tool_calls: list[dict] = []
+        sql_execution: dict = {}
+        fallback_reason = None
+        try:
+            if route in {
+                QuestionRoute.DATA_QUERY,
+                QuestionRoute.KNOWLEDGE_QUERY,
+                QuestionRoute.HYBRID_ANALYSIS,
+                QuestionRoute.COMPLEX_ANALYSIS,
+            }:
+                if progress:
+                    progress("QUERYING_DATA" if route == QuestionRoute.DATA_QUERY else "RETRIEVING_KNOWLEDGE", {})
+                result = AnalysisService().execute(
+                    db,
+                    AnalysisRequest(
+                        question=resolved_question,
+                        route=route,
+                        datasource_id=request.datasource_id,
+                        semantic_model_id=request.semantic_model_id,
+                        idempotency_key=request.client_message_id,
+                    ),
+                    principal,
+                    progress_callback=(lambda stage, detail: progress(stage.value, detail)) if progress else None,
+                )
+                response_payload = {"analysis": result.model_dump(mode="json")}
+                trace_id = result.trace_id
+                status = result.status
+                primary = result.primary
+                answer = _comparative_answer(resolved_question, _analysis_answer(route, primary), primary)
+                data_payload = primary.get("data", primary) if isinstance(primary, dict) else {}
+                query_run_id = data_payload.get("id") if isinstance(data_payload, dict) else None
+                model_provider = data_payload.get("provider") if isinstance(data_payload, dict) else None
+                sql_execution = data_payload.get("execution", {}) if isinstance(data_payload, dict) else {}
+                knowledge = primary.get("knowledge", primary) if isinstance(primary, dict) else {}
+                retrieved_sources = knowledge.get("citations", []) if isinstance(knowledge, dict) else []
+                tool_calls = primary.get("steps", []) if isinstance(primary, dict) else []
+                fallback_reason = "CONTROLLED_RUNTIME_FALLBACK" if result.fallback_used else None
+                if status not in {"SUCCEEDED", "PARTIAL"}:
+                    error_code = str(primary.get("error_code") or status)
+            elif route == QuestionRoute.GENERAL_CHAT:
+                reply = self.gateway.complete(
+                    system=(
+                        "You are ChatBI Studio. Answer ordinary product or conversational questions concisely. "
+                        "Never invent company data or internal policy. Direct business-data requests back to verified ChatBI analysis."
+                    ),
+                    user=content,
+                    history=_history(prior_messages),
+                )
+                answer, model_provider, model_name = reply.content, reply.provider, reply.model
+                response_payload = {"answer": answer}
+            elif route == QuestionRoute.FILE_QUERY:
+                answer, model_provider, model_name, retrieved_sources = self._file_answer(content, attachments, prior_messages)
+                response_payload = {"answer": answer, "citations": retrieved_sources}
+            elif route == QuestionRoute.MULTIMODAL_QUERY:
+                answer, model_provider, model_name = self._vision_answer(content, attachments, prior_messages)
+                response_payload = {"answer": answer}
+            elif route == QuestionRoute.CLARIFICATION:
+                answer = "请补充要分析的指标、时间范围、区域或数据源。例如：今年华东区销售额是多少？"
+                response_payload = {"answer": answer, "required_slots": ["metric", "time", "region_or_datasource"]}
+            else:
+                status, error_code = "REFUSED", "UNSUPPORTED"
+                answer = "该请求不在只读 ChatBI 分析范围内，或当前账号没有执行权限。"
+                response_payload = {"answer": answer}
+        except VisionModelUnavailable:
+            status, error_code, answer = "FAILED", "VISION_MODEL_UNAVAILABLE", "当前没有可用的图片理解模型，请配置受支持的多模态模型后重试。"
+            response_payload = {"answer": answer}
+        except ModelUnavailable:
+            status, error_code, answer = "FAILED", "MODEL_UNAVAILABLE", "当前没有可用的外部模型，无法生成真实模型回答。"
+            response_payload = {"answer": answer}
+
+        elapsed_ms = round((perf_counter() - started) * 1000)
+        trace = {
+            "conversation_id": conversation.id,
+            "message_id": user_message.id,
+            "workspace_id": principal.workspace_id,
+            "user_id": principal.user_id,
+            "route": route.value,
+            "model_provider": model_provider,
+            "model_name": model_name,
+            "prompt_version": "phase2-chat-v1",
+            "semantic_model_version": (response_payload.get("analysis", {}).get("primary", {}) or {}).get("semantic_model_version"),
+            "retrieved_sources": retrieved_sources,
+            "tool_calls": tool_calls,
+            "sql_execution": sql_execution,
+            "fallback_reason": fallback_reason,
+            "elapsed_ms": elapsed_ms,
+        }
+        assistant = ChatMessage(
+            conversation_id=conversation.id,
+            workspace_id=principal.workspace_id,
+            user_id=principal.user_id,
+            parent_message_id=user_message.id,
+            role="assistant",
+            content=answer,
+            route=route.value,
+            status=status,
+            attachment_ids=[item.id for item in attachments],
+            response_payload=response_payload,
+            trace_payload=trace,
+            query_run_id=query_run_id,
+            error_code=error_code,
+        )
+        db.add(assistant)
+        conversation.active_attachment_ids = [item.id for item in attachments]
+        refresh_conversation_summary(conversation, content, slots)
+        record_audit(
+            db,
+            principal,
+            action="CHAT_MESSAGE",
+            resource_type="CONVERSATION",
+            resource_id=conversation.id,
+            status="SUCCESS" if status in {"SUCCEEDED", "PARTIAL"} else status,
+            details={"route": route.value, "error_code": error_code, "elapsed_ms": elapsed_ms},
+        )
+        db.commit()
+        db.refresh(user_message)
+        db.refresh(assistant)
+        db.refresh(conversation)
+        if progress:
+            progress("COMPLETED", {"status": status, "elapsed_ms": elapsed_ms})
+        return ChatResponse(conversation=_conversation(conversation), user_message=_message(user_message), assistant_message=_message(assistant))
+
+    def _file_answer(self, question: str, attachments: list[Attachment], messages: list[ChatMessage]):
+        if not attachments:
+            raise HTTPException(status_code=422, detail="FILE_QUERY_REQUIRES_ATTACHMENT")
+        sources = [{"attachment_id": item.id, "filename": item.filename, "kind": item.kind} for item in attachments]
+        context = []
+        for item in attachments:
+            payload = item.extracted_payload or {}
+            if item.kind == "STRUCTURED":
+                context.append({"attachment_id": item.id, "filename": item.filename, **payload})
+            elif item.kind == "DOCUMENT":
+                context.append({"attachment_id": item.id, "filename": item.filename, "text": str(payload.get("text", ""))[:60_000]})
+        reply = self.gateway.complete(
+            system=(
+                "Answer only from the supplied temporary attachment evidence. For tabular files, calculate only from provided profile/preview and state limits. "
+                "For documents, cite claims as [attachment:<id>]. If evidence is absent, say so; never use general knowledge as company evidence."
+            ),
+            user=json.dumps({"question": question, "attachments": context}, ensure_ascii=False),
+            history=_history(messages),
+        )
+        return reply.content, reply.provider, reply.model, sources
+
+    def _vision_answer(self, question: str, attachments: list[Attachment], messages: list[ChatMessage]):
+        images = [item for item in attachments if item.kind == "IMAGE"]
+        if not images:
+            raise HTTPException(status_code=422, detail="MULTIMODAL_QUERY_REQUIRES_IMAGE")
+        data_urls = [
+            f"data:{item.mime_type};base64,{base64.b64encode(attachment_path(item).read_bytes()).decode('ascii')}"
+            for item in images
+        ]
+        reply = self.gateway.complete(
+            system=(
+                "Analyze the supplied images for the user's ChatBI question. Describe only visible evidence. "
+                "Do not infer confidential business facts that are not visible."
+            ),
+            user=question,
+            history=_history(messages),
+            image_data_urls=data_urls,
+            vision=True,
+        )
+        return reply.content, reply.provider, reply.model

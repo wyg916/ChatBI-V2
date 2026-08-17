@@ -7,9 +7,8 @@ from app.models import AnswerVersion, Dashboard, DashboardCard, DataSource, Quer
 from app.services.datasources import build_connector
 
 
-def answer_summary(db: Session) -> dict[str, int | float]:
-    row = db.execute(
-        select(
+def answer_summary(db: Session, workspace_id: str | None = None) -> dict[str, int | float]:
+    statement = select(
             func.count(VerifiedAnswer.id),
             func.coalesce(func.avg(VerifiedAnswer.accuracy_percent), 0),
             func.coalesce(func.sum(VerifiedAnswer.monthly_adoption_count), 0),
@@ -20,7 +19,9 @@ def answer_summary(db: Session) -> dict[str, int | float]:
             func.coalesce(func.sum(case((VerifiedAnswer.status == "REJECTED", 1), else_=0)), 0),
             func.coalesce(func.sum(case((VerifiedAnswer.status == "DEPRECATED", 1), else_=0)), 0),
         )
-    ).one()
+    if workspace_id:
+        statement = statement.where(VerifiedAnswer.workspace_id == workspace_id)
+    row = db.execute(statement).one()
     return {
         "total": row[0],
         "average_accuracy": round(float(row[1]), 1),
@@ -42,8 +43,11 @@ def list_answers(
     tab: str = "all",
     page: int = 1,
     page_size: int = 6,
+    workspace_id: str | None = None,
 ) -> tuple[list[VerifiedAnswer], int]:
     statement = select(VerifiedAnswer)
+    if workspace_id:
+        statement = statement.where(VerifiedAnswer.workspace_id == workspace_id)
     if query.strip():
         keyword = f"%{query.strip()}%"
         statement = statement.where(or_(
@@ -71,15 +75,16 @@ def list_answers(
     return items, total
 
 
-def dashboard_summary(db: Session) -> dict[str, int]:
-    row = db.execute(
-        select(
+def dashboard_summary(db: Session, workspace_id: str | None = None) -> dict[str, int]:
+    statement = select(
             func.count(Dashboard.id),
             func.coalesce(func.sum(Dashboard.card_count), 0),
             func.coalesce(func.sum(case((Dashboard.is_shared.is_(True), 1), else_=0)), 0),
             func.coalesce(func.sum(Dashboard.refresh_count_today), 0),
         )
-    ).one()
+    if workspace_id:
+        statement = statement.where(Dashboard.workspace_id == workspace_id)
+    row = db.execute(statement).one()
     return {"total": row[0], "cards": row[1], "shared": row[2], "refreshes_today": row[3]}
 
 
@@ -90,8 +95,11 @@ def list_dashboards(
     sort: str = "recent",
     page: int = 1,
     page_size: int = 6,
+    workspace_id: str | None = None,
 ) -> tuple[list[Dashboard], int]:
     statement = select(Dashboard)
+    if workspace_id:
+        statement = statement.where(Dashboard.workspace_id == workspace_id)
     if query.strip():
         keyword = f"%{query.strip()}%"
         statement = statement.where(or_(Dashboard.name.ilike(keyword), Dashboard.description.ilike(keyword)))
@@ -120,7 +128,7 @@ def _percent_change(current: float, previous: float) -> float:
 def dashboard_detail(db: Session, dashboard: Dashboard) -> dict:
     datasource = db.scalar(
         select(DataSource)
-        .where(DataSource.type == "postgresql", DataSource.name == "Demo PostgreSQL")
+        .where(DataSource.type == "postgresql", DataSource.name == "Demo PostgreSQL", DataSource.workspace_id == dashboard.workspace_id)
         .order_by(DataSource.created_at)
     )
     if datasource is None:

@@ -44,6 +44,8 @@ def _project_secrets() -> dict[str, str]:
         "CHATBI_RAG_SHARED_SECRET": values.get("CHATBI_RAG_SHARED_SECRET") or secrets.token_urlsafe(48),
         "CHATBI_DEMO_POSTGRES_PASSWORD": reader_password,
         "CHATBI_DEMO_MYSQL_PASSWORD": values.get("CHATBI_DEMO_MYSQL_PASSWORD") or reader_password,
+        "CHATBI_BOOTSTRAP_ADMIN_PASSWORD": values.get("CHATBI_BOOTSTRAP_ADMIN_PASSWORD") or secrets.token_urlsafe(24),
+        "CHATBI_BOOTSTRAP_ANALYST_PASSWORD": values.get("CHATBI_BOOTSTRAP_ANALYST_PASSWORD") or secrets.token_urlsafe(24),
     })
     return values
 
@@ -138,8 +140,14 @@ def _bootstrap_mysql(admin_password: str, values: dict[str, str], reset_demo: bo
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--reset-demo", action="store_true", help="replace only the simulated demo schemas")
+    parser.add_argument("--auth-only", action="store_true", help="add missing local application login secrets without touching databases")
     args = parser.parse_args()
     values = _project_secrets()
+    if args.auth_only:
+        _write_env(values)
+        print("LOCAL_AUTH_CONFIGURATION=PASS")
+        print("PROJECT_ENV_WRITTEN=YES SESSION_TOKEN_GENERATED=NO")
+        return
     postgres_password = _admin_password("CHATBI_LOCAL_POSTGRES_ADMIN_PASSWORD", "Local PostgreSQL administrator password: ")
     mysql_password = _admin_password("CHATBI_LOCAL_MYSQL_ADMIN_PASSWORD", "Local MySQL administrator password: ")
     pg_orders, pg_kpis = _bootstrap_postgres(postgres_password, values, args.reset_demo)

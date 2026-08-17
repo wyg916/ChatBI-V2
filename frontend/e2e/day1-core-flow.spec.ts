@@ -1,4 +1,5 @@
 import { expect, test, type APIRequestContext } from '@playwright/test';
+import { adminCredentials } from './auth';
 
 const apiBase = process.env.CHATBI_API_BASE ?? 'http://127.0.0.1:8000/api/v1';
 
@@ -10,14 +11,16 @@ async function list<T>(request: APIRequestContext, path: string): Promise<T[]> {
 }
 
 test('登录页表单进入默认问数据首页', async ({ page }) => {
+  await page.context().clearCookies();
   await page.goto('/login');
   await expect(page.getByRole('heading', { name: '登录工作空间' })).toBeVisible();
-  await page.getByLabel('账号或电子名').fill('demo.user');
+  await page.getByLabel('账号或电子名').fill(adminCredentials.email);
+  await page.getByLabel('密码').fill(adminCredentials.password);
   await page.getByLabel('记住登录').uncheck();
   await page.getByRole('button', { name: '登录 ChatBI Studio' }).click();
 
   await expect(page).toHaveURL('/');
-  await expect(page.getByRole('heading', { name: '今天想了解哪些业务数据？' })).toBeVisible();
+  await expect(page.getByRole('textbox', { name: '输入业务问题' })).toBeVisible();
 });
 
 test('Day 1 数据源到语义模型核心流程', async ({ page, request }) => {
@@ -30,7 +33,7 @@ test('Day 1 数据源到语义模型核心流程', async ({ page, request }) => 
   const synchronizedSchemas = await list<Record<string, unknown>>(request, `/datasources/${sourceId}/schemas`);
   expect(synchronizedSchemas.length, '并行 worker 启动前应已完成隔离的 Schema fixture 同步').toBeGreaterThan(0);
 
-  await page.goto('/'); await expect(page.getByRole('heading', { name: '今天想了解哪些业务数据？' })).toBeVisible();
+  await page.goto('/?new=1'); await expect(page.getByRole('heading', { name: '今天想了解哪些业务数据？' })).toBeVisible();
   await page.getByRole('link', { name: /数据源/ }).click(); await expect(page.getByRole('heading', { name: '数据源', exact: true }).last()).toBeVisible();
   await page.goto(`/datasources/${sourceId}`); await expect(page.getByRole('heading', { name: 'Schema 与字段管理' })).toBeVisible();
   const table = page.getByTestId('schema-table').first(); await expect(table).toBeVisible(); await table.click(); await expect(page.getByTestId('column-table')).toBeVisible();

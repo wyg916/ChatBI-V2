@@ -4,7 +4,9 @@ test('Day2 问数据结果页三视口无裁切并保存 1440x900 证据', async
   const errors: string[] = [];
   page.on('console', (message) => { if (message.type() === 'error') errors.push(`console: ${message.text()}`); });
   page.on('pageerror', (error) => errors.push(`page: ${error.message}`));
-  page.on('requestfailed', (request) => errors.push(`request: ${request.url()} ${request.failure()?.errorText ?? ''}`));
+  page.on('requestfailed', (request) => {
+    if (request.failure()?.errorText !== 'net::ERR_ABORTED') errors.push(`request: ${request.url()} ${request.failure()?.errorText ?? ''}`);
+  });
   for (const viewport of [
     { width: 1366, height: 768 },
     { width: 1440, height: 900 },

@@ -1,5 +1,6 @@
 import { createBrowserRouter, Navigate } from 'react-router-dom';
 import { AppShell } from './components/AppShell';
+import { ProtectedRoute } from './auth';
 
 export const routeManifest = [
   { path: '/login', title: '登录页' },
@@ -21,8 +22,11 @@ export const routeManifest = [
 export const router = createBrowserRouter([
   { path: '/login', lazy: async () => ({ Component: (await import('./pages/LoginPage')).LoginPage }) },
   {
-    element: <AppShell />,
+    element: <ProtectedRoute />,
     children: [
+      {
+        element: <AppShell />,
+        children: [
       { path: '/', lazy: async () => ({ Component: (await import('./pages/AskPage')).AskPage }) },
       { path: '/ask/results', lazy: async () => {
         const { AskPage } = await import('./pages/AskPage');
@@ -39,6 +43,8 @@ export const router = createBrowserRouter([
       { path: '/evaluation/:id', lazy: async () => ({ Component: (await import('./pages/EvaluationDetailPage')).EvaluationDetailPage }) },
       { path: '/settings/models', lazy: async () => ({ Component: (await import('./pages/SettingsModelsPage')).SettingsModelsPage }) },
       { path: '/settings/security', lazy: async () => ({ Component: (await import('./pages/SecurityAuditPage')).SecurityAuditPage }) },
+        ],
+      },
     ],
   },
   { path: '*', element: <Navigate to="/" replace /> },

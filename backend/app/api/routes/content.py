@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from app.core.access import Principal, record_audit, require_permission
+from app.core.access import Principal, ensure_resource_access, record_audit, require_permission
 from app.db.session import get_db
 from app.models import Dashboard, DashboardCard, VerifiedAnswer
 from app.query.contracts import AskRequest, QueryResponse
@@ -43,10 +43,10 @@ def get_answers(
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=6, ge=1, le=100),
     db: Session = Depends(get_db),
-    _: Principal = Depends(require_permission("answer.read")),
+    principal: Principal = Depends(require_permission("answer.read")),
 ):
-    items, total = list_answers(db, query=query, tab=tab, page=page, page_size=page_size)
-    return {"summary": answer_summary(db), "items": items, "total": total, "page": page, "page_size": page_size}
+    items, total = list_answers(db, query=query, tab=tab, page=page, page_size=page_size, workspace_id=principal.workspace_id)
+    return {"summary": answer_summary(db, principal.workspace_id), "items": items, "total": total, "page": page, "page_size": page_size}
 
 
 @router.post("/answers", response_model=AnswerRead, status_code=status.HTTP_201_CREATED)
@@ -57,10 +57,9 @@ def create_answer(
 ):
     if data.status != "DRAFT":
         raise HTTPException(status_code=422, detail="Manually created answers must start as DRAFT")
-    workspace = default_workspace(db)
     sort_order = (db.scalar(select(func.coalesce(func.max(VerifiedAnswer.sort_order), 0))) or 0) + 1
     answer = VerifiedAnswer(
-        workspace_id=workspace.id,
+        workspace_id=principal.workspace_id,
         question=data.question,
         module=data.module,
         sql_synced=False,
@@ -82,11 +81,12 @@ def create_answer(
 def get_answer(
     answer_id: str,
     db: Session = Depends(get_db),
-    _: Principal = Depends(require_permission("answer.read")),
+    principal: Principal = Depends(require_permission("answer.read")),
 ):
     answer = db.get(VerifiedAnswer, answer_id)
     if answer is None:
         raise HTTPException(status_code=404, detail="Answer not found")
+    ensure_resource_access(db, principal, resource_type="ANSWER", resource_id=answer_id)
     return answer
 
 
@@ -100,6 +100,7 @@ def set_answer_status(
     answer = db.get(VerifiedAnswer, answer_id)
     if answer is None:
         raise HTTPException(status_code=404, detail="Answer not found")
+    ensure_resource_access(db, principal, resource_type="ANSWER", resource_id=answer_id)
     try:
         updated = update_answer_status(db, answer, status=data.status, feedback=data.feedback)
         record_audit(
@@ -121,6 +122,7 @@ def reuse_answer(
     answer = db.get(VerifiedAnswer, answer_id)
     if answer is None:
         raise HTTPException(status_code=404, detail="Answer not found")
+    ensure_resource_access(db, principal, resource_type="ANSWER", resource_id=answer_id)
     if answer.status != "VERIFIED" or not answer.datasource_id or not answer.semantic_model_id:
         raise HTTPException(status_code=422, detail="Only a complete VERIFIED answer can be reused")
     run = QueryPipeline().execute(db, AskRequest(
@@ -142,10 +144,10 @@ def get_dashboards(
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=6, ge=1, le=100),
     db: Session = Depends(get_db),
-    _: Principal = Depends(require_permission("dashboard.read")),
+    principal: Principal = Depends(require_permission("dashboard.read")),
 ):
-    items, total = list_dashboards(db, query=query, sort=sort, page=page, page_size=page_size)
-    return {"summary": dashboard_summary(db), "items": items, "total": total, "page": page, "page_size": page_size}
+    items, total = list_dashboards(db, query=query, sort=sort, page=page, page_size=page_size, workspace_id=principal.workspace_id)
+    return {"summary": dashboard_summary(db, principal.workspace_id), "items": items, "total": total, "page": page, "page_size": page_size}
 
 
 @router.post("/dashboards", response_model=DashboardRead, status_code=status.HTTP_201_CREATED)
@@ -154,10 +156,9 @@ def create_dashboard(
     db: Session = Depends(get_db),
     principal: Principal = Depends(require_permission("dashboard.manage")),
 ):
-    workspace = default_workspace(db)
     sort_order = (db.scalar(select(func.coalesce(func.max(Dashboard.sort_order), 0))) or 0) + 1
     dashboard = Dashboard(
-        workspace_id=workspace.id,
+        workspace_id=principal.workspace_id,
         name=data.name,
         description=data.description,
         card_count=data.card_count,
@@ -177,11 +178,12 @@ def create_dashboard(
 def get_dashboard_detail(
     dashboard_id: str,
     db: Session = Depends(get_db),
-    _: Principal = Depends(require_permission("dashboard.read")),
+    principal: Principal = Depends(require_permission("dashboard.read")),
 ):
     dashboard = db.get(Dashboard, dashboard_id)
     if dashboard is None:
         raise HTTPException(status_code=404, detail="Dashboard not found")
+    ensure_resource_access(db, principal, resource_type="DASHBOARD", resource_id=dashboard_id)
     try:
         return dashboard_detail(db, dashboard)
     except LookupError as exc:
@@ -198,9 +200,11 @@ def add_dashboard_card(
     dashboard = db.get(Dashboard, dashboard_id)
     if dashboard is None:
         raise HTTPException(status_code=404, detail="Dashboard not found")
+    ensure_resource_access(db, principal, resource_type="DASHBOARD", resource_id=dashboard_id)
     answer = db.get(VerifiedAnswer, data.answer_id)
     if answer is None:
         raise HTTPException(status_code=404, detail="Answer not found")
+    ensure_resource_access(db, principal, resource_type="ANSWER", resource_id=answer.id)
     try:
         card = create_dashboard_card(db, dashboard, answer=answer, data=data)
     except ValueError as exc:
@@ -225,6 +229,7 @@ def refresh_card(
     db: Session = Depends(get_db),
     principal: Principal = Depends(require_permission("dashboard.manage")),
 ):
+    ensure_resource_access(db, principal, resource_type="DASHBOARD", resource_id=dashboard_id)
     try:
         card = refresh_dashboard_card(db, _card_or_404(db, dashboard_id, card_id))
     except ValueError as exc:
@@ -242,6 +247,7 @@ def delete_card(
     db: Session = Depends(get_db),
     principal: Principal = Depends(require_permission("dashboard.manage")),
 ):
+    ensure_resource_access(db, principal, resource_type="DASHBOARD", resource_id=dashboard_id)
     card = _card_or_404(db, dashboard_id, card_id)
     dashboard = db.get(Dashboard, dashboard_id)
     db.delete(card)

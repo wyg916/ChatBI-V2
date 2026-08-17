@@ -1,9 +1,10 @@
-import { request, type FullConfig } from '@playwright/test';
-
-const apiBase = process.env.CHATBI_API_BASE ?? 'http://127.0.0.1:8000/api/v1';
+import fs from 'node:fs';
+import path from 'node:path';
+import type { FullConfig } from '@playwright/test';
+import { adminCredentials, adminStorageState, apiBase, loginApi } from './auth';
 
 export default async function globalSetup(_: FullConfig) {
-  const api = await request.newContext();
+  const api = await loginApi(adminCredentials.email, adminCredentials.password);
   try {
     const sourceResponse = await api.get(`${apiBase}/datasources`);
     if (!sourceResponse.ok()) throw new Error(`Datasource fixture discovery failed: HTTP ${sourceResponse.status()}`);
@@ -23,6 +24,8 @@ export default async function globalSetup(_: FullConfig) {
         throw new Error(`${dialect} metadata fixture is empty after synchronization`);
       }
     }
+    fs.mkdirSync(path.dirname(adminStorageState), { recursive: true });
+    await api.storageState({ path: adminStorageState });
   } finally {
     await api.dispose();
   }

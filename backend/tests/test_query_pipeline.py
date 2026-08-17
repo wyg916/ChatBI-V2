@@ -166,6 +166,14 @@ def test_day4_planner_supports_growth_ratio_null_and_date_boundaries(dialect):
     guarded = SqlGuard().validate(growth.generated_sql, dialect=dialect, policy=policy())
     assert guarded.allowed is True, guarded.issues
 
+    yoy = provider.plan(question="华南今年收入同比去年", context=context)
+    assert yoy.metrics == ["revenue", "revenue_yoy"]
+    assert "JOIN" in yoy.generated_sql and "region_name" in yoy.generated_sql
+    assert "LAG(revenue, 12)" in yoy.generated_sql
+    assert "WHERE month" in yoy.generated_sql
+    guarded = SqlGuard().validate(yoy.generated_sql, dialect=dialect, policy=policy())
+    assert guarded.allowed is True, guarded.issues
+
 
 @pytest.mark.parametrize(
     ("provider_id", "secret_field", "expected_url", "auth_header", "max_tokens_field"),

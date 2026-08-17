@@ -334,13 +334,15 @@ def test_tool_executor_rejects_unknown_tool_without_direct_db_access(db_session)
     assert result.error_code == "UNAUTHORIZED_TOOL_CALL"
 
 
-def test_question_router_preserves_data_default_and_four_routes():
+def test_question_router_covers_governed_data_knowledge_complex_and_general_routes():
     router = QuestionRouter()
     assert router.classify("最近订单有多少") == QuestionRoute.DATA_QUERY
     assert router.classify("收入指标口径是什么") == QuestionRoute.HYBRID_ANALYSIS
     assert router.classify("权限制度说明") == QuestionRoute.KNOWLEDGE_QUERY
     assert router.classify("请综合分析收入变化") == QuestionRoute.COMPLEX_ANALYSIS
-    assert router.classify("hello") == QuestionRoute.DATA_QUERY
+    assert router.classify("hello") == QuestionRoute.GENERAL_CHAT
+    assert router.classify("SELECT order_id FROM demo_business.orders WHERE 1 = 0") == QuestionRoute.DATA_QUERY
+    assert router.classify("DELETE FROM demo_business.orders") == QuestionRoute.DATA_QUERY
 
 
 def test_feature_modes_are_deterministic_and_safe():
@@ -447,7 +449,7 @@ def test_knowledge_route_on_publishes_only_verified_citations(db_session, monkey
                 datasource_id=datasource.id,
                 semantic_model_id=model.id,
             ),
-            Principal(None, workspace_id, "admin@chatbi.local", "Admin", "ADMIN"),
+            Principal("test-admin", workspace_id, "admin@chatbi.local", "Admin", "ADMIN"),
         )
     finally:
         get_settings.cache_clear()
@@ -472,7 +474,7 @@ def test_knowledge_rag_failure_falls_back_to_verified_query(db_session, monkeypa
             datasource_id=datasource.id,
             semantic_model_id=model.id,
         ),
-        Principal(None, datasource.workspace_id, "admin@chatbi.local", "Admin", "ADMIN"),
+        Principal("test-admin", datasource.workspace_id, "admin@chatbi.local", "Admin", "ADMIN"),
     )
     assert response.status == "SUCCEEDED"
     assert response.fallback_used is True
@@ -526,7 +528,7 @@ def test_failed_complex_query_returns_structured_failed_fallback(db_session):
             semantic_model_id=model.id,
             idempotency_key="failed-query-fallback-test",
         ),
-        Principal(None, datasource.workspace_id, "admin@chatbi.local", "Admin", "ADMIN"),
+        Principal("test-admin", datasource.workspace_id, "admin@chatbi.local", "Admin", "ADMIN"),
     )
     assert response.status == "FAILED"
     assert response.fallback_used is True

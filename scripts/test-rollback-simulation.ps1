@@ -9,7 +9,7 @@ $python = Join-Path $projectRoot 'backend\.venv\Scripts\python.exe'
 $schema = 'chatbi_release_rollback_' + (Get-Date -Format 'yyyyMMddHHmmss') + '_' + $PID
 $previousSha = '4ec4f0eb8e4060cec035d76b1ffbe32d8f80fce0'
 $previousMigration = '20260817_0007'
-$finalMigration = '20260817_0008'
+$finalMigration = '20260818_0009'
 $portOffset = $PID % 1000
 $previousPort = 20000 + $portOffset
 $finalPort = 21000 + $portOffset
@@ -68,19 +68,33 @@ function Wait-Backend {
 function Invoke-CoreChecks {
   param([int]$Port)
   $apiBase = "http://127.0.0.1:${Port}/api/v1"
-  $sources = Invoke-RestMethod -Uri "$apiBase/datasources" -TimeoutSec 10
+  $requestSession = @{}
+  try {
+    $adminPassword = $env:CHATBI_BOOTSTRAP_ADMIN_PASSWORD
+    if($adminPassword) {
+      $webSession = New-Object Microsoft.PowerShell.Commands.WebRequestSession
+      $adminEmail = if($env:CHATBI_BOOTSTRAP_ADMIN_EMAIL) { $env:CHATBI_BOOTSTRAP_ADMIN_EMAIL } else { 'admin@chatbi.local' }
+      $loginBody = @{ email = $adminEmail; password = $adminPassword; remember = $false } | ConvertTo-Json
+      $login = Invoke-RestMethod -Method Post -Uri "$apiBase/auth/login" -WebSession $webSession -ContentType 'application/json' -Body $loginBody -TimeoutSec 10
+      if($login.authenticated) { $requestSession = @{ WebSession = $webSession } }
+    }
+  } catch {
+    # The previous safe baseline predates Phase 2 authentication and is checked anonymously.
+    $requestSession = @{}
+  }
+  $sources = Invoke-RestMethod -Uri "$apiBase/datasources" @requestSession -TimeoutSec 10
   foreach($source in $sources) {
-    $sync = Invoke-RestMethod -Method Post -Uri "$apiBase/datasources/$($source.id)/sync" -TimeoutSec 30
+    $sync = Invoke-RestMethod -Method Post -Uri "$apiBase/datasources/$($source.id)/sync" @requestSession -TimeoutSec 30
     if(-not $sync.success) { throw 'Rollback datasource sync failed' }
   }
   $postgres = $sources | Where-Object { $_.type -eq 'postgresql' } | Select-Object -First 1
-  $models = Invoke-RestMethod -Uri "$apiBase/semantic-models" -TimeoutSec 10
+  $models = Invoke-RestMethod -Uri "$apiBase/semantic-models" @requestSession -TimeoutSec 10
   $model = $models | Where-Object { $_.datasource_id -eq $postgres.id -and $_.status -eq 'PUBLISHED' } | Select-Object -First 1
   if(-not $postgres -or -not $model) { throw 'Rollback seed verification failed' }
   $body = @{ question = '统计订单数量'; datasource_id = $postgres.id; semantic_model_id = $model.id } | ConvertTo-Json
-  $ask = Invoke-RestMethod -Method Post -Uri "$apiBase/ask" -ContentType 'application/json' -Body $body -TimeoutSec 30
+  $ask = Invoke-RestMethod -Method Post -Uri "$apiBase/ask" @requestSession -ContentType 'application/json' -Body $body -TimeoutSec 30
   if($ask.status -ne 'SUCCEEDED' -or $ask.oracle.status -ne 'PASSED') { throw 'Rollback Ask verification failed' }
-  $evaluation = Invoke-RestMethod -Method Post -Uri "$apiBase/evaluation/runs" -TimeoutSec 120
+  $evaluation = Invoke-RestMethod -Method Post -Uri "$apiBase/evaluation/runs" @requestSession -TimeoutSec 120
   if($evaluation.run.status -ne 'PASS' -or $evaluation.run.golden_set_count -ne 50) {
     throw 'Rollback Evaluation verification failed'
   }

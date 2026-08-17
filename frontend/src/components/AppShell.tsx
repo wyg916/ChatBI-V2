@@ -1,5 +1,6 @@
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
 import onlineIcon from '../assets/semantic/online.svg';
+import { useAuth } from '../auth';
 
 const navItems = [
   { to: '/', label: '问数据', icon: '问', exact: true },
@@ -20,6 +21,7 @@ const titles: Record<string, [string, string]> = {
 };
 
 export function AppShell() {
+  const { user, logout } = useAuth();
   const { pathname } = useLocation();
   const key = Object.keys(titles).find((path) => path !== '/' && pathname.startsWith(path)) ?? '/';
   const [crumb, title] = titles[key];
@@ -65,7 +67,7 @@ export function AppShell() {
                     ? '权限策略 · UI 演示'
                     : '数据环境：正式分析库⌄';
   return (
-    <div className="app-shell">
+    <div className={isAskRoute ? 'app-shell ask-shell' : 'app-shell'}>
       <aside className="sidebar">
         <div className="brand"><span className="brand-mark">BI</span><div><strong>ChatBI Studio</strong><small>AI NATIVE ANALYTICS</small></div></div>
         <div className="side-divider" />
@@ -76,7 +78,7 @@ export function AppShell() {
         <div className="nav-caption manage">管理</div>
         <NavLink to="/settings/models" className={isSettings ? 'nav-item active' : 'nav-item'}><span>设</span>系统设置</NavLink>
         <div className="side-spacer" />
-        <NavLink to="/settings/security" className="user-card"><span>王</span><div><strong>王迎港</strong><small>管理员 · 数据分析部</small></div></NavLink>
+        <div className="user-card"><NavLink to="/settings/security"><span>{user.display_name.slice(0, 1)}</span><div><strong>{user.display_name}</strong><small>{user.role} · 当前工作空间</small></div></NavLink><button type="button" aria-label="退出登录" onClick={() => void logout()}>退出</button></div>
         <small className="version">v1.0.1 · 开源企业版</small>
       </aside>
       <div className="app-frame">

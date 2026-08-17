@@ -13,6 +13,7 @@ from app.models import (
     QueryRun,
     SemanticModel,
     VerifiedAnswer,
+    Workspace,
 )
 from app.chart import ChartEngine
 from app.insight import NarrativeEngine
@@ -47,7 +48,7 @@ def _audit(db: Session, run: QueryRun, event_type: str, status: str, details: di
     ))
 
 
-def _select_runtime(db: Session, request: AskRequest) -> tuple[DataSource, SemanticModel]:
+def _select_runtime(db: Session, request: AskRequest, workspace_id: str | None = None) -> tuple[DataSource, SemanticModel]:
     if request.semantic_model_id:
         model = db.get(SemanticModel, request.semantic_model_id)
     elif request.datasource_id:
@@ -57,17 +58,24 @@ def _select_runtime(db: Session, request: AskRequest) -> tuple[DataSource, Seman
             .order_by((SemanticModel.status == "PUBLISHED").desc(), SemanticModel.created_at.asc(), SemanticModel.id.asc())
         )
     else:
-        model = db.scalar(
+        statement = (
             select(SemanticModel)
             .join(DataSource, DataSource.id == SemanticModel.datasource_id)
             .where(DataSource.type == "postgresql")
             .order_by((SemanticModel.status == "PUBLISHED").desc(), SemanticModel.created_at.asc(), SemanticModel.id.asc())
         )
+        if workspace_id:
+            statement = statement.where(SemanticModel.workspace_id == workspace_id)
+        model = db.scalar(statement)
     if model is None:
         raise LookupError("No semantic model is available")
+    if workspace_id and model.workspace_id != workspace_id:
+        raise PermissionError("Semantic model belongs to another workspace")
     datasource = db.get(DataSource, request.datasource_id or model.datasource_id)
     if datasource is None:
         raise LookupError("No datasource is available")
+    if workspace_id and datasource.workspace_id != workspace_id:
+        raise PermissionError("Datasource belongs to another workspace")
     if request.semantic_model_id and model.datasource_id != datasource.id:
         raise ValueError("Semantic model and datasource do not match")
     if datasource.type not in {"postgresql", "mysql"}:
@@ -162,8 +170,14 @@ class QueryPipeline:
 
     def execute(self, db: Session, request: AskRequest, principal: Principal | None = None) -> QueryRun:
         settings = get_settings()
-        workspace = default_workspace(db)
-        datasource, model = _select_runtime(db, request)
+        workspace = db.get(Workspace, principal.workspace_id) if principal and principal.workspace_id else default_workspace(db)
+        if workspace is None:
+            raise PermissionError("Workspace is unavailable")
+        if principal is not None and request.datasource_id:
+            ensure_resource_access(db, principal, resource_type="DATASOURCE", resource_id=request.datasource_id, query=True)
+        if principal is not None and request.semantic_model_id:
+            ensure_resource_access(db, principal, resource_type="SEMANTIC_MODEL", resource_id=request.semantic_model_id, query=True)
+        datasource, model = _select_runtime(db, request, workspace.id)
         if principal is not None:
             ensure_resource_access(db, principal, resource_type="DATASOURCE", resource_id=datasource.id, query=True)
             ensure_resource_access(db, principal, resource_type="SEMANTIC_MODEL", resource_id=model.id, query=True)

@@ -3,6 +3,7 @@ from datetime import timedelta
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.core.auth import hash_password
 from app.core.config import get_settings
 from app.core.security import encrypt_secret
 from app.models import (
@@ -35,9 +36,10 @@ def _ensure_day4_access_control(
     semantic_model_id: str,
 ) -> None:
     users: dict[str, AppUser] = {}
-    for email, display_name, role in [
-        ("admin@chatbi.local", "ChatBI Administrator", "ADMIN"),
-        ("analyst@chatbi.local", "ChatBI Analyst", "ANALYST"),
+    settings = get_settings()
+    for email, display_name, role, password in [
+        ("admin@chatbi.local", "ChatBI Administrator", "ADMIN", settings.bootstrap_admin_password.get_secret_value()),
+        ("analyst@chatbi.local", "ChatBI Analyst", "ANALYST", settings.bootstrap_analyst_password.get_secret_value()),
     ]:
         user = db.scalar(select(AppUser).where(AppUser.email == email))
         if user is None:
@@ -47,6 +49,9 @@ def _ensure_day4_access_control(
             )
             db.add(user)
             db.flush()
+        if not user.password_hash and password:
+            user.password_hash = hash_password(password)
+            user.password_changed_at = utcnow()
         users[email] = user
     analyst = users["analyst@chatbi.local"]
     for resource_type, resource_id, can_query in [

@@ -137,3 +137,11 @@ P0 全部通过后，允许把专业知识 RAG 与复杂 ChatBI 分析的有限�
 ## ADR-030：受控 RAG 与最小 Multi-Agent 是 V1/P0 必选能力
 
 最终产品决策冻结四类路由、真实 HMAC RAG Bridge、Workspace/用户/角色映射、ACL/Citation/Answer Guard，以及固定五角色、六工具、8/12/2/2/30s 硬预算的复杂分析编排。默认模式均为 `on`；通用 RAG/Agent 平台仍禁止。旧项目二生产源码复制数保持 0，六个 Prompt 独立改写并记录来源、用途和 checksum。完整决策见 `docs/decisions/ADR_030_RAG_MULTIAGENT_V1_REQUIRED.md`。
+
+## ADR-031：所有用户输入统一进入持久化 Chat Runtime
+
+Phase 2 起，普通输入、示例问题、推荐追问、文件和图片都通过 Conversation/Message 主资源进入同一 Chat/SSE 入口。路由覆盖 DATA、KNOWLEDGE、HYBRID、COMPLEX、GENERAL、FILE、MULTIMODAL、CLARIFICATION、UNSUPPORTED；DATA_QUERY 保持确定性可验证管线，其余路由按受控 RAG/Agent 或真实模型执行。完整问题到固定答案/SQL 的映射、模型不可用时的伪答案和附件宿主机路径回传均禁止。Trace 只保存公开执行证据，不保存模型隐私推理。
+
+## ADR-032：服务端会话是唯一身份边界，一键启动保持匿名安全
+
+前端路由守卫只负责体验，所有受保护 API 必须从 HttpOnly Cookie 或显式 Bearer 会话解析已持久化用户与 Workspace；数据库只保存会话 Token 哈希。缺失、过期、撤销会话返回 401，已认证但越权返回 403，客户端身份头不能替代认证。一键启动只启动服务、检查公开健康端点并确认受保护端点匿名返回 401，不创建匿名用户、不登录、不生成浏览器 Token，也不写 localStorage 或 Token URL。

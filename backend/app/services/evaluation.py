@@ -16,6 +16,7 @@ from app.evaluation import DANGEROUS_SQL_CASES
 from app.models import DataSource, EvaluationCaseResult, EvaluationRun, SemanticModel
 from app.query.context_builder import ContextBuilder
 from app.query.contracts import AskRequest, ExpectedResult
+from app.core.access import Principal
 from app.query.service import QueryPipeline
 from app.query.sql_guard import SqlGuard
 from app.services.datasources import default_workspace
@@ -54,8 +55,8 @@ def load_golden_manifest() -> dict[str, Any]:
     return manifest
 
 
-def evaluation_overview(db: Session) -> dict:
-    comparisons = list(db.scalars(select(EvaluationRun).order_by(EvaluationRun.sort_order, EvaluationRun.completed_at.desc())))
+def evaluation_overview(db: Session, workspace_id: str) -> dict:
+    comparisons = list(db.scalars(select(EvaluationRun).where(EvaluationRun.workspace_id == workspace_id).order_by(EvaluationRun.sort_order, EvaluationRun.completed_at.desc())))
     if not comparisons:
         raise LookupError("No evaluation records are available")
     current = next((run for run in comparisons if run.is_current), comparisons[0])
@@ -69,8 +70,8 @@ def evaluation_overview(db: Session) -> dict:
     return {"current": current, "metrics": metrics, "comparisons": comparisons}
 
 
-def _runtime(db: Session, dialect: str) -> tuple[DataSource, SemanticModel]:
-    datasource = db.scalar(select(DataSource).where(DataSource.type == dialect).order_by(DataSource.created_at))
+def _runtime(db: Session, dialect: str, workspace_id: str) -> tuple[DataSource, SemanticModel]:
+    datasource = db.scalar(select(DataSource).where(DataSource.type == dialect, DataSource.workspace_id == workspace_id).order_by(DataSource.created_at))
     if datasource is None:
         raise LookupError(f"No {dialect} datasource is configured")
     model = db.scalar(
@@ -130,11 +131,16 @@ def _error_category(*, execution_ok: bool, result_ok: bool, semantic_ok: bool, e
     return None
 
 
-def _security_regression(db: Session) -> tuple[int, int]:
+def _security_regression(db: Session, workspace_id: str) -> tuple[int, int]:
     workspace = default_workspace(db)
+    if workspace.id != workspace_id:
+        from app.models import Workspace
+        workspace = db.get(Workspace, workspace_id)
+    if workspace is None:
+        raise LookupError("Workspace not found")
     policies = {}
     for dialect in {item[0] for item in DANGEROUS_SQL_CASES}:
-        datasource, model = _runtime(db, dialect)
+        datasource, model = _runtime(db, dialect, workspace_id)
         policies[dialect] = ContextBuilder().build(
             db, question="危险 SQL 安全回归", workspace=workspace,
             datasource=datasource, semantic_model=model, row_limit=100,
@@ -147,13 +153,13 @@ def _security_regression(db: Session) -> tuple[int, int]:
     return len(DANGEROUS_SQL_CASES), blocked
 
 
-def run_golden_evaluation(db: Session) -> EvaluationRun:
+def run_golden_evaluation(db: Session, principal: Principal) -> EvaluationRun:
     manifest = load_golden_manifest()
-    workspace = default_workspace(db)
-    datasource, model = _runtime(db, "postgresql")
+    workspace_id = principal.workspace_id
+    datasource, model = _runtime(db, "postgresql", workspace_id)
     started = time.perf_counter()
     run = EvaluationRun(
-        workspace_id=workspace.id, release_name="ChatBI V2 Day 4 Golden 50",
+        workspace_id=workspace_id, release_name="ChatBI V2 Day 4 Golden 50",
         model_name="Local Runtime Provider", status="RUNNING", is_current=False,
         golden_set_count=len(manifest["cases"]), manifest_sha256=manifest["manifest_sha256"],
         completed_at=datetime.now(timezone.utc), sort_order=0,
@@ -166,7 +172,7 @@ def run_golden_evaluation(db: Session) -> EvaluationRun:
         query = pipeline.execute(db, AskRequest(
             question=case["question"], datasource_id=datasource.id,
             semantic_model_id=model.id, row_limit=500,
-        ))
+        ), principal=principal)
         plan = query.plan_payload or {}
         execution = query.execution_payload or {}
         execution_ok = execution.get("status") == "SUCCEEDED"
@@ -205,7 +211,7 @@ def run_golden_evaluation(db: Session) -> EvaluationRun:
         )
         db.add(item)
         case_rows.append(item)
-    dangerous_total, dangerous_blocked = _security_regression(db)
+    dangerous_total, dangerous_blocked = _security_regression(db, workspace_id)
     execution_pass = sum(item.execution_ok for item in case_rows)
     result_pass = sum(item.result_ok for item in case_rows)
     semantic_pass = sum(item.semantic_ok for item in case_rows)
@@ -244,9 +250,9 @@ def run_golden_evaluation(db: Session) -> EvaluationRun:
     return run
 
 
-def evaluation_run_detail(db: Session, run_id: str) -> tuple[EvaluationRun, list[EvaluationCaseResult]]:
+def evaluation_run_detail(db: Session, run_id: str, workspace_id: str) -> tuple[EvaluationRun, list[EvaluationCaseResult]]:
     run = db.get(EvaluationRun, run_id)
-    if run is None:
+    if run is None or run.workspace_id != workspace_id:
         raise LookupError("Evaluation run not found")
     cases = list(db.scalars(
         select(EvaluationCaseResult).where(EvaluationCaseResult.evaluation_run_id == run.id).order_by(EvaluationCaseResult.case_id)
@@ -254,11 +260,11 @@ def evaluation_run_detail(db: Session, run_id: str) -> tuple[EvaluationRun, list
     return run, cases
 
 
-def evaluation_case_detail(db: Session, case_ref: str) -> tuple[EvaluationRun, EvaluationCaseResult, str | None, str | None]:
+def evaluation_case_detail(db: Session, case_ref: str, workspace_id: str) -> tuple[EvaluationRun, EvaluationCaseResult, str | None, str | None]:
     case = db.scalar(
         select(EvaluationCaseResult)
         .join(EvaluationRun, EvaluationRun.id == EvaluationCaseResult.evaluation_run_id)
-        .where(or_(EvaluationCaseResult.id == case_ref, EvaluationCaseResult.case_id == case_ref))
+        .where(EvaluationRun.workspace_id == workspace_id, or_(EvaluationCaseResult.id == case_ref, EvaluationCaseResult.case_id == case_ref))
         .order_by(EvaluationRun.is_current.desc(), EvaluationRun.completed_at.desc())
     )
     if case is None:

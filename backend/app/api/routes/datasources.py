@@ -51,13 +51,13 @@ def _read_datasource(datasource: DataSource, table_count: int = 0, column_count:
 
 
 @router.post("", response_model=DataSourceRead, status_code=status.HTTP_201_CREATED)
-def create_datasource(data: DataSourceCreate, db: Session = Depends(get_db), _: Principal = Depends(require_permission("datasource.manage"))):
-    return service.create_datasource(db, data)
+def create_datasource(data: DataSourceCreate, db: Session = Depends(get_db), principal: Principal = Depends(require_permission("datasource.manage"))):
+    return service.create_datasource(db, data, principal.workspace_id)
 
 
 @router.get("", response_model=list[DataSourceRead])
 def list_datasources(db: Session = Depends(get_db), principal: Principal = Depends(require_permission("datasource.read"))):
-    datasources = list(db.scalars(select(DataSource).order_by(DataSource.created_at.desc())))
+    datasources = list(db.scalars(select(DataSource).where(DataSource.workspace_id == principal.workspace_id).order_by(DataSource.created_at.desc())))
     datasources = [item for item in datasources if has_resource_access(db, principal, resource_type="DATASOURCE", resource_id=item.id)]
     table_counts, column_counts = _datasource_counts(db)
     return [
@@ -75,7 +75,8 @@ def get_datasource(datasource_id: str, db: Session = Depends(get_db), principal:
 
 
 @router.put("/{datasource_id}", response_model=DataSourceRead)
-def update_datasource(datasource_id: str, data: DataSourceUpdate, db: Session = Depends(get_db), _: Principal = Depends(require_permission("datasource.manage"))):
+def update_datasource(datasource_id: str, data: DataSourceUpdate, db: Session = Depends(get_db), principal: Principal = Depends(require_permission("datasource.manage"))):
+    ensure_resource_access(db, principal, resource_type="DATASOURCE", resource_id=datasource_id)
     datasource = service.update_datasource(db, _get_or_404(db, datasource_id), data)
     table_counts, column_counts = _datasource_counts(db)
     return _read_datasource(
@@ -86,7 +87,8 @@ def update_datasource(datasource_id: str, data: DataSourceUpdate, db: Session = 
 
 
 @router.delete("/{datasource_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_datasource(datasource_id: str, db: Session = Depends(get_db), _: Principal = Depends(require_permission("datasource.manage"))):
+def delete_datasource(datasource_id: str, db: Session = Depends(get_db), principal: Principal = Depends(require_permission("datasource.manage"))):
+    ensure_resource_access(db, principal, resource_type="DATASOURCE", resource_id=datasource_id)
     db.delete(_get_or_404(db, datasource_id))
     db.commit()
     return Response(status_code=status.HTTP_204_NO_CONTENT)
@@ -109,6 +111,7 @@ def sync_datasource(
     db: Session = Depends(get_db),
     principal: Principal = Depends(require_permission("datasource.manage")),
 ):
+    ensure_resource_access(db, principal, resource_type="DATASOURCE", resource_id=datasource_id)
     datasource = _get_or_404(db, datasource_id)
     try:
         counts = service.sync_datasource(db, datasource)

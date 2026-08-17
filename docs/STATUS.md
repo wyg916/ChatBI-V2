@@ -1,5 +1,13 @@
 # 项目状态
 
+## 2026-08-18
+
+- Phase 2 真实问答、认证、会话与多模态闭环达到预提交硬门槛：开放式 60/60、Trace 60/60、连续追问 10/10，数据 SQL/结果、知识引用、文件与图片准确率均为 1.0，不支持请求幻觉为 0。
+- 统一 Chat/SSE 入口覆盖九类正式路由；DATA_QUERY 继续复用 Semantic/NL2SQL/SQL Guard/只读执行/Result Oracle，GENERAL/FILE/IMAGE 使用真实配置模型且不可用时返回明确错误。
+- 服务端 HttpOnly 会话、登录限流、RBAC/Workspace/用户隔离和统一前端守卫已完成；匿名 API、无效会话为 401，跨 Workspace/附件为 403，logout 只撤销当前会话。一键启动不自动登录或写 Token。
+- Frontend 多轮会话、底部固定输入框、Enter/Shift+Enter/IME、停止/重试、滚动跟随、文件拖拽/粘贴/进度/删除已完成；11 类文件格式解析和真实图片问答通过。
+- 预提交门禁：Backend 134/134、Frontend 29/29、TypeScript/Build、Migration 1/1、Playwright 55/55 均 PASS；一键启动从停止状态连续两轮 20.09 秒与 18.98 秒 PASS，三个服务最终 healthy；临时 PostgreSQL Schema 的独立发布冷启动 48.8 秒 PASS。最终 clean SHA 复验和提交状态以交付输出为准，未创建 Final Tag。详见 `docs/evidence/phase2/README.md`。
+
 ## 2026-08-17
 
 - Day 5 RAG + Multi-Agent Final Closure 全部门禁 PASS：RAG Golden 120/120、Recall@10 1.0、Citation Accuracy 1.0、越权检索 0；Complex Analysis 10/10、Trace 100%；Backend 127/127、Frontend 27/27、串行 E2E 51/51、并行 E2E 5 workers 连续三轮 153/153、Golden PostgreSQL 50/50 与 MySQL 10/10。隔离冷启动 72.3 秒；完整停止后的一键启动 Run1 54.5 秒、Run2 33.2 秒；三家 Provider Live Smoke、Migration、Secret Scan、License 与安全回滚模拟均通过。最终 Git/远端/annotated tag 以 `docs/status/DAY5_STATUS.md` 和发布返回为准。

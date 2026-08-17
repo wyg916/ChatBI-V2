@@ -29,6 +29,7 @@ $result = [ordered]@{
   demo_data = 'NOT_RUN'
   backend = 'NOT_RUN'
   frontend = 'NOT_RUN'
+  authentication = 'NOT_RUN'
   ask = 'NOT_RUN'
   evaluation = 'NOT_RUN'
   model_provider_configuration = 'NOT_RUN'
@@ -72,15 +73,24 @@ try {
   $result.frontend = 'HTTP_200'
 
   $result.stage = 'MIGRATION'
-  $migration = (& docker compose exec -T backend alembic current 2>&1 | Out-String)
-  if($LASTEXITCODE -ne 0 -or $migration -notmatch '20260817_0008') { throw 'Migration head mismatch' }
-  $result.migration = '20260817_0008_HEAD'
+  $migration = (& docker compose exec -T backend sh -c 'alembic current 2>&1' | Out-String)
+  if($LASTEXITCODE -ne 0 -or $migration -notmatch '20260818_0009') { throw 'Migration head mismatch' }
+  $result.migration = '20260818_0009_HEAD'
+
+  $adminPassword = $localEnv['CHATBI_BOOTSTRAP_ADMIN_PASSWORD']
+  if(-not $adminPassword) { throw 'CHATBI_BOOTSTRAP_ADMIN_PASSWORD is missing from local .env' }
+  $adminEmail = if($localEnv['CHATBI_BOOTSTRAP_ADMIN_EMAIL']) { $localEnv['CHATBI_BOOTSTRAP_ADMIN_EMAIL'] } else { 'admin@chatbi.local' }
+  $webSession = New-Object Microsoft.PowerShell.Commands.WebRequestSession
+  $loginBody = @{ email = $adminEmail; password = $adminPassword; remember = $false } | ConvertTo-Json
+  $login = Invoke-RestMethod -Method Post -Uri "$apiBase/auth/login" -WebSession $webSession -ContentType 'application/json' -Body $loginBody -TimeoutSec 10
+  if(-not $login.authenticated -or $login.user.role -ne 'ADMIN') { throw 'Cold start authentication failed' }
+  $result.authentication = 'ADMIN_SESSION_READY_TOKEN_NOT_RECORDED'
 
   $result.stage = 'DATASOURCE_LIST'
-  $sources = Invoke-RestMethod -Uri "$apiBase/datasources" -TimeoutSec 10
+  $sources = Invoke-RestMethod -Uri "$apiBase/datasources" -WebSession $webSession -TimeoutSec 10
   $result.stage = 'DATASOURCE_SYNC'
   foreach($source in $sources) {
-    $sync = Invoke-RestMethod -Method Post -Uri "$apiBase/datasources/$($source.id)/sync" -TimeoutSec 30
+    $sync = Invoke-RestMethod -Method Post -Uri "$apiBase/datasources/$($source.id)/sync" -WebSession $webSession -TimeoutSec 30
     if(-not $sync.success) { throw "Datasource sync failed for $($source.type)" }
   }
   if(($sources.type -notcontains 'postgresql') -or ($sources.type -notcontains 'mysql')) {
@@ -90,24 +100,24 @@ try {
 
   $result.stage = 'SEMANTIC_MODEL'
   $postgres = $sources | Where-Object { $_.type -eq 'postgresql' } | Select-Object -First 1
-  $models = Invoke-RestMethod -Uri "$apiBase/semantic-models" -TimeoutSec 10
+  $models = Invoke-RestMethod -Uri "$apiBase/semantic-models" -WebSession $webSession -TimeoutSec 10
   $model = $models | Where-Object { $_.datasource_id -eq $postgres.id -and $_.status -eq 'PUBLISHED' } | Select-Object -First 1
   if(-not $model) { throw 'Published PostgreSQL semantic model was not seeded' }
   $askBody = @{ question = '统计订单数量'; datasource_id = $postgres.id; semantic_model_id = $model.id } | ConvertTo-Json
   $result.stage = 'ASK'
-  $ask = Invoke-RestMethod -Method Post -Uri "$apiBase/ask" -ContentType 'application/json' -Body $askBody -TimeoutSec 30
+  $ask = Invoke-RestMethod -Method Post -Uri "$apiBase/ask" -WebSession $webSession -ContentType 'application/json' -Body $askBody -TimeoutSec 30
   if($ask.status -ne 'SUCCEEDED' -or $ask.oracle.status -ne 'PASSED') { throw 'Cold start Ask gate failed' }
   $result.ask = 'SUCCEEDED_ORACLE_PASSED'
 
   $result.stage = 'EVALUATION'
-  $evaluation = Invoke-RestMethod -Method Post -Uri "$apiBase/evaluation/runs" -TimeoutSec 120
+  $evaluation = Invoke-RestMethod -Method Post -Uri "$apiBase/evaluation/runs" -WebSession $webSession -TimeoutSec 120
   if($evaluation.run.status -ne 'PASS' -or $evaluation.run.golden_set_count -ne 50) {
     throw 'Cold start Evaluation gate failed'
   }
   $result.evaluation = 'GOLDEN50_PASS'
 
   $result.stage = 'MODEL_PROVIDERS'
-  $providers = Invoke-RestMethod -Uri "$apiBase/model-providers" -TimeoutSec 10
+  $providers = Invoke-RestMethod -Uri "$apiBase/model-providers" -WebSession $webSession -TimeoutSec 10
   $named = @($providers.items | Where-Object { $_.id -in @('kimi','mimo','deepseek') })
   if($named.Count -ne 3 -or @($named | Where-Object { -not $_.configured }).Count -ne 0 -or $providers.secrets_exposed) {
     throw 'Model Provider configuration gate failed'

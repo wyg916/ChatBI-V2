@@ -21,15 +21,17 @@ from chatbi_rag_adapter import LiveRagAdapter
 router = APIRouter(tags=["query pipeline"])
 
 
-def _run_or_404(db: Session, query_id: str) -> QueryRun:
+def _run_or_404(db: Session, query_id: str, principal: Principal) -> QueryRun:
     run = db.get(QueryRun, query_id)
     if run is None:
         raise HTTPException(status_code=404, detail="Query run not found")
+    if run.workspace_id != principal.workspace_id:
+        raise HTTPException(status_code=403, detail="Query run access denied")
     return run
 
 
 @router.get("/query-capabilities")
-def query_capabilities():
+def query_capabilities(_: Principal = Depends(require_permission("query.ask"))):
     settings = get_settings()
     rag = LiveRagAdapter(
         base_url=settings.legacy_rag_base_url,
@@ -71,28 +73,28 @@ def ask(data: AskRequest, db: Session = Depends(get_db), principal: Principal = 
 
 
 @router.get("/queries/{query_id}", response_model=QueryResponse)
-def get_query(query_id: str, db: Session = Depends(get_db), _: Principal = Depends(require_permission("query.ask"))):
-    return query_response(_run_or_404(db, query_id))
+def get_query(query_id: str, db: Session = Depends(get_db), principal: Principal = Depends(require_permission("query.ask"))):
+    return query_response(_run_or_404(db, query_id, principal))
 
 
 @router.post("/queries/{query_id}/verify", response_model=QueryResponse)
-def verify_query(query_id: str, data: VerifyResultRequest, db: Session = Depends(get_db), _: Principal = Depends(require_permission("query.ask"))):
+def verify_query(query_id: str, data: VerifyResultRequest, db: Session = Depends(get_db), principal: Principal = Depends(require_permission("query.ask"))):
     try:
-        run = QueryPipeline().verify(db, _run_or_404(db, query_id), data.expected)
+        run = QueryPipeline().verify(db, _run_or_404(db, query_id, principal), data.expected)
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     return query_response(run)
 
 
 @router.post("/queries/{query_id}/feedback", status_code=status.HTTP_201_CREATED)
-def feedback(query_id: str, data: FeedbackRequest, db: Session = Depends(get_db), _: Principal = Depends(require_permission("answer.manage"))):
-    item = save_feedback(db, _run_or_404(db, query_id), data)
+def feedback(query_id: str, data: FeedbackRequest, db: Session = Depends(get_db), principal: Principal = Depends(require_permission("answer.manage"))):
+    item = save_feedback(db, _run_or_404(db, query_id, principal), data)
     return {"id": item.id, "query_id": item.query_run_id, "feedback_type": item.feedback_type, "recorded": True}
 
 
 @router.post("/queries/{query_id}/save", response_model=AnswerRead, status_code=status.HTTP_201_CREATED)
-def save_answer(query_id: str, data: SaveAnswerRequest, db: Session = Depends(get_db), _: Principal = Depends(require_permission("answer.manage"))):
+def save_answer(query_id: str, data: SaveAnswerRequest, db: Session = Depends(get_db), principal: Principal = Depends(require_permission("answer.manage"))):
     try:
-        return save_verified_answer(db, _run_or_404(db, query_id), data)
+        return save_verified_answer(db, _run_or_404(db, query_id, principal), data)
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc

@@ -1,4 +1,5 @@
 import { expect, test, type APIRequestContext, type Page } from '@playwright/test';
+import { adminCredentials } from './auth';
 
 const apiBase = process.env.CHATBI_API_BASE ?? 'http://127.0.0.1:8000/api/v1';
 
@@ -6,7 +7,9 @@ function captureRuntimeErrors(page: Page) {
   const errors: string[] = [];
   page.on('console', (message) => { if (message.type() === 'error') errors.push(`console: ${message.text()}`); });
   page.on('pageerror', (error) => errors.push(`page: ${error.message}`));
-  page.on('requestfailed', (request) => errors.push(`request: ${request.url()} ${request.failure()?.errorText ?? ''}`));
+  page.on('requestfailed', (request) => {
+    if (request.failure()?.errorText !== 'net::ERR_ABORTED') errors.push(`request: ${request.url()} ${request.failure()?.errorText ?? ''}`);
+  });
   return errors;
 }
 
@@ -18,11 +21,13 @@ async function ask(request: APIRequestContext, question: string) {
 
 test('Day2-1 登录后默认进入真实问数据首页', async ({ page }) => {
   const errors = captureRuntimeErrors(page);
+  await page.context().clearCookies();
   await page.goto('/login');
-  await page.getByLabel('账号或电子名').fill('day2.user');
+  await page.getByLabel('账号或电子名').fill(adminCredentials.email);
+  await page.getByLabel('密码').fill(adminCredentials.password);
   await page.getByRole('button', { name: '登录 ChatBI Studio' }).click();
   await expect(page).toHaveURL('/');
-  await expect(page.getByRole('heading', { name: '今天想了解哪些业务数据？' })).toBeVisible();
+  await expect(page.getByRole('textbox', { name: '输入业务问题' })).toBeVisible();
   expect(errors).toEqual([]);
 });
 

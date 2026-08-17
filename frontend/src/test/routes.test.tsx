@@ -4,6 +4,7 @@ import { createMemoryRouter, RouterProvider } from 'react-router-dom';
 import { describe, expect, it } from 'vitest';
 import { AppShell } from '../components/AppShell';
 import { routeManifest } from '../router';
+import { AuthContext } from '../auth';
 
 describe('UI route coverage', () => {
   it('declares all 14 approved pages without duplicate paths', () => {
@@ -30,7 +31,7 @@ describe('UI route coverage', () => {
   it('keeps exactly six top-level workspace navigation entries', () => {
     const router = createMemoryRouter([{ element: <AppShell/>, children: [{ path: '/', element: <div>首页</div> }] }], { initialEntries: ['/'] });
     const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-    render(<QueryClientProvider client={queryClient}><RouterProvider router={router}/></QueryClientProvider>);
+    render(<AuthContext.Provider value={{ user: { id: 'u1', workspace_id: 'w1', email: 'admin@chatbi.local', display_name: 'Admin', role: 'ADMIN' }, logout: async () => {} }}><QueryClientProvider client={queryClient}><RouterProvider router={router}/></QueryClientProvider></AuthContext.Provider>);
     const nav = screen.getByRole('navigation', { name: '一级导航' });
     expect(nav.querySelectorAll('a')).toHaveLength(6);
     ['问数据', '数据源', '语义模型', '答案库', '看板', '评测中心'].forEach((label) => expect(nav).toHaveTextContent(label));

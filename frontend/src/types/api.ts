@@ -180,3 +180,26 @@ export interface QueryResponse {
   summary: string; kpis: Array<{ label: string; value: unknown; unit?: string }>;
   recommended_questions: string[]; error_code?: string; error_message?: string;
 }
+
+export type QuestionRoute = 'DATA_QUERY' | 'KNOWLEDGE_QUERY' | 'HYBRID_ANALYSIS' | 'COMPLEX_ANALYSIS' | 'GENERAL_CHAT' | 'FILE_QUERY' | 'MULTIMODAL_QUERY' | 'CLARIFICATION' | 'UNSUPPORTED';
+export interface SessionUser { id: string; workspace_id: string; email: string; display_name: string; role: 'ADMIN' | 'ANALYST' }
+export interface SessionResponse { authenticated: true; user: SessionUser; expires_at: string }
+export interface LoginInput { email: string; password: string; remember: boolean }
+export interface Conversation {
+  id: string; title: string; summary: string; active_attachment_ids: string[]; created_at: string; updated_at: string;
+}
+export interface ChatMessage {
+  id: string; conversation_id: string; parent_message_id?: string; role: 'user' | 'assistant'; content: string;
+  route?: QuestionRoute; status: string; attachment_ids: string[]; context_payload?: Record<string, unknown>; response_payload: Record<string, unknown>;
+  trace_payload: Record<string, unknown>; error_code?: string; created_at: string;
+}
+export interface ConversationDetail extends Conversation { messages: ChatMessage[] }
+export interface ChatInput {
+  conversation_id: string; content: string; parent_message_id?: string; client_message_id: string;
+  attachment_ids: string[]; route?: QuestionRoute; datasource_id?: string; semantic_model_id?: string;
+}
+export interface ChatResponse { conversation: Conversation; user_message: ChatMessage; assistant_message: ChatMessage }
+export interface Attachment {
+  id: string; conversation_id: string; filename: string; extension: string; mime_type: string; kind: 'STRUCTURED' | 'DOCUMENT' | 'IMAGE' | 'UNKNOWN';
+  size_bytes: number; status: 'PROCESSING' | 'READY' | 'FAILED'; error_code?: string; created_at: string; expires_at: string;
+}

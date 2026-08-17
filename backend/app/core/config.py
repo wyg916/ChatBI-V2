@@ -1,4 +1,6 @@
 from functools import lru_cache
+from pathlib import Path
+from tempfile import gettempdir
 
 from typing import Literal
 
@@ -8,7 +10,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
     app_name: str = "ChatBI V2"
-    app_version: str = "1.0.1"
+    app_version: str = "1.1.0"
     environment: str = "development"
     database_url: str = "postgresql+psycopg://chatbi_app@127.0.0.1:5432/chatbi_v2"
     meta_password: SecretStr = SecretStr("")
@@ -61,6 +63,23 @@ class Settings(BaseSettings):
     agent_max_replan: int = 2
     agent_max_depth: int = 2
     agent_token_budget: int = 6000
+    bootstrap_admin_password: SecretStr = SecretStr("")
+    bootstrap_analyst_password: SecretStr = SecretStr("")
+    session_cookie_name: str = "chatbi_session"
+    session_ttl_minutes: int = 480
+    remember_session_ttl_days: int = 30
+    session_cookie_secure: bool = False
+    login_max_failures: int = 8
+    login_window_minutes: int = 15
+    attachment_storage_dir: str = str(Path(gettempdir()) / "chatbi-v2-attachments")
+    attachment_max_bytes: int = 25 * 1024 * 1024
+    attachment_max_rows: int = 100_000
+    attachment_text_max_chars: int = 200_000
+    attachment_ttl_hours: int = 24
+    chat_recent_message_limit: int = 20
+    general_model_provider: str = "auto"
+    vision_model_provider: str = "auto"
+    vision_model_name: str = ""
 
     @property
     def agent_route_allowlist(self) -> frozenset[str]:

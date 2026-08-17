@@ -27,8 +27,10 @@ def default_workspace(db: Session) -> Workspace:
     return workspace
 
 
-def create_datasource(db: Session, data: DataSourceCreate) -> DataSource:
-    workspace = default_workspace(db)
+def create_datasource(db: Session, data: DataSourceCreate, workspace_id: str | None = None) -> DataSource:
+    workspace = db.get(Workspace, workspace_id) if workspace_id else default_workspace(db)
+    if workspace is None:
+        raise LookupError("Workspace not found")
     datasource = DataSource(
         workspace_id=workspace.id,
         name=data.name,

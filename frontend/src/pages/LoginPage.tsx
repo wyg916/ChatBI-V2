@@ -1,5 +1,6 @@
-import { FormEvent } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { FormEvent, useState } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
+import { authApi } from '../api/auth';
 import glowBottomRight from '../assets/login/glow-bottom-right.svg';
 import glowTopLeft from '../assets/login/glow-top-left.svg';
 import rememberSwitch from '../assets/login/remember-switch.svg';
@@ -13,10 +14,27 @@ const featureCards = [
 
 export function LoginPage() {
   const navigate = useNavigate();
+  const location = useLocation();
+  const [error, setError] = useState('');
+  const [submitting, setSubmitting] = useState(false);
 
-  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    navigate('/');
+    const form = new FormData(event.currentTarget);
+    setSubmitting(true); setError('');
+    try {
+      await authApi.login({
+        email: String(form.get('account') ?? '').trim(),
+        password: String(form.get('password') ?? ''),
+        remember: form.get('remember') === 'on',
+      });
+      const from = (location.state as { from?: string } | null)?.from;
+      navigate(from?.startsWith('/') ? from : '/', { replace: true });
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : '登录失败');
+    } finally {
+      setSubmitting(false);
+    }
   }
 
   return (
@@ -79,7 +97,7 @@ export function LoginPage() {
                 name="password"
                 type="password"
                 autoComplete="current-password"
-                defaultValue="chatbi-demo"
+                placeholder="请输入密码"
                 required
               />
             </div>
@@ -93,13 +111,14 @@ export function LoginPage() {
             <span>记住登录</span>
           </label>
 
-          <button className="login-submit" type="submit">登录 ChatBI Studio</button>
+          {error && <p className="login-error" role="alert">{error}</p>}
+          <button className="login-submit" type="submit" disabled={submitting}>{submitting ? '正在登录…' : '登录 ChatBI Studio'}</button>
 
           <p className="login-legal">
             登录即表示你已同意 <button type="button">服务条款</button> 和 <button type="button">隐私政策</button>
           </p>
           <div className="login-divider" aria-hidden="true" />
-          <p className="login-environment">演示环境&nbsp;&nbsp;·&nbsp;&nbsp;SSO / OIDC 已启用</p>
+          <p className="login-environment">本机开发环境&nbsp;&nbsp;·&nbsp;&nbsp;服务端安全会话</p>
         </form>
       </section>
     </main>

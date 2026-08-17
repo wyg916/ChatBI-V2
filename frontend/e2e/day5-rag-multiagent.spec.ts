@@ -1,4 +1,4 @@
-import { expect, test, type APIRequestContext } from '@playwright/test';
+import { expect, request as requestFactory, test, type APIRequestContext } from '@playwright/test';
 
 const apiBase = process.env.CHATBI_API_BASE ?? 'http://127.0.0.1:8000/api/v1';
 const roles = ['PlannerAgent', 'DataAnalystAgent', 'KnowledgeAgent', 'VerificationAgent', 'InsightAgent'];
@@ -126,13 +126,15 @@ test('Day5-13 SSE exposes finite stages and no reasoning payload', async ({ requ
   expect(text.toLowerCase()).not.toContain('reasoning');
 });
 
-test('Day5-14 unknown actor cannot access RAG or tools', async ({ request }) => {
-  const response = await request.post(`${apiBase}/analysis`, {
+test('Day5-14 missing session cannot access RAG or tools', async () => {
+  const anonymous = await requestFactory.newContext({ storageState: { cookies: [], origins: [] } });
+  const response = await anonymous.post(`${apiBase}/analysis`, {
     headers: { 'X-ChatBI-Actor': 'cross-workspace@chatbi.invalid' },
     data: { question: '收入口径', route: 'KNOWLEDGE_QUERY' },
   });
   expect(response.status()).toBe(401);
   expect(await response.text()).not.toContain('citations');
+  await anonymous.dispose();
 });
 
 test('Day5-15 RAG no-evidence path explicitly falls back to verified data', async ({ request }) => {

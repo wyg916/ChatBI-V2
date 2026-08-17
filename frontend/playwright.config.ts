@@ -1,4 +1,5 @@
 import { defineConfig } from '@playwright/test';
+import { adminStorageState } from './e2e/auth';
 
 export default defineConfig({
   testDir: './e2e',
@@ -12,6 +13,7 @@ export default defineConfig({
     baseURL: 'http://127.0.0.1:5173',
     browserName: 'chromium',
     viewport: { width: 1440, height: 900 },
+    storageState: adminStorageState,
     trace: 'retain-on-failure',
   },
   webServer: {
