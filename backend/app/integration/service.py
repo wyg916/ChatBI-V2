@@ -4,9 +4,15 @@ import hashlib
 from datetime import datetime, timezone
 from uuid import uuid4
 
-from chatbi_agent_contracts import AgentExecutionContext, OrchestrationRequest, OrchestrationResult, QuestionRoute
+from chatbi_agent_contracts import (
+    AgentExecutionContext,
+    OrchestrationRequest,
+    OrchestrationResult,
+    QuestionRoute,
+    ToolName,
+)
 from chatbi_agent_orchestrator import BoundedAgentOrchestrator
-from chatbi_rag_adapter import CitationVerifierV1, LegacyRagAdapter, RagAdapterError, UnavailableRagAdapter
+from chatbi_rag_adapter import CitationVerifierV1, LiveRagAdapter, RagAdapterError, UnavailableRagAdapter
 from chatbi_rag_contracts import RagExecutionContext, RagRequest, RagResult
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -22,8 +28,11 @@ from app.models import (
     DataSource,
     KnowledgeRetrievalRun,
     OrchestrationRun,
+    OrchestrationProfile,
     OrchestrationStep,
     SemanticModel,
+    PromptTemplate,
+    PromptVersion,
     ToolCall,
 )
 from app.query.contracts import AskRequest
@@ -41,7 +50,14 @@ class AnalysisService:
         self._rag_adapter = rag_adapter
         self.verifier = CitationVerifierV1()
 
-    def execute(self, db: Session, request: AnalysisRequest, principal: Principal) -> AnalysisResponse:
+    def execute(
+        self,
+        db: Session,
+        request: AnalysisRequest,
+        principal: Principal,
+        *,
+        progress_callback=None,
+    ) -> AnalysisResponse:
         settings = get_settings()
         trace_id = f"TRACE-{uuid4()}"
         route = self.router.classify(request.question, request.route)
@@ -65,7 +81,10 @@ class AnalysisService:
                 primary = self._data(db, request, principal)
                 self._audit_route(db, principal, route, trace_id, "FALLBACK", True)
                 return self._response(route, trace_id, primary, fallback=True, settings=settings)
-            return self._complex(db, request, principal, trace_id, rag_decision)
+            return self._complex(
+                db, request, principal, trace_id, rag_decision,
+                progress_callback=progress_callback,
+            )
         raise ValueError(f"unsupported route: {route}")
 
     def _knowledge(self, db, request, principal, trace_id, decision) -> AnalysisResponse:
@@ -118,10 +137,12 @@ class AnalysisService:
             QuestionRoute.HYBRID_ANALYSIS, trace_id, data, shadow=shadow, fallback=True, settings=settings
         )
 
-    def _complex(self, db, request, principal, trace_id, rag_decision) -> AnalysisResponse:
+    def _complex(
+        self, db, request, principal, trace_id, rag_decision, *, progress_callback=None
+    ) -> AnalysisResponse:
         settings = get_settings()
         context = self._agent_context(db, principal, trace_id)
-        include_knowledge = rag_decision.publish and "knowledge.retrieve" in context.allowed_tools
+        include_knowledge = rag_decision.publish and ToolName.RETRIEVE_KNOWLEDGE.value in context.allowed_tools
         idempotency_key = request.idempotency_key or f"analysis:{uuid4()}"
         existing = db.scalar(select(OrchestrationRun).where(
             OrchestrationRun.workspace_id == context.workspace_id,
@@ -133,7 +154,9 @@ class AnalysisService:
                 QuestionRoute.COMPLEX_ANALYSIS, trace_id, replay.model_dump(mode="json"), settings=settings
             )
         tool_executor = ChatBIToolExecutor(db, principal, self._rag_adapter_instance())
-        result = BoundedAgentOrchestrator(tool_executor).run(OrchestrationRequest(
+        result = BoundedAgentOrchestrator(
+            tool_executor, progress_callback=progress_callback
+        ).run(OrchestrationRequest(
             question=request.question,
             route=QuestionRoute.COMPLEX_ANALYSIS,
             context=context,
@@ -141,6 +164,7 @@ class AnalysisService:
             semantic_model_id=request.semantic_model_id,
             include_knowledge=include_knowledge,
             idempotency_key=idempotency_key,
+            prompt_versions=self._prompt_versions(db, context.workspace_id),
         ))
         self._record_orchestration(db, principal, request, result, idempotency_key)
         if result.status not in {"SUCCEEDED", "PARTIAL"} and settings.agent_fallback_enabled:
@@ -196,10 +220,12 @@ class AnalysisService:
         settings = get_settings()
         if not settings.legacy_rag_base_url:
             return UnavailableRagAdapter()
-        return LegacyRagAdapter(
+        return LiveRagAdapter(
             base_url=settings.legacy_rag_base_url,
             bearer_token=settings.legacy_rag_bearer_token.get_secret_value(),
+            shared_secret=settings.rag_shared_secret.get_secret_value(),
             require_workspace_echo=settings.legacy_rag_require_workspace_echo,
+            retry_count=settings.rag_retry_count,
         )
 
     @staticmethod
@@ -225,7 +251,7 @@ class AnalysisService:
             roles=frozenset({principal.role}),
             allowed_datasources=datasources,
             allowed_semantic_models=models,
-            allowed_tools=frozenset({"knowledge.retrieve"}),
+            allowed_tools=frozenset({ToolName.RETRIEVE_KNOWLEDGE.value}),
             trace_id=trace_id,
             timeout_ms=settings.agent_timeout_ms,
             max_steps=settings.agent_max_steps,
@@ -241,12 +267,31 @@ class AnalysisService:
             roles=frozenset({principal.role}),
             allowed_datasources=datasources,
             allowed_semantic_models=models,
-            allowed_tools=frozenset({"data.query", "knowledge.retrieve"}),
+            allowed_tools=frozenset(item.value for item in ToolName),
             trace_id=trace_id,
             timeout_ms=settings.agent_timeout_ms,
             max_steps=settings.agent_max_steps,
+            max_tool_calls=settings.agent_max_tool_calls,
+            max_replan=settings.agent_max_replan,
+            max_agent_depth=settings.agent_max_depth,
             token_budget=settings.agent_token_budget,
         )
+
+    @staticmethod
+    def _prompt_versions(db: Session, workspace_id: str) -> dict[str, str]:
+        rows = db.execute(
+            select(PromptTemplate.code, PromptVersion.version, PromptVersion.checksum_sha256)
+            .join(PromptVersion, PromptVersion.prompt_template_id == PromptTemplate.id)
+            .where(
+                PromptTemplate.workspace_id == workspace_id,
+                PromptTemplate.status == "ACTIVE",
+                PromptVersion.status == "ACTIVE",
+            )
+        ).all()
+        return {
+            code: f"v{version}:{checksum[:12]}"
+            for code, version, checksum in rows
+        }
 
     @staticmethod
     def _rag_primary(result: RagResult) -> dict:
@@ -276,6 +321,9 @@ class AnalysisService:
         for item in result.citations:
             db.add(CitationRecord(
                 retrieval_run_id=run.id,
+                document_id=item.document_id or None,
+                document_version_id=item.document_version_id or None,
+                chunk_id=item.chunk_id or None,
                 source=item.source,
                 locator=item.locator,
                 text_excerpt=item.text[:1000],
@@ -285,9 +333,15 @@ class AnalysisService:
 
     @staticmethod
     def _record_orchestration(db, principal, request, result, idempotency_key) -> None:
+        profile = db.scalar(select(OrchestrationProfile).where(
+            OrchestrationProfile.workspace_id == principal.workspace_id,
+            OrchestrationProfile.code == "chatbi-v1-complex-analysis",
+        ))
+        performance = result.performance
         run = OrchestrationRun(
             id=result.run_id.removeprefix("ORCH-")[:36],
             workspace_id=principal.workspace_id,
+            profile_id=profile.id if profile else None,
             user_id=principal.user_id,
             route=result.route.value,
             status=result.status,
@@ -296,6 +350,10 @@ class AnalysisService:
             request_payload={"question_sha256": hashlib.sha256(request.question.encode()).hexdigest()},
             result_payload=result.model_dump(mode="json"),
             error_code=result.error_code,
+            ttft_ms=performance.get("ttft_ms", 0),
+            total_latency_ms=performance.get("total_latency_ms", 0),
+            tool_latency_ms=performance.get("tool_latency_ms", 0),
+            trace_complete=result.trace_complete,
             finished_at=_now(),
         )
         db.add(run)
@@ -307,7 +365,8 @@ class AnalysisService:
                 code=step.code,
                 tool_name=step.tool_name,
                 status=step.status,
-                details=step.detail,
+                details={**step.detail, "agent_role": step.agent_role.value},
+                duration_ms=step.duration_ms,
             )
             db.add(record)
             db.flush()
@@ -321,6 +380,7 @@ class AnalysisService:
                     request_payload={"question_sha256": hashlib.sha256(request.question.encode()).hexdigest()},
                     response_payload=step.detail,
                     error_code=step.detail.get("error_code"),
+                    duration_ms=step.duration_ms,
                 ))
         db.commit()
 
