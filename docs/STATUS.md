@@ -2,7 +2,7 @@
 
 ## 2026-08-17
 
-- Day 5 RAG + Multi-Agent Final Closure 全部门禁 PASS：RAG Golden 120/120、Recall@10 1.0、Citation Accuracy 1.0、越权检索 0；Complex Analysis 10/10、Trace 100%；Backend 121/121、Frontend 27/27、Serial/Parallel E2E 50/50、Golden PostgreSQL 50/50 与 MySQL 10/10。完整停止后的冷启动 Run1 174.9 秒、Run2 83.5 秒；三家 Provider Live Smoke、Migration、Secret Scan、License 与安全回滚模拟均通过。最终 Git/远端/annotated tag 以 `docs/status/DAY5_STATUS.md` 和发布返回为准。
+- Day 5 RAG + Multi-Agent Final Closure 全部门禁 PASS：RAG Golden 120/120、Recall@10 1.0、Citation Accuracy 1.0、越权检索 0；Complex Analysis 10/10、Trace 100%；Backend 127/127、Frontend 27/27、串行 E2E 51/51、并行 E2E 5 workers 连续三轮 153/153、Golden PostgreSQL 50/50 与 MySQL 10/10。隔离冷启动 72.3 秒；完整停止后的一键启动 Run1 54.5 秒、Run2 33.2 秒；三家 Provider Live Smoke、Migration、Secret Scan、License 与安全回滚模拟均通过。最终 Git/远端/annotated tag 以 `docs/status/DAY5_STATUS.md` 和发布返回为准。
 
 - ADR-030 已把受控 RAG 与最小 Multi-Agent 提升为 V1/P0 必选：新增独立 Live RAG Runtime、HMAC Workspace/用户/角色映射、ACL/Citation/Answer Guard、固定五角色六工具、8/12/2/2/30s 预算、SSE 阶段和运行性能字段。默认 `CHATBI_RAG_MODE=on`、`CHATBI_AGENT_MODE=on`；普通 `DATA_QUERY` 仍只走 QueryPipeline。
 - 旧项目二生产源码复制数为 0；六个 Prompt 均独立编写并保存 source/version/purpose/checksum。15 张运行时表均有真实使用记录；迁移 head 为 `20260817_0008`。

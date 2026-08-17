@@ -40,7 +40,7 @@ class BridgeRequest(BaseModel):
     chatbi_context: BridgeContext
 
 
-app = FastAPI(title="ChatBI V1 RAG Runtime", version="1.0.0")
+app = FastAPI(title="ChatBI V1 RAG Runtime", version="1.0.1")
 
 
 @app.get("/health")
@@ -49,7 +49,7 @@ def health() -> dict[str, Any]:
     return {
         "status": "ok" if secret_configured else "degraded",
         "component": "chatbi-rag-runtime",
-        "version": "1.0.0",
+        "version": "1.0.1",
         "identity_signing": secret_configured,
     }
 

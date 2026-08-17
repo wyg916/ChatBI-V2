@@ -1,14 +1,21 @@
 {
   "checked_at": "2026-08-18",
-  "backend_pytest": {"passed": 121, "failed": 0},
+  "backend_pytest": {"passed": 127, "failed": 0},
   "frontend": {
     "typecheck": "PASS",
     "vitest_tests": 27,
     "build": "PASS",
     "echarts_chunk_kb": 555.48
   },
-  "serial_e2e": {"passed": 50, "failed": 0, "duration_minutes": 2.5},
-  "parallel_e2e": {"workers": 5, "final_passed": 50, "final_failed": 0, "retries": 0, "duration_minutes": 1.5},
+  "serial_e2e": {"passed": 51, "failed": 0, "duration_minutes": 1.5},
+  "parallel_e2e": {
+    "workers": 5,
+    "rounds": 3,
+    "passed_per_round": [51, 51, 51],
+    "failed_per_round": [0, 0, 0],
+    "total_passed": 153,
+    "retries": 0
+  },
   "rag": {
     "live_bridge": "PASS",
     "workspace_identity": "PASS",
@@ -34,7 +41,8 @@
   "migration": {"single_head": true, "upgrade_base_upgrade": "PASS", "temporary_schema_removed": true, "head": "20260817_0008"},
   "ui14": {"routes": "14/14", "browser_regression": "PASS"},
   "provider_live_smoke": "KIMI_MIMO_DEEPSEEK_PASS",
-  "cold_start": "2/2 PASS",
+  "cold_start": "PASS_ISOLATED_72.3S",
+  "one_click_start": "2/2 PASS_FROM_FULL_STOP_54.5S_33.2S",
   "rollback_simulation": "PASS",
   "tracked_secret_matches": 0,
   "old_source_code_copy": 0,

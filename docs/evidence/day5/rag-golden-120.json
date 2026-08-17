@@ -1,6 +1,6 @@
 {
   "suite": "CHATBI_V1_RAG_GOLDEN_120",
-  "generated_at": "2026-08-17T16:10:07.949627+00:00",
+  "generated_at": "2026-08-17T17:12:57.759709+00:00",
   "cases": 120,
   "recall_at_10": 1.0,
   "citation_accuracy": 1.0,
@@ -13,7 +13,7 @@
       "case_id": "RAG-revenue-01",
       "topic": "revenue",
       "status": "SUCCEEDED",
-      "trace_id": "TRACE-a495ec9b-37b1-4009-9c6d-a7e747e50a1f",
+      "trace_id": "TRACE-8536d154-da7d-4d99-9ae4-f9853dd0e57d",
       "hit_at_10": true,
       "citation_verified": true,
       "citation_ids": [
@@ -27,7 +27,7 @@
       "case_id": "RAG-revenue-02",
       "topic": "revenue",
       "status": "SUCCEEDED",
-      "trace_id": "TRACE-676c97a5-bee9-425f-97d6-2520e0cc0ea1",
+      "trace_id": "TRACE-7805b2af-d23e-4a32-b674-bd48a2f1d3d8",
       "hit_at_10": true,
       "citation_verified": true,
       "citation_ids": [
@@ -40,7 +40,7 @@
       "case_id": "RAG-revenue-03",
       "topic": "revenue",
       "status": "SUCCEEDED",
-      "trace_id": "TRACE-595d18cb-2e9b-4e8c-b4fa-9018695183f5",
+      "trace_id": "TRACE-4ff6dd89-56a9-442b-b3e0-b0a475930283",
       "hit_at_10": true,
       "citation_verified": true,
       "citation_ids": [
@@ -53,7 +53,7 @@
       "case_id": "RAG-revenue-04",
       "topic": "revenue",
       "status": "SUCCEEDED",
-      "trace_id": "TRACE-da595935-7cb6-43dc-857c-462fbaf8bddb",
+      "trace_id": "TRACE-9813d5c2-5864-4ef9-b28c-6894b417dc5f",
       "hit_at_10": true,
       "citation_verified": true,
       "citation_ids": [
@@ -66,7 +66,7 @@
       "case_id": "RAG-revenue-05",
       "topic": "revenue",
       "status": "SUCCEEDED",
-      "trace_id": "TRACE-3037663c-6fef-4aaf-960d-985182e86338",
+      "trace_id": "TRACE-92489082-63a8-432c-b40d-5e9536dcde60",
       "hit_at_10": true,
       "citation_verified": true,
       "citation_ids": [
@@ -79,7 +79,7 @@
       "case_id": "RAG-revenue-06",
       "topic": "revenue",
       "status": "SUCCEEDED",
-      "trace_id": "TRACE-1fd057b0-0c10-4ad7-a98c-9b1861f49304",
+      "trace_id": "TRACE-73e82ec8-394b-4cd7-97e4-52130684baca",
       "hit_at_10": true,
       "citation_verified": true,
       "citation_ids": [
@@ -93,7 +93,7 @@
       "case_id": "RAG-revenue-07",
       "topic": "revenue",
       "status": "SUCCEEDED",
-      "trace_id": "TRACE-aa296f06-4a4d-4d9a-aa64-4db4a5c4e87f",
+      "trace_id": "TRACE-9ddfa1ef-4cd5-4a3c-a3b2-e642836fb7f9",
       "hit_at_10": true,
       "citation_verified": true,
       "citation_ids": [
@@ -106,7 +106,7 @@
       "case_id": "RAG-revenue-08",
       "topic": "revenue",
       "status": "SUCCEEDED",
-      "trace_id": "TRACE-e0f0cdd5-fbba-47c9-8b09-eda9b198ae01",
+      "trace_id": "TRACE-d2d4d055-6a87-4273-a05d-3b8195b97e69",
       "hit_at_10": true,
       "citation_verified": true,
       "citation_ids": [
@@ -119,7 +119,7 @@
       "case_id": "RAG-revenue-09",
       "topic": "revenue",
       "status": "SUCCEEDED",
-      "trace_id": "TRACE-8c296de6-f186-43c7-b089-6d31caed3111",
+      "trace_id": "TRACE-e1c7eef0-dd93-4544-93a6-cbaa2d69df53",
       "hit_at_10": true,
       "citation_verified": true,
       "citation_ids": [
@@ -132,7 +132,7 @@
       "case_id": "RAG-revenue-10",
       "topic": "revenue",
       "status": "SUCCEEDED",
-      "trace_id": "TRACE-63adc41d-e42f-491d-83f9-22a200029a23",
+      "trace_id": "TRACE-5006c54c-c70c-40ea-a41a-d956ddddbfef",
       "hit_at_10": true,
       "citation_verified": true,
       "citation_ids": [
@@ -147,7 +147,7 @@
       "case_id": "RAG-revenue-11",
       "topic": "revenue",
       "status": "SUCCEEDED",
-      "trace_id": "TRACE-e72c07ec-eea5-40b8-9a02-f49a7f6c5c62",
+      "trace_id": "TRACE-830447cf-bbe8-499e-9519-cc217cc317cf",
       "hit_at_10": true,
       "citation_verified": true,
       "citation_ids": [
@@ -161,7 +161,7 @@
       "case_id": "RAG-revenue-12",
       "topic": "revenue",
       "status": "SUCCEEDED",
-      "trace_id": "TRACE-203448db-af03-4693-bf85-799d7933d249",
+      "trace_id": "TRACE-b3ec82d9-b6e2-4e97-bfa9-fc7940286d50",
       "hit_at_10": true,
       "citation_verified": true,
       "citation_ids": [
@@ -174,7 +174,7 @@
       "case_id": "RAG-revenue-13",
       "topic": "revenue",
       "status": "SUCCEEDED",
-      "trace_id": "TRACE-30e51a2d-2e06-47db-a2e1-c46d1ddf3238",
+      "trace_id": "TRACE-af1fec73-9356-4299-b757-f509a095e196",
       "hit_at_10": true,
       "citation_verified": true,
       "citation_ids": [
@@ -188,7 +188,7 @@
       "case_id": "RAG-revenue-14",
       "topic": "revenue",
       "status": "SUCCEEDED",
-      "trace_id": "TRACE-b5eb12fb-8e0e-4429-ad7b-6257b7a8a324",
+      "trace_id": "TRACE-c324e6e4-52a5-4fdc-b1e4-c1f2b65259a4",
       "hit_at_10": true,
       "citation_verified": true,
       "citation_ids": [
@@ -201,7 +201,7 @@
       "case_id": "RAG-revenue-15",
       "topic": "revenue",
       "status": "SUCCEEDED",
-      "trace_id": "TRACE-5610174d-e267-4d7f-8242-b6406fc0e39b",
+      "trace_id": "TRACE-d24a292f-d20e-4aaa-8e97-1068bbcdc260",
       "hit_at_10": true,
       "citation_verified": true,
       "citation_ids": [
@@ -216,7 +216,7 @@
       "case_id": "RAG-revenue-16",
       "topic": "revenue",
       "status": "SUCCEEDED",
-      "trace_id": "TRACE-b1095f34-6bbc-416a-aabd-2f108e68b14b",
+      "trace_id": "TRACE-e1b8b0de-0abf-4e96-b74a-34891fb0174b",
       "hit_at_10": true,
       "citation_verified": true,
       "citation_ids": [
@@ -229,7 +229,7 @@
       "case_id": "RAG-revenue-17",
       "topic": "revenue",
       "status": "SUCCEEDED",
-      "trace_id": "TRACE-a5efbbfc-e427-458d-a805-9b16872e3f5c",
+      "trace_id": "TRACE-24d4b6c6-52af-49ed-967f-08d082231a15",
       "hit_at_10": true,
       "citation_verified": true,
       "citation_ids": [
@@ -243,7 +243,7 @@
       "case_id": "RAG-revenue-18",
       "topic": "revenue",
       "status": "SUCCEEDED",
-      "trace_id": "TRACE-cd69b4ba-a13a-48b7-92be-d9a7932591cb",
+      "trace_id": "TRACE-4e82a503-ee4d-4cba-9bb0-4bc9b03cdd03",
       "hit_at_10": true,
       "citation_verified": true,
       "citation_ids": [
@@ -256,7 +256,7 @@
       "case_id": "RAG-revenue-19",
       "topic": "revenue",
       "status": "SUCCEEDED",
-      "trace_id": "TRACE-b4dc2ab3-96c1-4a4b-abf3-6e38ed8b0407",
+      "trace_id": "TRACE-2d6a9e34-ef2d-468b-8396-e28c7e7278c6",
       "hit_at_10": true,
       "citation_verified": true,
       "citation_ids": [
@@ -270,7 +270,7 @@
       "case_id": "RAG-revenue-20",
       "topic": "revenue",
       "status": "SUCCEEDED",
-      "trace_id": "TRACE-14dca21e-770e-4345-a320-5086403fcfd3",
+      "trace_id": "TRACE-da9bc281-ab0c-4f5a-bf2d-509aad30967c",
       "hit_at_10": true,
       "citation_verified": true,
       "citation_ids": [
@@ -283,7 +283,7 @@
       "case_id": "RAG-profit-01",
       "topic": "profit",
       "status": "SUCCEEDED",
-      "trace_id": "TRACE-d1e924e2-3c03-468f-993e-0368a3e779d8",
+      "trace_id": "TRACE-f3cf8acf-5b23-4e68-9ab8-5b39b110a68b",
       "hit_at_10": true,
       "citation_verified": true,
       "citation_ids": [
@@ -297,7 +297,7 @@
       "case_id": "RAG-profit-02",
       "topic": "profit",
       "status": "SUCCEEDED",
-      "trace_id": "TRACE-b6af8f83-748e-4416-9999-6c67c927af10",
+      "trace_id": "TRACE-d3580dc0-ff52-4e33-81ec-0ed2e8399d01",
       "hit_at_10": true,
       "citation_verified": true,
       "citation_ids": [
@@ -310,7 +310,7 @@
       "case_id": "RAG-profit-03",
       "topic": "profit",
       "status": "SUCCEEDED",
-      "trace_id": "TRACE-ace528e9-676b-454e-b9ec-e77c65adc689",
+      "trace_id": "TRACE-2323abbe-24ff-4459-b752-45e5422d2398",
       "hit_at_10": true,
       "citation_verified": true,
       "citation_ids": [
@@ -323,7 +323,7 @@
       "case_id": "RAG-profit-04",
       "topic": "profit",
       "status": "SUCCEEDED",
-      "trace_id": "TRACE-77326fb5-2769-48b9-981e-99844b497493",
+      "trace_id": "TRACE-a51d1dc1-691f-42b6-b44c-bcc333416b5c",
       "hit_at_10": true,
       "citation_verified": true,
       "citation_ids": [
@@ -336,7 +336,7 @@
       "case_id": "RAG-profit-05",
       "topic": "profit",
       "status": "SUCCEEDED",
-      "trace_id": "TRACE-ff6fea8c-a7fd-4bca-aade-4170a71e681b",
+      "trace_id": "TRACE-7477b3d2-a6dd-4ef8-a6e0-bad518e14929",
       "hit_at_10": true,
       "citation_verified": true,
       "citation_ids": [
@@ -349,7 +349,7 @@
       "case_id": "RAG-profit-06",
       "topic": "profit",
       "status": "SUCCEEDED",
-      "trace_id": "TRACE-415d70d2-fd28-4eba-89a6-3d7b2e1b57e7",
+      "trace_id": "TRACE-f23b47ef-7e10-4141-b473-26f9e736f669",
       "hit_at_10": true,
       "citation_verified": true,
       "citation_ids": [
@@ -363,7 +363,7 @@
       "case_id": "RAG-profit-07",
       "topic": "profit",
       "status": "SUCCEEDED",
-      "trace_id": "TRACE-1fb818f6-7230-4d55-b6d3-a4bc6d13e5ea",
+      "trace_id": "TRACE-efc93ca5-4b2e-469b-a9d4-8aa881532397",
       "hit_at_10": true,
       "citation_verified": true,
       "citation_ids": [
@@ -376,7 +376,7 @@
       "case_id": "RAG-profit-08",
       "topic": "profit",
       "status": "SUCCEEDED",
-      "trace_id": "TRACE-4157afeb-4cce-45c6-b8d6-1052cc422182",
+      "trace_id": "TRACE-2b883eaa-13f2-4888-8b73-bc4646a5aaeb",
       "hit_at_10": true,
       "citation_verified": true,
       "citation_ids": [
@@ -389,7 +389,7 @@
       "case_id": "RAG-profit-09",
       "topic": "profit",
       "status": "SUCCEEDED",
-      "trace_id": "TRACE-3711ca6e-632b-45d0-9bf2-0833fad20511",
+      "trace_id": "TRACE-9ef2f682-f1ac-4d15-9df0-5f2e937ebabd",
       "hit_at_10": true,
       "citation_verified": true,
       "citation_ids": [
@@ -402,7 +402,7 @@
       "case_id": "RAG-profit-10",
       "topic": "profit",
       "status": "SUCCEEDED",
-      "trace_id": "TRACE-144f8bf4-473a-4b47-8e68-94a325aedd5b",
+      "trace_id": "TRACE-79c23442-85c2-46b0-8fd7-e1a3f81fa279",
       "hit_at_10": true,
       "citation_verified": true,
       "citation_ids": [
@@ -417,7 +417,7 @@
       "case_id": "RAG-profit-11",
       "topic": "profit",
       "status": "SUCCEEDED",
-      "trace_id": "TRACE-0abbcdd1-8bca-4e44-b02a-e3083cf4f0d8",
+      "trace_id": "TRACE-82435a25-1aef-4b36-9d99-27392f26cdfb",
       "hit_at_10": true,
       "citation_verified": true,
       "citation_ids": [
@@ -431,7 +431,7 @@
       "case_id": "RAG-profit-12",
       "topic": "profit",
       "status": "SUCCEEDED",
-      "trace_id": "TRACE-1650fbc1-405b-4281-8ed9-32fd3aaa49ab",
+      "trace_id": "TRACE-3b347c5b-a826-462c-a016-c2054d3b63be",
       "hit_at_10": true,
       "citation_verified": true,
       "citation_ids": [
@@ -444,7 +444,7 @@
       "case_id": "RAG-profit-13",
       "topic": "profit",
       "status": "SUCCEEDED",
-      "trace_id": "TRACE-b998a6e3-0d8e-4cf7-9a37-707df20a7594",
+      "trace_id": "TRACE-30df4a7c-694b-4854-95ea-45c8a860b047",
       "hit_at_10": true,
       "citation_verified": true,
       "citation_ids": [
@@ -458,7 +458,7 @@
       "case_id": "RAG-profit-14",
       "topic": "profit",
       "status": "SUCCEEDED",
-      "trace_id": "TRACE-0a02d176-26d0-4e56-aab7-f87d443db58e",
+      "trace_id": "TRACE-dc2ec3b8-8193-4049-ae87-15cde6264bf3",
       "hit_at_10": true,
       "citation_verified": true,
       "citation_ids": [
@@ -471,7 +471,7 @@
       "case_id": "RAG-profit-15",
       "topic": "profit",
       "status": "SUCCEEDED",
-      "trace_id": "TRACE-d4221e04-c2f2-40ba-a1d0-5d9c673197aa",
+      "trace_id": "TRACE-5274879e-69e3-472c-a3ff-429c3091b452",
       "hit_at_10": true,
       "citation_verified": true,
       "citation_ids": [
@@ -486,7 +486,7 @@
       "case_id": "RAG-profit-16",
       "topic": "profit",
       "status": "SUCCEEDED",
-      "trace_id": "TRACE-b90577ea-0c22-4c9b-92c4-c8e2b4b8e772",
+      "trace_id": "TRACE-849dd935-cd9d-43d2-b9be-01cdd2187e00",
       "hit_at_10": true,
       "citation_verified": true,
       "citation_ids": [
@@ -499,7 +499,7 @@
       "case_id": "RAG-profit-17",
       "topic": "profit",
       "status": "SUCCEEDED",
-      "trace_id": "TRACE-50856878-dbf3-483a-beb9-79caa9fa4426",
+      "trace_id": "TRACE-1ca60511-1c3e-4bb0-95f0-dad7014bcc7f",
       "hit_at_10": true,
       "citation_verified": true,
       "citation_ids": [
@@ -513,7 +513,7 @@
       "case_id": "RAG-profit-18",
       "topic": "profit",
       "status": "SUCCEEDED",
-      "trace_id": "TRACE-d181e08e-8893-464b-b813-39a11cf6e3fd",
+      "trace_id": "TRACE-32ba268f-f44c-46ab-ae2c-0b00b9fe42be",
       "hit_at_10": true,
       "citation_verified": true,
       "citation_ids": [
@@ -526,7 +526,7 @@
       "case_id": "RAG-profit-19",
       "topic": "profit",
       "status": "SUCCEEDED",
-      "trace_id": "TRACE-8ce4d222-787f-4e23-bcfb-928c198b5230",
+      "trace_id": "TRACE-007bb685-eae0-45cf-a3f9-dce44f2fcc7a",
       "hit_at_10": true,
       "citation_verified": true,
       "citation_ids": [
@@ -540,7 +540,7 @@
       "case_id": "RAG-profit-20",
       "topic": "profit",
       "status": "SUCCEEDED",
-      "trace_id": "TRACE-664300a0-ef89-4ce3-a63d-e5c7cdd4bd5a",
+      "trace_id": "TRACE-ae1bf511-dc12-43ff-9c13-e726555ca5df",
       "hit_at_10": true,
       "citation_verified": true,
       "citation_ids": [
@@ -553,7 +553,7 @@
       "case_id": "RAG-orders-01",
       "topic": "orders",
       "status": "SUCCEEDED",
-      "trace_id": "TRACE-894a3bd4-e69f-4f16-8f22-47c9cff84c19",
+      "trace_id": "TRACE-deeac817-fa0c-4e23-885a-89bd9c5fc6f7",
       "hit_at_10": true,
       "citation_verified": true,
       "citation_ids": [
@@ -568,7 +568,7 @@
       "case_id": "RAG-orders-02",
       "topic": "orders",
       "status": "SUCCEEDED",
-      "trace_id": "TRACE-f639791c-c899-48bc-833f-4e17780f7985",
+      "trace_id": "TRACE-cab3e33b-9504-4ea1-9294-bba2c13b32f6",
       "hit_at_10": true,
       "citation_verified": true,
       "citation_ids": [
@@ -582,7 +582,7 @@
       "case_id": "RAG-orders-03",
       "topic": "orders",
       "status": "SUCCEEDED",
-      "trace_id": "TRACE-710e3638-8986-4579-9e13-b4ad0adf7b84",
+      "trace_id": "TRACE-f728f65d-24e6-4f13-bdd0-e2043aa2f33b",
       "hit_at_10": true,
       "citation_verified": true,
       "citation_ids": [
@@ -596,7 +596,7 @@
       "case_id": "RAG-orders-04",
       "topic": "orders",
       "status": "SUCCEEDED",
-      "trace_id": "TRACE-a951acf7-6479-4a31-8204-7c4e2921c0fe",
+      "trace_id": "TRACE-f91bfc6d-739b-40e2-8700-2188101b7640",
       "hit_at_10": true,
       "citation_verified": true,
       "citation_ids": [
@@ -610,7 +610,7 @@
       "case_id": "RAG-orders-05",
       "topic": "orders",
       "status": "SUCCEEDED",
-      "trace_id": "TRACE-7d513990-61fc-4346-bb4d-410857892ee2",
+      "trace_id": "TRACE-02d176ec-adc6-496f-9881-8ca924ab280c",
       "hit_at_10": true,
       "citation_verified": true,
       "citation_ids": [
@@ -624,7 +624,7 @@
       "case_id": "RAG-orders-06",
       "topic": "orders",
       "status": "SUCCEEDED",
-      "trace_id": "TRACE-3a9e5d10-8380-430b-acd5-7bdb9b59ce8d",
+      "trace_id": "TRACE-521c99f6-2998-4efb-a280-8d1c6d3622e9",
       "hit_at_10": true,
       "citation_verified": true,
       "citation_ids": [
@@ -639,7 +639,7 @@
       "case_id": "RAG-orders-07",
       "topic": "orders",
       "status": "SUCCEEDED",
-      "trace_id": "TRACE-97bf664d-adf4-4706-a832-3b6880b54569",
+      "trace_id": "TRACE-4ac21f27-5c79-400d-9e75-e209195e5a5a",
       "hit_at_10": true,
       "citation_verified": true,
       "citation_ids": [
@@ -653,7 +653,7 @@
       "case_id": "RAG-orders-08",
       "topic": "orders",
       "status": "SUCCEEDED",
-      "trace_id": "TRACE-42278332-e0b6-44eb-a51d-a7de7b500b5e",
+      "trace_id": "TRACE-bfc77bc2-7ad6-473b-a098-1ceb53459381",
       "hit_at_10": true,
       "citation_verified": true,
       "citation_ids": [
@@ -667,7 +667,7 @@
       "case_id": "RAG-orders-09",
       "topic": "orders",
       "status": "SUCCEEDED",
-      "trace_id": "TRACE-85d2f361-2279-4563-a73d-700941eacfcb",
+      "trace_id": "TRACE-41d0010a-60b5-4bab-8dd5-7f913cf0abac",
       "hit_at_10": true,
       "citation_verified": true,
       "citation_ids": [
@@ -681,7 +681,7 @@
       "case_id": "RAG-orders-10",
       "topic": "orders",
       "status": "SUCCEEDED",
-      "trace_id": "TRACE-1551ed6b-76ef-4dbb-86b7-33df4f367a99",
+      "trace_id": "TRACE-10248520-c5f8-4dc3-ba8c-ab96744a9459",
       "hit_at_10": true,
       "citation_verified": true,
       "citation_ids": [
@@ -696,7 +696,7 @@
       "case_id": "RAG-orders-11",
       "topic": "orders",
       "status": "SUCCEEDED",
-      "trace_id": "TRACE-6e26784c-3a61-4a18-80f8-99d09315962e",
+      "trace_id": "TRACE-b8a045a7-6d84-4460-862e-d29590e74a67",
       "hit_at_10": true,
       "citation_verified": true,
       "citation_ids": [
@@ -711,7 +711,7 @@
       "case_id": "RAG-orders-12",
       "topic": "orders",
       "status": "SUCCEEDED",
-      "trace_id": "TRACE-ace50e7d-6383-4d4f-801d-7a44048e2112",
+      "trace_id": "TRACE-21983679-21b8-47aa-816d-21cbd7c25768",
       "hit_at_10": true,
       "citation_verified": true,
       "citation_ids": [
@@ -725,7 +725,7 @@
       "case_id": "RAG-orders-13",
       "topic": "orders",
       "status": "SUCCEEDED",
-      "trace_id": "TRACE-587da4de-7fe8-4988-afab-c7da525773e9",
+      "trace_id": "TRACE-ed965f69-6722-4f0a-a2d1-bf992c849b1f",
       "hit_at_10": true,
       "citation_verified": true,
       "citation_ids": [
@@ -740,7 +740,7 @@
       "case_id": "RAG-orders-14",
       "topic": "orders",
       "status": "SUCCEEDED",
-      "trace_id": "TRACE-6e3ae422-79a5-49e6-9142-572a9ac0f9a5",
+      "trace_id": "TRACE-e96742fa-8c29-4743-8efe-a4461be115ec",
       "hit_at_10": true,
       "citation_verified": true,
       "citation_ids": [
@@ -754,7 +754,7 @@
       "case_id": "RAG-orders-15",
       "topic": "orders",
       "status": "SUCCEEDED",
-      "trace_id": "TRACE-78fb844e-9992-41ec-b407-524454a9b948",
+      "trace_id": "TRACE-2c0991eb-ac6c-4a42-8bc5-587c302ff69f",
       "hit_at_10": true,
       "citation_verified": true,
       "citation_ids": [
@@ -769,7 +769,7 @@
       "case_id": "RAG-orders-16",
       "topic": "orders",
       "status": "SUCCEEDED",
-      "trace_id": "TRACE-eb3086fe-5b6d-43ea-9c39-342942d63067",
+      "trace_id": "TRACE-8954fe8b-6351-4f68-b874-c6e7a4da6dfb",
       "hit_at_10": true,
       "citation_verified": true,
       "citation_ids": [
@@ -783,7 +783,7 @@
       "case_id": "RAG-orders-17",
       "topic": "orders",
       "status": "SUCCEEDED",
-      "trace_id": "TRACE-c35545c4-107e-411b-898a-df77f42964b4",
+      "trace_id": "TRACE-9d32d0ee-2755-40bd-9d01-d6327a35db07",
       "hit_at_10": true,
       "citation_verified": true,
       "citation_ids": [
@@ -798,7 +798,7 @@
       "case_id": "RAG-orders-18",
       "topic": "orders",
       "status": "SUCCEEDED",
-      "trace_id": "TRACE-d9615493-00c3-45e6-b5e2-827fffb9ec65",
+      "trace_id": "TRACE-290c6d93-89e5-4735-9cc5-664ad182092a",
       "hit_at_10": true,
       "citation_verified": true,
       "citation_ids": [
@@ -812,7 +812,7 @@
       "case_id": "RAG-orders-19",
       "topic": "orders",
       "status": "SUCCEEDED",
-      "trace_id": "TRACE-f3bbf5c6-4ee1-43c0-9b16-b653bd0f24d3",
+      "trace_id": "TRACE-93443656-badb-49d6-9a4c-61b78b51ae45",
       "hit_at_10": true,
       "citation_verified": true,
       "citation_ids": [
@@ -827,7 +827,7 @@
       "case_id": "RAG-orders-20",
       "topic": "orders",
       "status": "SUCCEEDED",
-      "trace_id": "TRACE-74954d22-ed86-468b-9d71-f2fc5207899d",
+      "trace_id": "TRACE-1225fe5c-3e5e-4383-ae2c-91cd83d81421",
       "hit_at_10": true,
       "citation_verified": true,
       "citation_ids": [
@@ -841,7 +841,7 @@
       "case_id": "RAG-region-01",
       "topic": "region",
       "status": "SUCCEEDED",
-      "trace_id": "TRACE-bf410f53-dd68-4d1e-900a-30abe98b7a72",
+      "trace_id": "TRACE-36404ee0-7969-4507-9351-4b0ca8dac8d3",
       "hit_at_10": true,
       "citation_verified": true,
       "citation_ids": [
@@ -853,7 +853,7 @@
       "case_id": "RAG-region-02",
       "topic": "region",
       "status": "SUCCEEDED",
-      "trace_id": "TRACE-2805c3c4-157b-48f0-b9f5-48f6d8b02514",
+      "trace_id": "TRACE-ff4a7fe6-3f9c-410c-b710-054416275a1f",
       "hit_at_10": true,
       "citation_verified": true,
       "citation_ids": [
@@ -865,7 +865,7 @@
       "case_id": "RAG-region-03",
       "topic": "region",
       "status": "SUCCEEDED",
-      "trace_id": "TRACE-c7c6d8db-9ce0-4795-8675-eb7bcc1f209d",
+      "trace_id": "TRACE-08fe0ed8-f64d-4274-8444-caac089ac1d1",
       "hit_at_10": true,
       "citation_verified": true,
       "citation_ids": [
@@ -877,7 +877,7 @@
       "case_id": "RAG-region-04",
       "topic": "region",
       "status": "SUCCEEDED",
-      "trace_id": "TRACE-674761fe-d823-4ac7-91b2-ade69a5829f5",
+      "trace_id": "TRACE-9c95e603-9217-4725-bb3a-cf93d217737f",
       "hit_at_10": true,
       "citation_verified": true,
       "citation_ids": [
@@ -889,7 +889,7 @@
       "case_id": "RAG-region-05",
       "topic": "region",
       "status": "SUCCEEDED",
-      "trace_id": "TRACE-b7243de5-df94-4f29-91aa-987e9af1a2dc",
+      "trace_id": "TRACE-ff10035a-2921-4a5c-83a5-f697f3890520",
       "hit_at_10": true,
       "citation_verified": true,
       "citation_ids": [
@@ -901,7 +901,7 @@
       "case_id": "RAG-region-06",
       "topic": "region",
       "status": "SUCCEEDED",
-      "trace_id": "TRACE-f7bcae6a-a7e6-4e4c-a2b3-5d1be74bb589",
+      "trace_id": "TRACE-8d6a879f-452c-40ca-9221-6e95af25b20f",
       "hit_at_10": true,
       "citation_verified": true,
       "citation_ids": [
@@ -915,7 +915,7 @@
       "case_id": "RAG-region-07",
       "topic": "region",
       "status": "SUCCEEDED",
-      "trace_id": "TRACE-9f36d14d-31ef-4b1e-aba4-c3437dc27758",
+      "trace_id": "TRACE-47175eb0-a209-48cf-aa29-55b07313e57d",
       "hit_at_10": true,
       "citation_verified": true,
       "citation_ids": [
@@ -927,7 +927,7 @@
       "case_id": "RAG-region-08",
       "topic": "region",
       "status": "SUCCEEDED",
-      "trace_id": "TRACE-63ef38a8-e6e0-401a-8327-de37cc7dcdaa",
+      "trace_id": "TRACE-9ca51157-f019-4a77-8374-06a0b2b7bd34",
       "hit_at_10": true,
       "citation_verified": true,
       "citation_ids": [
@@ -939,7 +939,7 @@
       "case_id": "RAG-region-09",
       "topic": "region",
       "status": "SUCCEEDED",
-      "trace_id": "TRACE-0d9d2fbb-4073-4da4-b38b-665c17a20fcf",
+      "trace_id": "TRACE-7128342a-cb3f-41ed-92e8-1bd4fc3a44d4",
       "hit_at_10": true,
       "citation_verified": true,
       "citation_ids": [
@@ -951,7 +951,7 @@
       "case_id": "RAG-region-10",
       "topic": "region",
       "status": "SUCCEEDED",
-      "trace_id": "TRACE-e4ce0d18-ecd1-4051-8c07-06c46db3f608",
+      "trace_id": "TRACE-d1271ece-8279-49ca-8b80-47bda7498219",
       "hit_at_10": true,
       "citation_verified": true,
       "citation_ids": [
@@ -964,7 +964,7 @@
       "case_id": "RAG-region-11",
       "topic": "region",
       "status": "SUCCEEDED",
-      "trace_id": "TRACE-d0d282b5-19c2-44e4-888a-cf31df18bb32",
+      "trace_id": "TRACE-f963f307-8704-4ba5-b1d6-40e182fe0e84",
       "hit_at_10": true,
       "citation_verified": true,
       "citation_ids": [
@@ -978,7 +978,7 @@
       "case_id": "RAG-region-12",
       "topic": "region",
       "status": "SUCCEEDED",
-      "trace_id": "TRACE-cd00584a-4d87-443a-a5be-b326c29366fe",
+      "trace_id": "TRACE-2f3a6bd3-e3ff-4c90-88f5-c0b2fc832def",
       "hit_at_10": true,
       "citation_verified": true,
       "citation_ids": [
@@ -990,7 +990,7 @@
       "case_id": "RAG-region-13",
       "topic": "region",
       "status": "SUCCEEDED",
-      "trace_id": "TRACE-43c47554-9d0f-40e8-a825-7f8cba1b6ed3",
+      "trace_id": "TRACE-7812f7dc-7912-442a-9bb3-cdce44e3b316",
       "hit_at_10": true,
       "citation_verified": true,
       "citation_ids": [
@@ -1003,7 +1003,7 @@
       "case_id": "RAG-region-14",
       "topic": "region",
       "status": "SUCCEEDED",
-      "trace_id": "TRACE-9d576e02-8c5c-4f90-a1f3-0c0e799ffb16",
+      "trace_id": "TRACE-64593791-0505-4e62-9d6b-303f56b992ba",
       "hit_at_10": true,
       "citation_verified": true,
       "citation_ids": [
@@ -1016,7 +1016,7 @@
       "case_id": "RAG-region-15",
       "topic": "region",
       "status": "SUCCEEDED",
-      "trace_id": "TRACE-d372d5ed-b977-4d6f-8465-dbfb2d343162",
+      "trace_id": "TRACE-538c7e3b-1351-4bd9-9a43-16d42aea962e",
       "hit_at_10": true,
       "citation_verified": true,
       "citation_ids": [
@@ -1030,7 +1030,7 @@
       "case_id": "RAG-region-16",
       "topic": "region",
       "status": "SUCCEEDED",
-      "trace_id": "TRACE-b498831f-cfb0-470c-ab6b-d33295d065e5",
+      "trace_id": "TRACE-daae3d34-2955-43fe-a33f-648e474f43c1",
       "hit_at_10": true,
       "citation_verified": true,
       "citation_ids": [
@@ -1044,7 +1044,7 @@
       "case_id": "RAG-region-17",
       "topic": "region",
       "status": "SUCCEEDED",
-      "trace_id": "TRACE-e7f27202-d183-43f4-a181-c782a8326a07",
+      "trace_id": "TRACE-7281837a-b78a-45ef-b00d-3d83c3cd6252",
       "hit_at_10": true,
       "citation_verified": true,
       "citation_ids": [
@@ -1057,7 +1057,7 @@
       "case_id": "RAG-region-18",
       "topic": "region",
       "status": "SUCCEEDED",
-      "trace_id": "TRACE-9108bdf5-77f9-4e19-9faf-d0d0f87ac14e",
+      "trace_id": "TRACE-4769baad-8eac-46f6-bc62-9b7829032462",
       "hit_at_10": true,
       "citation_verified": true,
       "citation_ids": [
@@ -1069,7 +1069,7 @@
       "case_id": "RAG-region-19",
       "topic": "region",
       "status": "SUCCEEDED",
-      "trace_id": "TRACE-bbc719d2-0967-42f3-b823-15a5245e833b",
+      "trace_id": "TRACE-b1bb5608-2d57-4a6f-8d0b-17b31f8c06f0",
       "hit_at_10": true,
       "citation_verified": true,
       "citation_ids": [
@@ -1081,7 +1081,7 @@
       "case_id": "RAG-region-20",
       "topic": "region",
       "status": "SUCCEEDED",
-      "trace_id": "TRACE-3160e767-3534-4682-b044-4cff773ae668",
+      "trace_id": "TRACE-c2988bef-17e6-42ca-a017-1bd14f026ebb",
       "hit_at_10": true,
       "citation_verified": true,
       "citation_ids": [
@@ -1093,7 +1093,7 @@
       "case_id": "RAG-time-01",
       "topic": "time",
       "status": "SUCCEEDED",
-      "trace_id": "TRACE-f27ae4ac-c4bd-4a26-8e43-835bf0125a33",
+      "trace_id": "TRACE-4469f5e1-9415-4857-8c42-1a4112ab0e15",
       "hit_at_10": true,
       "citation_verified": true,
       "citation_ids": [
@@ -1105,7 +1105,7 @@
       "case_id": "RAG-time-02",
       "topic": "time",
       "status": "SUCCEEDED",
-      "trace_id": "TRACE-32879eb2-0d7f-443f-b5c4-305a77d54320",
+      "trace_id": "TRACE-c8f3f3fb-4744-418f-8e0a-5781524320ea",
       "hit_at_10": true,
       "citation_verified": true,
       "citation_ids": [
@@ -1116,7 +1116,7 @@
       "case_id": "RAG-time-03",
       "topic": "time",
       "status": "SUCCEEDED",
-      "trace_id": "TRACE-fb525f37-9fde-4c88-a3b4-7e3af41fe961",
+      "trace_id": "TRACE-ad905a79-1580-4963-b273-ab225b36048f",
       "hit_at_10": true,
       "citation_verified": true,
       "citation_ids": [
@@ -1127,7 +1127,7 @@
       "case_id": "RAG-time-04",
       "topic": "time",
       "status": "SUCCEEDED",
-      "trace_id": "TRACE-15ede6c4-2e09-4359-811f-3b51c37f79e1",
+      "trace_id": "TRACE-74686e6a-3b4a-4cb2-b58c-a06d16c3a0cb",
       "hit_at_10": true,
       "citation_verified": true,
       "citation_ids": [
@@ -1138,7 +1138,7 @@
       "case_id": "RAG-time-05",
       "topic": "time",
       "status": "SUCCEEDED",
-      "trace_id": "TRACE-4f23f612-5f68-4830-a7af-fc68d2166965",
+      "trace_id": "TRACE-e52920d5-5453-473f-8773-2881c8757639",
       "hit_at_10": true,
       "citation_verified": true,
       "citation_ids": [
@@ -1149,7 +1149,7 @@
       "case_id": "RAG-time-06",
       "topic": "time",
       "status": "SUCCEEDED",
-      "trace_id": "TRACE-0e95f053-7a98-45e8-a75b-456a7bcdb262",
+      "trace_id": "TRACE-3615a113-dd94-4dd4-84e5-6eaf02d88ca0",
       "hit_at_10": true,
       "citation_verified": true,
       "citation_ids": [
@@ -1162,7 +1162,7 @@
       "case_id": "RAG-time-07",
       "topic": "time",
       "status": "SUCCEEDED",
-      "trace_id": "TRACE-834bb303-2553-4e0f-8ac8-14def7d32811",
+      "trace_id": "TRACE-a8f7d2ea-c5ce-4bbb-97ea-1d981f740ee3",
       "hit_at_10": true,
       "citation_verified": true,
       "citation_ids": [
@@ -1173,7 +1173,7 @@
       "case_id": "RAG-time-08",
       "topic": "time",
       "status": "SUCCEEDED",
-      "trace_id": "TRACE-2ea14360-f8b6-4f09-a4c8-5803575b1ef4",
+      "trace_id": "TRACE-44fe81cd-d4c3-4a92-b519-071a469d1e13",
       "hit_at_10": true,
       "citation_verified": true,
       "citation_ids": [
@@ -1184,7 +1184,7 @@
       "case_id": "RAG-time-09",
       "topic": "time",
       "status": "SUCCEEDED",
-      "trace_id": "TRACE-c5cc2a6d-f338-4119-a051-d1d96818a97e",
+      "trace_id": "TRACE-350f95c2-0031-4b13-98e9-f7dfbab78346",
       "hit_at_10": true,
       "citation_verified": true,
       "citation_ids": [
@@ -1195,7 +1195,7 @@
       "case_id": "RAG-time-10",
       "topic": "time",
       "status": "SUCCEEDED",
-      "trace_id": "TRACE-d889d02d-407c-43b9-9c5c-0e4ee70c61b5",
+      "trace_id": "TRACE-dbee3208-5784-4032-83d7-871205010e52",
       "hit_at_10": true,
       "citation_verified": true,
       "citation_ids": [
@@ -1208,7 +1208,7 @@
       "case_id": "RAG-time-11",
       "topic": "time",
       "status": "SUCCEEDED",
-      "trace_id": "TRACE-806fb7d9-ef7e-4529-a5eb-4c118a26b7bb",
+      "trace_id": "TRACE-b8eca4ec-5a9f-4b22-962e-f8f17ef359a3",
       "hit_at_10": true,
       "citation_verified": true,
       "citation_ids": [
@@ -1221,7 +1221,7 @@
       "case_id": "RAG-time-12",
       "topic": "time",
       "status": "SUCCEEDED",
-      "trace_id": "TRACE-20e46778-436c-4fdf-a5d4-29b7ab67a060",
+      "trace_id": "TRACE-6759f5d2-5baa-4f9a-bd56-93f07d00ed1d",
       "hit_at_10": true,
       "citation_verified": true,
       "citation_ids": [
@@ -1232,7 +1232,7 @@
       "case_id": "RAG-time-13",
       "topic": "time",
       "status": "SUCCEEDED",
-      "trace_id": "TRACE-f3664a8a-3a9e-40b0-81da-2722fce41729",
+      "trace_id": "TRACE-eb550c2f-3008-496e-8c81-6ab4ae32124b",
       "hit_at_10": true,
       "citation_verified": true,
       "citation_ids": [
@@ -1244,7 +1244,7 @@
       "case_id": "RAG-time-14",
       "topic": "time",
       "status": "SUCCEEDED",
-      "trace_id": "TRACE-0a0ae253-45ae-4cbc-8b49-c14eb0528107",
+      "trace_id": "TRACE-72aaef00-5ae1-4397-98ba-487019b561d6",
       "hit_at_10": true,
       "citation_verified": true,
       "citation_ids": [
@@ -1256,7 +1256,7 @@
       "case_id": "RAG-time-15",
       "topic": "time",
       "status": "SUCCEEDED",
-      "trace_id": "TRACE-8211274d-bfed-45f3-af86-c38b844f8e3a",
+      "trace_id": "TRACE-25e76032-8bb6-4127-b6e2-ea986f77bcb6",
       "hit_at_10": true,
       "citation_verified": true,
       "citation_ids": [
@@ -1269,7 +1269,7 @@
       "case_id": "RAG-time-16",
       "topic": "time",
       "status": "SUCCEEDED",
-      "trace_id": "TRACE-5bef5269-f1e3-45de-8983-0f3eded7b12c",
+      "trace_id": "TRACE-824c373b-1bbb-4533-8fb1-8fda166a21aa",
       "hit_at_10": true,
       "citation_verified": true,
       "citation_ids": [
@@ -1282,7 +1282,7 @@
       "case_id": "RAG-time-17",
       "topic": "time",
       "status": "SUCCEEDED",
-      "trace_id": "TRACE-30e94033-1181-4265-adf5-ad8f8204665d",
+      "trace_id": "TRACE-4c3e54e3-771e-494b-a1ee-464081e8c71e",
       "hit_at_10": true,
       "citation_verified": true,
       "citation_ids": [
@@ -1294,7 +1294,7 @@
       "case_id": "RAG-time-18",
       "topic": "time",
       "status": "SUCCEEDED",
-      "trace_id": "TRACE-ce3426ba-dcbf-41d2-ba32-10c1c8b155b5",
+      "trace_id": "TRACE-714e06e4-b986-41ec-9b24-9b5ced3534a7",
       "hit_at_10": true,
       "citation_verified": true,
       "citation_ids": [
@@ -1305,7 +1305,7 @@
       "case_id": "RAG-time-19",
       "topic": "time",
       "status": "SUCCEEDED",
-      "trace_id": "TRACE-56a385c0-2e10-48cb-a7d3-9d14e878da4a",
+      "trace_id": "TRACE-18bf9512-5b5b-4257-8e06-ee5a0904c0b0",
       "hit_at_10": true,
       "citation_verified": true,
       "citation_ids": [
@@ -1317,7 +1317,7 @@
       "case_id": "RAG-time-20",
       "topic": "time",
       "status": "SUCCEEDED",
-      "trace_id": "TRACE-67d49ab9-9eb9-4a5f-ac9f-d7f8bac74a4c",
+      "trace_id": "TRACE-bceed34a-b03f-4141-b606-012b785fbb99",
       "hit_at_10": true,
       "citation_verified": true,
       "citation_ids": [
@@ -1328,7 +1328,7 @@
       "case_id": "RAG-verification-01",
       "topic": "verification",
       "status": "SUCCEEDED",
-      "trace_id": "TRACE-b603c172-771a-4dc5-8924-463714f7fc12",
+      "trace_id": "TRACE-101b2b8f-880c-4f50-b862-d607b1e9cc79",
       "hit_at_10": true,
       "citation_verified": true,
       "citation_ids": [
@@ -1341,7 +1341,7 @@
       "case_id": "RAG-verification-02",
       "topic": "verification",
       "status": "SUCCEEDED",
-      "trace_id": "TRACE-fbfcec91-b4c8-4e5f-b8dd-55cb7c9889ba",
+      "trace_id": "TRACE-e71cb1a5-09ca-4a84-b3ff-6f6bd635c0c0",
       "hit_at_10": true,
       "citation_verified": true,
       "citation_ids": [
@@ -1353,7 +1353,7 @@
       "case_id": "RAG-verification-03",
       "topic": "verification",
       "status": "SUCCEEDED",
-      "trace_id": "TRACE-6a514119-c6aa-4420-8981-70be1ad35811",
+      "trace_id": "TRACE-a41ab923-d4f8-4ac3-9ff0-2aed087a7576",
       "hit_at_10": true,
       "citation_verified": true,
       "citation_ids": [
@@ -1365,7 +1365,7 @@
       "case_id": "RAG-verification-04",
       "topic": "verification",
       "status": "SUCCEEDED",
-      "trace_id": "TRACE-87dbb475-6b4b-4a28-a725-e99bbc1c0595",
+      "trace_id": "TRACE-f7088412-ff5d-4888-871f-0c99f20a0ecc",
       "hit_at_10": true,
       "citation_verified": true,
       "citation_ids": [
@@ -1377,7 +1377,7 @@
       "case_id": "RAG-verification-05",
       "topic": "verification",
       "status": "SUCCEEDED",
-      "trace_id": "TRACE-3b39b119-9e8e-4ab2-917d-a913aa93179f",
+      "trace_id": "TRACE-3fda0db7-3589-4558-99ec-ccb7c7570aa9",
       "hit_at_10": true,
       "citation_verified": true,
       "citation_ids": [
@@ -1389,7 +1389,7 @@
       "case_id": "RAG-verification-06",
       "topic": "verification",
       "status": "SUCCEEDED",
-      "trace_id": "TRACE-54e31e98-e7f5-4a8c-9d2f-d443883849d5",
+      "trace_id": "TRACE-268c067c-48b5-4483-a356-42363daa5be8",
       "hit_at_10": true,
       "citation_verified": true,
       "citation_ids": [
@@ -1401,7 +1401,7 @@
       "case_id": "RAG-verification-07",
       "topic": "verification",
       "status": "SUCCEEDED",
-      "trace_id": "TRACE-e3606afb-a336-4b0b-b858-6eb0080091ab",
+      "trace_id": "TRACE-5c8df187-858b-4efd-80e5-918797b37fac",
       "hit_at_10": true,
       "citation_verified": true,
       "citation_ids": [
@@ -1413,7 +1413,7 @@
       "case_id": "RAG-verification-08",
       "topic": "verification",
       "status": "SUCCEEDED",
-      "trace_id": "TRACE-147edd31-0ab2-409d-a83b-8cd06564ecd4",
+      "trace_id": "TRACE-3021fedf-863b-4a73-8510-bb5686dfb4d0",
       "hit_at_10": true,
       "citation_verified": true,
       "citation_ids": [
@@ -1425,7 +1425,7 @@
       "case_id": "RAG-verification-09",
       "topic": "verification",
       "status": "SUCCEEDED",
-      "trace_id": "TRACE-05f32406-8006-4075-96a5-014b55bf1812",
+      "trace_id": "TRACE-2e9b3db5-91d3-4cbb-86f9-542ce45efa3f",
       "hit_at_10": true,
       "citation_verified": true,
       "citation_ids": [
@@ -1437,7 +1437,7 @@
       "case_id": "RAG-verification-10",
       "topic": "verification",
       "status": "SUCCEEDED",
-      "trace_id": "TRACE-409a6577-9a87-4386-8d44-6a507d3384c4",
+      "trace_id": "TRACE-a0a5e696-ab79-4212-907d-02916619ce7f",
       "hit_at_10": true,
       "citation_verified": true,
       "citation_ids": [
@@ -1450,7 +1450,7 @@
       "case_id": "RAG-verification-11",
       "topic": "verification",
       "status": "SUCCEEDED",
-      "trace_id": "TRACE-4c2e7a11-f843-43c2-a7ce-b84e37d97331",
+      "trace_id": "TRACE-e3ecb613-4fda-49c7-a013-c7b2f1ffb3b1",
       "hit_at_10": true,
       "citation_verified": true,
       "citation_ids": [
@@ -1463,7 +1463,7 @@
       "case_id": "RAG-verification-12",
       "topic": "verification",
       "status": "SUCCEEDED",
-      "trace_id": "TRACE-415d1f4b-6f2a-44e7-bf63-f9da2664e99a",
+      "trace_id": "TRACE-3fc0b27a-d6d1-4284-92c4-e8ac02c5d9b7",
       "hit_at_10": true,
       "citation_verified": true,
       "citation_ids": [
@@ -1475,7 +1475,7 @@
       "case_id": "RAG-verification-13",
       "topic": "verification",
       "status": "SUCCEEDED",
-      "trace_id": "TRACE-e6b99da0-4a8a-44fb-9554-e6cd40534e2f",
+      "trace_id": "TRACE-648b1c3f-1d8e-409e-b315-bdfe935c43ee",
       "hit_at_10": true,
       "citation_verified": true,
       "citation_ids": [
@@ -1487,7 +1487,7 @@
       "case_id": "RAG-verification-14",
       "topic": "verification",
       "status": "SUCCEEDED",
-      "trace_id": "TRACE-f5113b3b-6b07-4c86-acee-1d88047efd80",
+      "trace_id": "TRACE-cf76d975-4752-4bad-9b12-423c0f326328",
       "hit_at_10": true,
       "citation_verified": true,
       "citation_ids": [
@@ -1499,7 +1499,7 @@
       "case_id": "RAG-verification-15",
       "topic": "verification",
       "status": "SUCCEEDED",
-      "trace_id": "TRACE-ef17895a-0ebe-48be-8ce0-2cbd84c6de30",
+      "trace_id": "TRACE-84904d19-036a-430d-a816-55fef84e0595",
       "hit_at_10": true,
       "citation_verified": true,
       "citation_ids": [
@@ -1514,7 +1514,7 @@
       "case_id": "RAG-verification-16",
       "topic": "verification",
       "status": "SUCCEEDED",
-      "trace_id": "TRACE-b9a30242-e4cb-49c7-b0a8-b8a29b1667bd",
+      "trace_id": "TRACE-eb6030b4-3ae0-47b7-9654-5e95e9250103",
       "hit_at_10": true,
       "citation_verified": true,
       "citation_ids": [
@@ -1527,7 +1527,7 @@
       "case_id": "RAG-verification-17",
       "topic": "verification",
       "status": "SUCCEEDED",
-      "trace_id": "TRACE-d311a6db-9e6d-4293-91de-2b3c3432075c",
+      "trace_id": "TRACE-d025c264-69e5-4eaa-8184-5846acb859ba",
       "hit_at_10": true,
       "citation_verified": true,
       "citation_ids": [
@@ -1539,7 +1539,7 @@
       "case_id": "RAG-verification-18",
       "topic": "verification",
       "status": "SUCCEEDED",
-      "trace_id": "TRACE-05d87b3a-d9ee-4b0f-9299-701d97791663",
+      "trace_id": "TRACE-98fa169d-c9f1-465f-93d2-d0b6e9a378f9",
       "hit_at_10": true,
       "citation_verified": true,
       "citation_ids": [
@@ -1551,7 +1551,7 @@
       "case_id": "RAG-verification-19",
       "topic": "verification",
       "status": "SUCCEEDED",
-      "trace_id": "TRACE-4e2bcc40-a5da-454d-9dc6-8405407a458e",
+      "trace_id": "TRACE-e7c462ff-d832-4178-b7b4-7c0174761fe4",
       "hit_at_10": true,
       "citation_verified": true,
       "citation_ids": [
@@ -1564,7 +1564,7 @@
       "case_id": "RAG-verification-20",
       "topic": "verification",
       "status": "SUCCEEDED",
-      "trace_id": "TRACE-3f6a7278-4312-4895-b887-f50f8930b23b",
+      "trace_id": "TRACE-c327aa43-d155-4bd9-9e49-867e5ed641a9",
       "hit_at_10": true,
       "citation_verified": true,
       "citation_ids": [

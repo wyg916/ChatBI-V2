@@ -1,10 +1,10 @@
 {
   "checked_at": "2026-08-18",
-  "candidate_version": "1.0.0",
+  "candidate_version": "1.0.1",
   "migration_head": "20260817_0008",
   "run1": {
     "full_stop_before_start": true,
-    "duration_seconds": 174.9,
+    "duration_seconds": 54.5,
     "backend_http": 200,
     "frontend_http": 200,
     "live_rag": "READY_SIGNED_WORKSPACE_IDENTITY",
@@ -18,7 +18,7 @@
   "full_stop_between_runs": true,
   "run2": {
     "full_stop_before_start": true,
-    "duration_seconds": 83.5,
+    "duration_seconds": 33.2,
     "backend_http": 200,
     "frontend_http": 200,
     "live_rag": "READY_SIGNED_WORKSPACE_IDENTITY",

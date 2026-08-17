@@ -1,6 +1,6 @@
-# ChatBI V2 V1.0.0 Release Notes
+# ChatBI V2 V1.0.1 Release Notes
 
-ChatBI V2 是一个 Chat-first、可验证、可独立部署的开源企业级问数产品。V1.0.0 完成从数据源连接到持续评测的完整主链路，并以结果值正确性与只读安全作为发布门禁。
+ChatBI V2 是一个 Chat-first、可验证、可独立部署的开源企业级问数产品。V1.0.1 在不可变的 V1.0.0 安全基线上完成 Live RAG 与受限 Multi-Agent 最终门禁，并保持从数据源连接到持续评测的完整主链路、结果值正确性与只读安全。
 
 ## 核心能力
 
@@ -23,10 +23,10 @@ Windows 用户完成本机 PostgreSQL/MySQL 初始化后，可双击 `一键启�
 
 - Golden PostgreSQL：SQL/结果/语义 50/50；MySQL 10/10。
 - 危险 SQL：38/38 阻断，实际写入成功 0。
-- Backend 121/121、Frontend Vitest 27/27；Serial E2E 50/50、5 workers Parallel E2E 50/50，retries=0。
+- Backend 127/127、Frontend Vitest 27/27；Serial E2E 51/51、5 workers Parallel E2E 连续三轮 153/153，retries=0。
 - Live RAG Golden 120/120，Recall@10 1.0，Citation Accuracy 1.0，越权检索 0；Complex Analysis 10/10，Trace 完整率 100%。
 - 三模型 Final Smoke 均通过 Discovery、认证、Chat、SQLPlan 与 SQL Guard。
-- 从停止状态的两次隔离 metadata 冷启动与 Day4→Final 回滚恢复模拟通过。
+- 一次隔离 metadata 冷启动、两次完整停止后的一键启动，以及 V1.0.0→V1.0.1 回滚恢复模拟全部通过。
 
 最终 Backend、Frontend、Migration、两次一键启动、Git/Tag 数字以 `docs/releases/V1_FINAL_MANIFEST.md` 与 `docs/status/DAY5_STATUS.md` 为准。
 

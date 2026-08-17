@@ -6,7 +6,7 @@ This directory contains sanitized, reproducible release-gate summaries. It conta
 - `provider-live-smoke.json`: Kimi, MiMo and DeepSeek Discovery/Auth/Chat/SQLPlan/Guard status without credentials.
 - `migration-results.json`: isolated PostgreSQL upgrade/base/upgrade and single-head validation.
 - `one-click-runs.json`: two starts from fully stopped state.
-- `parallel-e2e-final.json`: two 5-worker Playwright rounds with retries disabled.
+- `parallel-e2e-final.json`: three accepted 5-worker Playwright rounds with retries disabled, plus the pre-fix race evidence.
 - `rollback-simulation.json`: safe Day4-to-final rollback and restore using temporary source/schema.
 - `final-regression.json`: final Backend, Frontend, Golden, E2E, security, migration and UI summary.
 - `rag-golden-120.json`: 120 live signed RAG queries plus workspace authorization rejection checks.

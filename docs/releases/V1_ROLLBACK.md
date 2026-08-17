@@ -1,10 +1,10 @@
-# ChatBI V1.0.0 Rollback
+# ChatBI V1.0.1 Rollback
 
 ## Baselines
 
-- Final Tag: `chatbi-v2-v1.0.0`
-- Day 4 safe SHA: `d70125f6172dd170c419110fd75d47e87a7f121a`
-- Day 4 migration: `20260817_0006`
+- Final Tag: `chatbi-v2-v1.0.1`
+- Previous public safe tag: `chatbi-v2-v1.0.0` (`4ec4f0eb8e4060cec035d76b1ffbe32d8f80fce0`)
+- Previous public safe migration: `20260817_0007`
 - V1 final migration: `20260817_0008`
 
 ## Back up first
@@ -14,11 +14,11 @@ Stop metadata administration writes and use the deployment environment's secret 
 ## Emergency application rollback
 
 1. Stop the application with `.\scripts\stop.ps1`.
-2. Deploy the retained Day 4 image or SHA `d70125f6172dd170c419110fd75d47e87a7f121a`.
-3. Using the backed-up metadata database, downgrade only when schema compatibility requires it: `.\.venv\Scripts\python.exe -m alembic downgrade 20260817_0006` from `backend`.
-4. Start Day 4 and verify health, data-source connections, Ask, Result Oracle, Golden 50 and zero writes.
+2. Deploy the retained public `chatbi-v2-v1.0.0` artifact at SHA `4ec4f0eb8e4060cec035d76b1ffbe32d8f80fce0`.
+3. Using the backed-up metadata database, downgrade only when schema compatibility requires it: `.\.venv\Scripts\python.exe -m alembic downgrade 20260817_0007` from `backend`.
+4. Start V1.0.0 and verify health, data-source connections, Ask, Result Oracle, Golden 50 and zero writes.
 
-`CHATBI_RAG_MODE=off` and `CHATBI_AGENT_MODE=off` are emergency diagnostics for the final image, not a release-compliant V1 configuration. The safer rollback is to deploy the fully tested Day 4 artifact together with its compatible schema.
+`CHATBI_RAG_MODE=off` and `CHATBI_AGENT_MODE=off` are emergency diagnostics for the final image, not a release-compliant V1 configuration. The safer rollback is to deploy the immutable, fully tested V1.0.0 artifact together with migration `0007`.
 
 ## Restore V1 final
 
@@ -34,4 +34,4 @@ Then verify PostgreSQL/MySQL READY, signed live RAG READY, five-role Agent READY
 
 ## Executed simulation
 
-The isolated rollback exercise ran final migration `0008` → Day 4 migration `0006` and validated Day 4 start/Ask/Golden50, then restored `0008` and validated final start/Ask/Golden50. Temporary schema and source were removed; real project data was preserved. Evidence: `docs/evidence/day5/rollback-rag-agent-simulation.json`.
+The isolated rollback exercise ran final migration `0008` → V1.0.0 migration `0007` and validated V1.0.0 start/Ask/Golden50, then restored `0008` and validated V1.0.1 start/Ask/Golden50. Temporary schema and source were removed; real project data was preserved. Evidence: `docs/evidence/day5/rollback-simulation.json`.

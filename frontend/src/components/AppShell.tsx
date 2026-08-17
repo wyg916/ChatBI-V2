@@ -77,7 +77,7 @@ export function AppShell() {
         <NavLink to="/settings/models" className={isSettings ? 'nav-item active' : 'nav-item'}><span>设</span>系统设置</NavLink>
         <div className="side-spacer" />
         <NavLink to="/settings/security" className="user-card"><span>王</span><div><strong>王迎港</strong><small>管理员 · 数据分析部</small></div></NavLink>
-        <small className="version">v1.0.0 · 开源企业版</small>
+        <small className="version">v1.0.1 · 开源企业版</small>
       </aside>
       <div className="app-frame">
         <header className="topbar"><div><small>{headerCrumb}</small><h2>{title}</h2></div><div className="header-actions"><button className="context-pill"><img src={onlineIcon} alt="" />{contextLabel}</button><button className="icon-button" aria-label={isDashboardDetail ? '返回看板列表' : '帮助'} onClick={isDashboardDetail ? () => history.back() : undefined}>{isDashboardDetail ? '←' : '?'}</button>{(isContentLibrary || isDashboardDetail || isEvaluation || isSettings) && <button className="icon-button" aria-label="更多操作">{isDashboardDetail || isEvaluation ? '↑' : '⋯'}</button>}</div></header>

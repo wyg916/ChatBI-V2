@@ -1,14 +1,14 @@
-# ChatBI V2 V1.0.0 Final Manifest
+# ChatBI V2 V1.0.1 Final Manifest
 
 ## Release identity
 
 - Product: ChatBI V2 / ChatBI Core
-- Version: `1.0.0`
-- Final SHA: the commit peeled from annotated tag `chatbi-v2-v1.0.0`
-- Final Tag: `chatbi-v2-v1.0.0`
+- Version: `1.0.1`
+- Final SHA: the commit peeled from annotated tag `chatbi-v2-v1.0.1`
+- Final Tag: `chatbi-v2-v1.0.1`
 - Build Date: `2026-08-18`
 - Migration Head: `20260817_0008`
-- Previous safe rollback target: `d70125f6172dd170c419110fd75d47e87a7f121a` (`chatbi-v2-day4-quality-pass`)
+- Previous safe rollback target: `4ec4f0eb8e4060cec035d76b1ffbe32d8f80fce0` (`chatbi-v2-v1.0.0`)
 
 The Git object ID cannot be embedded in the commit that determines that ID. After release, the peeled tag, local `main`, `origin/main`, and `ls-remote` main SHA must be identical.
 
@@ -28,12 +28,13 @@ The Git object ID cannot be embedded in the commit that determines that ID. Afte
 | Golden Manifest SHA-256 | `25580af42bc76ebddd3d49e6b9c16f8bfabba8ba485a835c453c29175ee2a64a` |
 | Golden Result | Original Golden20 PASS; PostgreSQL execution/result/semantic 50/50; MySQL execution/result 10/10 |
 | Security Block Rate | 38/38 = 100%; actual successful write attempts 0 |
-| Backend Tests | 121/121 PASS |
+| Backend Tests | 127/127 PASS |
 | Frontend Tests | TypeScript PASS; Vitest 27/27; production build PASS |
-| E2E | Serial 50/50 PASS; parallel 50/50 PASS at 5 workers; retries 0 |
+| E2E | Serial 51/51 PASS; parallel 153/153 PASS at 5 workers × 3; retries 0 |
 | Provider Smoke | Kimi, MiMo, DeepSeek Discovery/Auth/Chat/SQLPlan/Guard PASS |
 | UI14 | 14/14 pages retained; browser regression suite PASS |
-| Cold Start | Run1 PASS in 174.9s; complete stop; Run2 PASS in 83.5s |
+| Cold Start | Isolated metadata schema PASS in 72.3s |
+| One-click Start | Run1 PASS in 54.5s; complete stop; Run2 PASS in 33.2s |
 | Migration | Single head; upgrade to head, base, and re-upgrade PASS; temporary schema removed |
 | Secret Scan | Tracked secret matches 0; credentials remain only in ignored local environment |
 | License Gate | PASS; old production source copy 0; old source imports 0; Git submodules 0 |

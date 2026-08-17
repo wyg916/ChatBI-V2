@@ -22,15 +22,16 @@
 - `UNAUTHORIZED_TOOL_CALL=0`
 - `SQL_GUARD_BYPASS=0`
 - `RBAC_BYPASS=0`
-- `BACKEND=121/121 PASS`
+- `BACKEND=127/127 PASS`
 - `FRONTEND=TypeScript PASS; Vitest 27/27; Build PASS`
-- `SERIAL_E2E=50/50 PASS`
-- `PARALLEL_E2E=50/50 PASS (5 workers, retries=0)`
+- `SERIAL_E2E=51/51 PASS`
+- `PARALLEL_E2E=153/153 PASS (5 workers × 3, retries=0)`
 - `GOLDEN50=PostgreSQL 50/50; MySQL 10/10; Golden20 regression PASS`
 - `SECURITY=38/38 dangerous SQL blocked; actual writes 0`
 - `MIGRATION=single head; upgrade-base-upgrade PASS; head 20260817_0008`
-- `COLD_START_RUN1=PASS (174.9s)`
-- `COLD_START_RUN2=PASS (83.5s)`
+- `COLD_START=PASS (isolated schema, 72.3s)`
+- `ONE_CLICK_START_RUN1=PASS (full stop, 54.5s)`
+- `ONE_CLICK_START_RUN2=PASS (full stop, 33.2s)`
 - `ROLLBACK_SIMULATION=PASS`
 - `PROVIDER_LIVE_SMOKE=Kimi/MiMo/DeepSeek PASS`
 - `TRACKED_SECRET_MATCHES=0`
@@ -48,16 +49,18 @@ The final release response records the literal values after merge, push, fetch, 
 git rev-parse main
 git rev-parse origin/main
 git ls-remote origin refs/heads/main
-git rev-parse "chatbi-v2-v1.0.0^{}"
+git rev-parse "chatbi-v2-v1.0.1^{}"
 ```
+
+The existing public annotated tag `chatbi-v2-v1.0.0` remains unchanged at the prior safe baseline; this closure publishes the new annotated tag `chatbi-v2-v1.0.1`.
 
 ## Evidence
 
 - `docs/evidence/day5/rag-multiagent-final-acceptance.json`
 - `docs/evidence/day5/rag-golden-120.json`
 - `docs/evidence/day5/complex-e2e-10.json`
-- `docs/evidence/day5/cold-start-rag-agent-run1.json`
-- `docs/evidence/day5/cold-start-rag-agent-run2.json`
+- `docs/evidence/day5/cold-start.json`
+- `docs/evidence/day5/one-click-runs.json`
 - `docs/evidence/day5/rollback-rag-agent-simulation.json`
 - `docs/evidence/day5/rag-agent-license-gate.json`
 - `docs/releases/V1_FINAL_MANIFEST.md`

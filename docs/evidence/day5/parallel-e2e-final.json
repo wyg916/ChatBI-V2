@@ -2,17 +2,25 @@
   "checked_at": "2026-08-18",
   "workers": 5,
   "playwright_retries": 0,
-  "pre_fix_run": {
-    "passed": 45,
-    "failed": 5,
-    "cause": "The new suite selected an ephemeral semantic model that another parallel test deleted.",
-    "resolution": "Select the stable seeded semantic model by name."
-  },
-  "accepted_final_run": {
-    "passed": 50,
-    "failed": 0,
-    "duration_minutes": 1.5,
-    "runtime_race": 0
-  },
-  "result": "PASS_AFTER_TEST_ISOLATION_FIX"
+  "pre_fix_runs": [
+    {
+      "passed": 44,
+      "failed": 6,
+      "cause": "The new suite selected an ephemeral semantic model that another parallel test deleted.",
+      "resolution": "Select the stable seeded semantic model by exact name."
+    },
+    {
+      "passed": 48,
+      "failed": 2,
+      "cause": "Golden50 exceeded the former 45 second per-test timeout only under the new concurrent workload.",
+      "resolution": "Use the evidence-backed 90 second Playwright timeout while keeping retries disabled."
+    }
+  ],
+  "accepted_final_runs": [
+    {"round": 1, "passed": 51, "failed": 0, "duration_minutes": 1.1},
+    {"round": 2, "passed": 51, "failed": 0, "duration_minutes": 1.0},
+    {"round": 3, "passed": 51, "failed": 0, "duration_minutes": 1.0}
+  ],
+  "accepted_total": {"passed": 153, "failed": 0, "runtime_race": 0},
+  "result": "PASS_AFTER_TEST_ISOLATION_AND_TIMEOUT_FIX"
 }

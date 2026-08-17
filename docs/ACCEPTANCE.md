@@ -1,6 +1,6 @@
 # ChatBI V2 验收标准
 
-V1.0.0 Final Release 的本次执行报告见 [`docs/status/DAY5_STATUS.md`](status/DAY5_STATUS.md) 与 [`docs/releases/V1_FINAL_MANIFEST.md`](releases/V1_FINAL_MANIFEST.md)。只有 Final Manifest 中的功能、正确性、安全、迁移、冷启动、两次正式启动、回滚和 Git 发布 Gate 全部通过，才允许创建 annotated Final Tag。Day 3 RC 历史报告保留在 [`docs/ACCEPTANCE_REPORT_V1_RC.md`](ACCEPTANCE_REPORT_V1_RC.md)。
+V1.0.1 Final Release 的本次执行报告见 [`docs/status/DAY5_STATUS.md`](status/DAY5_STATUS.md) 与 [`docs/releases/V1_FINAL_MANIFEST.md`](releases/V1_FINAL_MANIFEST.md)。只有 Final Manifest 中的功能、正确性、安全、迁移、冷启动、两次正式启动、回滚和 Git 发布 Gate 全部通过，才允许创建新的 annotated Final Tag；既有公开 `chatbi-v2-v1.0.0` 不得移动。Day 3 RC 历史报告保留在 [`docs/ACCEPTANCE_REPORT_V1_RC.md`](ACCEPTANCE_REPORT_V1_RC.md)。
 
 ## 产品主链路
 

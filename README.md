@@ -1,6 +1,6 @@
 # ChatBI V2
 
-ChatBI V2 是围绕“数据源 → Schema → 语义层 → 问数 → 可验证结果 → 图表与洞察 → 答案 → 看板 → 评测”构建的开源企业级 ChatBI 产品。V1.0.0 已实现完整、可验证的产品闭环；最终发布 Gate 以 [`docs/status/DAY5_STATUS.md`](docs/status/DAY5_STATUS.md) 为准。
+ChatBI V2 是围绕“数据源 → Schema → 语义层 → 问数 → 可验证结果 → 图表与洞察 → 答案 → 看板 → 评测”构建的开源企业级 ChatBI 产品。V1.0.1 已实现完整、可验证的产品闭环以及受控 Live RAG 与受限 Multi-Agent；最终发布 Gate 以 [`docs/status/DAY5_STATUS.md`](docs/status/DAY5_STATUS.md) 为准。
 
 ## 一键启动
 
