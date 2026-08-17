@@ -519,7 +519,17 @@ class OpenAICompatibleProvider(ModelProviderAdapter):
             )
             response.raise_for_status()
         content = response.json()["choices"][0]["message"]["content"]
-        return SQLPlan.model_validate_json(content)
+        plan = SQLPlan.model_validate_json(content)
+        # Provider output is untrusted. Runtime identity and release-critical
+        # context must come from the server-owned request, never model JSON.
+        return plan.model_copy(update={
+            "question": question,
+            "dialect": context.dialect,
+            "provider": self.name,
+            "semantic_model_id": context.semantic_model_id,
+            "semantic_model_version": context.semantic_model_version,
+            "limit": min(plan.limit, context.row_limit),
+        })
 
 
 def build_model_provider(settings: Settings | None = None) -> ModelProviderAdapter:

@@ -59,10 +59,10 @@ npm run build
 npx playwright test --workers=1
 
 cd ..
-.\backend\.venv\Scripts\python.exe backend\scripts\run_day3_golden.py
+.\backend\.venv\Scripts\python.exe backend\scripts\run_day4_golden.py
 ```
 
-Golden runner 必须报告冻结 SHA-256 `d40bb690a4208240ecf347abe47e045cd74c8eb89b9162d5d53890ecf24bc282`；禁止用 `--freeze` 或修改 Expected Result 来迁就失败。
+Golden runner 必须报告冻结 SHA-256 `25580af42bc76ebddd3d49e6b9c16f8bfabba8ba485a835c453c29175ee2a64a`，PostgreSQL 50/50、MySQL 兼容集 10/10；禁止修改 Expected Result 来迁就失败。
 
 ## 外部模型
 
@@ -79,9 +79,9 @@ CHATBI_AGENT_ALLOWED_ROUTES=
 CHATBI_RAG_FALLBACK_ENABLED=true
 CHATBI_AGENT_FALLBACK_ENABLED=true
 CHATBI_LEGACY_RAG_BASE_URL=
-CHATBI_LEGACY_RAG_TOKEN=
+CHATBI_LEGACY_RAG_BEARER_TOKEN=
 CHATBI_LEGACY_AGENT_BASE_URL=
-CHATBI_LEGACY_AGENT_TOKEN=
+CHATBI_LEGACY_AGENT_BEARER_TOKEN=
 ```
 
 只有在目标 Workspace、身份映射、旧 RAG ACL 和响应 Workspace 回显完成联调后，才可从 `shadow` 提升到 `canary`。旧 Agent HTTP 端点目前不能接受 ChatBI 的 `ToolExecutor` 回调，保持关闭；不得通过配置绕过这一安全限制。

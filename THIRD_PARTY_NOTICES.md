@@ -12,6 +12,21 @@
 
 Other pre-existing runtime packages remain pinned in the relevant package manifests. No third-party logo, brand asset, UI source, or restricted project source was introduced in Day 2.
 
+## Direct runtime and test dependencies
+
+ChatBI V2 itself is released under Apache License 2.0. Direct dependencies are consumed as published packages; their source is not copied into this repository. Versions are pinned in `backend/requirements.txt` and `frontend/package-lock.json`.
+
+| Component | License |
+| --- | --- |
+| FastAPI, SQLAlchemy, Alembic, Pydantic, pydantic-settings, PyMySQL, pytest, SQLGlot | MIT |
+| Uvicorn, HTTPX | BSD-3-Clause |
+| psycopg / psycopg-binary | LGPL-3.0-only |
+| cryptography | Apache-2.0 OR BSD-3-Clause |
+| React, React DOM, React Router, TanStack Query, Testing Library, jsdom, Vite, Vitest | MIT |
+| TypeScript, Playwright, Apache ECharts | Apache-2.0 |
+
+This table covers direct project dependencies used by the released build. Transitive notices remain governed by their package metadata and lockfiles.
+
 ## Apache ECharts
 
 - Source repository: `https://github.com/apache/echarts`

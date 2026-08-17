@@ -1,6 +1,6 @@
 # ChatBI V2
 
-ChatBI V2 是围绕“数据源 → Schema → 语义层 → 问数 → 可验证结果 → 图表与洞察 → 答案 → 看板 → 评测”构建的开源企业级 ChatBI 产品。V1 RC 候选已实现完整的真实产品闭环；当前发布 Gate 与未完成项以 [`docs/status/DAY3_STATUS.md`](docs/status/DAY3_STATUS.md) 为准。
+ChatBI V2 是围绕“数据源 → Schema → 语义层 → 问数 → 可验证结果 → 图表与洞察 → 答案 → 看板 → 评测”构建的开源企业级 ChatBI 产品。V1.0.0 已实现完整、可验证的产品闭环；最终发布 Gate 以 [`docs/status/DAY5_STATUS.md`](docs/status/DAY5_STATUS.md) 为准。
 
 ## 一键启动
 
@@ -50,7 +50,7 @@ docs/         产品、架构、验收、UI 与状态文档
 
 后端统一使用 `/api/v1`，语义层业务代码只依赖 ChatBI 自有 `SemanticEngine` 接口。当前使用可运行的 `LocalSemanticEngine`，并保留隔离且如实报告不可用的 `WrenSemanticAdapter` seam；Day 2 主链路不依赖未配置的 Wren runtime。
 
-## V1 RC 产品闭环
+## V1 产品闭环
 
 ```text
 自然语言问题
@@ -111,7 +111,7 @@ CHATBI_AGENT_FALLBACK_ENABLED=true
 ```powershell
 cd backend
 .\.venv\Scripts\python.exe -m pytest -q
-.\.venv\Scripts\python.exe scripts\run_day3_golden.py
+.\.venv\Scripts\python.exe scripts\run_day4_golden.py
 
 cd ..\frontend
 npm ci
@@ -121,4 +121,4 @@ npm run build
 npm run e2e
 ```
 
-Golden 20 冻结清单位于 [`evaluation/golden/day2-golden-20.json`](evaluation/golden/day2-golden-20.json)，V1 RC 候选验收结果见 [`docs/status/DAY3_STATUS.md`](docs/status/DAY3_STATUS.md)，15 分钟演示见 [`DEMO.md`](DEMO.md)，完整安装说明见 [`INSTALL.md`](INSTALL.md)。
+Golden 50 冻结清单位于 [`evaluation/golden/day4-golden-50.json`](evaluation/golden/day4-golden-50.json)。完整安装说明见 [`INSTALL.md`](INSTALL.md)，15 分钟演示见 [`DEMO.md`](DEMO.md)，发布说明见 [`RELEASE_NOTES_V1.md`](RELEASE_NOTES_V1.md)，许可证与第三方声明见 [`LICENSE`](LICENSE) 和 [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md)。

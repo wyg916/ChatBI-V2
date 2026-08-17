@@ -7,7 +7,7 @@ services:
       dockerfile: backend/Dockerfile
     environment:
       CHATBI_ENVIRONMENT: development
-      CHATBI_DATABASE_URL: postgresql+psycopg://chatbi_app:${CHATBI_META_PASSWORD:?Run scripts/bootstrap-local-databases.ps1 first}@host.docker.internal:5432/chatbi_v2
+      CHATBI_DATABASE_URL: ${CHATBI_DATABASE_URL:-postgresql+psycopg://chatbi_app:${CHATBI_META_PASSWORD:?Run scripts/bootstrap-local-databases.ps1 first}@host.docker.internal:5432/chatbi_v2}
       CHATBI_DATASOURCE_SECRET_KEY: ${CHATBI_DATASOURCE_SECRET_KEY:?Run scripts/bootstrap-local-databases.ps1 first}
       CHATBI_SEED_DEMO_SEMANTIC_MODEL: "true"
       CHATBI_DEMO_POSTGRES_HOST: host.docker.internal
@@ -54,7 +54,7 @@ services:
     extra_hosts:
       - "host.docker.internal:host-gateway"
     ports:
-      - "8000:8000"
+      - "${CHATBI_BACKEND_PORT:-8000}:8000"
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health', timeout=2)"]
       interval: 4s
@@ -66,7 +66,7 @@ services:
     build:
       context: ./frontend
     ports:
-      - "5173:80"
+      - "${CHATBI_FRONTEND_PORT:-5173}:80"
     depends_on:
       backend:
         condition: service_healthy

@@ -8,9 +8,10 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
     app_name: str = "ChatBI V2"
-    app_version: str = "1.0.0-rc1"
+    app_version: str = "1.0.0"
     environment: str = "development"
     database_url: str = "postgresql+psycopg://chatbi_app@127.0.0.1:5432/chatbi_v2"
+    meta_password: SecretStr = SecretStr("")
     datasource_secret_key: str = ""
     seed_demo_semantic_model: bool = False
     demo_postgres_host: str = "127.0.0.1"

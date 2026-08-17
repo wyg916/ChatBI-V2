@@ -1,0 +1,19 @@
+{
+  "timestamp": "2026-08-17T23:03:51.6917188+08:00",
+  "cold_start": "PASS",
+  "duration_seconds": 44.2,
+  "project_metadata": "ISOLATED_TEMPORARY_POSTGRES_SCHEMA",
+  "demo_business_data": "EXISTING_REPRODUCIBLE_LOCAL_DATA_READ_ONLY",
+  "local_external_database": "PRESERVED",
+  "bootstrap": "PASS",
+  "migration": "20260817_0007_HEAD",
+  "demo_data": "POSTGRESQL_READY_MYSQL_READY",
+  "backend": "HTTP_200",
+  "frontend": "HTTP_200",
+  "ask": "SUCCEEDED_ORACLE_PASSED",
+  "evaluation": "GOLDEN50_PASS",
+  "model_provider_configuration": "KIMI_MIMO_DEEPSEEK_READY_SECRETS_HIDDEN",
+  "cleanup": "PASS",
+  "stage": "COMPLETE",
+  "secrets_recorded": false
+}

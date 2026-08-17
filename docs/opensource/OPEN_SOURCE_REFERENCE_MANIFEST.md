@@ -4,22 +4,22 @@
 
 - Phase: `PHASE_0_PROJECT_BOOTSTRAP`
 - Generated: `2026-08-16` (Asia/Shanghai)
-- Formal repository: `E:\ChatBI V2 项目`
-- External reference root: `E:\ChatBI V2 开源参考项目`
+- Formal repository: this repository root
+- External reference root: an operator-managed checkout outside this repository
 - Trust classification: every downloaded repository is `UNTRUSTED_EXTERNAL_SOURCE`.
 - Acquisition policy: shallow Git repository (`depth=1`); no dependency installation, migration, database connection, Docker resource, model download, or service startup.
 - This is a static license and source-layout review, not legal advice. Package dependencies, bundled assets, trademarks, and notices still require a release-time audit before any code enters ChatBI V2.
 
 ## 2. Frozen repositories
 
-| Project | Local path | GitHub | Branch | HEAD | License | Phase 1 purpose | Usage mode |
+| Project | Reference checkout | GitHub | Branch | HEAD | License | Phase 1 purpose | Usage mode |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| WrenAI | `E:\ChatBI V2 开源参考项目\WrenAI` | https://github.com/Canner/WrenAI | `main` | `7f7370e4e9b05a51dbde918cd5c9ecbedafe3d20` | Path-based: Apache-2.0 for `core/`, `sdk/`, `skills/`, `examples/`, and root files; CC-BY-4.0 for `docs/`; the included AGPL-3.0 text is reserved for possible future modules and the current root map assigns none | Semantic Layer, MDL, Metric, Dimension, Relationship, Context Layer, Semantic SQL | `RUNTIME_CANDIDATE` |
-| OpenChatBI | `E:\ChatBI V2 开源参考项目\OpenChatBI` | https://github.com/zhongyu09/openchatbi | `main` | `c8786cb180081dbdd18d841efa33b70d77b633e9` | MIT | Schema Linking, catalog retrieval, table selection, NL2SQL graph and analysis flow | `SELECTIVE_CODE_REFERENCE` |
-| IBM Text-to-SQL Evaluation Toolkit | `E:\ChatBI V2 开源参考项目\text2sql-eval-toolkit` | https://github.com/IBM/text2sql-eval-toolkit | `main` | `60dd4515236adb335f2053b7c069397d7d88fe0a` | Apache-2.0 | Execution-based evaluation, result comparison, Golden SQL, error analysis, release gate | `EVALUATION_TOOL` |
-| SQLBot | `E:\ChatBI V2 开源参考项目\SQLBot` | https://github.com/dataease/SQLBot | `main` | `0c885d5a677ed3f6551645a4c5a630ee4c4eb437` | Modified GPLv3 with additional logo/copyright conditions | ChatBI product flow, terminology, SQL examples, prompts, feedback patterns, recommended questions | `PRODUCT_REFERENCE` |
-| SuperSonic | `E:\ChatBI V2 开源参考项目\SuperSonic` | https://github.com/tencentmusic/supersonic | `master` | `af08d869c4609bf8d48d64e78c61427fe93f7489` | Apache-2.0 plus additional commercial derivative-work restrictions | Semantic model, metric/dimension/entity/relation, schema mapping, parser and translator architecture | `ARCHITECTURE_REFERENCE` |
-| Chat2DB | `E:\ChatBI V2 开源参考项目\Chat2DB` | https://github.com/OtterMind/Chat2DB | `main` | `f85ae9e0ccc7a883aae94a3261ac5cfbd566d46a` | `LicenseRef-Chat2DB`, a modified Apache-2.0 license for Community 5.3.0+ with external-product, object-distribution, managed-delivery, embedded-use, and branding restrictions | Datasource UI, Schema/table browser, SQL workspace, query result and history interaction | `UI_UX_REFERENCE` |
+| WrenAI | `WrenAI` | https://github.com/Canner/WrenAI | `main` | `7f7370e4e9b05a51dbde918cd5c9ecbedafe3d20` | Path-based: Apache-2.0 for `core/`, `sdk/`, `skills/`, `examples/`, and root files; CC-BY-4.0 for `docs/`; the included AGPL-3.0 text is reserved for possible future modules and the current root map assigns none | Semantic Layer, MDL, Metric, Dimension, Relationship, Context Layer, Semantic SQL | `RUNTIME_CANDIDATE` |
+| OpenChatBI | `OpenChatBI` | https://github.com/zhongyu09/openchatbi | `main` | `c8786cb180081dbdd18d841efa33b70d77b633e9` | MIT | Schema Linking, catalog retrieval, table selection, NL2SQL graph and analysis flow | `SELECTIVE_CODE_REFERENCE` |
+| IBM Text-to-SQL Evaluation Toolkit | `text2sql-eval-toolkit` | https://github.com/IBM/text2sql-eval-toolkit | `main` | `60dd4515236adb335f2053b7c069397d7d88fe0a` | Apache-2.0 | Execution-based evaluation, result comparison, Golden SQL, error analysis, release gate | `EVALUATION_TOOL` |
+| SQLBot | `SQLBot` | https://github.com/dataease/SQLBot | `main` | `0c885d5a677ed3f6551645a4c5a630ee4c4eb437` | Modified GPLv3 with additional logo/copyright conditions | ChatBI product flow, terminology, SQL examples, prompts, feedback patterns, recommended questions | `PRODUCT_REFERENCE` |
+| SuperSonic | `SuperSonic` | https://github.com/tencentmusic/supersonic | `master` | `af08d869c4609bf8d48d64e78c61427fe93f7489` | Apache-2.0 plus additional commercial derivative-work restrictions | Semantic model, metric/dimension/entity/relation, schema mapping, parser and translator architecture | `ARCHITECTURE_REFERENCE` |
+| Chat2DB | `Chat2DB` | https://github.com/OtterMind/Chat2DB | `main` | `f85ae9e0ccc7a883aae94a3261ac5cfbd566d46a` | `LicenseRef-Chat2DB`, a modified Apache-2.0 license for Community 5.3.0+ with external-product, object-distribution, managed-delivery, embedded-use, and branding restrictions | Datasource UI, Schema/table browser, SQL workspace, query result and history interaction | `UI_UX_REFERENCE` |
 | DB-GPT | Not downloaded | https://github.com/eosphoros-ai/DB-GPT | Not frozen | Not frozen | Not audited in Phase 0 | Agentic Data Analysis, SQL + Python, advanced analysis | `PHASE_2_ONLY` |
 | PandasAI | Not downloaded | https://github.com/sinaptik-ai/pandas-ai | Not frozen | Not frozen | Not audited in Phase 0 | CSV, Excel and DataFrame natural-language analysis | `PHASE_2_ONLY` |
 

@@ -184,7 +184,10 @@ def test_named_provider_uses_safe_provider_specific_contract(
     assert isinstance(router.provider, OpenAICompatibleProvider)
 
     expected = DeterministicTestProvider().plan(question="按地区统计收入", context=semantic_context())
-    expected.provider = provider_id
+    expected.provider = "untrusted-model-label"
+    expected.semantic_model_id = "untrusted-model-id"
+    expected.semantic_model_version = 999
+    expected.limit = 5000
     observed: dict[str, object] = {}
 
     def handler(request: httpx.Request) -> httpx.Response:
@@ -196,6 +199,9 @@ def test_named_provider_uses_safe_provider_specific_contract(
     actual = router.plan(question="按地区统计收入", context=semantic_context())
 
     assert actual.provider == provider_id
+    assert actual.semantic_model_id == semantic_context().semantic_model_id
+    assert actual.semantic_model_version == semantic_context().semantic_model_version
+    assert actual.limit == semantic_context().row_limit
     assert observed["url"] == expected_url
     assert observed["payload"]["thinking"] == {"type": "disabled"}
     assert observed["payload"][max_tokens_field] == 4096
