@@ -9,6 +9,17 @@ async function list<T>(request: APIRequestContext, path: string): Promise<T[]> {
   return Array.isArray(body) ? body : body.items;
 }
 
+test('登录页表单进入默认问数据首页', async ({ page }) => {
+  await page.goto('/login');
+  await expect(page.getByRole('heading', { name: '登录工作空间' })).toBeVisible();
+  await page.getByLabel('账号或电子名').fill('demo.user');
+  await page.getByLabel('记住登录').uncheck();
+  await page.getByRole('button', { name: '登录 ChatBI Studio' }).click();
+
+  await expect(page).toHaveURL('/');
+  await expect(page.getByRole('heading', { name: '今天想了解哪些业务数据？' })).toBeVisible();
+});
+
 test('Day 1 数据源到语义模型核心流程', async ({ page, request }) => {
   const sources = await list<Record<string, unknown>>(request, '/datasources');
   const datasource = sources.find((item) => item.type === 'postgresql');

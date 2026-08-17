@@ -23,3 +23,7 @@ Wren runtime 未进入 Day 1 运行镜像。Adapter 的 capabilities 明确报�
 ## ADR-006：前端不直接连接数据库
 
 真实模拟数据必须通过 `Frontend → Backend API → Connector → Local Database` 使用。浏览器直连数据库会暴露凭据并绕过只读、审计和后续 SQL Guard，因此明确禁止。
+
+## ADR-007：登录页不伪装生产认证
+
+Day 1 登录页只承担进入 ChatBI 工作空间的高保真界面与前端演示路由。表单通过原生必填校验后进入默认“问数据”页，但不在前端伪造令牌、用户会话或 SSO/OIDC 成功状态；页面中的 SSO/OIDC 文案属于批准设计内容，不作为认证能力已完成的验收证据。真实认证接入必须由后端身份能力、会话安全与审计共同实现。
