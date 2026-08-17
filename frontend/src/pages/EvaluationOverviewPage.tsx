@@ -48,10 +48,10 @@ export function EvaluationOverviewPage() {
   if (!data) return <ErrorNotice error={result.error ?? new Error('暂无评测记录')} />;
   const current = data.current;
   const completed = new Intl.DateTimeFormat('zh-CN', { dateStyle: 'medium', timeStyle: 'medium' }).format(new Date(current.completed_at));
-  const action = (label: string) => setNotice(`${label}不在 Day 3 Golden 20 主链路内，本轮未伪造该写操作。`);
+  const action = (label: string) => setNotice(`${label}不在 Day 4 Golden 50 主链路内，本轮未伪造该写操作。`);
 
   return <div className="evaluation-page" data-testid="evaluation-overview">
-    <header className="evaluation-heading"><div><h1>评测中心</h1><p>执行冻结 Golden 20，保存 SQL、结果值、语义匹配和 Result Diff 证据。</p></div><div><button className="button secondary" type="button" onClick={() => action('导入评测集')}>导入评测集</button><button className="button secondary" type="button" onClick={() => action('新建评测任务')}>新建评测任务</button><button className="button primary" type="button" disabled={runGolden.isPending} onClick={() => runGolden.mutate()}>▶ {runGolden.isPending ? '正在执行 Golden 20' : '运行 Golden 20'}</button></div></header>
+    <header className="evaluation-heading"><div><h1>评测中心</h1><p>执行冻结 Golden 50，保存 SQL、结果值、语义匹配和 Result Diff 证据。</p></div><div><button className="button secondary" type="button" onClick={() => action('导入评测集')}>导入评测集</button><button className="button secondary" type="button" onClick={() => action('新建评测任务')}>新建评测任务</button><button className="button primary" type="button" disabled={runGolden.isPending} onClick={() => runGolden.mutate()}>▶ {runGolden.isPending ? '正在执行 Golden 50' : '运行 Golden 50'}</button></div></header>
     {notice && <div className="evaluation-notice" role="status">{notice}<button type="button" aria-label="关闭提示" onClick={() => setNotice('')}>×</button></div>}
     <section className="evaluation-kpis" aria-label="评测指标">
       {data.metrics.map((metric, index) => { const worse = metric.key === 'average_response_seconds' ? metric.change > 0 : metric.change < 0; return <article key={metric.key}><span>{icons[index]}</span><small>{metric.label}</small><strong>{number.format(metric.value)}{metric.unit}</strong><em className={worse ? 'worse' : ''}>{metric.change >= 0 ? '↑' : '↓'} {number.format(Math.abs(metric.change))}{metric.unit === 's' ? 's' : '%'}</em></article>; })}

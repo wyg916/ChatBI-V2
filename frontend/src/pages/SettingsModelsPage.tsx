@@ -1,39 +1,44 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { systemApi } from '../api/system';
 import toggleOff from '../assets/settings/toggle-off.svg';
 import toggleOn from '../assets/settings/toggle-on.svg';
+import type { ModelProviderCatalog, ModelProviderStatus } from '../types/api';
 import './system-settings.css';
-
-type ProviderKey = 'openai' | 'deepseek' | 'kimi' | 'local';
 
 const sections = ['模型服务', '查询与安全', '工作空间', '用户与角色', '审计日志', '外观与品牌', '系统信息'] as const;
 
-const providers: Array<{ key: ProviderKey; mark: string; name: string; models: string; tone: string; configured: boolean }> = [
-  { key: 'openai', mark: 'OPEN', name: 'OpenAI Compatible', models: 'GPT-4.1 / GPT-4o', tone: 'openai', configured: true },
-  { key: 'deepseek', mark: 'DS', name: 'DeepSeek', models: 'DeepSeek Chat / Reasoner', tone: 'deepseek', configured: true },
-  { key: 'kimi', mark: 'KIMI', name: 'Moonshot Kimi', models: 'Kimi K2 / Kimi-Latest', tone: 'kimi', configured: true },
-  { key: 'local', mark: 'LOCAL', name: '本地模型服务', models: 'Qwen / Llama / Mistral', tone: 'local', configured: false },
-];
+function providerVisual(provider: ModelProviderStatus) {
+  if (provider.id === 'kimi') return { mark: 'KIMI', tone: 'kimi' };
+  if (provider.id === 'mimo') return { mark: 'MIMO', tone: 'mimo' };
+  if (provider.id === 'deepseek') return { mark: 'DS', tone: 'deepseek' };
+  if (provider.id === 'deterministic') return { mark: 'LOCAL', tone: 'local' };
+  return { mark: 'OPEN', tone: 'openai' };
+}
 
-const routingRows = [
-  ['NL2SQL', 'GPT-4.1', 'DeepSeek Reasoner'],
-  ['业务洞察', 'Kimi K2', 'GPT-4.1'],
-  ['评测 Judge', 'GPT-4.1', 'DeepSeek Chat'],
-];
-
-function Toggle({ checked, label, onChange }: { checked: boolean; label: string; onChange: () => void }) {
-  return <button className="settings-toggle" type="button" role="switch" aria-checked={checked} aria-label={label} onClick={onChange}><img src={checked ? toggleOn : toggleOff} alt="" /></button>;
+function Toggle({ checked, label }: { checked: boolean; label: string }) {
+  return <button className="settings-toggle" type="button" role="switch" aria-checked={checked} aria-label={label} disabled><img src={checked ? toggleOn : toggleOff} alt="" /></button>;
 }
 
 export function SettingsModelsPage() {
   const navigate = useNavigate();
   const [activeSection, setActiveSection] = useState<(typeof sections)[number]>('模型服务');
-  const [enabled, setEnabled] = useState<Record<ProviderKey, boolean>>({ openai: true, deepseek: true, kimi: true, local: false });
-  const [autoFailover, setAutoFailover] = useState(true);
-  const [maskLogs, setMaskLogs] = useState(true);
+  const [catalog, setCatalog] = useState<ModelProviderCatalog | null>(null);
+  const [loadError, setLoadError] = useState('');
   const [notice, setNotice] = useState('');
 
-  const action = (label: string) => setNotice(`${label}仅作用于当前 UI 演示；模型服务配置 API 尚未接入。`);
+  useEffect(() => {
+    let cancelled = false;
+    systemApi.modelProviders()
+      .then((value) => { if (!cancelled) setCatalog(value); })
+      .catch(() => { if (!cancelled) setLoadError('模型服务状态加载失败，请确认 Backend API 可用。'); });
+    return () => { cancelled = true; };
+  }, []);
+
+  const action = (provider: ModelProviderStatus) => {
+    const source = provider.credential_env ? `由 Backend 环境变量 ${provider.credential_env} 管理` : '无需外部凭据';
+    setNotice(`${provider.display_name} ${source}；浏览器不会接收或显示 API Key。`);
+  };
   const selectSection = (section: (typeof sections)[number]) => {
     if (section === '用户与角色' || section === '审计日志') {
       navigate('/settings/security');
@@ -41,19 +46,15 @@ export function SettingsModelsPage() {
     }
     setActiveSection(section);
   };
-  const toggleProvider = (provider: (typeof providers)[number]) => {
-    if (!provider.configured) {
-      setNotice('本地模型服务尚未配置，完成连接参数后才能启用。');
-      return;
-    }
-    setEnabled((current) => ({ ...current, [provider.key]: !current[provider.key] }));
-    setNotice(`${provider.name} 的开关已在当前页面更新，尚未写入后端。`);
-  };
+  const providers = catalog?.items ?? [];
+  const activeProvider = providers.find((provider) => provider.active);
+  const namedIds = new Set(['kimi', 'mimo', 'deepseek']);
+  const configuredNamed = providers.filter((provider) => namedIds.has(provider.id) && provider.configured).length;
 
   return <div className="settings-surface-page" data-testid="settings-models-page">
     <header className="settings-page-heading">
       <div><h1>系统设置</h1><p>管理模型服务、查询策略、用户权限和系统运行配置。</p></div>
-      <div className="settings-heading-actions"><button className="button secondary" type="button" onClick={() => action('导出配置')}>导出配置</button><button className="button primary" type="button" onClick={() => action('保存全部设置')}>保存全部设置</button></div>
+      <div className="settings-heading-actions"><button className="button secondary" type="button" disabled>凭据仅在服务端配置</button><button className="button primary" type="button" disabled>保存全部设置</button></div>
     </header>
     {notice && <div className="settings-inline-notice" role="status"><span>{notice}</span><button type="button" aria-label="关闭提示" onClick={() => setNotice('')}>×</button></div>}
 
@@ -64,31 +65,36 @@ export function SettingsModelsPage() {
 
       {activeSection === '模型服务' ? <div className="settings-model-content">
         <div className="settings-content-heading">
-          <div><div className="settings-title-row"><h2>模型服务</h2><span>UI 演示</span></div><p>配置用于 NL2SQL、业务洞察和评测的模型提供商。</p></div>
-          <button className="button primary" type="button" onClick={() => action('添加模型服务')}>＋ 添加模型服务</button>
+          <div><div className="settings-title-row"><h2>模型服务</h2><span>Backend API</span></div><p>查看用于 NL2SQL 的服务端模型提供商；API Key 永不下发到浏览器。</p></div>
         </div>
 
-        <div className="provider-grid" aria-label="模型服务列表">
-          {providers.map((provider) => <article className="provider-card" key={provider.key}>
-            <div className={`provider-logo ${provider.tone}`}>{provider.mark}</div>
-            <div className="provider-copy"><h3>{provider.name}</h3><p>{provider.models}</p></div>
-            <Toggle checked={enabled[provider.key]} label={`${provider.name}${enabled[provider.key] ? '已启用' : '未启用'}`} onChange={() => toggleProvider(provider)} />
-            <span className={provider.configured ? 'settings-status enabled' : 'settings-status pending'}>{provider.configured ? '已启用' : '未配置'}</span>
-            <button className="provider-configure" type="button" onClick={() => action(`配置 ${provider.name}`)}>配置 →</button>
-          </article>)}
-        </div>
+        {!catalog && !loadError && <div className="settings-provider-state" role="status">正在读取服务端模型配置…</div>}
+        {loadError && <div className="settings-provider-state error" role="alert">{loadError}</div>}
+        {catalog && <div className="provider-grid" aria-label="模型服务列表">
+          {providers.map((provider) => {
+            const visual = providerVisual(provider);
+            const state = provider.active ? '当前使用' : provider.configured ? '已配置' : '未配置';
+            return <article className="provider-card" key={provider.id}>
+              <div className={`provider-logo ${visual.tone}`}>{visual.mark}</div>
+              <div className="provider-copy"><h3>{provider.display_name}</h3><p>{provider.model_name ?? '未选择模型'} · {provider.protocol === 'local' ? '本地语义运行时' : 'OpenAI Compatible'}</p></div>
+              <Toggle checked={provider.active} label={`${provider.display_name}${provider.active ? '当前使用' : '未启用'}`} />
+              <span className={provider.configured ? 'settings-status enabled' : 'settings-status pending'}>{state}</span>
+              <button className="provider-configure" type="button" onClick={() => action(provider)}>配置方式 →</button>
+            </article>;
+          })}
+        </div>}
 
         <div className="settings-bottom-grid">
           <article className="settings-detail-card routing-card">
-            <header><h3>默认路由策略</h3><p>按任务类型选择首选模型和降级顺序。</p></header>
-            <div className="routing-table-wrap"><table><thead><tr><th>任务</th><th>首选模型</th><th>备用模型</th><th>状态</th></tr></thead><tbody>{routingRows.map(([task, primary, fallback]) => <tr key={task}><td><b>{task}</b></td><td>{primary}</td><td>{fallback}</td><td><span className="settings-status enabled">启用</span></td></tr>)}</tbody></table></div>
-            <footer><div><b>自动故障转移</b><span>首选模型不可用时切换至备用模型</span></div><Toggle checked={autoFailover} label="自动故障转移" onChange={() => { setAutoFailover((value) => !value); setNotice('自动故障转移仅在当前 UI 演示中更新。'); }} /></footer>
+            <header><h3>当前 NL2SQL 路由</h3><p>服务端环境变量选择一个 Provider；未配置时安全回退到本地确定性运行时。</p></header>
+            <div className="routing-table-wrap"><table><thead><tr><th>任务</th><th>当前 Provider</th><th>模型</th><th>状态</th></tr></thead><tbody><tr><td><b>NL2SQL</b></td><td>{activeProvider?.display_name ?? '加载中'}</td><td>{activeProvider?.model_name ?? '—'}</td><td><span className="settings-status enabled">{activeProvider ? '可用' : '检查中'}</span></td></tr></tbody></table></div>
+            <footer><div><b>安全回退</b><span>外部 Provider 未完整配置时使用 deterministic-semantic-v1，不向浏览器暴露凭据</span></div></footer>
           </article>
 
           <article className="settings-detail-card health-card">
-            <header><h3>服务健康状态</h3><p>最近 15 分钟调用表现 · 静态样例</p></header>
-            <div className="health-grid"><div><span>成功率</span><strong>99.7%</strong></div><div><span>平均延迟</span><strong>2.8s</strong></div><div><span>调用量</span><strong>1,284</strong></div><div><span>本月成本</span><strong>¥ 842</strong></div></div>
-            <footer><div><b>请求日志脱敏</b><span>自动移除凭证和敏感字段</span></div><Toggle checked={maskLogs} label="请求日志脱敏" onChange={() => { setMaskLogs((value) => !value); setNotice('请求日志脱敏仅在当前 UI 演示中更新。'); }} /></footer>
+            <header><h3>配置安全状态</h3><p>来自 Backend API 的实时配置摘要</p></header>
+            <div className="health-grid"><div><span>指定供应商</span><strong>{configuredNamed}/3</strong></div><div><span>当前路由</span><strong>{activeProvider?.id ?? '—'}</strong></div><div><span>浏览器凭据</span><strong>{catalog?.secrets_exposed ? '异常' : '0'}</strong></div><div><span>JSON 输出</span><strong>ON</strong></div></div>
+            <footer><div><b>凭据隔离</b><span>密钥只从 Backend 进程环境读取，状态接口不返回密钥字段</span></div></footer>
           </article>
         </div>
       </div> : <div className="settings-section-placeholder">

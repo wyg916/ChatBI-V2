@@ -1,8 +1,11 @@
+from datetime import timedelta
+
 from sqlalchemy import select
 
-from app.models import DataSource, DataSourceColumn, DataSourceSchema, DataSourceTable, SemanticModel
-from app.query.contracts import ExecutionResult
+from app.models import AuditEvent, DataSource, DataSourceColumn, DataSourceSchema, DataSourceTable, SemanticModel
+from app.query.contracts import AskRequest, ExecutionResult
 from app.query.executor import QueryExecutor
+from app.query.service import _select_runtime
 from app.services.seed import DEMO_MODEL_NAME, seed_demo_semantic_model
 
 
@@ -37,6 +40,23 @@ def prepare_catalog(db_session):
     datasource.status = "SYNCED"
     db_session.commit()
     return datasource, db_session.scalar(select(SemanticModel).where(SemanticModel.name == DEMO_MODEL_NAME))
+
+
+def test_default_runtime_is_stable_when_new_published_model_appears(db_session):
+    datasource, primary = prepare_catalog(db_session)
+    transient = SemanticModel(
+        workspace_id=primary.workspace_id,
+        datasource_id=datasource.id,
+        name="Parallel transient model",
+        status="PUBLISHED",
+        created_at=primary.created_at + timedelta(seconds=1),
+    )
+    db_session.add(transient)
+    db_session.commit()
+
+    selected_datasource, selected_model = _select_runtime(db_session, AskRequest(question="统计收入"))
+    assert selected_datasource.id == datasource.id
+    assert selected_model.id == primary.id
 
 
 def test_query_api_full_chain_feedback_and_save(client, db_session, monkeypatch):
@@ -89,6 +109,7 @@ def test_query_api_full_chain_feedback_and_save(client, db_session, monkeypatch)
 
     deleted = client.delete(f"/api/v1/dashboards/{dashboard.json()['id']}/cards/{card.json()['id']}")
     assert deleted.status_code == 204
+    assert db_session.scalar(select(AuditEvent).where(AuditEvent.action == "QUERY_RUN", AuditEvent.resource_id == query_id)) is not None
 
 
 def test_query_api_rejects_dangerous_sql_before_executor(client, db_session, monkeypatch):

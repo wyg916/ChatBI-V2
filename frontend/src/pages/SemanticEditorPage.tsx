@@ -4,7 +4,7 @@ import { useParams } from 'react-router-dom';
 import { semanticApi } from '../api/semantic';
 import { useSemanticModel } from '../hooks/useData';
 import { ErrorNotice, Field, FormActions, Loading, Modal } from '../components/UI';
-import type { SemanticModel, SemanticResource } from '../types/api';
+import type { SemanticModel, SemanticResource, SemanticVersion } from '../types/api';
 import canvasGrid from '../assets/semantic/canvas-grid.png';
 import relationEndpoint from '../assets/semantic/relation-endpoint.svg';
 import tagDot from '../assets/semantic/tag-dot.svg';
@@ -123,6 +123,9 @@ export function SemanticEditorPage() {
   const [configDraft, setConfigDraft] = useState<Record<string, string>>({});
   const [message, setMessage] = useState('');
   const [previewOpen, setPreviewOpen] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [history, setHistory] = useState<SemanticVersion[]>([]);
+  const [historyError, setHistoryError] = useState<unknown>();
   const [cachePolicy, setCachePolicy] = useState({ query: true, full: true });
   const [scope, setScope] = useState('全部');
 
@@ -174,6 +177,25 @@ export function SemanticEditorPage() {
     },
   });
 
+  const rollback = useMutation({
+    mutationFn: (version: number) => semanticApi.rollback(id, version),
+    onSuccess: async (result) => {
+      await client.invalidateQueries({ queryKey: ['semantic-model', id] });
+      setHistory(await semanticApi.versions(id));
+      setMessage(`已从历史版本恢复并发布为 v${result.version}`);
+    },
+  });
+
+  const openHistory = async () => {
+    setHistoryOpen(true);
+    setHistoryError(undefined);
+    try {
+      setHistory(await semanticApi.versions(id));
+    } catch (reason) {
+      setHistoryError(reason);
+    }
+  };
+
   if (model.isLoading) return <Loading />;
   if (!model.data) return <ErrorNotice error={model.error ?? new Error('未找到语义模型')} />;
 
@@ -206,6 +228,7 @@ export function SemanticEditorPage() {
         <div className="semantic-editor-title"><h1>模型编辑器</h1><span>已保存 1 分钟前</span></div>
         <div className="semantic-heading-actions">
           <button className="button secondary" onClick={() => setPreviewOpen(true)}>预览数据</button>
+          <button className="button secondary" data-testid="version-history" onClick={openHistory}>版本历史</button>
           <button className="button secondary" data-testid="save-model" disabled={save.isPending} onClick={() => save.mutate()}>{save.isPending ? '保存中…' : '保存模型'}</button>
           <button className="button primary" data-testid="publish-model" disabled={publish.isPending} onClick={() => publish.mutate()}>发布 {versionLabel(model.data.version)}</button>
         </div>
@@ -213,6 +236,7 @@ export function SemanticEditorPage() {
 
       {message && <div className="semantic-editor-message" role="status">{message}</div>}
       <ErrorNotice error={model.error ?? add.error ?? save.error ?? publish.error} />
+      <ErrorNotice error={historyError ?? rollback.error} />
 
       <div className="semantic-editor-shell">
         <aside className="semantic-resource-panel">
@@ -267,6 +291,8 @@ export function SemanticEditorPage() {
           <div className="semantic-scope">{['全部', '部门', '角色', '成员'].map((item) => <button className={scope === item ? 'active' : ''} onClick={() => setScope(item)} key={item}>{item}</button>)}</div>
         </aside>
       </div>
+
+      {historyOpen && <Modal title="语义模型版本历史" onClose={() => setHistoryOpen(false)}><div className="semantic-version-list" data-testid="semantic-version-history">{history.length ? history.map((item) => <article key={item.id}><div><strong>v{item.version}</strong><span>{item.is_current ? '当前版本' : new Date(item.published_at).toLocaleString('zh-CN')}</span></div><button className="button secondary" type="button" disabled={item.is_current || rollback.isPending} onClick={() => rollback.mutate(item.version)}>{item.is_current ? '当前' : '回滚到此版本'}</button></article>) : <p className="notice">尚无已发布版本。</p>}</div></Modal>}
 
       {adding && (
         <Modal title={`添加${resourceConfig[adding].label}`} onClose={() => setAdding(null)}>

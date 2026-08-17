@@ -22,3 +22,11 @@ Other pre-existing runtime packages remain pinned in the relevant package manife
 - Modification: no ECharts source file was copied or modified. ChatBI only uses the published package through project-owned renderer components.
 
 Day 3 introduced no copied third-party source, logo, brand asset, or restricted UI code. The Chart Engine, Narrative Engine, Answer/Dashboard evidence contracts, and Evaluation runner are project-owned code.
+
+## External model API integrations
+
+- Services: Moonshot Kimi API, Xiaomi MiMo API, DeepSeek API.
+- Interface: OpenAI-compatible Chat Completions over HTTPS through the project-owned `ModelProviderAdapter`.
+- Source use: no provider SDK, source code, logo, model weight, or brand asset was copied into the repository.
+- Credentials: server-side environment variables only; no credential is present in tracked files or browser responses.
+- Terms: operators remain responsible for each provider's current API terms, pricing, data handling policy, and key rotation.

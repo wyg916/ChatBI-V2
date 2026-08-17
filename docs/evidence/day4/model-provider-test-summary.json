@@ -1,0 +1,49 @@
+{
+  "timestamp": "2026-08-17T19:28:00+08:00",
+  "scope": "kimi_mimo_deepseek_provider_integration",
+  "base_head": "b0616f653cdabcd45a9255707442004948aaed7b",
+  "branch": "flex/day4-quality-hardening",
+  "backend": {
+    "pytest_pass": 90,
+    "pytest_fail": 0,
+    "pip_check": "PASS"
+  },
+  "frontend": {
+    "typecheck": "PASS",
+    "vitest_files_pass": 10,
+    "vitest_tests_pass": 26,
+    "build": "PASS",
+    "modules_transformed": 729,
+    "large_chunk_warning": true,
+    "production_audit_vulnerabilities": 0
+  },
+  "e2e": {
+    "mode": "serial_release_baseline",
+    "pass": 34,
+    "fail": 0,
+    "viewports": ["1440x900", "1366x768", "1920x1080"]
+  },
+  "docker": {
+    "run1": "PASS",
+    "full_stop_between_runs": "PASS",
+    "run2": "PASS",
+    "backend_http": 200,
+    "frontend_http": 200,
+    "backend_health": "healthy",
+    "frontend_health": "healthy"
+  },
+  "provider_runtime": {
+    "active_provider": "deterministic",
+    "kimi_configured": true,
+    "mimo_configured": true,
+    "deepseek_configured": true,
+    "secrets_exposed": false
+  },
+  "secret_scan": {
+    "files_scanned": 284,
+    "secret_pattern_file_count": 0,
+    "tracked_runtime_env": false,
+    "runtime_env_ignored": true
+  },
+  "day4_overall_gate": "PARTIAL"
+}

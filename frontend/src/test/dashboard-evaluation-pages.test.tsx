@@ -23,7 +23,7 @@ const dashboard: DashboardDetail = {
 };
 
 const evaluation: EvaluationOverview = {
-  current: { id: 'e1', release_name: 'Day 3 Golden 20', model_name: 'Local Runtime Provider', status: 'PASS', is_current: true, golden_set_count: 20, sql_generation_rate: 100, result_accuracy: 100, semantic_accuracy: 100, relevance_accuracy: 100, average_response_seconds: 0.1, error_distribution: [{ label: '无错误', percent: 100, color: '#16a36a' }], trend_points: [{ date: '08/17', value: 100 }], completed_at: '2026-08-17T06:00:00Z', duration_seconds: 3, sql_execution_pass_count: 20, result_value_pass_count: 20, semantic_pass_count: 20, dangerous_sql_total: 38, dangerous_sql_block_count: 38 },
+  current: { id: 'e1', release_name: 'Day 4 Golden 50', model_name: 'Local Runtime Provider', status: 'PASS', is_current: true, golden_set_count: 50, sql_generation_rate: 100, result_accuracy: 100, semantic_accuracy: 100, relevance_accuracy: 100, average_response_seconds: 0.1, error_distribution: [{ label: '无错误', percent: 100, color: '#16a36a' }], trend_points: [{ date: '08/17', value: 100 }], completed_at: '2026-08-17T06:00:00Z', duration_seconds: 3, sql_execution_pass_count: 50, result_value_pass_count: 50, semantic_pass_count: 50, dangerous_sql_total: 38, dangerous_sql_block_count: 38 },
   metrics: [
     { key: 'sql_generation_rate', label: 'SQL 生成率', value: 98.8, unit: '%', change: 1.6 },
     { key: 'result_accuracy', label: '结果集准确率', value: 96.4, unit: '%', change: 1.2 },
@@ -53,6 +53,6 @@ test('评测中心总览渲染数据库评测记录', async () => {
   vi.spyOn(evaluationApi, 'overview').mockResolvedValue(evaluation);
   renderRoute('/evaluation', <EvaluationOverviewPage />);
   expect(await screen.findByTestId('evaluation-overview')).toBeInTheDocument();
-  expect(screen.getAllByText('Day 3 Golden 20').length).toBeGreaterThan(0);
+  expect(screen.getAllByText('Day 4 Golden 50').length).toBeGreaterThan(0);
   expect(screen.getByText('最近评测运行')).toBeInTheDocument();
 });

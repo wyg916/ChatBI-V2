@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
+from app.core.access import Principal, require_permission
 from app.db.session import get_db
 from app.models import QueryRun
 from app.query.contracts import (
@@ -34,17 +35,17 @@ def query_capabilities():
 
 
 @router.post("/ask", response_model=QueryResponse, status_code=status.HTTP_201_CREATED)
-def ask(data: AskRequest, db: Session = Depends(get_db)):
-    return query_response(QueryPipeline().execute(db, data))
+def ask(data: AskRequest, db: Session = Depends(get_db), principal: Principal = Depends(require_permission("query.ask"))):
+    return query_response(QueryPipeline().execute(db, data, principal=principal))
 
 
 @router.get("/queries/{query_id}", response_model=QueryResponse)
-def get_query(query_id: str, db: Session = Depends(get_db)):
+def get_query(query_id: str, db: Session = Depends(get_db), _: Principal = Depends(require_permission("query.ask"))):
     return query_response(_run_or_404(db, query_id))
 
 
 @router.post("/queries/{query_id}/verify", response_model=QueryResponse)
-def verify_query(query_id: str, data: VerifyResultRequest, db: Session = Depends(get_db)):
+def verify_query(query_id: str, data: VerifyResultRequest, db: Session = Depends(get_db), _: Principal = Depends(require_permission("query.ask"))):
     try:
         run = QueryPipeline().verify(db, _run_or_404(db, query_id), data.expected)
     except ValueError as exc:
@@ -53,13 +54,13 @@ def verify_query(query_id: str, data: VerifyResultRequest, db: Session = Depends
 
 
 @router.post("/queries/{query_id}/feedback", status_code=status.HTTP_201_CREATED)
-def feedback(query_id: str, data: FeedbackRequest, db: Session = Depends(get_db)):
+def feedback(query_id: str, data: FeedbackRequest, db: Session = Depends(get_db), _: Principal = Depends(require_permission("answer.manage"))):
     item = save_feedback(db, _run_or_404(db, query_id), data)
     return {"id": item.id, "query_id": item.query_run_id, "feedback_type": item.feedback_type, "recorded": True}
 
 
 @router.post("/queries/{query_id}/save", response_model=AnswerRead, status_code=status.HTTP_201_CREATED)
-def save_answer(query_id: str, data: SaveAnswerRequest, db: Session = Depends(get_db)):
+def save_answer(query_id: str, data: SaveAnswerRequest, db: Session = Depends(get_db), _: Principal = Depends(require_permission("answer.manage"))):
     try:
         return save_verified_answer(db, _run_or_404(db, query_id), data)
     except ValueError as exc:

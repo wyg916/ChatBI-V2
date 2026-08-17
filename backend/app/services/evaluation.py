@@ -23,14 +23,15 @@ from app.services.datasources import default_workspace
 
 _SERVICE_FILE = Path(__file__).resolve()
 _GOLDEN_MANIFEST_CANDIDATES = (
-    _SERVICE_FILE.parents[3] / "evaluation" / "golden" / "day2-golden-20.json",
-    _SERVICE_FILE.parents[2] / "evaluation" / "golden" / "day2-golden-20.json",
+    _SERVICE_FILE.parents[3] / "evaluation" / "golden" / "day4-golden-50.json",
+    _SERVICE_FILE.parents[2] / "evaluation" / "golden" / "day4-golden-50.json",
 )
 GOLDEN_MANIFEST_PATH = next(
     (candidate for candidate in _GOLDEN_MANIFEST_CANDIDATES if candidate.is_file()),
     _GOLDEN_MANIFEST_CANDIDATES[-1],
 )
-GOLDEN_MANIFEST_SHA256 = "d40bb690a4208240ecf347abe47e045cd74c8eb89b9162d5d53890ecf24bc282"
+GOLDEN_MANIFEST_SHA256 = "25580af42bc76ebddd3d49e6b9c16f8bfabba8ba485a835c453c29175ee2a64a"
+SOURCE_GOLDEN_20_SHA256 = "d40bb690a4208240ecf347abe47e045cd74c8eb89b9162d5d53890ecf24bc282"
 
 
 def manifest_hash(manifest: dict[str, Any]) -> str:
@@ -44,11 +45,12 @@ def load_golden_manifest() -> dict[str, Any]:
     manifest = json.loads(GOLDEN_MANIFEST_PATH.read_text(encoding="utf-8"))
     if (
         not manifest.get("frozen")
-        or len(manifest.get("cases") or []) != 20
+        or len(manifest.get("cases") or []) != 50
+        or manifest.get("source_manifest_sha256") != SOURCE_GOLDEN_20_SHA256
         or manifest.get("manifest_sha256") != GOLDEN_MANIFEST_SHA256
         or manifest_hash(manifest) != GOLDEN_MANIFEST_SHA256
     ):
-        raise RuntimeError("Golden 20 manifest is not frozen or its SHA-256 is invalid")
+        raise RuntimeError("Golden 50 manifest is not frozen or its SHA-256 is invalid")
     return manifest
 
 
@@ -74,7 +76,7 @@ def _runtime(db: Session, dialect: str) -> tuple[DataSource, SemanticModel]:
     model = db.scalar(
         select(SemanticModel)
         .where(SemanticModel.datasource_id == datasource.id)
-        .order_by((SemanticModel.status == "PUBLISHED").desc(), SemanticModel.updated_at.desc())
+        .order_by((SemanticModel.status == "PUBLISHED").desc(), SemanticModel.created_at.asc(), SemanticModel.id.asc())
     )
     if model is None:
         raise LookupError(f"No {dialect} semantic model is configured")
@@ -151,7 +153,7 @@ def run_golden_evaluation(db: Session) -> EvaluationRun:
     datasource, model = _runtime(db, "postgresql")
     started = time.perf_counter()
     run = EvaluationRun(
-        workspace_id=workspace.id, release_name="ChatBI V2 V1 RC Golden 20",
+        workspace_id=workspace.id, release_name="ChatBI V2 Day 4 Golden 50",
         model_name="Local Runtime Provider", status="RUNNING", is_current=False,
         golden_set_count=len(manifest["cases"]), manifest_sha256=manifest["manifest_sha256"],
         completed_at=datetime.now(timezone.utc), sort_order=0,
@@ -171,9 +173,14 @@ def run_golden_evaluation(db: Session) -> EvaluationRun:
         semantic_ok, semantic_reasons = _semantic_match(case, plan)
         result_ok = False
         if execution_ok:
+            expected_rows = case.get("expected_result") or []
+            expected_columns = (
+                list(expected_rows[0]) if expected_rows
+                else [*(case.get("expected_dimensions") or []), *(case.get("expected_metrics") or [])]
+            )
             query = pipeline.verify(db, query, ExpectedResult(
-                columns=list(case["expected_result"][0]) if case.get("expected_result") else [],
-                rows=case.get("expected_result") or [], tolerance=0.0001, order_independent=True,
+                columns=expected_columns,
+                rows=expected_rows, tolerance=0.0001, order_independent=True,
                 metric_names=case.get("expected_metrics") or [], dimension_names=case.get("expected_dimensions") or [],
                 expected_signature=case.get("expected_signature"),
             ))
@@ -226,7 +233,7 @@ def run_golden_evaluation(db: Session) -> EvaluationRun:
     run.average_response_seconds = round(sum(durations) / max(total, 1) / 1000, 3)
     run.duration_seconds = max(1, round(time.perf_counter() - started))
     run.completed_at = datetime.now(timezone.utc)
-    gate_pass = execution_pass >= 19 and result_pass >= 18 and dangerous_blocked == dangerous_total
+    gate_pass = execution_pass >= 49 and result_pass >= 48 and dangerous_blocked == dangerous_total
     run.status = "PASS" if gate_pass else "FAIL"
     for previous in db.scalars(select(EvaluationRun).where(EvaluationRun.id != run.id, EvaluationRun.is_current.is_(True))):
         previous.is_current = False

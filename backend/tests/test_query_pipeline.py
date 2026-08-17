@@ -1,7 +1,10 @@
+import json
 from datetime import datetime, timezone
 
+import httpx
 import pytest
 
+from app.core.config import Settings
 from app.query.context_builder import ContextBuilder
 from app.query.contracts import (
     ExecutionResult,
@@ -10,7 +13,7 @@ from app.query.contracts import (
     QueryContext,
     SecurityPolicy,
 )
-from app.query.nl2sql import DeterministicTestProvider
+from app.query.nl2sql import DeterministicTestProvider, Nl2SqlRouter, OpenAICompatibleProvider, model_provider_catalog
 from app.query.oracle import ResultOracle
 from app.query.sql_guard import SqlGuard
 
@@ -104,6 +107,8 @@ def semantic_context(dialect: str = "postgresql") -> QueryContext:
         metrics=[
             {"id": "m1", "name": "revenue", "label": "收入", "description": "订单收入", "expression": "orders.revenue", "aggregation": "SUM", "filters": []},
             {"id": "m2", "name": "order_count", "label": "订单量", "description": "订单数量", "expression": "orders.order_id", "aggregation": "COUNT", "filters": []},
+            {"id": "m3", "name": "cost", "label": "成本", "description": "订单成本", "expression": "orders.cost", "aggregation": "SUM", "filters": []},
+            {"id": "m4", "name": "profit", "label": "利润", "description": "订单利润", "expression": "orders.revenue - orders.cost", "aggregation": "SUM", "filters": []},
         ],
         dimensions=[{"id": "d1", "name": "region", "label": "地区", "source_column": "regions.region_name", "type": "STRING"}],
         relationships=[],
@@ -129,6 +134,95 @@ def test_deterministic_provider_builds_structured_join_plan(dialect):
     assert plan.dialect == dialect
 
 
+@pytest.mark.parametrize("dialect", ["postgresql", "mysql"])
+def test_day4_planner_supports_growth_ratio_null_and_date_boundaries(dialect):
+    provider = DeterministicTestProvider()
+    context = semantic_context(dialect)
+
+    quarter = provider.plan(question="2026年第一季度按地区统计收入和成本", context=context)
+    assert quarter.metrics == ["revenue", "cost"]
+    assert quarter.time_range.start == "2026-01-01"
+    assert quarter.time_range.end_exclusive == "2026-04-01"
+
+    natural_month = provider.plan(question="2026年2月按产品统计利润率", context=context)
+    assert natural_month.metrics == ["profit_margin"]
+    assert natural_month.time_range.kind == "NATURAL_MONTH"
+    assert natural_month.time_range.end_exclusive == "2026-03-01"
+    assert "NULLIF" in natural_month.generated_sql
+
+    share = provider.plan(question="按地区统计收入贡献度", context=context)
+    assert share.metrics == ["revenue_share"]
+    assert "OVER" in share.generated_sql
+
+    null_status = provider.plan(question="统计状态为空的订单量", context=context)
+    assert null_status.filters[0].operator == "IS"
+    assert null_status.filters[0].value is None
+    assert "IS NULL" in null_status.generated_sql
+
+    growth = provider.plan(question="按月统计收入环比", context=context)
+    assert growth.metrics == ["revenue", "revenue_mom"]
+    assert growth.dimensions == ["month"]
+    assert "LAG" in growth.generated_sql
+    guarded = SqlGuard().validate(growth.generated_sql, dialect=dialect, policy=policy())
+    assert guarded.allowed is True, guarded.issues
+
+
+@pytest.mark.parametrize(
+    ("provider_id", "secret_field", "expected_url", "auth_header", "max_tokens_field"),
+    [
+        ("kimi", "kimi_api_key", "https://api.moonshot.cn/v1/chat/completions", "authorization", "max_completion_tokens"),
+        ("mimo", "mimo_api_key", "https://api.xiaomimimo.com/v1/chat/completions", "api-key", "max_completion_tokens"),
+        ("deepseek", "deepseek_api_key", "https://api.deepseek.com/chat/completions", "authorization", "max_tokens"),
+    ],
+)
+def test_named_provider_uses_safe_provider_specific_contract(
+    provider_id, secret_field, expected_url, auth_header, max_tokens_field,
+):
+    secret = f"{provider_id}-test-secret"
+    settings = Settings(_env_file=None, model_provider=provider_id, **{secret_field: secret})
+    router = Nl2SqlRouter(settings=settings)
+    assert isinstance(router.provider, OpenAICompatibleProvider)
+
+    expected = DeterministicTestProvider().plan(question="按地区统计收入", context=semantic_context())
+    expected.provider = provider_id
+    observed: dict[str, object] = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        payload = json.loads(request.content)
+        observed.update(url=str(request.url), payload=payload, headers=dict(request.headers))
+        return httpx.Response(200, json={"choices": [{"message": {"content": expected.model_dump_json()}}]})
+
+    router.provider.transport = httpx.MockTransport(handler)
+    actual = router.plan(question="按地区统计收入", context=semantic_context())
+
+    assert actual.provider == provider_id
+    assert observed["url"] == expected_url
+    assert observed["payload"]["thinking"] == {"type": "disabled"}
+    assert observed["payload"][max_tokens_field] == 4096
+    assert "temperature" not in observed["payload"]
+    assert observed["payload"]["response_format"] == {"type": "json_object"}
+    expected_auth = secret if auth_header == "api-key" else f"Bearer {secret}"
+    assert observed["headers"][auth_header] == expected_auth
+
+
+def test_provider_catalog_reports_configuration_without_exposing_secrets():
+    settings = Settings(
+        _env_file=None,
+        model_provider="kimi",
+        kimi_api_key="kimi-catalog-secret",
+        mimo_api_key="mimo-catalog-secret",
+        deepseek_api_key="deepseek-catalog-secret",
+    )
+    catalog = model_provider_catalog(settings)
+    serialized = json.dumps(catalog)
+
+    assert catalog["active_provider"] == "kimi"
+    assert catalog["secrets_exposed"] is False
+    assert {item["id"] for item in catalog["items"]} >= {"kimi", "mimo", "deepseek", "deterministic"}
+    assert all(item["configured"] for item in catalog["items"] if item["id"] in {"kimi", "mimo", "deepseek"})
+    assert "catalog-secret" not in serialized
+
+
 def test_result_oracle_compares_values_not_sql_text():
     plan = DeterministicTestProvider().plan(question="按地区统计收入", context=semantic_context())
     guard = GuardResult(allowed=True, dialect="postgresql", normalized_sql="SELECT ...", statement_type="SELECT")
@@ -146,6 +240,32 @@ def test_result_oracle_compares_values_not_sql_text():
     result = ResultOracle().verify(plan=plan, guard=guard, execution=execution, expected=expected)
     assert result.status == "PASSED"
     assert result.mismatch_count == 0
+
+
+def test_result_oracle_requires_all_metrics_and_rejects_duplicate_grain():
+    context = semantic_context()
+    plan = DeterministicTestProvider().plan(question="按地区统计收入和成本", context=context)
+    guard = GuardResult(allowed=True, dialect="postgresql", normalized_sql="SELECT ...", statement_type="SELECT")
+    missing_metric = ExecutionResult(
+        status="SUCCEEDED", columns=["region", "revenue"], column_types=["text", "numeric"],
+        rows=[{"region": "华东", "revenue": 100.0}], row_count=1, datasource_id="d",
+        dialect="postgresql", normalized_sql="SELECT ...", result_signature="missing",
+    )
+    result = ResultOracle().verify(plan=plan, guard=guard, execution=missing_metric)
+    assert result.status == "MISMATCH"
+    assert next(item for item in result.checks if item.name == "metric_columns").passed is False
+
+    duplicate = ExecutionResult(
+        status="SUCCEEDED", columns=["region", "revenue", "cost"], column_types=["text", "numeric", "numeric"],
+        rows=[
+            {"region": "华东", "revenue": 100.0, "cost": 60.0},
+            {"region": "华东", "revenue": 50.0, "cost": 30.0},
+        ],
+        row_count=2, datasource_id="d", dialect="postgresql", normalized_sql="SELECT ...", result_signature="duplicate",
+    )
+    result = ResultOracle().verify(plan=plan, guard=guard, execution=duplicate)
+    assert result.status == "MISMATCH"
+    assert next(item for item in result.checks if item.name == "duplicate_grain").passed is False
 
 
 def test_context_builder_link_score_is_deterministic():

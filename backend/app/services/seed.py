@@ -6,12 +6,14 @@ from sqlalchemy.orm import Session
 from app.core.config import get_settings
 from app.core.security import encrypt_secret
 from app.models import (
+    AppUser,
     BusinessTerm,
     Dashboard,
     DataSource,
     Dimension,
     EvaluationRun,
     Metric,
+    ResourceGrant,
     SemanticEntity,
     SemanticModel,
     SemanticRelation,
@@ -23,6 +25,43 @@ from app.services.datasources import default_workspace
 
 DEMO_MODEL_NAME = "新能源经营分析"
 DEMO_MYSQL_MODEL_NAME = "新能源经营分析（MySQL兼容）"
+
+
+def _ensure_day4_access_control(
+    db: Session,
+    *,
+    workspace_id: str,
+    postgres_datasource_id: str,
+    semantic_model_id: str,
+) -> None:
+    users: dict[str, AppUser] = {}
+    for email, display_name, role in [
+        ("admin@chatbi.local", "ChatBI Administrator", "ADMIN"),
+        ("analyst@chatbi.local", "ChatBI Analyst", "ANALYST"),
+    ]:
+        user = db.scalar(select(AppUser).where(AppUser.email == email))
+        if user is None:
+            user = AppUser(
+                workspace_id=workspace_id, email=email, display_name=display_name,
+                role=role, status="ACTIVE", last_active_at=utcnow(),
+            )
+            db.add(user)
+            db.flush()
+        users[email] = user
+    analyst = users["analyst@chatbi.local"]
+    for resource_type, resource_id, can_query in [
+        ("DATASOURCE", postgres_datasource_id, True),
+        ("SEMANTIC_MODEL", semantic_model_id, True),
+    ]:
+        if db.scalar(select(ResourceGrant.id).where(
+            ResourceGrant.user_id == analyst.id,
+            ResourceGrant.resource_type == resource_type,
+            ResourceGrant.resource_id == resource_id,
+        )) is None:
+            db.add(ResourceGrant(
+                user_id=analyst.id, resource_type=resource_type,
+                resource_id=resource_id, can_read=True, can_query=can_query,
+            ))
 
 
 def _ensure_day2_semantic_resources(db: Session, model: SemanticModel) -> None:
@@ -281,6 +320,10 @@ def seed_demo_semantic_model(db: Session) -> SemanticModel:
         _ensure_day2_semantic_resources(db, existing)
         db.flush()
         _ensure_mysql_semantic_model(db, mysql_datasource, existing)
+        _ensure_day4_access_control(
+            db, workspace_id=workspace.id, postgres_datasource_id=datasource.id,
+            semantic_model_id=existing.id,
+        )
         _seed_demo_content(db, workspace.id)
         db.commit()
         return existing
@@ -317,6 +360,10 @@ def seed_demo_semantic_model(db: Session) -> SemanticModel:
     _ensure_day2_semantic_resources(db, model)
     db.flush()
     _ensure_mysql_semantic_model(db, mysql_datasource, model)
+    _ensure_day4_access_control(
+        db, workspace_id=workspace.id, postgres_datasource_id=datasource.id,
+        semantic_model_id=model.id,
+    )
     _seed_demo_content(db, workspace.id)
     db.commit()
     db.refresh(model)

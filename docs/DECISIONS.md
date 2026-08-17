@@ -103,3 +103,27 @@ NarrativeEngine 在 Result Oracle 未通过时不生成业务洞察；通过时�
 ## ADR-022：共享状态 E2E 发布门禁串行执行
 
 Day 3 E2E 会同步 Schema、发布语义模型、保存 Answer/Dashboard Card 并运行 Golden Set，多个文件共享同一本机 PostgreSQL 元数据库。发布门禁因此使用 Playwright 单 worker 串行执行，避免 Schema Catalog 重建与查询 allowlist 构建发生测试级竞态。并行模式仍可作为压力探测，但其结果不得替代 34 项确定性发布 Gate；Schema Sync 与在线查询的并发隔离列入 Day 4 加固。
+
+## ADR-023：命名模型供应商共享 Adapter 契约但保留请求差异
+
+Kimi、MiMo 与 DeepSeek 都提供 OpenAI Chat Completions 兼容接口，但兼容不等于请求参数完全相同：Kimi K2.6 不接受任意 `temperature`，MiMo 官方 HTTP 示例使用 `api-key`，三家对最大输出字段也不完全一致。ChatBI 因此用命名 `ProviderDefinition` 保存 Base URL、Model ID、认证头和安全请求参数，再统一进入 `OpenAICompatibleProvider`、`SQLPlan` 强校验和 SQL Guard；业务代码不直接依赖供应商 SDK。API Key 只来自 Backend 环境变量，前端状态 API 永不返回密钥。默认发布与 Golden 回归继续使用 deterministic，外部模型只能显式选择，避免非确定性与费用进入基础 Gate。
+
+## ADR-024：并行 E2E 先建立稳定运行时，再并发只读与隔离写入
+
+Playwright `globalSetup` 在 worker 启动前只同步一次 PostgreSQL/MySQL Catalog；Schema Sync 通过数据源行锁与单事务替换元数据，查询在提交前继续看到旧目录。会发布和回滚的测试使用独立语义模型并负责清理，跨 worker 的 UI/查询/Golden 场景按正式主模型稳定标识取运行时，不再使用“最新更新时间”或列表首项。这样既避免测试竞态，也修复了临时已发布模型劫持产品默认运行时的真实风险。
+
+## ADR-025：Golden 50 是可追溯冻结清单，不是问题到 SQL 的运行时映射
+
+`day4-golden-50.json` 保留原 Golden 20 的 SHA-256 来源并新增 30 条多指标、贡献率、NULL、环比/同比、自然月/季度、去重粒度和空结果用例。冻结 Expected SQL/Result/Signature 仅由独立评测脚本读取；NL2SQL 运行时仍只消费语义对象。正式 Gate 要求 PostgreSQL 50/50、MySQL 至少 10/10，并由 Result Oracle 同时验证结果值和语义契约。
+
+## ADR-026：语义回滚生成新发布版本，历史版本保持不可变
+
+Publish 在完整校验实体、指标依赖、维度、关系键和业务术语引用后写入快照。Rollback 读取目标快照、重新校验并生成递增的新版本，例如 V1→V2 后回滚 V1 会发布 V3，并在快照记录 `rollback_source_version=1`；历史 V1/V2 不被覆盖。
+
+## ADR-027：Day 4 最小 RBAC 信任上游身份头并记录真实审计
+
+Backend 以受信反向代理提供的 `X-ChatBI-Actor` 解析已持久化用户；缺省本地模式映射为 ADMIN，显式未知或停用用户被拒绝。ADMIN 拥有系统设置和审计权限，ANALYST 只能访问授予的 DataSource/SemanticModel，并可使用问数、答案、看板和评测权限。拒绝访问、查询、Schema Sync、语义发布/回滚、评测、答案和看板写操作均写入 PostgreSQL 审计表。完整 SSO/OIDC 认证仍不在本轮伪装实现。
+
+## ADR-028：前端页面按路由加载，图表库保持独立非阻断 chunk
+
+14 个页面改为 React Router lazy route，入口 JS 从 963.34 kB 降到 273.08 kB。ECharts 被隔离到只有图表页面才加载的 555.48 kB chunk；该独立 chunk 仍触发 Vite 500 kB warning，但规范明确其为非阻断 P1，不为消除 warning 引入大规模图表重构。

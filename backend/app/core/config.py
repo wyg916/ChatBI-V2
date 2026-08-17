@@ -1,5 +1,6 @@
 from functools import lru_cache
 
+from pydantic import SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -25,6 +26,15 @@ class Settings(BaseSettings):
     model_base_url: str = ""
     model_api_key: str = ""
     model_name: str = ""
+    kimi_base_url: str = "https://api.moonshot.cn/v1"
+    kimi_api_key: SecretStr = SecretStr("")
+    kimi_model_name: str = "kimi-k2.6"
+    mimo_base_url: str = "https://api.xiaomimimo.com/v1"
+    mimo_api_key: SecretStr = SecretStr("")
+    mimo_model_name: str = "mimo-v2.5"
+    deepseek_base_url: str = "https://api.deepseek.com"
+    deepseek_api_key: SecretStr = SecretStr("")
+    deepseek_model_name: str = "deepseek-v4-flash"
     query_timeout_ms: int = 8000
     query_row_limit: int = 500
     query_concurrency: int = 4

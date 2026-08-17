@@ -1,5 +1,37 @@
 export type DatasourceKind = 'postgresql' | 'mysql';
 
+export interface ModelProviderStatus {
+  id: string;
+  display_name: string;
+  model_name: string | null;
+  base_url: string | null;
+  configured: boolean;
+  active: boolean;
+  external_model: boolean;
+  structured_output: boolean;
+  protocol: 'openai-chat-completions' | 'local';
+  credential_env: string | null;
+}
+
+export interface ModelProviderCatalog {
+  active_provider: string;
+  secrets_exposed: false;
+  items: ModelProviderStatus[];
+}
+
+export interface SecurityUser {
+  id: string; email: string; display_name: string; role: 'ADMIN' | 'ANALYST'; status: string; last_active_at?: string;
+}
+export interface SecurityRole { name: 'ADMIN' | 'ANALYST'; permissions: string[]; user_count: number }
+export interface SecurityAuditEvent {
+  id: string; actor_email: string; action: string; resource_type: string; resource_id?: string;
+  status: string; details: Record<string, unknown>; created_at: string;
+}
+export interface SecurityOverview {
+  current_actor?: SecurityUser; user_count: number; role_count: number; active_user_count: number; audit_event_count: number;
+  users: SecurityUser[]; roles: SecurityRole[]; audit_events: SecurityAuditEvent[];
+}
+
 export interface Datasource {
   id: string;
   name: string;
@@ -42,6 +74,9 @@ export interface SemanticModel {
 }
 
 export interface SemanticModelInput { name: string; description?: string; datasource_id: string }
+export interface SemanticVersion {
+  id: string; semantic_model_id: string; version: number; snapshot: Record<string, unknown>; published_at: string; is_current: boolean;
+}
 
 export type AnswerStatus = 'DRAFT' | 'VERIFIED' | 'REJECTED' | 'DEPRECATED';
 export interface VerifiedAnswer {

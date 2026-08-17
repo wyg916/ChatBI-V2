@@ -49,11 +49,11 @@ class ResultOracle:
         metric_aliases = set(plan.metrics)
         dimension_aliases = set(plan.dimensions)
         columns = set(execution.columns)
-        metric_ok = not metric_aliases or bool(metric_aliases & columns)
+        metric_ok = metric_aliases.issubset(columns)
         dimension_ok = all(item in columns for item in dimension_aliases)
         checks.append(OracleCheck(
             name="metric_columns", passed=metric_ok,
-            message="Selected metric columns are present" if metric_ok else "Selected metric columns are missing",
+            message="All selected metric columns are present" if metric_ok else "One or more selected metric columns are missing",
         ))
         checks.append(OracleCheck(
             name="dimension_columns", passed=dimension_ok,
@@ -83,10 +83,27 @@ class ResultOracle:
             name="row_shape_and_nulls", passed=null_ok,
             message="Every row has the declared column set" if null_ok else "One or more rows have inconsistent columns",
         ))
+        grain_keys = [item for item in plan.dimensions if item in columns]
+        grain_values = [tuple(row.get(key) for key in grain_keys) for row in execution.rows]
+        duplicate_grain_ok = not grain_keys or len(grain_values) == len(set(grain_values))
+        checks.append(OracleCheck(
+            name="duplicate_grain", passed=duplicate_grain_ok,
+            message="Result grain is unique" if duplicate_grain_ok else "Duplicate rows were detected at the declared dimension grain",
+        ))
 
         mismatch_count = 0
         expected_signature: str | None = None
         if expected is not None:
+            metric_contract_ok = not expected.metric_names or set(expected.metric_names) == metric_aliases
+            dimension_contract_ok = not expected.dimension_names or set(expected.dimension_names) == dimension_aliases
+            checks.append(OracleCheck(
+                name="expected_metric_semantics", passed=metric_contract_ok,
+                message="Metric semantics match the frozen contract" if metric_contract_ok else "Metric semantics differ from the frozen contract",
+            ))
+            checks.append(OracleCheck(
+                name="expected_dimension_semantics", passed=dimension_contract_ok,
+                message="Dimension semantics match the frozen contract" if dimension_contract_ok else "Dimension semantics differ from the frozen contract",
+            ))
             expected_columns = expected.columns or list(expected.rows[0]) if expected.rows else expected.columns
             column_set_ok = set(expected_columns) == columns
             checks.append(OracleCheck(

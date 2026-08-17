@@ -6,12 +6,16 @@ ChatBI V2 是围绕“数据源 → Schema → 语义层 → 问数 → 可验�
 
 前置条件：Windows PowerShell、Python 3.11、本机 PostgreSQL 15+、本机 MySQL 8+、Docker Desktop（仅运行 Backend/Frontend）。
 
+完成首次数据库初始化后，直接双击仓库根目录的 `一键启动-ChatBI-V2.cmd`。它会检查 Docker Desktop、构建并启动 Backend/Frontend、验证 PostgreSQL/MySQL 数据源，然后自动打开 <http://localhost:5173>。启动失败时窗口会保留错误提示，不会 reset、提交或修改当前 Git 工作树。
+
 ```powershell
 git clone https://github.com/wyg916/ChatBI-V2.git
 cd "ChatBI-V2"
 .\scripts\bootstrap-local-databases.ps1
-.\scripts\start.ps1
+.\一键启动-ChatBI-V2.cmd
 ```
+
+命令行启动仍可使用 `.\scripts\start.ps1`；自动化检查可使用 `.\scripts\launch.ps1 -NoOpen`，已确认镜像无需重建时可再加 `-SkipBuild`。
 
 启动完成后访问：
 
