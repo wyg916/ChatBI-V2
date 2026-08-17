@@ -1,6 +1,10 @@
 from __future__ import annotations
 
+import hashlib
+import hmac
+import json
 import re
+import time
 from collections.abc import Callable
 
 import httpx
@@ -23,22 +27,26 @@ class UnavailableRagAdapter:
         raise RagAdapterError("legacy RAG runtime is not configured")
 
 
-class LegacyRagAdapter:
+class LiveRagAdapter:
     def __init__(
         self,
         *,
         base_url: str,
         bearer_token: str = "",
-        endpoint: str = "/api/v1/knowledge/retrieval/test",
+        shared_secret: str = "",
+        endpoint: str = "/api/v1/retrieve",
         require_workspace_echo: bool = True,
+        retry_count: int = 1,
         client_factory: Callable[..., httpx.Client] = httpx.Client,
     ) -> None:
         if not base_url.startswith(("http://", "https://")):
             raise ValueError("legacy RAG base_url must use HTTP or HTTPS")
         self.base_url = base_url.rstrip("/")
         self.bearer_token = bearer_token
+        self.shared_secret = shared_secret
         self.endpoint = endpoint
         self.require_workspace_echo = require_workspace_echo
+        self.retry_count = max(0, min(retry_count, 2))
         self.client_factory = client_factory
 
     def retrieve(self, request: RagRequest) -> RagResult:
@@ -48,8 +56,6 @@ class LegacyRagAdapter:
             "X-ChatBI-Roles": ",".join(sorted(request.context.roles)),
             "X-ChatBI-Trace-Id": request.context.trace_id,
         }
-        if self.bearer_token:
-            headers["Authorization"] = f"Bearer {self.bearer_token}"
         payload = {
             "query": request.query,
             "scenario_id": request.scenario_id,
@@ -68,16 +74,44 @@ class LegacyRagAdapter:
                 "token_budget": request.context.token_budget,
             },
         }
-        try:
-            with self.client_factory(
-                base_url=self.base_url,
-                timeout=request.context.timeout_ms / 1000,
-                follow_redirects=False,
-            ) as client:
-                response = client.post(self.endpoint, json=payload, headers=headers)
-                response.raise_for_status()
-        except httpx.HTTPError as exc:
-            raise RagAdapterError(f"legacy RAG request failed: {type(exc).__name__}") from exc
+        body_bytes = json.dumps(
+            payload, ensure_ascii=False, sort_keys=True, separators=(",", ":")
+        ).encode("utf-8")
+        timestamp = str(int(time.time()))
+        if self.shared_secret:
+            headers["X-ChatBI-Timestamp"] = timestamp
+            headers["X-ChatBI-Signature"] = hmac.new(
+                self.shared_secret.encode("utf-8"),
+                timestamp.encode("ascii") + b"." + body_bytes,
+                hashlib.sha256,
+            ).hexdigest()
+        if self.bearer_token:
+            headers["Authorization"] = f"Bearer {self.bearer_token}"
+        headers["Content-Type"] = "application/json"
+        response = None
+        last_error: Exception | None = None
+        for attempt in range(self.retry_count + 1):
+            try:
+                with self.client_factory(
+                    base_url=self.base_url,
+                    timeout=request.context.timeout_ms / 1000,
+                    follow_redirects=False,
+                ) as client:
+                    response = client.post(self.endpoint, content=body_bytes, headers=headers)
+                    if response.status_code >= 500 and attempt < self.retry_count:
+                        continue
+                    response.raise_for_status()
+                    break
+            except httpx.HTTPError as exc:
+                last_error = exc
+                if attempt >= self.retry_count:
+                    raise RagAdapterError(
+                        f"live RAG request failed: {type(exc).__name__}"
+                    ) from exc
+        if response is None:
+            raise RagAdapterError(
+                f"live RAG request failed: {type(last_error).__name__ if last_error else 'UNKNOWN'}"
+            )
         echoed_workspace = response.headers.get("X-ChatBI-Workspace-Id")
         if self.require_workspace_echo and echoed_workspace != request.context.workspace_id:
             raise RagAdapterError("legacy RAG workspace identity was not echoed")
@@ -93,13 +127,25 @@ class LegacyRagAdapter:
             refusal_reason=refusal,
             trace_id=str(body.get("trace_id") or request.context.trace_id),
             run_id=body.get("run_id"),
-            adapter="legacy-rag-http",
+            adapter="chatbi-live-rag-http",
             metadata={
                 "answer_guard_status": body.get("answer_guard_status"),
                 "vector_status": body.get("vector_status"),
                 "workspace_echo_verified": echoed_workspace == request.context.workspace_id,
             },
         )
+
+    def health(self, *, timeout_ms: int = 1500) -> bool:
+        try:
+            with self.client_factory(
+                base_url=self.base_url,
+                timeout=timeout_ms / 1000,
+                follow_redirects=False,
+            ) as client:
+                response = client.get("/health")
+                return response.status_code == 200 and response.json().get("status") == "ok"
+        except (httpx.HTTPError, ValueError):
+            return False
 
     @staticmethod
     def _citation(item: dict, index: int) -> Citation:
@@ -140,3 +186,7 @@ class CitationVerifierV1:
                 return CitationVerification(passed=False, reason="PROMPT_INJECTION_EVIDENCE")
             seen.add(item.citation_id)
         return CitationVerification(passed=True, verified_ids=tuple(sorted(seen)))
+
+
+class LegacyRagAdapter(LiveRagAdapter):
+    """Deprecated import alias retained for one release; it uses the live bridge."""

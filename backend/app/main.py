@@ -9,6 +9,7 @@ from app.api.router import api_router
 from app.core.config import get_settings
 from app.db.session import SessionLocal
 from app.services.seed import seed_demo_semantic_model
+from app.services.runtime_seed import seed_v1_runtime
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
 logger = logging.getLogger(__name__)
@@ -20,7 +21,8 @@ async def lifespan(_: FastAPI):
     if get_settings().seed_demo_semantic_model:
         try:
             with SessionLocal() as db:
-                seed_demo_semantic_model(db)
+                model = seed_demo_semantic_model(db)
+                seed_v1_runtime(db, model.workspace_id)
         except Exception:
             logger.exception("Demo semantic seed skipped because metadata database is not ready")
     yield

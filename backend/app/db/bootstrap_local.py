@@ -38,12 +38,14 @@ def _read_env() -> dict[str, str]:
 def _project_secrets() -> dict[str, str]:
     values = _read_env()
     reader_password = values.get("CHATBI_DEMO_POSTGRES_PASSWORD") or secrets.token_urlsafe(30)
-    return {
+    values.update({
         "CHATBI_META_PASSWORD": values.get("CHATBI_META_PASSWORD") or secrets.token_urlsafe(30),
         "CHATBI_DATASOURCE_SECRET_KEY": values.get("CHATBI_DATASOURCE_SECRET_KEY") or secrets.token_urlsafe(48),
+        "CHATBI_RAG_SHARED_SECRET": values.get("CHATBI_RAG_SHARED_SECRET") or secrets.token_urlsafe(48),
         "CHATBI_DEMO_POSTGRES_PASSWORD": reader_password,
         "CHATBI_DEMO_MYSQL_PASSWORD": values.get("CHATBI_DEMO_MYSQL_PASSWORD") or reader_password,
-    }
+    })
+    return values
 
 
 def _write_env(values: dict[str, str]) -> None:

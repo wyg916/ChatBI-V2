@@ -9,6 +9,7 @@ services:
       CHATBI_ENVIRONMENT: development
       CHATBI_DATABASE_URL: ${CHATBI_DATABASE_URL:-postgresql+psycopg://chatbi_app:${CHATBI_META_PASSWORD:?Run scripts/bootstrap-local-databases.ps1 first}@host.docker.internal:5432/chatbi_v2}
       CHATBI_DATASOURCE_SECRET_KEY: ${CHATBI_DATASOURCE_SECRET_KEY:?Run scripts/bootstrap-local-databases.ps1 first}
+      CHATBI_RAG_SHARED_SECRET: ${CHATBI_RAG_SHARED_SECRET:?Run scripts/bootstrap-local-databases.ps1 first}
       CHATBI_SEED_DEMO_SEMANTIC_MODEL: "true"
       CHATBI_DEMO_POSTGRES_HOST: host.docker.internal
       CHATBI_DEMO_POSTGRES_PORT: "5432"
@@ -38,19 +39,22 @@ services:
       CHATBI_QUERY_ROW_LIMIT: ${CHATBI_QUERY_ROW_LIMIT:-500}
       CHATBI_QUERY_CONCURRENCY: ${CHATBI_QUERY_CONCURRENCY:-4}
       CHATBI_CONTEXT_TOKEN_BUDGET: ${CHATBI_CONTEXT_TOKEN_BUDGET:-6000}
-      CHATBI_RAG_MODE: ${CHATBI_RAG_MODE:-shadow}
-      CHATBI_AGENT_MODE: ${CHATBI_AGENT_MODE:-off}
-      CHATBI_AGENT_ALLOWED_ROUTES: ${CHATBI_AGENT_ALLOWED_ROUTES:-}
+      CHATBI_RAG_MODE: ${CHATBI_RAG_MODE:-on}
+      CHATBI_AGENT_MODE: ${CHATBI_AGENT_MODE:-on}
+      CHATBI_AGENT_ALLOWED_ROUTES: ${CHATBI_AGENT_ALLOWED_ROUTES:-COMPLEX_ANALYSIS}
       CHATBI_RAG_FALLBACK_ENABLED: ${CHATBI_RAG_FALLBACK_ENABLED:-true}
       CHATBI_AGENT_FALLBACK_ENABLED: ${CHATBI_AGENT_FALLBACK_ENABLED:-true}
-      CHATBI_LEGACY_RAG_BASE_URL: ${CHATBI_LEGACY_RAG_BASE_URL:-}
+      CHATBI_LEGACY_RAG_BASE_URL: ${CHATBI_LEGACY_RAG_BASE_URL:-http://rag-runtime:8001}
       CHATBI_LEGACY_RAG_BEARER_TOKEN: ${CHATBI_LEGACY_RAG_BEARER_TOKEN:-}
       CHATBI_LEGACY_RAG_REQUIRE_WORKSPACE_ECHO: ${CHATBI_LEGACY_RAG_REQUIRE_WORKSPACE_ECHO:-true}
       CHATBI_LEGACY_AGENT_BASE_URL: ${CHATBI_LEGACY_AGENT_BASE_URL:-}
       CHATBI_LEGACY_AGENT_BEARER_TOKEN: ${CHATBI_LEGACY_AGENT_BEARER_TOKEN:-}
-      CHATBI_AGENT_TIMEOUT_MS: ${CHATBI_AGENT_TIMEOUT_MS:-15000}
-      CHATBI_AGENT_MAX_STEPS: ${CHATBI_AGENT_MAX_STEPS:-4}
-      CHATBI_AGENT_TOKEN_BUDGET: ${CHATBI_AGENT_TOKEN_BUDGET:-4000}
+      CHATBI_AGENT_TIMEOUT_MS: ${CHATBI_AGENT_TIMEOUT_MS:-30000}
+      CHATBI_AGENT_MAX_STEPS: ${CHATBI_AGENT_MAX_STEPS:-8}
+      CHATBI_AGENT_MAX_TOOL_CALLS: ${CHATBI_AGENT_MAX_TOOL_CALLS:-12}
+      CHATBI_AGENT_MAX_REPLAN: ${CHATBI_AGENT_MAX_REPLAN:-2}
+      CHATBI_AGENT_MAX_DEPTH: ${CHATBI_AGENT_MAX_DEPTH:-2}
+      CHATBI_AGENT_TOKEN_BUDGET: ${CHATBI_AGENT_TOKEN_BUDGET:-6000}
     extra_hosts:
       - "host.docker.internal:host-gateway"
     ports:
@@ -62,13 +66,34 @@ services:
       retries: 30
     restart: unless-stopped
 
+  rag-runtime:
+    image: chatbi-v2-backend
+    command: ["uvicorn", "app.rag_runtime.main:app", "--host", "0.0.0.0", "--port", "8001"]
+    environment:
+      CHATBI_ENVIRONMENT: development
+      CHATBI_DATABASE_URL: ${CHATBI_DATABASE_URL:-postgresql+psycopg://chatbi_app:${CHATBI_META_PASSWORD:?Run scripts/bootstrap-local-databases.ps1 first}@host.docker.internal:5432/chatbi_v2}
+      CHATBI_RAG_SHARED_SECRET: ${CHATBI_RAG_SHARED_SECRET:?Run scripts/bootstrap-local-databases.ps1 first}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      backend:
+        condition: service_healthy
+    ports:
+      - "${CHATBI_RAG_PORT:-8001}:8001"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8001/health', timeout=2)"]
+      interval: 4s
+      timeout: 4s
+      retries: 30
+    restart: unless-stopped
+
   frontend:
     build:
       context: ./frontend
     ports:
       - "${CHATBI_FRONTEND_PORT:-5173}:80"
     depends_on:
-      backend:
+      rag-runtime:
         condition: service_healthy
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://127.0.0.1/ >/dev/null || exit 1"]
