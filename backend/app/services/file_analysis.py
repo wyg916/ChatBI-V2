@@ -63,15 +63,28 @@ def _column(question: str, columns: list[str], numeric: list[str]) -> str | None
     return aliased or (numeric[0] if numeric else None)
 
 
+def _filter_by_mentions(question: str, rows: list[dict[str, Any]], selected: str | None) -> list[dict[str, Any]]:
+    filtered = rows
+    for column in ({key for row in rows for key in row} - {selected}):
+        mentioned = {
+            value for row in rows
+            if isinstance((value := row.get(column)), str) and len(value.strip()) >= 2 and value.lower() in question.lower()
+        }
+        if mentioned:
+            filtered = [row for row in filtered if row.get(column) in mentioned]
+    return filtered
+
+
 def analyze_structured(question: str, attachments: list[Any]) -> dict[str, Any]:
     datasets = _datasets(attachments)
     if not datasets:
         raise ValueError("FILE_ANALYSIS_REQUIRES_STRUCTURED_ATTACHMENT")
     question_lower = question.lower()
     primary = datasets[0]
-    rows = primary["rows"]
-    numeric = _numeric_columns(rows)
+    source_rows = primary["rows"]
+    numeric = _numeric_columns(source_rows)
     selected = _column(question, primary["columns"], numeric)
+    rows = _filter_by_mentions(question, source_rows, selected)
     values = [float(row[selected]) for row in rows if selected and isinstance(row.get(selected), (int, float))]
     operation = "SUMMARY"
     result_rows: list[dict[str, Any]] = []

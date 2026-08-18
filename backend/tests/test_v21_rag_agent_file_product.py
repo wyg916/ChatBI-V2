@@ -85,7 +85,7 @@ def test_agent_product_15_uses_only_fixed_roles_tools_and_complete_trace():
 
 
 def _attachment(identifier: str, *, multiplier: int = 1):
-    rows = [{"customer_id": index, "date": f"2026-01-{index:02d}", "revenue": index * 10 * multiplier} for index in range(1, 7)]
+    rows = [{"customer_id": index, "region": "华东" if index % 2 else "华南", "date": f"2026-01-{index:02d}", "revenue": index * 10 * multiplier} for index in range(1, 7)]
     return SimpleNamespace(id=identifier, filename=f"{identifier}.csv", extracted_payload={"row_count": len(rows), "columns": list(rows[0]), "preview": rows})
 
 
@@ -100,7 +100,7 @@ def test_file_product_10_fixed_interpreter_has_no_code_network_secret_or_host_ac
         rows = result["result"]["rows"]
         if case["id"] == "F01": assert rows == [{"dataset": "left.csv", "row_count": 6}]
         if case["id"] == "F02": assert rows == [{"column": "revenue", "average": 35.0}]
-        if case["id"] == "F03": assert rows == [{"column": "revenue", "sum": 210.0}]
+        if case["id"] == "F03": assert rows == [{"column": "revenue", "sum": 90.0}]
         if case["id"] in {"F04", "F10"}: assert rows[0]["revenue"] == 60
         if case["id"] == "F05": assert rows[0]["revenue"] == 10
         if case["id"] == "F07": assert [row["count"] for row in rows] == [2, 2, 2]

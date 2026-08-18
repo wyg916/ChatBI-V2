@@ -1,10 +1,10 @@
 {
   "schema_version": "2.1-day2-evidence-v1",
-  "tested_sha": "5ed2a9a7d012a86f9409c0fb9175709671bd6fe5",
-  "executed_at": "2026-08-19T02:06:07+08:00",
+  "tested_sha": "c7b3ae7181b34ea9721329769ee3f2dd5ba82c2a",
+  "executed_at": "2026-08-19T02:13:00+08:00",
   "command": "python -m pytest tests/test_v21_rag_agent_file_product.py tests/test_phase2_auth_chat_attachments.py -q",
   "manifest": "evaluation/golden/v2.1-file-10.json",
-  "manifest_sha256": "b552bacad47e1afa6264de844394ad31cdf8174ec2801c761e087e20a513da01",
+  "manifest_sha256": "d8eaa3b3a3abad15b1dba17ab7caa4566e6e715daffbc6a3690fe6183e4168aa",
   "cases": 10,
   "passed": 10,
   "result_accuracy": 1.0,
