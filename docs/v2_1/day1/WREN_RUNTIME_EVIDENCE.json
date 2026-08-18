@@ -1,0 +1,415 @@
+{
+  "executed_at": "2026-08-18T13:08:34.885434+00:00",
+  "git_sha": "ac1f43506e7cd2a51bf8db11af7233606ef6eb63",
+  "command": "python backend/scripts/run_v21_semantic_cases.py --env-file <local-env> --datasource-id <datasource-id> --semantic-model-id <semantic-model-id> --output temp/day1/semantic-cases.json",
+  "test_count": 20,
+  "raw_evidence_path": "temp/day1/semantic-cases.json",
+  "failures": [],
+  "blockers": [],
+  "frozen_zone_intersection": [
+    ".env.example",
+    "backend/app/core/config.py",
+    "backend/app/query/oracle.py",
+    "backend/app/query/service.py",
+    "backend/app/semantic/engine.py",
+    "docker-compose.yml",
+    "frontend/src/pages/AskExperience.tsx"
+  ],
+  "migration_impact": "NONE",
+  "license_impact": "Clean-room compatible adapters; no upstream source, UI, logo, or binary copied.",
+  "rollback": "Set CHATBI_SEMANTIC_RUNTIME_MODE=local and restart the backend.",
+  "runtime": "wren-clean-room-runtime",
+  "gate": {
+    "wren_runtime_call_rate": 1.0,
+    "wren_mdl_mapping_coverage": 1.0,
+    "wren_dry_plan": "PASS",
+    "wren_structured_error": "PASS",
+    "wren_rollback": "PASS",
+    "wren_golden_result_consistency": 1.0
+  },
+  "trace_count": 19,
+  "golden_cases": [
+    {
+      "case_id": "GT-001",
+      "question": "租户 1 在 2024-01 的 net_sales 是多少？",
+      "expected": [
+        {
+          "value": "782110995.39"
+        }
+      ],
+      "actual": [
+        {
+          "net_sales": 782110995.39
+        }
+      ],
+      "consistent": true,
+      "generated_sql": "SELECT\n  ROUND(SUM(f.net_amount - f.refund_amount)::numeric, 2) AS net_sales\nFROM \"chatbi_benchmark_v21\".fact_sales f\nWHERE f.order_status <> 'TEST'\n  AND f.tenant_id = 1\n  AND f.order_date >= DATE '2024-01-01'\n  AND f.order_date < DATE '2024-02-01'\nLIMIT 10",
+      "normalized_sql": "SELECT ROUND(CAST(SUM(f.net_amount - f.refund_amount) AS DECIMAL), 2) AS net_sales FROM \"chatbi_benchmark_v21\".fact_sales AS f WHERE f.order_status <> 'TEST' AND f.tenant_id = 1 AND f.order_date >= CAST('2024-01-01' AS DATE) AND f.order_date < CAST('2024-02-01' AS DATE) LIMIT 10",
+      "result_signature": "52dcdc1765dc7fde36fd9f934ef794ca286401b35e9c0cb76acc31e234fcb8bb",
+      "oracle_status": "PASSED"
+    },
+    {
+      "case_id": "GT-002",
+      "question": "租户 2 在 2024-01 的 net_profit 是多少？",
+      "expected": [
+        {
+          "value": "267605283.13"
+        }
+      ],
+      "actual": [
+        {
+          "net_profit": 267605283.13
+        }
+      ],
+      "consistent": true,
+      "generated_sql": "SELECT\n  ROUND(SUM(f.profit_amount - f.refund_amount)::numeric, 2) AS net_profit\nFROM \"chatbi_benchmark_v21\".fact_sales f\nWHERE f.order_status <> 'TEST'\n  AND f.tenant_id = 2\n  AND f.order_date >= DATE '2024-01-01'\n  AND f.order_date < DATE '2024-02-01'\nLIMIT 10",
+      "normalized_sql": "SELECT ROUND(CAST(SUM(f.profit_amount - f.refund_amount) AS DECIMAL), 2) AS net_profit FROM \"chatbi_benchmark_v21\".fact_sales AS f WHERE f.order_status <> 'TEST' AND f.tenant_id = 2 AND f.order_date >= CAST('2024-01-01' AS DATE) AND f.order_date < CAST('2024-02-01' AS DATE) LIMIT 10",
+      "result_signature": "e92827084481982b3126dffe417856bb5711585be4caf19324bde4e26125b604",
+      "oracle_status": "PASSED"
+    },
+    {
+      "case_id": "GT-003",
+      "question": "租户 3 在 2024-01 的 valid_orders 是多少？",
+      "expected": [
+        {
+          "value": 28870
+        }
+      ],
+      "actual": [
+        {
+          "valid_orders": 28870
+        }
+      ],
+      "consistent": true,
+      "generated_sql": "SELECT\n  COUNT(*) FILTER (WHERE f.order_status IN ('VALID','PARTIAL_REFUND','REFUNDED')) AS valid_orders\nFROM \"chatbi_benchmark_v21\".fact_sales f\nWHERE f.order_status <> 'TEST'\n  AND f.tenant_id = 3\n  AND f.order_date >= DATE '2024-01-01'\n  AND f.order_date < DATE '2024-02-01'\nLIMIT 10",
+      "normalized_sql": "SELECT COUNT(*) FILTER(WHERE f.order_status IN ('VALID', 'PARTIAL_REFUND', 'REFUNDED')) AS valid_orders FROM \"chatbi_benchmark_v21\".fact_sales AS f WHERE f.order_status <> 'TEST' AND f.tenant_id = 3 AND f.order_date >= CAST('2024-01-01' AS DATE) AND f.order_date < CAST('2024-02-01' AS DATE) LIMIT 10",
+      "result_signature": "24ffb03a2b973118106bf356d4575747f2225adb7787f9e77a31c12126ac00df",
+      "oracle_status": "PASSED"
+    },
+    {
+      "case_id": "GT-004",
+      "question": "租户 4 在 2024-01 的 active_customers 是多少？",
+      "expected": [
+        {
+          "value": 18627
+        }
+      ],
+      "actual": [
+        {
+          "active_customers": 18627
+        }
+      ],
+      "consistent": true,
+      "generated_sql": "SELECT\n  COUNT(DISTINCT f.customer_id) FILTER (WHERE f.order_status IN ('VALID','PARTIAL_REFUND','REFUNDED')) AS active_customers\nFROM \"chatbi_benchmark_v21\".fact_sales f\nWHERE f.order_status <> 'TEST'\n  AND f.tenant_id = 4\n  AND f.order_date >= DATE '2024-01-01'\n  AND f.order_date < DATE '2024-02-01'\nLIMIT 10",
+      "normalized_sql": "SELECT COUNT(DISTINCT f.customer_id) FILTER(WHERE f.order_status IN ('VALID', 'PARTIAL_REFUND', 'REFUNDED')) AS active_customers FROM \"chatbi_benchmark_v21\".fact_sales AS f WHERE f.order_status <> 'TEST' AND f.tenant_id = 4 AND f.order_date >= CAST('2024-01-01' AS DATE) AND f.order_date < CAST('2024-02-01' AS DATE) LIMIT 10",
+      "result_signature": "b242eed3e1e8a1fb3ee3df34d4e7ddb1bed2b1f4eeb0a696fffa9c1832d857d9",
+      "oracle_status": "PASSED"
+    },
+    {
+      "case_id": "GT-005",
+      "question": "租户 5 在 2024-01 的 refund_amount 是多少？",
+      "expected": [
+        {
+          "value": "13169646.14"
+        }
+      ],
+      "actual": [
+        {
+          "refund_amount": 13169646.14
+        }
+      ],
+      "consistent": true,
+      "generated_sql": "SELECT\n  ROUND(SUM(f.refund_amount)::numeric, 2) AS refund_amount\nFROM \"chatbi_benchmark_v21\".fact_sales f\nWHERE f.order_status <> 'TEST'\n  AND f.tenant_id = 5\n  AND f.order_date >= DATE '2024-01-01'\n  AND f.order_date < DATE '2024-02-01'\nLIMIT 10",
+      "normalized_sql": "SELECT ROUND(CAST(SUM(f.refund_amount) AS DECIMAL), 2) AS refund_amount FROM \"chatbi_benchmark_v21\".fact_sales AS f WHERE f.order_status <> 'TEST' AND f.tenant_id = 5 AND f.order_date >= CAST('2024-01-01' AS DATE) AND f.order_date < CAST('2024-02-01' AS DATE) LIMIT 10",
+      "result_signature": "180e5f3bc6f969218c657a12c6169e17c40e7928130f76d528d8aa902bbf76ce",
+      "oracle_status": "PASSED"
+    },
+    {
+      "case_id": "GT-006",
+      "question": "租户 6 在 2024-02 的 net_sales 是多少？",
+      "expected": [
+        {
+          "value": "929697147.47"
+        }
+      ],
+      "actual": [
+        {
+          "net_sales": 929697147.47
+        }
+      ],
+      "consistent": true,
+      "generated_sql": "SELECT\n  ROUND(SUM(f.net_amount - f.refund_amount)::numeric, 2) AS net_sales\nFROM \"chatbi_benchmark_v21\".fact_sales f\nWHERE f.order_status <> 'TEST'\n  AND f.tenant_id = 6\n  AND f.order_date >= DATE '2024-02-01'\n  AND f.order_date < DATE '2024-03-01'\nLIMIT 10",
+      "normalized_sql": "SELECT ROUND(CAST(SUM(f.net_amount - f.refund_amount) AS DECIMAL), 2) AS net_sales FROM \"chatbi_benchmark_v21\".fact_sales AS f WHERE f.order_status <> 'TEST' AND f.tenant_id = 6 AND f.order_date >= CAST('2024-02-01' AS DATE) AND f.order_date < CAST('2024-03-01' AS DATE) LIMIT 10",
+      "result_signature": "37a1fba9f10b3e9eefc2b9cac6468a06b3f3f3be376752b7dfae9ed75ebc2c61",
+      "oracle_status": "PASSED"
+    },
+    {
+      "case_id": "GT-007",
+      "question": "租户 7 在 2024-02 的 net_profit 是多少？",
+      "expected": [
+        {
+          "value": "192378212.87"
+        }
+      ],
+      "actual": [
+        {
+          "net_profit": 192378212.87
+        }
+      ],
+      "consistent": true,
+      "generated_sql": "SELECT\n  ROUND(SUM(f.profit_amount - f.refund_amount)::numeric, 2) AS net_profit\nFROM \"chatbi_benchmark_v21\".fact_sales f\nWHERE f.order_status <> 'TEST'\n  AND f.tenant_id = 7\n  AND f.order_date >= DATE '2024-02-01'\n  AND f.order_date < DATE '2024-03-01'\nLIMIT 10",
+      "normalized_sql": "SELECT ROUND(CAST(SUM(f.profit_amount - f.refund_amount) AS DECIMAL), 2) AS net_profit FROM \"chatbi_benchmark_v21\".fact_sales AS f WHERE f.order_status <> 'TEST' AND f.tenant_id = 7 AND f.order_date >= CAST('2024-02-01' AS DATE) AND f.order_date < CAST('2024-03-01' AS DATE) LIMIT 10",
+      "result_signature": "a6d484d4424b5198768a091e8b15ce95731fc4014f8296ab49cc6b8e52968d32",
+      "oracle_status": "PASSED"
+    },
+    {
+      "case_id": "GT-008",
+      "question": "租户 8 在 2024-02 的 valid_orders 是多少？",
+      "expected": [
+        {
+          "value": 27061
+        }
+      ],
+      "actual": [
+        {
+          "valid_orders": 27061
+        }
+      ],
+      "consistent": true,
+      "generated_sql": "SELECT\n  COUNT(*) FILTER (WHERE f.order_status IN ('VALID','PARTIAL_REFUND','REFUNDED')) AS valid_orders\nFROM \"chatbi_benchmark_v21\".fact_sales f\nWHERE f.order_status <> 'TEST'\n  AND f.tenant_id = 8\n  AND f.order_date >= DATE '2024-02-01'\n  AND f.order_date < DATE '2024-03-01'\nLIMIT 10",
+      "normalized_sql": "SELECT COUNT(*) FILTER(WHERE f.order_status IN ('VALID', 'PARTIAL_REFUND', 'REFUNDED')) AS valid_orders FROM \"chatbi_benchmark_v21\".fact_sales AS f WHERE f.order_status <> 'TEST' AND f.tenant_id = 8 AND f.order_date >= CAST('2024-02-01' AS DATE) AND f.order_date < CAST('2024-03-01' AS DATE) LIMIT 10",
+      "result_signature": "a61881b83e9eefcfd4944cc5b77bf927f46b7fa3cec6bee34ebdfac00576889d",
+      "oracle_status": "PASSED"
+    },
+    {
+      "case_id": "GT-009",
+      "question": "租户 9 在 2024-02 的 active_customers 是多少？",
+      "expected": [
+        {
+          "value": 17586
+        }
+      ],
+      "actual": [
+        {
+          "active_customers": 17586
+        }
+      ],
+      "consistent": true,
+      "generated_sql": "SELECT\n  COUNT(DISTINCT f.customer_id) FILTER (WHERE f.order_status IN ('VALID','PARTIAL_REFUND','REFUNDED')) AS active_customers\nFROM \"chatbi_benchmark_v21\".fact_sales f\nWHERE f.order_status <> 'TEST'\n  AND f.tenant_id = 9\n  AND f.order_date >= DATE '2024-02-01'\n  AND f.order_date < DATE '2024-03-01'\nLIMIT 10",
+      "normalized_sql": "SELECT COUNT(DISTINCT f.customer_id) FILTER(WHERE f.order_status IN ('VALID', 'PARTIAL_REFUND', 'REFUNDED')) AS active_customers FROM \"chatbi_benchmark_v21\".fact_sales AS f WHERE f.order_status <> 'TEST' AND f.tenant_id = 9 AND f.order_date >= CAST('2024-02-01' AS DATE) AND f.order_date < CAST('2024-03-01' AS DATE) LIMIT 10",
+      "result_signature": "64ca4857ffc46ad7756191c1be97ee78938d20420906d547ca52d59bfbbedf24",
+      "oracle_status": "PASSED"
+    },
+    {
+      "case_id": "GT-010",
+      "question": "租户 10 在 2024-02 的 refund_amount 是多少？",
+      "expected": [
+        {
+          "value": "15647850.83"
+        }
+      ],
+      "actual": [
+        {
+          "refund_amount": 15647850.83
+        }
+      ],
+      "consistent": true,
+      "generated_sql": "SELECT\n  ROUND(SUM(f.refund_amount)::numeric, 2) AS refund_amount\nFROM \"chatbi_benchmark_v21\".fact_sales f\nWHERE f.order_status <> 'TEST'\n  AND f.tenant_id = 10\n  AND f.order_date >= DATE '2024-02-01'\n  AND f.order_date < DATE '2024-03-01'\nLIMIT 10",
+      "normalized_sql": "SELECT ROUND(CAST(SUM(f.refund_amount) AS DECIMAL), 2) AS refund_amount FROM \"chatbi_benchmark_v21\".fact_sales AS f WHERE f.order_status <> 'TEST' AND f.tenant_id = 10 AND f.order_date >= CAST('2024-02-01' AS DATE) AND f.order_date < CAST('2024-03-01' AS DATE) LIMIT 10",
+      "result_signature": "78be0eeaf57192d89a4309ef37b8688fc10e579e09fa49118ba5275ba6124265",
+      "oracle_status": "PASSED"
+    },
+    {
+      "case_id": "GT-011",
+      "question": "租户 1 在 2024-03 的 net_sales 是多少？",
+      "expected": [
+        {
+          "value": "782772717.81"
+        }
+      ],
+      "actual": [
+        {
+          "net_sales": 782772717.81
+        }
+      ],
+      "consistent": true,
+      "generated_sql": "SELECT\n  ROUND(SUM(f.net_amount - f.refund_amount)::numeric, 2) AS net_sales\nFROM \"chatbi_benchmark_v21\".fact_sales f\nWHERE f.order_status <> 'TEST'\n  AND f.tenant_id = 1\n  AND f.order_date >= DATE '2024-03-01'\n  AND f.order_date < DATE '2024-04-01'\nLIMIT 10",
+      "normalized_sql": "SELECT ROUND(CAST(SUM(f.net_amount - f.refund_amount) AS DECIMAL), 2) AS net_sales FROM \"chatbi_benchmark_v21\".fact_sales AS f WHERE f.order_status <> 'TEST' AND f.tenant_id = 1 AND f.order_date >= CAST('2024-03-01' AS DATE) AND f.order_date < CAST('2024-04-01' AS DATE) LIMIT 10",
+      "result_signature": "79ef783806171616631ba3c1308db803e91acdd475c77566633b934e1dc2ba0f",
+      "oracle_status": "PASSED"
+    },
+    {
+      "case_id": "GT-012",
+      "question": "租户 2 在 2024-03 的 net_profit 是多少？",
+      "expected": [
+        {
+          "value": "253851618.04"
+        }
+      ],
+      "actual": [
+        {
+          "net_profit": 253851618.04
+        }
+      ],
+      "consistent": true,
+      "generated_sql": "SELECT\n  ROUND(SUM(f.profit_amount - f.refund_amount)::numeric, 2) AS net_profit\nFROM \"chatbi_benchmark_v21\".fact_sales f\nWHERE f.order_status <> 'TEST'\n  AND f.tenant_id = 2\n  AND f.order_date >= DATE '2024-03-01'\n  AND f.order_date < DATE '2024-04-01'\nLIMIT 10",
+      "normalized_sql": "SELECT ROUND(CAST(SUM(f.profit_amount - f.refund_amount) AS DECIMAL), 2) AS net_profit FROM \"chatbi_benchmark_v21\".fact_sales AS f WHERE f.order_status <> 'TEST' AND f.tenant_id = 2 AND f.order_date >= CAST('2024-03-01' AS DATE) AND f.order_date < CAST('2024-04-01' AS DATE) LIMIT 10",
+      "result_signature": "ab5f4b66304a43c3f576f52c2ccf854e80b25d646b4170e51fb534918a285b1e",
+      "oracle_status": "PASSED"
+    },
+    {
+      "case_id": "GT-013",
+      "question": "租户 3 在 2024-03 的 valid_orders 是多少？",
+      "expected": [
+        {
+          "value": 28867
+        }
+      ],
+      "actual": [
+        {
+          "valid_orders": 28867
+        }
+      ],
+      "consistent": true,
+      "generated_sql": "SELECT\n  COUNT(*) FILTER (WHERE f.order_status IN ('VALID','PARTIAL_REFUND','REFUNDED')) AS valid_orders\nFROM \"chatbi_benchmark_v21\".fact_sales f\nWHERE f.order_status <> 'TEST'\n  AND f.tenant_id = 3\n  AND f.order_date >= DATE '2024-03-01'\n  AND f.order_date < DATE '2024-04-01'\nLIMIT 10",
+      "normalized_sql": "SELECT COUNT(*) FILTER(WHERE f.order_status IN ('VALID', 'PARTIAL_REFUND', 'REFUNDED')) AS valid_orders FROM \"chatbi_benchmark_v21\".fact_sales AS f WHERE f.order_status <> 'TEST' AND f.tenant_id = 3 AND f.order_date >= CAST('2024-03-01' AS DATE) AND f.order_date < CAST('2024-04-01' AS DATE) LIMIT 10",
+      "result_signature": "d7263037884660fbb8d11adc37f5882904c6c032e4f38d4ccceb142fc6385ff7",
+      "oracle_status": "PASSED"
+    },
+    {
+      "case_id": "GT-014",
+      "question": "租户 4 在 2024-03 的 active_customers 是多少？",
+      "expected": [
+        {
+          "value": 18628
+        }
+      ],
+      "actual": [
+        {
+          "active_customers": 18628
+        }
+      ],
+      "consistent": true,
+      "generated_sql": "SELECT\n  COUNT(DISTINCT f.customer_id) FILTER (WHERE f.order_status IN ('VALID','PARTIAL_REFUND','REFUNDED')) AS active_customers\nFROM \"chatbi_benchmark_v21\".fact_sales f\nWHERE f.order_status <> 'TEST'\n  AND f.tenant_id = 4\n  AND f.order_date >= DATE '2024-03-01'\n  AND f.order_date < DATE '2024-04-01'\nLIMIT 10",
+      "normalized_sql": "SELECT COUNT(DISTINCT f.customer_id) FILTER(WHERE f.order_status IN ('VALID', 'PARTIAL_REFUND', 'REFUNDED')) AS active_customers FROM \"chatbi_benchmark_v21\".fact_sales AS f WHERE f.order_status <> 'TEST' AND f.tenant_id = 4 AND f.order_date >= CAST('2024-03-01' AS DATE) AND f.order_date < CAST('2024-04-01' AS DATE) LIMIT 10",
+      "result_signature": "ff6be71fec1effc9fc3a92f4cfc22f3cefe2ebbe5e62bc0fbee49edebf00625c",
+      "oracle_status": "PASSED"
+    },
+    {
+      "case_id": "GT-015",
+      "question": "租户 5 在 2024-03 的 refund_amount 是多少？",
+      "expected": [
+        {
+          "value": "13187847.33"
+        }
+      ],
+      "actual": [
+        {
+          "refund_amount": 13187847.33
+        }
+      ],
+      "consistent": true,
+      "generated_sql": "SELECT\n  ROUND(SUM(f.refund_amount)::numeric, 2) AS refund_amount\nFROM \"chatbi_benchmark_v21\".fact_sales f\nWHERE f.order_status <> 'TEST'\n  AND f.tenant_id = 5\n  AND f.order_date >= DATE '2024-03-01'\n  AND f.order_date < DATE '2024-04-01'\nLIMIT 10",
+      "normalized_sql": "SELECT ROUND(CAST(SUM(f.refund_amount) AS DECIMAL), 2) AS refund_amount FROM \"chatbi_benchmark_v21\".fact_sales AS f WHERE f.order_status <> 'TEST' AND f.tenant_id = 5 AND f.order_date >= CAST('2024-03-01' AS DATE) AND f.order_date < CAST('2024-04-01' AS DATE) LIMIT 10",
+      "result_signature": "2eb9851dffcbd664211d56535bb9050655ba974f076b25a88edacc0cbfd2753d",
+      "oracle_status": "PASSED"
+    },
+    {
+      "case_id": "GT-016",
+      "question": "租户 6 在 2024-04 的 net_sales 是多少？",
+      "expected": [
+        {
+          "value": "880584659.92"
+        }
+      ],
+      "actual": [
+        {
+          "net_sales": 880584659.92
+        }
+      ],
+      "consistent": true,
+      "generated_sql": "SELECT\n  ROUND(SUM(f.net_amount - f.refund_amount)::numeric, 2) AS net_sales\nFROM \"chatbi_benchmark_v21\".fact_sales f\nWHERE f.order_status <> 'TEST'\n  AND f.tenant_id = 6\n  AND f.order_date >= DATE '2024-04-01'\n  AND f.order_date < DATE '2024-05-01'\nLIMIT 10",
+      "normalized_sql": "SELECT ROUND(CAST(SUM(f.net_amount - f.refund_amount) AS DECIMAL), 2) AS net_sales FROM \"chatbi_benchmark_v21\".fact_sales AS f WHERE f.order_status <> 'TEST' AND f.tenant_id = 6 AND f.order_date >= CAST('2024-04-01' AS DATE) AND f.order_date < CAST('2024-05-01' AS DATE) LIMIT 10",
+      "result_signature": "6f2b22aee299b83ff0c471ce9f15e49c832931623137217e9986c8d8356353eb",
+      "oracle_status": "PASSED"
+    },
+    {
+      "case_id": "GT-017",
+      "question": "租户 7 在 2024-04 的 net_profit 是多少？",
+      "expected": [
+        {
+          "value": "209361173.84"
+        }
+      ],
+      "actual": [
+        {
+          "net_profit": 209361173.84
+        }
+      ],
+      "consistent": true,
+      "generated_sql": "SELECT\n  ROUND(SUM(f.profit_amount - f.refund_amount)::numeric, 2) AS net_profit\nFROM \"chatbi_benchmark_v21\".fact_sales f\nWHERE f.order_status <> 'TEST'\n  AND f.tenant_id = 7\n  AND f.order_date >= DATE '2024-04-01'\n  AND f.order_date < DATE '2024-05-01'\nLIMIT 10",
+      "normalized_sql": "SELECT ROUND(CAST(SUM(f.profit_amount - f.refund_amount) AS DECIMAL), 2) AS net_profit FROM \"chatbi_benchmark_v21\".fact_sales AS f WHERE f.order_status <> 'TEST' AND f.tenant_id = 7 AND f.order_date >= CAST('2024-04-01' AS DATE) AND f.order_date < CAST('2024-05-01' AS DATE) LIMIT 10",
+      "result_signature": "9dce2c049614ae531a1416f8d39aab81281b2fb07a37700bb64a6bfaf25e0b52",
+      "oracle_status": "PASSED"
+    },
+    {
+      "case_id": "GT-018",
+      "question": "租户 8 在 2024-04 的 valid_orders 是多少？",
+      "expected": [
+        {
+          "value": 27064
+        }
+      ],
+      "actual": [
+        {
+          "valid_orders": 27064
+        }
+      ],
+      "consistent": true,
+      "generated_sql": "SELECT\n  COUNT(*) FILTER (WHERE f.order_status IN ('VALID','PARTIAL_REFUND','REFUNDED')) AS valid_orders\nFROM \"chatbi_benchmark_v21\".fact_sales f\nWHERE f.order_status <> 'TEST'\n  AND f.tenant_id = 8\n  AND f.order_date >= DATE '2024-04-01'\n  AND f.order_date < DATE '2024-05-01'\nLIMIT 10",
+      "normalized_sql": "SELECT COUNT(*) FILTER(WHERE f.order_status IN ('VALID', 'PARTIAL_REFUND', 'REFUNDED')) AS valid_orders FROM \"chatbi_benchmark_v21\".fact_sales AS f WHERE f.order_status <> 'TEST' AND f.tenant_id = 8 AND f.order_date >= CAST('2024-04-01' AS DATE) AND f.order_date < CAST('2024-05-01' AS DATE) LIMIT 10",
+      "result_signature": "b37f7aedce3aa2938f5485c8463f6eb50283b7d117e803ed814019df5a9367e9",
+      "oracle_status": "PASSED"
+    },
+    {
+      "case_id": "GT-019",
+      "question": "租户 9 在 2024-04 的 active_customers 是多少？",
+      "expected": [
+        {
+          "value": 18628
+        }
+      ],
+      "actual": [
+        {
+          "active_customers": 18628
+        }
+      ],
+      "consistent": true,
+      "generated_sql": "SELECT\n  COUNT(DISTINCT f.customer_id) FILTER (WHERE f.order_status IN ('VALID','PARTIAL_REFUND','REFUNDED')) AS active_customers\nFROM \"chatbi_benchmark_v21\".fact_sales f\nWHERE f.order_status <> 'TEST'\n  AND f.tenant_id = 9\n  AND f.order_date >= DATE '2024-04-01'\n  AND f.order_date < DATE '2024-05-01'\nLIMIT 10",
+      "normalized_sql": "SELECT COUNT(DISTINCT f.customer_id) FILTER(WHERE f.order_status IN ('VALID', 'PARTIAL_REFUND', 'REFUNDED')) AS active_customers FROM \"chatbi_benchmark_v21\".fact_sales AS f WHERE f.order_status <> 'TEST' AND f.tenant_id = 9 AND f.order_date >= CAST('2024-04-01' AS DATE) AND f.order_date < CAST('2024-05-01' AS DATE) LIMIT 10",
+      "result_signature": "ff6be71fec1effc9fc3a92f4cfc22f3cefe2ebbe5e62bc0fbee49edebf00625c",
+      "oracle_status": "PASSED"
+    },
+    {
+      "case_id": "GT-020",
+      "question": "租户 10 在 2024-04 的 refund_amount 是多少？",
+      "expected": [
+        {
+          "value": "14933961.58"
+        }
+      ],
+      "actual": [
+        {
+          "refund_amount": 14933961.58
+        }
+      ],
+      "consistent": true,
+      "generated_sql": "SELECT\n  ROUND(SUM(f.refund_amount)::numeric, 2) AS refund_amount\nFROM \"chatbi_benchmark_v21\".fact_sales f\nWHERE f.order_status <> 'TEST'\n  AND f.tenant_id = 10\n  AND f.order_date >= DATE '2024-04-01'\n  AND f.order_date < DATE '2024-05-01'\nLIMIT 10",
+      "normalized_sql": "SELECT ROUND(CAST(SUM(f.refund_amount) AS DECIMAL), 2) AS refund_amount FROM \"chatbi_benchmark_v21\".fact_sales AS f WHERE f.order_status <> 'TEST' AND f.tenant_id = 10 AND f.order_date >= CAST('2024-04-01' AS DATE) AND f.order_date < CAST('2024-05-01' AS DATE) LIMIT 10",
+      "result_signature": "d22c42d19b4d5e3557054a6c00e0ea71b3b39f750cec0a8993f95fc1cc1fae9d",
+      "oracle_status": "PASSED"
+    }
+  ],
+  "structured_error_test": "tests/test_v21_semantic_runtime.py::test_wren_dry_plan_returns_structured_error",
+  "rollback_test": "tests/test_v21_semantic_runtime.py::test_semantic_runtime_has_explicit_local_rollback"
+}

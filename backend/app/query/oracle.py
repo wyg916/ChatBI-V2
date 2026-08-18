@@ -59,7 +59,7 @@ class ResultOracle:
             name="dimension_columns", passed=dimension_ok,
             message="Selected dimension columns are present" if dimension_ok else "Selected dimension columns are missing",
         ))
-        time_ok = plan.time_range is None or "orders.order_date" in plan.selected_columns
+        time_ok = plan.time_range is None or plan.time_range.field in plan.selected_columns
         checks.append(OracleCheck(
             name="time_semantics", passed=time_ok,
             message="Time range is bound to the semantic time column" if time_ok else "Time range has no authorized time column",

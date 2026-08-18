@@ -44,6 +44,7 @@ class Settings(BaseSettings):
     query_row_limit: int = 500
     query_concurrency: int = 4
     context_token_budget: int = 6000
+    semantic_runtime_mode: Literal["wren", "local"] = "wren"
     rag_mode: Literal["off", "shadow", "canary", "on"] = "on"
     agent_mode: Literal["off", "shadow", "canary", "on"] = "on"
     agent_allowed_routes: str = "COMPLEX_ANALYSIS"

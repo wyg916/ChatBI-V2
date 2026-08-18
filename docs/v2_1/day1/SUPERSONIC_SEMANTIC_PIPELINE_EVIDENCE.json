@@ -1,0 +1,753 @@
+{
+  "executed_at": "2026-08-18T13:08:34.885434+00:00",
+  "git_sha": "ac1f43506e7cd2a51bf8db11af7233606ef6eb63",
+  "command": "python backend/scripts/run_v21_semantic_cases.py --env-file <local-env> --datasource-id <datasource-id> --semantic-model-id <semantic-model-id> --output temp/day1/semantic-cases.json",
+  "test_count": 20,
+  "raw_evidence_path": "temp/day1/semantic-cases.json",
+  "failures": [],
+  "blockers": [],
+  "frozen_zone_intersection": [
+    ".env.example",
+    "backend/app/core/config.py",
+    "backend/app/query/oracle.py",
+    "backend/app/query/service.py",
+    "backend/app/semantic/engine.py",
+    "docker-compose.yml",
+    "frontend/src/pages/AskExperience.tsx"
+  ],
+  "migration_impact": "NONE",
+  "license_impact": "Clean-room compatible adapters; no upstream source, UI, logo, or binary copied.",
+  "rollback": "Set CHATBI_SEMANTIC_RUNTIME_MODE=local and restart the backend.",
+  "runtime": "supersonic-clean-room",
+  "gate": {
+    "supersonic_runtime_call_rate": 1.0,
+    "metric_linking_accuracy": 1.0,
+    "dimension_linking_accuracy": 1.0,
+    "time_linking_accuracy": 1.0,
+    "filter_linking_accuracy": 1.0,
+    "invalid_relation_block_rate": 1.0,
+    "semantic_query_trace_complete": 1.0
+  },
+  "semantic_queries": [
+    {
+      "case_id": "D1-001",
+      "semantic_query": {
+        "metrics": [
+          "net_sales"
+        ],
+        "dimensions": [],
+        "filters": [
+          {
+            "field": "fact_sales.tenant_id",
+            "operator": "=",
+            "value": 1
+          }
+        ],
+        "time_range": {
+          "kind": "NATURAL_MONTH",
+          "start": "2025-07-01",
+          "end_exclusive": "2025-08-01"
+        },
+        "relationships": [],
+        "comparison": null,
+        "confidence": 0.909588,
+        "evidence": [
+          "schema_linking_confidence:0.7448",
+          "metric:net_sales",
+          "filter:fact_sales.tenant_id"
+        ],
+        "clarification_required": false,
+        "clarification_reason": null
+      }
+    },
+    {
+      "case_id": "D1-002",
+      "semantic_query": {
+        "metrics": [
+          "net_sales",
+          "net_profit"
+        ],
+        "dimensions": [],
+        "filters": [
+          {
+            "field": "fact_sales.tenant_id",
+            "operator": "=",
+            "value": 1
+          }
+        ],
+        "time_range": {
+          "kind": "NATURAL_YEAR",
+          "start": "2025-01-01",
+          "end_exclusive": "2026-01-01"
+        },
+        "relationships": [],
+        "comparison": null,
+        "confidence": 0.910841,
+        "evidence": [
+          "schema_linking_confidence:0.7605",
+          "metric:net_sales",
+          "metric:net_profit",
+          "filter:fact_sales.tenant_id"
+        ],
+        "clarification_required": false,
+        "clarification_reason": null
+      }
+    },
+    {
+      "case_id": "D1-003",
+      "semantic_query": {
+        "metrics": [
+          "net_sales"
+        ],
+        "dimensions": [
+          "region"
+        ],
+        "filters": [
+          {
+            "field": "fact_sales.tenant_id",
+            "operator": "=",
+            "value": 1
+          }
+        ],
+        "time_range": {
+          "kind": "NATURAL_YEAR",
+          "start": "2025-01-01",
+          "end_exclusive": "2026-01-01"
+        },
+        "relationships": [
+          {
+            "id": "db6309e2-f087-4c1a-aa43-aae7bf3f4d1f",
+            "left_entity": "fact_sales",
+            "right_entity": "dim_region",
+            "join_type": "LEFT",
+            "join_keys": [
+              {
+                "left": "region_id",
+                "right": "region_id"
+              }
+            ],
+            "cardinality": "MANY_TO_ONE"
+          }
+        ],
+        "comparison": null,
+        "confidence": 0.959775,
+        "evidence": [
+          "schema_linking_confidence:0.6222",
+          "metric:net_sales",
+          "dimension:region",
+          "filter:fact_sales.tenant_id"
+        ],
+        "clarification_required": false,
+        "clarification_reason": null
+      }
+    },
+    {
+      "case_id": "D1-004",
+      "semantic_query": {
+        "metrics": [
+          "net_sales"
+        ],
+        "dimensions": [
+          "product"
+        ],
+        "filters": [
+          {
+            "field": "fact_sales.tenant_id",
+            "operator": "=",
+            "value": 1
+          }
+        ],
+        "time_range": {
+          "kind": "NATURAL_YEAR",
+          "start": "2025-01-01",
+          "end_exclusive": "2026-01-01"
+        },
+        "relationships": [
+          {
+            "id": "2f4f9a70-a281-447a-9049-12f367d5718c",
+            "left_entity": "fact_sales",
+            "right_entity": "dim_product",
+            "join_type": "LEFT",
+            "join_keys": [
+              {
+                "left": "product_id",
+                "right": "product_id"
+              }
+            ],
+            "cardinality": "MANY_TO_ONE"
+          }
+        ],
+        "comparison": null,
+        "confidence": 0.959279,
+        "evidence": [
+          "schema_linking_confidence:0.6160",
+          "metric:net_sales",
+          "dimension:product",
+          "filter:fact_sales.tenant_id"
+        ],
+        "clarification_required": false,
+        "clarification_reason": null
+      }
+    },
+    {
+      "case_id": "D1-005",
+      "semantic_query": {
+        "metrics": [
+          "net_sales"
+        ],
+        "dimensions": [
+          "customer"
+        ],
+        "filters": [
+          {
+            "field": "fact_sales.tenant_id",
+            "operator": "=",
+            "value": 1
+          }
+        ],
+        "time_range": {
+          "kind": "NATURAL_YEAR",
+          "start": "2025-01-01",
+          "end_exclusive": "2026-01-01"
+        },
+        "relationships": [
+          {
+            "id": "d2692a4a-f74a-499d-97ae-6ec91319800e",
+            "left_entity": "fact_sales",
+            "right_entity": "dim_customer",
+            "join_type": "LEFT",
+            "join_keys": [
+              {
+                "left": "customer_id",
+                "right": "customer_id"
+              }
+            ],
+            "cardinality": "MANY_TO_ONE"
+          }
+        ],
+        "comparison": null,
+        "confidence": 0.959279,
+        "evidence": [
+          "schema_linking_confidence:0.6160",
+          "metric:net_sales",
+          "dimension:customer",
+          "filter:fact_sales.tenant_id"
+        ],
+        "clarification_required": false,
+        "clarification_reason": null
+      }
+    },
+    {
+      "case_id": "D1-006",
+      "semantic_query": {
+        "metrics": [
+          "net_sales"
+        ],
+        "dimensions": [
+          "month"
+        ],
+        "filters": [
+          {
+            "field": "fact_sales.tenant_id",
+            "operator": "=",
+            "value": 1
+          }
+        ],
+        "time_range": {
+          "kind": "NATURAL_YEAR",
+          "start": "2025-01-01",
+          "end_exclusive": "2026-01-01"
+        },
+        "relationships": [],
+        "comparison": null,
+        "confidence": 0.960062,
+        "evidence": [
+          "schema_linking_confidence:0.6258",
+          "metric:net_sales",
+          "dimension:month",
+          "filter:fact_sales.tenant_id"
+        ],
+        "clarification_required": false,
+        "clarification_reason": null
+      }
+    },
+    {
+      "case_id": "D1-007",
+      "semantic_query": {
+        "metrics": [
+          "net_sales"
+        ],
+        "dimensions": [
+          "month"
+        ],
+        "filters": [
+          {
+            "field": "fact_sales.tenant_id",
+            "operator": "=",
+            "value": 1
+          }
+        ],
+        "time_range": {
+          "kind": "NATURAL_YEAR",
+          "start": "2025-01-01",
+          "end_exclusive": "2026-01-01"
+        },
+        "relationships": [],
+        "comparison": "YEAR_OVER_YEAR",
+        "confidence": 0.96074,
+        "evidence": [
+          "schema_linking_confidence:0.6342",
+          "metric:net_sales",
+          "dimension:month",
+          "filter:fact_sales.tenant_id"
+        ],
+        "clarification_required": false,
+        "clarification_reason": null
+      }
+    },
+    {
+      "case_id": "D1-008",
+      "semantic_query": {
+        "metrics": [
+          "net_sales"
+        ],
+        "dimensions": [
+          "month"
+        ],
+        "filters": [
+          {
+            "field": "fact_sales.tenant_id",
+            "operator": "=",
+            "value": 1
+          }
+        ],
+        "time_range": {
+          "kind": "NATURAL_YEAR",
+          "start": "2025-01-01",
+          "end_exclusive": "2026-01-01"
+        },
+        "relationships": [],
+        "comparison": "MONTH_OVER_MONTH",
+        "confidence": 0.96074,
+        "evidence": [
+          "schema_linking_confidence:0.6342",
+          "metric:net_sales",
+          "dimension:month",
+          "filter:fact_sales.tenant_id"
+        ],
+        "clarification_required": false,
+        "clarification_reason": null
+      }
+    },
+    {
+      "case_id": "D1-009",
+      "semantic_query": {
+        "metrics": [
+          "net_sales"
+        ],
+        "dimensions": [
+          "category"
+        ],
+        "filters": [
+          {
+            "field": "fact_sales.tenant_id",
+            "operator": "=",
+            "value": 1
+          }
+        ],
+        "time_range": {
+          "kind": "NATURAL_YEAR",
+          "start": "2025-01-01",
+          "end_exclusive": "2026-01-01"
+        },
+        "relationships": [
+          {
+            "id": "2f4f9a70-a281-447a-9049-12f367d5718c",
+            "left_entity": "fact_sales",
+            "right_entity": "dim_product",
+            "join_type": "LEFT",
+            "join_keys": [
+              {
+                "left": "product_id",
+                "right": "product_id"
+              }
+            ],
+            "cardinality": "MANY_TO_ONE"
+          }
+        ],
+        "comparison": null,
+        "confidence": 0.959516,
+        "evidence": [
+          "schema_linking_confidence:0.6189",
+          "metric:net_sales",
+          "dimension:category",
+          "filter:fact_sales.tenant_id"
+        ],
+        "clarification_required": false,
+        "clarification_reason": null
+      }
+    },
+    {
+      "case_id": "D1-010",
+      "semantic_query": {
+        "metrics": [
+          "net_sales"
+        ],
+        "dimensions": [
+          "region"
+        ],
+        "filters": [
+          {
+            "field": "fact_sales.tenant_id",
+            "operator": "=",
+            "value": 1
+          }
+        ],
+        "time_range": {
+          "kind": "NATURAL_YEAR",
+          "start": "2025-01-01",
+          "end_exclusive": "2026-01-01"
+        },
+        "relationships": [
+          {
+            "id": "db6309e2-f087-4c1a-aa43-aae7bf3f4d1f",
+            "left_entity": "fact_sales",
+            "right_entity": "dim_region",
+            "join_type": "LEFT",
+            "join_keys": [
+              {
+                "left": "region_id",
+                "right": "region_id"
+              }
+            ],
+            "cardinality": "MANY_TO_ONE"
+          }
+        ],
+        "comparison": "CONTRIBUTION",
+        "confidence": 0.960901,
+        "evidence": [
+          "schema_linking_confidence:0.6363",
+          "metric:net_sales",
+          "dimension:region",
+          "filter:fact_sales.tenant_id"
+        ],
+        "clarification_required": false,
+        "clarification_reason": null
+      }
+    },
+    {
+      "case_id": "D1-011",
+      "semantic_query": {
+        "metrics": [
+          "refund_amount"
+        ],
+        "dimensions": [],
+        "filters": [
+          {
+            "field": "fact_sales.tenant_id",
+            "operator": "=",
+            "value": 1
+          }
+        ],
+        "time_range": {
+          "kind": "NATURAL_YEAR",
+          "start": "2025-01-01",
+          "end_exclusive": "2026-01-01"
+        },
+        "relationships": [],
+        "comparison": null,
+        "confidence": 0.911635,
+        "evidence": [
+          "schema_linking_confidence:0.7704",
+          "metric:refund_amount",
+          "filter:fact_sales.tenant_id"
+        ],
+        "clarification_required": false,
+        "clarification_reason": null
+      }
+    },
+    {
+      "case_id": "D1-012",
+      "semantic_query": {
+        "metrics": [
+          "cancelled_orders"
+        ],
+        "dimensions": [],
+        "filters": [
+          {
+            "field": "fact_sales.tenant_id",
+            "operator": "=",
+            "value": 1
+          },
+          {
+            "field": "fact_sales.order_status",
+            "operator": "=",
+            "value": "CANCELLED"
+          }
+        ],
+        "time_range": {
+          "kind": "NATURAL_YEAR",
+          "start": "2025-01-01",
+          "end_exclusive": "2026-01-01"
+        },
+        "relationships": [],
+        "comparison": null,
+        "confidence": 0.914505,
+        "evidence": [
+          "schema_linking_confidence:0.8063",
+          "metric:cancelled_orders",
+          "filter:fact_sales.tenant_id",
+          "filter:fact_sales.order_status"
+        ],
+        "clarification_required": false,
+        "clarification_reason": null
+      }
+    },
+    {
+      "case_id": "D1-013",
+      "semantic_query": {
+        "metrics": [
+          "net_sales"
+        ],
+        "dimensions": [],
+        "filters": [
+          {
+            "field": "fact_sales.tenant_id",
+            "operator": "=",
+            "value": 1
+          },
+          {
+            "field": "fact_sales.discount_rate",
+            "operator": "IS",
+            "value": null
+          }
+        ],
+        "time_range": {
+          "kind": "NATURAL_YEAR",
+          "start": "2025-01-01",
+          "end_exclusive": "2026-01-01"
+        },
+        "relationships": [],
+        "comparison": null,
+        "confidence": 0.90593,
+        "evidence": [
+          "schema_linking_confidence:0.6991",
+          "metric:net_sales",
+          "filter:fact_sales.tenant_id",
+          "filter:fact_sales.discount_rate"
+        ],
+        "clarification_required": false,
+        "clarification_reason": null
+      }
+    },
+    {
+      "case_id": "D1-014",
+      "semantic_query": {
+        "metrics": [
+          "net_sales"
+        ],
+        "dimensions": [
+          "customer_tier"
+        ],
+        "filters": [
+          {
+            "field": "fact_sales.tenant_id",
+            "operator": "=",
+            "value": 1
+          }
+        ],
+        "time_range": {
+          "kind": "NATURAL_YEAR",
+          "start": "2025-01-01",
+          "end_exclusive": "2026-01-01"
+        },
+        "relationships": [
+          {
+            "id": "d2692a4a-f74a-499d-97ae-6ec91319800e",
+            "left_entity": "fact_sales",
+            "right_entity": "dim_customer",
+            "join_type": "LEFT",
+            "join_keys": [
+              {
+                "left": "customer_id",
+                "right": "customer_id"
+              }
+            ],
+            "cardinality": "MANY_TO_ONE"
+          }
+        ],
+        "comparison": null,
+        "confidence": 0.964198,
+        "evidence": [
+          "schema_linking_confidence:0.6775",
+          "metric:net_sales",
+          "dimension:customer_tier",
+          "filter:fact_sales.tenant_id"
+        ],
+        "clarification_required": false,
+        "clarification_reason": null
+      }
+    },
+    {
+      "case_id": "D1-015",
+      "semantic_query": {
+        "metrics": [
+          "outstanding_amount"
+        ],
+        "dimensions": [],
+        "filters": [
+          {
+            "field": "fact_sales.tenant_id",
+            "operator": "=",
+            "value": 1
+          }
+        ],
+        "time_range": {
+          "kind": "NATURAL_YEAR",
+          "start": "2025-01-01",
+          "end_exclusive": "2026-01-01"
+        },
+        "relationships": [],
+        "comparison": null,
+        "confidence": 0.911566,
+        "evidence": [
+          "schema_linking_confidence:0.7696",
+          "metric:outstanding_amount",
+          "filter:fact_sales.tenant_id"
+        ],
+        "clarification_required": false,
+        "clarification_reason": null
+      }
+    },
+    {
+      "case_id": "D1-016",
+      "semantic_query": {
+        "metrics": [
+          "outstanding_amount"
+        ],
+        "dimensions": [
+          "aging_bucket"
+        ],
+        "filters": [
+          {
+            "field": "fact_sales.tenant_id",
+            "operator": "=",
+            "value": 1
+          }
+        ],
+        "time_range": {
+          "kind": "NATURAL_YEAR",
+          "start": "2025-01-01",
+          "end_exclusive": "2026-01-01"
+        },
+        "relationships": [],
+        "comparison": null,
+        "confidence": 0.96494,
+        "evidence": [
+          "schema_linking_confidence:0.6867",
+          "metric:outstanding_amount",
+          "dimension:aging_bucket",
+          "filter:fact_sales.tenant_id"
+        ],
+        "clarification_required": false,
+        "clarification_reason": null
+      }
+    },
+    {
+      "case_id": "D1-017",
+      "semantic_query": {
+        "metrics": [
+          "net_sales"
+        ],
+        "dimensions": [
+          "month"
+        ],
+        "filters": [
+          {
+            "field": "fact_sales.tenant_id",
+            "operator": "=",
+            "value": 2
+          }
+        ],
+        "time_range": {
+          "kind": "NATURAL_YEAR",
+          "start": "2025-01-01",
+          "end_exclusive": "2026-01-01"
+        },
+        "relationships": [],
+        "comparison": "ANOMALY",
+        "confidence": 0.960062,
+        "evidence": [
+          "schema_linking_confidence:0.6258",
+          "metric:net_sales",
+          "dimension:month",
+          "filter:fact_sales.tenant_id"
+        ],
+        "clarification_required": false,
+        "clarification_reason": null
+      }
+    },
+    {
+      "case_id": "D1-018",
+      "semantic_query": {
+        "metrics": [
+          "active_customers"
+        ],
+        "dimensions": [],
+        "filters": [
+          {
+            "field": "fact_sales.tenant_id",
+            "operator": "=",
+            "value": 7
+          }
+        ],
+        "time_range": {
+          "kind": "NATURAL_MONTH",
+          "start": "2025-02-01",
+          "end_exclusive": "2025-03-01"
+        },
+        "relationships": [],
+        "comparison": null,
+        "confidence": 0.909579,
+        "evidence": [
+          "schema_linking_confidence:0.7447",
+          "metric:active_customers",
+          "filter:fact_sales.tenant_id"
+        ],
+        "clarification_required": false,
+        "clarification_reason": null
+      }
+    },
+    {
+      "case_id": "D1-019",
+      "semantic_query": {}
+    },
+    {
+      "case_id": "D1-020",
+      "semantic_query": {
+        "metrics": [
+          "net_sales"
+        ],
+        "dimensions": [],
+        "filters": [
+          {
+            "field": "fact_sales.tenant_id",
+            "operator": "=",
+            "value": 1
+          }
+        ],
+        "time_range": null,
+        "relationships": [],
+        "comparison": null,
+        "confidence": 0.848063,
+        "evidence": [
+          "schema_linking_confidence:0.6008",
+          "metric:net_sales",
+          "filter:fact_sales.tenant_id"
+        ],
+        "clarification_required": true,
+        "clarification_reason": "指标、时间或分析粒度不明确"
+      }
+    }
+  ]
+}

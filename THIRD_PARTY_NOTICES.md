@@ -1,5 +1,17 @@
 # Third-Party Notices
 
+## v2.1 Day 1 semantic design provenance
+
+No source, UI, logo, trademark asset or binary from the following projects is copied or packaged. ChatBI uses project-owned clean-room adapters behind its own contracts; the references below document design provenance and the exact upstream state reviewed on 2026-08-18.
+
+| Project | Locked revision | Reviewed license scope | ChatBI integration |
+| --- | --- | --- | --- |
+| WrenAI | `7830cc746c11602d5899d8fdec1e28de4ce11a87` (`wren-v0.13.3`) | `core/**` and `sdk/**`: Apache-2.0; `docs/**`: CC-BY-4.0; trademarks excluded | Public MDL concepts only; `backend/app/semantic_runtime/wren.py` is independently implemented |
+| OpenChatBI | `c8786cb180081dbdd18d841efa33b70d77b633e9` (`1.0.0b1`) | MIT | Public catalog, hybrid retrieval and workflow concepts only; independently implemented |
+| SuperSonic | `af08d869c4609bf8d48d64e78c61427fe93f7489` | Apache-2.0 with an additional derivative-distribution condition | Public semantic-pipeline concepts only; no source-derived distributed work |
+
+The complete eight-project path-level draft and license checksums are in `docs/UPSTREAM_LOCK.json` and `docs/OPEN_SOURCE_LICENSE_AUDIT_DRAFT.md` after Day 1 integration.
+
 ## SQLGlot
 
 - Source repository: `https://github.com/tobymao/sqlglot`

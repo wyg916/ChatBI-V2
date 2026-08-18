@@ -218,7 +218,11 @@ class LocalSemanticEngine(SemanticEngine):
 
 
 class WrenSemanticAdapter(SemanticEngine):
-    """Integration boundary for a future Wren runtime; no Wren internal code is copied."""
+    """ChatBI-owned Wren-compatible MDL publication adapter.
+
+    Query execution is handled by ``app.semantic_runtime``. No Wren internal
+    source file is copied; the integration follows public MDL concepts.
+    """
 
     def __init__(self, delegate: SemanticEngine | None = None):
         self.delegate = delegate or LocalSemanticEngine()
@@ -226,10 +230,11 @@ class WrenSemanticAdapter(SemanticEngine):
     def capabilities(self) -> dict:
         return {
             "engine": "wren",
-            "runtime_available": False,
+            "runtime_available": True,
             "validation": True,
             "manifest_compile": True,
-            "note": "Day 1 manifest seam; Wren runtime is not embedded",
+            "runtime": "wren-clean-room-runtime",
+            "rollback": "CHATBI_SEMANTIC_RUNTIME_MODE=local",
         }
 
     def validate(self, model: SemanticModel, db: Session | None = None) -> list[str]:
@@ -246,5 +251,5 @@ class WrenSemanticAdapter(SemanticEngine):
             "models": snapshot["entities"],
             "metrics": snapshot["metrics"],
             "relationships": snapshot["relationships"],
-            "metadata": {"source": "chatbi-semantic-snapshot", "runtime_available": False},
+            "metadata": {"source": "chatbi-semantic-snapshot", "runtime_available": True},
         }

@@ -48,7 +48,7 @@ scripts/      Windows 一键启动、停止、状态和验证
 docs/         产品、架构、验收、UI 与状态文档
 ```
 
-后端统一使用 `/api/v1`，语义层业务代码只依赖 ChatBI 自有 `SemanticEngine` 接口。当前使用可运行的 `LocalSemanticEngine`，并保留隔离且如实报告不可用的 `WrenSemanticAdapter` seam；Day 2 主链路不依赖未配置的 Wren runtime。
+后端统一使用 `/api/v1`，语义层业务代码只依赖 ChatBI 自有接口。v2.1 Day 1 默认问数链为 `OpenChatBI-compatible Catalog/Schema Linking → SuperSonic-compatible SemanticQuery → Wren-compatible MDL/dry-plan/Semantic SQL → SQLGlot → QueryExecutor → ResultOracle`。三项兼容层均为仓库自有 clean-room Adapter，不复制上游内部代码；`CHATBI_SEMANTIC_RUNTIME_MODE=local` 是明确的事故回滚路径。
 
 ## V1 产品闭环
 
