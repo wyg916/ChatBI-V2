@@ -32,6 +32,7 @@ from app.query.executor import QueryExecutor
 from app.query.nl2sql import Nl2SqlRouter
 from app.query.oracle import ResultOracle
 from app.query.sql_guard import SqlGuard
+from app.semantic_runtime import SemanticRuntime, SemanticRuntimeError
 from app.services.datasources import default_workspace
 
 
@@ -146,6 +147,7 @@ class QueryPipeline:
     def __init__(self):
         self.context_builder = ContextBuilder()
         self.router = Nl2SqlRouter()
+        self.semantic_runtime = SemanticRuntime(router=self.router)
         self.guard = SqlGuard()
         self.executor = QueryExecutor()
         self.oracle = ResultOracle()
@@ -189,7 +191,7 @@ class QueryPipeline:
             semantic_model_version=model.version,
             question=request.question,
             status="PLANNING",
-            provider=self.router.capabilities()["provider"],
+            provider="wren-clean-room-runtime" if settings.semantic_runtime_mode == "wren" else self.router.capabilities()["provider"],
         )
         db.add(run)
         db.flush()
@@ -205,10 +207,34 @@ class QueryPipeline:
                 "estimated_tokens": context.estimated_tokens,
                 "truncated": context.truncated,
             })
-            plan = self.router.plan(question=request.question, context=context)
+            plan, semantic_trace = self.semantic_runtime.plan(question=request.question, context=context)
             run.provider = plan.provider
-            run.plan_payload = _json(plan)
+            trace_payload = _json(semantic_trace)
+            run.context_payload = {**_json(context), "semantic_runtime": trace_payload}
+            run.plan_payload = {
+                **_json(plan),
+                "semantic_query": trace_payload.get("semantic_query"),
+                "wren_dry_plan": trace_payload.get("wren_dry_plan"),
+                "runtime_call_chain": trace_payload.get("call_chain", []),
+            }
             run.generated_sql = plan.generated_sql
+            if semantic_trace.openchatbi_called:
+                _audit(db, run, "OPENCHATBI_SCHEMA_LINKING", "PASS", {
+                    "confidence": semantic_trace.schema_linking.confidence if semantic_trace.schema_linking else 0,
+                    "elapsed_ms": semantic_trace.stage_latency_ms.get("openchatbi", 0),
+                    "workspace_cache_scope": semantic_trace.schema_linking.cache_scope if semantic_trace.schema_linking else None,
+                })
+            if semantic_trace.supersonic_called:
+                _audit(db, run, "SUPERSONIC_SEMANTIC_QUERY", "PASS", {
+                    "confidence": semantic_trace.semantic_query.confidence if semantic_trace.semantic_query else 0,
+                    "elapsed_ms": semantic_trace.stage_latency_ms.get("supersonic", 0),
+                })
+            if semantic_trace.wren_called:
+                _audit(db, run, "WREN_DRY_PLAN", "PASS", {
+                    "mapping_coverage": semantic_trace.wren_mdl.mapping_coverage if semantic_trace.wren_mdl else 0,
+                    "dry_plan_status": semantic_trace.wren_dry_plan.status if semantic_trace.wren_dry_plan else None,
+                    "elapsed_ms": semantic_trace.stage_latency_ms.get("wren", 0),
+                })
             _audit(db, run, "SQL_PLAN_GENERATED", "PASS", {
                 "provider": plan.provider, "confidence": plan.confidence, "repair_count": plan.repair_count,
             })
@@ -272,9 +298,18 @@ class QueryPipeline:
             return run
         except Exception as exc:
             run.status = "FAILED"
-            run.error_code = "QUERY_PIPELINE_ERROR"
+            if isinstance(exc, SemanticRuntimeError):
+                run.error_code = str(exc.payload["code"])
+                run.plan_payload = {**(run.plan_payload or {}), "structured_error": exc.payload}
+                if exc.trace is not None:
+                    run.context_payload = {**(run.context_payload or {}), "semantic_runtime": _json(exc.trace)}
+            else:
+                run.error_code = "QUERY_PIPELINE_ERROR"
             run.error_message = str(exc)[:1000]
-            _audit(db, run, "QUERY_PIPELINE", "FAIL", {"error_type": type(exc).__name__})
+            _audit(db, run, "QUERY_PIPELINE", "FAIL", {
+                "error_type": type(exc).__name__,
+                "structured_error": exc.payload if isinstance(exc, SemanticRuntimeError) else None,
+            })
             db.commit()
             db.refresh(run)
             if principal is not None:

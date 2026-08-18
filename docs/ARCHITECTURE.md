@@ -1,5 +1,13 @@
 # ChatBI V2 技术架构
 
+## v2.1 Day 1 default semantic runtime
+
+`DATA_QUERY` remains deterministic, read-only and Oracle-verified, but semantic preparation is now an explicit replaceable chain:
+
+`OpenChatBI-compatible hybrid catalog linking → SuperSonic-compatible SemanticQuery → Wren-compatible MDL + dry-plan + semantic SQL → SQLGlot AST Guard → QueryExecutor → ResultOracle`.
+
+All three compatibility adapters are ChatBI-owned clean-room implementations. Runtime evidence is persisted in `QueryRun.context_payload.semantic_runtime` and the plan stores SemanticQuery, dry-plan and the public call chain. Cache keys include Workspace, Semantic Model and version. The prior `LocalSemanticEngine/Nl2SqlRouter` path remains available only via `CHATBI_SEMANTIC_RUNTIME_MODE=local` for explicit rollback.
+
 ## 1. 推荐技术栈
 
 - Web：React、TypeScript、Vite、ECharts。

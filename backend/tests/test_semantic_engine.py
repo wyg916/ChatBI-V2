@@ -26,7 +26,8 @@ def test_demo_seed_and_engine_boundaries(db_session):
     assert len(local.compile(model)["entities"]) == 4
 
     wren = WrenSemanticAdapter()
-    assert wren.capabilities()["runtime_available"] is False
+    assert wren.capabilities()["runtime_available"] is True
+    assert wren.capabilities()["runtime"] == "wren-clean-room-runtime"
     manifest = wren.compile(model)
     assert manifest["metadata"]["source"] == "chatbi-semantic-snapshot"
     assert len(manifest["models"]) == 4

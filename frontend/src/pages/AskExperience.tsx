@@ -82,6 +82,17 @@ function QueryDetailDialog({ result, onClose }: { result: QueryResponse; onClose
   }, [onClose]);
   const columns = result.execution.columns ?? [];
   const rows = result.execution.rows ?? [];
+  const semanticRuntime = (result.context.semantic_runtime ?? {}) as Record<string, unknown>;
+  const schemaLinking = (semanticRuntime.schema_linking ?? {}) as Record<string, unknown>;
+  const runtimePlan = result.plan as unknown as Record<string, unknown>;
+  const semanticQuery = (semanticRuntime.semantic_query ?? runtimePlan.semantic_query ?? {}) as Record<string, unknown>;
+  const dryPlan = (semanticRuntime.wren_dry_plan ?? runtimePlan.wren_dry_plan ?? {}) as Record<string, unknown>;
+  const candidates = Array.isArray(schemaLinking.candidates) ? schemaLinking.candidates as Array<Record<string, unknown>> : [];
+  const candidateSummary = (key: string) => {
+    const items = Array.isArray(schemaLinking[key]) ? schemaLinking[key] as Array<Record<string, unknown>> : [];
+    return items.slice(0, 5).map((item) => String(item.qualified_name ?? item.name)).join('、') || '—';
+  };
+  const callChain = Array.isArray(semanticRuntime.call_chain) ? semanticRuntime.call_chain.map(String) : [];
   return (
     <div className="query-dialog-backdrop" role="presentation" onMouseDown={onClose}>
       <section className="query-dialog" role="dialog" aria-modal="true" aria-labelledby="query-detail-title" onMouseDown={(event) => event.stopPropagation()}>
@@ -96,6 +107,16 @@ function QueryDetailDialog({ result, onClose }: { result: QueryResponse; onClose
           <div><dt>Metric / Dimension</dt><dd>{result.plan.metrics?.join('、') || '明细'} / {result.plan.dimensions?.join('、') || '无分组'}</dd></div>
           <div><dt>Time / Filter / Join</dt><dd>{result.plan.time_range?.kind ?? '全部时间'} / {result.plan.filters?.length ?? 0} / {Array.isArray(result.plan.joins) ? result.plan.joins.length : 0}</dd></div>
           <div><dt>Result Oracle</dt><dd>{result.oracle.status}</dd></div>
+          <div><dt>Semantic Runtime</dt><dd>{callChain.join(' → ') || result.provider}</dd></div>
+          <div><dt>Trace ID</dt><dd>{result.id}</dd></div>
+          <div><dt>Schema Candidates</dt><dd>{candidates.slice(0, 8).map((item) => `${String(item.object_type)}:${String(item.qualified_name ?? item.name)}(${Number(item.score ?? 0).toFixed(2)})`).join('、') || '—'}</dd></div>
+          <div><dt>Candidate Tables</dt><dd>{candidateSummary('candidate_tables')}</dd></div>
+          <div><dt>Candidate Columns</dt><dd>{candidateSummary('candidate_columns')}</dd></div>
+          <div><dt>Candidate Metrics</dt><dd>{candidateSummary('candidate_metrics')}</dd></div>
+          <div><dt>Candidate Relationships</dt><dd>{candidateSummary('candidate_relationships')}</dd></div>
+          <div><dt>Clarification</dt><dd>{schemaLinking.clarification_required ? String(schemaLinking.clarification_reason ?? '需要澄清') : '不需要'}</dd></div>
+          <div><dt>SemanticQuery Evidence</dt><dd>{Array.isArray(semanticQuery.evidence) ? semanticQuery.evidence.slice(0, 8).map(String).join('、') : '—'}</dd></div>
+          <div><dt>Wren Dry-plan</dt><dd>{String(dryPlan.status ?? '—')} · v{String(dryPlan.semantic_model_version ?? result.semantic_model_version)}</dd></div>
         </dl>
         <pre><code>{result.guard.normalized_sql ?? result.plan.generated_sql ?? 'SQL 未生成'}</code></pre>
         <div className="query-detail-table-wrap">
