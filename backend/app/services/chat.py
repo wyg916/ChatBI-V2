@@ -115,6 +115,11 @@ class ChatService:
         )
         if progress:
             progress("UNDERSTANDING", {"route": route.value})
+            if route in {QuestionRoute.DATA_QUERY, QuestionRoute.HYBRID_ANALYSIS, QuestionRoute.COMPLEX_ANALYSIS}:
+                progress("SCHEMA_LINKED", {"route": route.value})
+                progress("SEMANTIC_PARSING", {"route": route.value})
+                progress("SEMANTIC_COMPILING", {"route": route.value})
+                progress("SQL_VALIDATING", {"route": route.value})
 
         user_message = ChatMessage(
             conversation_id=conversation.id,
@@ -177,6 +182,8 @@ class ChatService:
                 retrieved_sources = knowledge.get("citations", []) if isinstance(knowledge, dict) else []
                 tool_calls = primary.get("steps", []) if isinstance(primary, dict) else []
                 fallback_reason = "CONTROLLED_RUNTIME_FALLBACK" if result.fallback_used else None
+                if progress:
+                    progress("RESULT_VALIDATING", {"route": route.value, "status": status})
                 if status not in {"SUCCEEDED", "PARTIAL"}:
                     error_code = str(primary.get("error_code") or status)
             elif route == QuestionRoute.GENERAL_CHAT:
@@ -190,6 +197,8 @@ class ChatService:
                 )
                 answer, model_provider, model_name = reply.content, reply.provider, reply.model
                 response_payload = {"answer": answer}
+                if progress:
+                    progress("GENERATING_INSIGHT", {"route": route.value})
             elif route == QuestionRoute.FILE_QUERY:
                 answer, model_provider, model_name, retrieved_sources = self._file_answer(content, attachments, prior_messages)
                 response_payload = {"answer": answer, "citations": retrieved_sources}
