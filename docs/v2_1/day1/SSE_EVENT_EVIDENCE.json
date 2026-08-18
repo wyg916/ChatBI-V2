@@ -1,0 +1,41 @@
+{
+  "executed_at": "2026-08-18T18:31:20+08:00",
+  "base_git_sha": "6cdbf12f6c2e8494afe21262fd092795c4f784c3",
+  "command": "python scripts/performance/run_v21_performance.py --env-file <redacted> --base-url http://127.0.0.1:8000/api/v1 --concurrency 4 --duration-minutes 0.5 --db-repeats 3 --output artifacts/v2_1_data10m/day1_sse_baseline.json",
+  "raw_evidence": "artifacts/v2_1_data10m/day1_sse_baseline.json",
+  "requests": 91,
+  "errors": 0,
+  "all_query_sse_rate": 1.0,
+  "completed_rate": 1.0,
+  "routes": {
+    "DATA_QUERY": 23,
+    "KNOWLEDGE_QUERY": 22,
+    "HYBRID_ANALYSIS": 23,
+    "COMPLEX_ANALYSIS": 23
+  },
+  "events": {
+    "accepted": 91,
+    "catalog_retrieving": 114,
+    "schema_linked": 69,
+    "semantic_parsing": 69,
+    "semantic_compiling": 69,
+    "sql_validating": 69,
+    "sql_running": 46,
+    "result_validating": 137,
+    "knowledge_retrieving": 91,
+    "answer_delta": 137,
+    "chart_ready": 69,
+    "heartbeat": 5,
+    "completed": 91
+  },
+  "envelope_errors": [],
+  "unauthenticated_sse_401": true,
+  "cancellation": {
+    "cleanup_ms": 264.684,
+    "connection_leak_count": 0,
+    "task_leak_count": 0
+  },
+  "cross_workspace_sse_leak": 0,
+  "failures": [],
+  "rollback": "Revert the Day 1 SSE lifecycle and protocol changes; no migration is required."
+}

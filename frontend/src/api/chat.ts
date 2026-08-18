@@ -45,6 +45,7 @@ export const chatApi = {
         if (!event || !raw) continue;
         const payload = JSON.parse(raw);
         if (event === 'progress') onProgress(payload.stage);
+        else if (['accepted', 'catalog_retrieving', 'schema_linked', 'semantic_parsing', 'semantic_compiling', 'sql_validating', 'sql_running', 'result_validating', 'knowledge_retrieving', 'agent_running', 'python_running', 'answer_delta', 'chart_ready', 'heartbeat'].includes(event)) onProgress(payload.event ?? event);
         if (event === 'error') throw new Error(payload.code ?? 'CHAT_STREAM_FAILED');
         if (event === 'result') result = payload as ChatResponse;
       }

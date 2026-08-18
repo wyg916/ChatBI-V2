@@ -49,6 +49,9 @@ def test_unauthenticated_login_logout_and_invalid_session(raw_client, db_session
     assert raw_client.post("/api/v1/chat", json={
         "conversation_id": "missing", "client_message_id": "anonymous", "content": "你好",
     }).status_code == 401
+    assert raw_client.post("/api/v1/chat/stream", json={
+        "conversation_id": "missing", "client_message_id": "anonymous-stream", "content": "你好",
+    }).status_code == 401
     invalid = raw_client.get("/api/v1/datasources", headers={"Authorization": "Bearer invalid"})
     assert invalid.status_code == 401
     login = raw_client.post("/api/v1/auth/login", json={"email": user.email, "password": PASSWORD, "remember": False})
@@ -79,6 +82,13 @@ def test_cross_workspace_conversation_and_attachment_access_returns_403(raw_clie
     assert raw_client.post("/api/v1/auth/login", json={"email": first.email, "password": PASSWORD, "remember": False}).status_code == 200
     assert raw_client.get(f"/api/v1/conversations/{foreign.id}").status_code == 403
     assert raw_client.get(f"/api/v1/attachments/{attachment.id}").status_code == 403
+    stream = raw_client.post("/api/v1/chat/stream", json={
+        "conversation_id": foreign.id,
+        "client_message_id": "cross-workspace-stream",
+        "content": "读取另一个工作区的数据",
+    })
+    assert stream.status_code == 403
+    assert "secret" not in stream.text
 
 
 def _file_bytes(extension: str) -> tuple[bytes, str]:

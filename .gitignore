@@ -24,6 +24,9 @@ temp/
 playwright-report/
 test-results/
 
+# Reproducible v2.1 benchmark outputs are generated locally and may be large.
+artifacts/v2_1_data10m/
+
 # Legacy project evaluation payloads are provenance-restricted and are not
 # redistributed in the public V1 source release. SOURCE.json retains hashes.
 evaluation/legacy-rag/rag_60.json
