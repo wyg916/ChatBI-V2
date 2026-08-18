@@ -1,7 +1,7 @@
 {
   "schema_version": "2.1-day2-evidence-v1",
-  "tested_sha": "c7b3ae7181b34ea9721329769ee3f2dd5ba82c2a",
-  "executed_at": "2026-08-19T02:13:00+08:00",
+  "tested_sha": "f8ecb031e9b6e4435708d4046f9b38da7e01e30b",
+  "executed_at": "2026-08-19T02:27:00+08:00",
   "command": "python -m pytest tests/test_v21_rag_agent_file_product.py tests/test_legacy_rag_agent_integration.py -q",
   "manifest": "evaluation/golden/v2.1-agent-15.json",
   "manifest_sha256": "82932ac218dd9216fcb9215c278b96265989e5256389e2abe89e427560ce0c8b",
