@@ -1,0 +1,31 @@
+{
+  "status": "PASS",
+  "tested_sha": "d3582dc5054da48f1f4b0dff365b8e05224f368a",
+  "executed_at": "2026-08-19T01:23:16+08:00",
+  "adapter": "IbmText2SqlEvaluationAdapter",
+  "multiple_ground_truth": true,
+  "comparison_axes": ["model", "prompt", "semantic_engine", "nl2sql_engine", "version"],
+  "accuracy": {
+    "metric": 1.0,
+    "dimension": 1.0,
+    "time": 1.0,
+    "filter": 1.0,
+    "join": 1.0,
+    "result_value": 1.0,
+    "chart": 1.0,
+    "narrative": 1.0
+  },
+  "result_compare": "PASS",
+  "error_analysis": "PASS",
+  "evaluation_dashboard": "PASS",
+  "ci_release_gate": "PASS",
+  "evidence_path": "artifacts/v2_1/day2/b/eval-feedback-release-gate.json",
+  "raw_sha256": "1a24c66955d8efcd22ec34530cdffa22777e63509da661d9e2cf6d1d3dab1559",
+  "frozen_zone_intersection": 4,
+  "migration_impact": "NONE",
+  "license_impact": "NOTICE_UPDATED",
+  "security_result": "WORKSPACE_SCOPED",
+  "failures": [],
+  "blockers": [],
+  "rollback": "revert d3582dc5054da48f1f4b0dff365b8e05224f368a"
+}
