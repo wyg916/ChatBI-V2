@@ -1,0 +1,72 @@
+{
+  "schema_version": "chatbi-v2.1-day1-preaudit-v1",
+  "audit_base_sha": "cceeb1c598f633d68c6428907db82b2f7903b5e2",
+  "phase2_sha": "6cdbf12f6c2e8494afe21262fd092795c4f784c3",
+  "day1_final_sha": null,
+  "day1_pass_claimed": false,
+  "overall_status": "RISK",
+  "master_plan_source": {
+    "status": "UNKNOWN",
+    "note": "The named v2.1 force-landing master-plan document was not present in the checkout or supplied attachment."
+  },
+  "worktrees": [
+    {
+      "branch": "codex/v2.1-data10m-performance",
+      "head": "6cdbf12f6c2e8494afe21262fd092795c4f784c3",
+      "status": "IN_PROGRESS",
+      "changed_path_count": 32,
+      "frozen_intersection_count": 5,
+      "migration_changed": false,
+      "clean": false
+    },
+    {
+      "branch": "codex/v2.1-semantic-runtime",
+      "head": "6cdbf12f6c2e8494afe21262fd092795c4f784c3",
+      "status": "IN_PROGRESS",
+      "changed_path_count": 22,
+      "frozen_intersection_count": 7,
+      "migration_changed": false,
+      "clean": false
+    }
+  ],
+  "work_packages": [
+    {"id": "D1-0", "name": "baseline_freeze", "status": "EVIDENCE_PRESENT", "risk": "No unique Day 1 final SHA"},
+    {"id": "D1-1", "name": "upstream_lock", "status": "EVIDENCE_PRESENT", "risk": "Uncommitted lock and missing named master-plan source"},
+    {"id": "D1-2", "name": "10m_data_and_files", "status": "READY_FOR_FINAL_GATE", "risk": "Final-SHA reproducibility rerun required"},
+    {"id": "D1-3", "name": "end_to_end_sse", "status": "EVIDENCE_PRESENT", "risk": "Strict profile has no real request longer than 10 seconds"},
+    {"id": "D1-4", "name": "wren_compatible_runtime", "status": "IN_PROGRESS", "risk": "No committed runtime evidence"},
+    {"id": "D1-5", "name": "openchatbi_compatible_linking", "status": "IN_PROGRESS", "risk": "No final runtime call-rate evidence"},
+    {"id": "D1-6", "name": "supersonic_compatible_semantic_query", "status": "IN_PROGRESS", "risk": "No final A/B evidence"},
+    {"id": "D1-7", "name": "twenty_question_10m_ab", "status": "IN_PROGRESS", "risk": "Runner exists but completed output was not located"}
+  ],
+  "frozen_intersections": {
+    "data_streaming": [
+      "backend/app/api/routes/analysis.py",
+      "backend/app/api/routes/chat.py",
+      "backend/app/services/chat.py",
+      "backend/tests/test_phase2_auth_chat_attachments.py",
+      "frontend/src/api/chat.ts"
+    ],
+    "semantic_runtime": [
+      ".env.example",
+      "backend/app/core/config.py",
+      "backend/app/query/oracle.py",
+      "backend/app/query/service.py",
+      "backend/app/semantic/engine.py",
+      "docker-compose.yml",
+      "frontend/src/pages/AskExperience.tsx"
+    ]
+  },
+  "product_regression_risks": {
+    "open_ended_chat": "RISK",
+    "chat_ui": "RISK",
+    "enter_and_ime": "RISK",
+    "file_document_image": "RISK",
+    "multimodal": "RISK",
+    "auth_session": "RISK",
+    "short_term_memory": "RISK",
+    "attachment_isolation": "RISK"
+  },
+  "stitching_risk": "RISK",
+  "required_next_state": "READY_FOR_FINAL_GATE"
+}
