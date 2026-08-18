@@ -77,9 +77,9 @@ def _chat(client: httpx.Client, api: str, conversation_id: str, question: str, a
     return response.json()
 
 
-def run(base_url: str, *, reuse: bool = False) -> dict:
+def run(base_url: str, *, reuse: bool = False, env_file: Path | None = None) -> dict:
     api = f"{base_url.rstrip('/')}/api/v1"
-    environment = dotenv_values(PROJECT_ROOT / ".env")
+    environment = dotenv_values(env_file or PROJECT_ROOT / ".env")
     password = environment.get("CHATBI_BOOTSTRAP_ADMIN_PASSWORD")
     if not password:
         raise RuntimeError("CHATBI_BOOTSTRAP_ADMIN_PASSWORD is not configured")
@@ -233,8 +233,15 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--base-url", default="http://127.0.0.1:8000")
     parser.add_argument("--reuse", action="store_true", help="score the most recent persisted acceptance conversations")
+    parser.add_argument("--env-file", type=Path, default=PROJECT_ROOT / ".env")
+    parser.add_argument("--output", type=Path)
     args = parser.parse_args()
-    print(json.dumps(run(args.base_url, reuse=args.reuse), ensure_ascii=False, indent=2))
+    result = run(args.base_url, reuse=args.reuse, env_file=args.env_file)
+    rendered = json.dumps(result, ensure_ascii=False, indent=2)
+    if args.output:
+        args.output.parent.mkdir(parents=True, exist_ok=True)
+        args.output.write_text(rendered + "\n", encoding="utf-8")
+    print(rendered)
 
 
 if __name__ == "__main__":
