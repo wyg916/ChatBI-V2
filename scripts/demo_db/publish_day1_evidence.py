@@ -20,6 +20,7 @@ def main() -> None:
     parser.add_argument("--business-rules", type=Path, required=True)
     parser.add_argument("--docs-dir", type=Path, required=True)
     parser.add_argument("--git-sha", required=True)
+    parser.add_argument("--quality-migration-seconds", type=float, default=0.0)
     args = parser.parse_args()
     final = load(args.final_manifest)
     rebuild = load(args.rebuild_manifest)
@@ -59,6 +60,7 @@ def main() -> None:
             "timings_seconds": rebuild["timings_seconds"],
         },
         "data_signature_stable": stable,
+        "quality_migration_seconds": args.quality_migration_seconds,
     }
     atomic_json(args.docs_dir / "DATA_MANIFEST_10M.json", data_manifest)
     atomic_json(args.docs_dir / "FILE_DATASET_MANIFEST.json", {
@@ -92,6 +94,7 @@ def main() -> None:
 - Rows: dim_date={final['counts']['dim_date']}, dim_region={final['counts']['dim_region']}, dim_product={final['counts']['dim_product']}, dim_customer={final['counts']['dim_customer']}, fact_sales={final['counts']['fact_sales']}, fact_payment={final['counts']['fact_payment']}, ground_truth={final['counts']['golden_expected_result']}.
 - Partition/index count: {final['partition_count']} / {final['index_count']}.
 - Data signature: `{final['data_signature']}`; independent rebuild signature: `{rebuild['data_signature']}`; stable={str(stable).lower()}.
+- One-time isolated-schema quality migration including full VACUUM: {args.quality_migration_seconds:.3f} seconds.
 - Quality: duplicate external order rows={quality.get('duplicate_external_order_rows')}, zero net rows={quality.get('zero_net_amount_rows')}, extreme discount rows={quality.get('extreme_discount_rows')}, NULL payment dates={quality.get('null_payment_date_rows')}.
 - Pre-aggregations: monthly sales, region-product, customer contribution and receivable aging are materialized and indexed.
 - File datasets: {len(files['files'])}/5 generated and hash-verified.

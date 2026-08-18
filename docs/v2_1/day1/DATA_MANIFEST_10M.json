@@ -1,0 +1,172 @@
+{
+  "executed_at": "2026-08-18T12:57:41.218149+00:00",
+  "git_sha": "650bb01",
+  "raw_evidence": {
+    "final_manifest": "artifacts\\v2_1_data10m\\final\\manifest.json",
+    "rebuild_manifest": "artifacts\\v2_1_data10m\\rebuild\\manifest.json",
+    "explain_analyze": "artifacts\\v2_1_data10m\\final\\explain_analyze.json"
+  },
+  "failures": [],
+  "blockers": [],
+  "frozen_zone_intersection": [],
+  "migration_impact": "No Alembic migration; only the isolated chatbi_benchmark_v21 schema is created or reset.",
+  "license_impact": "None; generated SQL, Python and synthetic data are project-owned.",
+  "rollback": "Stop queries using the benchmark datasource, then drop only the isolated chatbi_benchmark_v21 schema after explicit approval.",
+  "commands": [
+    "python scripts/demo_db/generate_benchmark.py --scale 10M --seed 20260818 --tenant-count 10 --date-start 2024-01-01 --date-end 2026-12-31 --reset",
+    "python scripts/demo_db/migrate_external_order_no.py --sales-count 10000000",
+    "python scripts/demo_db/generate_benchmark.py --scale 10M --seed 20260818 --tenant-count 10 --date-start 2024-01-01 --date-end 2026-12-31 --reuse-existing",
+    "python scripts/demo_db/verify_manifest.py --manifest <final-manifest>"
+  ],
+  "test_count": 1,
+  "manifest": {
+    "manifest_version": 1,
+    "generated_at": "2026-08-18T12:39:35.311553+00:00",
+    "parameters": {
+      "schema": "chatbi_benchmark_v21",
+      "scale": "10M",
+      "seed": 20260818,
+      "tenant_count": 10,
+      "date_start": "2024-01-01",
+      "date_end": "2026-12-31",
+      "sales": 10000000,
+      "payments": 5000000,
+      "products": 50000,
+      "customers": 300000
+    },
+    "counts": {
+      "dim_date": 1096,
+      "dim_region": 50,
+      "dim_product": 50000,
+      "dim_customer": 300000,
+      "fact_sales": 10000000,
+      "fact_payment": 5000000,
+      "golden_expected_result": 100
+    },
+    "partition_count": 72,
+    "index_count": 345,
+    "data_signature": "34b8ec8023f410ea387003475f84bd63b05743580138ea919880979caf86af4c",
+    "signature_facts": {
+      "parameters": {
+        "schema": "chatbi_benchmark_v21",
+        "scale": "10M",
+        "seed": 20260818,
+        "tenant_count": 10,
+        "date_start": "2024-01-01",
+        "date_end": "2026-12-31",
+        "sales": 10000000,
+        "payments": 5000000,
+        "products": 50000,
+        "customers": 300000
+      },
+      "sales": [
+        10000000,
+        "2024-01-01",
+        "2026-12-31",
+        10,
+        "329344139898.39",
+        "5547716428.25"
+      ],
+      "payments": [
+        5000000,
+        "2024-01-01",
+        "2026-12-31",
+        "164668456769.05",
+        "10107528643.90"
+      ]
+    },
+    "ground_truth_count": 100,
+    "quality_checks": {
+      "duplicate_external_order_rows": 500000,
+      "zero_net_amount_rows": 112998,
+      "extreme_discount_rows": 10129,
+      "null_payment_date_rows": 294117
+    },
+    "timings_seconds": {
+      "reuse_existing_validation": 0.0,
+      "grant_readonly": 0.468
+    },
+    "explain_cases": [
+      {
+        "name": "simple_monthly",
+        "execution_time_ms": 22.896,
+        "planning_time_ms": 29.405
+      },
+      {
+        "name": "standard_region",
+        "execution_time_ms": 329.663,
+        "planning_time_ms": 15.261
+      },
+      {
+        "name": "complex_product",
+        "execution_time_ms": 374.233,
+        "planning_time_ms": 321.651
+      },
+      {
+        "name": "receivable_aging",
+        "execution_time_ms": 45.351,
+        "planning_time_ms": 61.756
+      }
+    ],
+    "file_datasets": {
+      "schema": "chatbi_benchmark_v21",
+      "data_signature": "34b8ec8023f410ea387003475f84bd63b05743580138ea919880979caf86af4c",
+      "files": {
+        "sales_sample.parquet": {
+          "rows": 1000000,
+          "bytes": 42122085,
+          "sha256": "fe1a3ef28a1772fc3a3bc84e573638af2c3231f1cdc9b75a129a07dd27ae7272"
+        },
+        "sales_sample.csv": {
+          "rows": 200000,
+          "bytes": 20488223,
+          "sha256": "65edb201c80803bf2dfea201b86e6c3a3b3977b6a8da7a63fc0316dcee02ba3d"
+        },
+        "sales_workbook.xlsx": {
+          "sheets": {
+            "sales": 50000,
+            "monthly_summary": 360
+          },
+          "bytes": 4711084,
+          "sha256": "c82450f0f818c90165d18bc525c47f1ab48d948dabfa847b2dd2739c50f24e4a"
+        },
+        "customer_profile.xlsx": {
+          "rows": 100000,
+          "bytes": 5288200,
+          "sha256": "8306eb964deec0f1b47a3a574303cae945e69377041091bb65551ed8b784bed5"
+        },
+        "file_golden.json": {
+          "cases": 10,
+          "bytes": 3220,
+          "sha256": "21dcb5ba25d1e29c08c60f4c8e4eaf5c75e9f2d3129e8c0bc061813d71f0d08c"
+        }
+      }
+    }
+  },
+  "rebuild": {
+    "data_signature": "34b8ec8023f410ea387003475f84bd63b05743580138ea919880979caf86af4c",
+    "counts": {
+      "dim_date": 1096,
+      "dim_region": 50,
+      "dim_product": 50000,
+      "dim_customer": 300000,
+      "fact_sales": 10000000,
+      "fact_payment": 5000000,
+      "golden_expected_result": 100
+    },
+    "timings_seconds": {
+      "reset": 1.516,
+      "create_schema": 0.36,
+      "create_partitions": 1.929,
+      "generate_dimensions": 17.399,
+      "generate_fact_sales": 358.868,
+      "generate_fact_payment": 425.529,
+      "create_indexes": 528.207,
+      "create_aggregates": 1474.869,
+      "analyze": 109.418,
+      "grant_readonly": 0.296
+    }
+  },
+  "data_signature_stable": true,
+  "quality_migration_seconds": 2952.059
+}
