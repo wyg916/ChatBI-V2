@@ -149,8 +149,8 @@ def main() -> None:
             "scripts/launch.ps1 -NoOpen -SkipBuild",
             "scripts/test-release-cold-start.ps1 -EvidencePath temp/day1/cold-start.json",
         ],
-        "test_count": 173 + 29 + 55 + phase2["total"] + semantic["coverage_case_count"] + len(semantic["golden_cases"]),
-        "backend": {"status": "PASS", "passed": 173},
+        "test_count": 174 + 29 + 55 + phase2["total"] + semantic["coverage_case_count"] + len(semantic["golden_cases"]),
+        "backend": {"status": "PASS", "passed": 174},
         "frontend": {"typecheck": "PASS", "unit_passed": 29, "build": "PASS", "transformed_modules": 734},
         "browser_e2e": {"status": "PASS", "passed": 55, "console_errors": 0, "page_errors": 0, "blocking_request_errors": 0},
         "semantic": {"coverage": "20/20", "golden": f"{sum(item['consistent'] for item in semantic['golden_cases'])}/{len(semantic['golden_cases'])}", "failures": semantic["failures"]},
@@ -213,7 +213,7 @@ def main() -> None:
 | Wren runtime | call {metrics['wren_runtime_call_rate']}; mapping {metrics['wren_mdl_mapping_coverage']}; Golden {metrics['wren_golden_result_consistency']} | PASS |
 | OpenChatBI linking | call {metrics['openchatbi_runtime_call_rate']}; Recall@5 {metrics['schema_linking_recall_at_5']}; p95 {metrics['catalog_schema_linking_p95_ms']} ms; cross-workspace/unauthorized recall 0/0 | PASS |
 | SuperSonic pipeline | call {metrics['supersonic_runtime_call_rate']}; metric/dimension/time/filter {metrics['metric_linking_accuracy']}/{metrics['dimension_linking_accuracy']}/{metrics['time_linking_accuracy']}/{metrics['filter_linking_accuracy']}; invalid relation {metrics['invalid_relation_block_rate']} | PASS |
-| No regression | Backend 173; Frontend 29; E2E 55; Phase 2 runtime {phase2['total']}; console/page/blocking request 0/0/0 | PASS |
+| No regression | Backend 174; Frontend 29; E2E 55; Phase 2 runtime {phase2['total']}; console/page/blocking request 0/0/0 | PASS |
 
 ## Execution evidence
 

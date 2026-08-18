@@ -42,10 +42,10 @@
     "scripts/launch.ps1 -NoOpen -SkipBuild",
     "scripts/test-release-cold-start.ps1 -EvidencePath temp/day1/cold-start.json"
   ],
-  "test_count": 357,
+  "test_count": 358,
   "backend": {
     "status": "PASS",
-    "passed": 173
+    "passed": 174
   },
   "frontend": {
     "typecheck": "PASS",

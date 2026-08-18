@@ -4,7 +4,7 @@
 
 - v2.1 Day 1（仅 E + A）已在 `codex/v2.1-final-integration` 完成集成候选收口：固定 Seed `20260818` 的 PostgreSQL 10M/5M 事实数据、72 个分区、345 个索引、4 个预聚合、可复现文件集与全链路 SSE 已落地；数据签名为 `34b8ec8023f410ea387003475f84bd63b05743580138ea919880979caf86af4c`。
 - 默认 DATA_QUERY 运行链现为 OpenChatBI-compatible Workspace 隔离 Hybrid Schema Linking → SuperSonic-compatible SemanticQuery → Wren-compatible MDL/dry-plan/Semantic SQL → SQLGlot → 只读执行 → Result Oracle；20/20 覆盖 Case、20/20 Golden 值、三个运行时调用率与主要链接准确率均为 1.0，LocalSemanticEngine 仅作为显式回滚。
-- Day 1 集成证据：Backend 173/173、Frontend 29/29、Playwright 55/55、Phase 2 运行时 60/60、迁移单 head 与 upgrade→rollback→upgrade、Docker 两次从停止状态启动、隔离冷启动 76.8 秒、一键启动、Secret/License 检查均 PASS。严格 SSE 106 请求 0 错误，TTFE p95 213.104 ms，心跳最大间隔 2508.131 ms，取消清理 250.802 ms；另有 26 个真实 >10 秒样本流式率 1.0。详见 `docs/v2_1/day1/DAY1_REPORT.md`。
+- Day 1 集成证据：Backend 174/174、Frontend 29/29、Playwright 55/55、Phase 2 运行时 60/60、迁移单 head 与 upgrade→rollback→upgrade、Docker 两次从停止状态启动、隔离冷启动 76.8 秒、一键启动、Secret/License 检查均 PASS。严格 SSE 106 请求 0 错误，TTFE p95 213.104 ms，心跳最大间隔 2508.131 ms，取消清理 250.802 ms；另有 26 个真实 >10 秒样本流式率 1.0。详见 `docs/v2_1/day1/DAY1_REPORT.md`。
 - Phase 2 Frozen Zone 共有 16 个交集文件，均为基于 Phase 2 的最小差量语义合并；Frozen blob 整体覆盖数 0。B 未合并，main 未推送，Final Tag 未创建，Day 2/3 未执行。
 - Phase 2 真实问答、认证、会话与多模态闭环达到预提交硬门槛：开放式 60/60、Trace 60/60、连续追问 10/10，数据 SQL/结果、知识引用、文件与图片准确率均为 1.0，不支持请求幻觉为 0。
 - 统一 Chat/SSE 入口覆盖九类正式路由；DATA_QUERY 继续复用 Semantic/NL2SQL/SQL Guard/只读执行/Result Oracle，GENERAL/FILE/IMAGE 使用真实配置模型且不可用时返回明确错误。

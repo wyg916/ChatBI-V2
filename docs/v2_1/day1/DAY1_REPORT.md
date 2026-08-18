@@ -17,7 +17,7 @@
 | Wren runtime | call 1.0; mapping 1.0; Golden 1.0 | PASS |
 | OpenChatBI linking | call 1.0; Recall@5 1.0; p95 7.476 ms; cross-workspace/unauthorized recall 0/0 | PASS |
 | SuperSonic pipeline | call 1.0; metric/dimension/time/filter 1.0/1.0/1.0/1.0; invalid relation 1.0 | PASS |
-| No regression | Backend 173; Frontend 29; E2E 55; Phase 2 runtime 60; console/page/blocking request 0/0/0 | PASS |
+| No regression | Backend 174; Frontend 29; E2E 55; Phase 2 runtime 60; console/page/blocking request 0/0/0 | PASS |
 
 ## Execution evidence
 
