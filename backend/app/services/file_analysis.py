@@ -134,11 +134,33 @@ def analyze_structured(question: str, attachments: list[Any]) -> dict[str, Any]:
     result_signature = hashlib.sha256(json.dumps(result_rows, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
     chart = None
     if operation in {"TREND", "TOP_N", "SEGMENT"} and len(result_columns) >= 2:
-        chart = {"chart_type": "line" if operation == "TREND" else "bar", "x": result_columns[0], "y": result_columns[1], "rows": result_rows[:20]}
+        if operation == "TREND":
+            x_field = next((column for column in result_columns if any(token in column.lower() for token in ("date", "time", "日期", "时间"))), result_columns[0])
+            y_field = selected if selected in result_columns else next((column for column in result_columns if column != x_field), result_columns[1])
+        elif operation == "TOP_N":
+            y_field = selected if selected in result_columns else result_columns[-1]
+            x_field = next((column for column in result_columns if column != y_field), result_columns[0])
+        else:
+            x_field, y_field = result_columns[:2]
+        chart = {"chart_type": "line" if operation == "TREND" else "bar", "x": x_field, "y": y_field, "rows": result_rows[:20]}
+    if operation == "ROW_COUNT" and result_rows:
+        answer = f"{primary['filename']} 共 {result_rows[0]['row_count']} 行。"
+    elif operation == "SUM" and result_rows:
+        answer = f"{selected} 合计为 {result_rows[0]['sum']:g}。"
+    elif operation == "AVERAGE" and result_rows:
+        answer = f"{selected} 平均值为 {result_rows[0]['average']:g}。"
+    elif operation == "MIN" and result_rows:
+        answer = f"{selected} 最小值为 {float(result_rows[0][selected]):g}。"
+    elif operation == "TOP_N" and result_rows:
+        answer = f"{selected} 最高值为 {float(result_rows[0][selected]):g}，已返回 Top {len(result_rows)}。"
+    else:
+        answer = f"已用受限数据解释器完成 {operation}，返回 {len(result_rows)} 行结果。"
+    if not exact:
+        answer += " 文件超过预览上限，结论仅覆盖已验证预览。"
     return {
         "status": "SUCCEEDED",
         "operation": operation,
-        "answer": f"已用受限数据解释器完成 {operation}，返回 {len(result_rows)} 行结果。" + ("" if exact else " 文件超过预览上限，结论仅覆盖已验证预览。"),
+        "answer": answer,
         "result": {"columns": result_columns, "rows": result_rows, "exact_for_full_file": exact, "result_signature": result_signature},
         "chart": chart,
         "datasets": [{key: value for key, value in item.items() if key != "rows"} for item in datasets],

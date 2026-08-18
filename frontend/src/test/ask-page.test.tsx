@@ -84,7 +84,7 @@ describe('问数据真实多轮界面', () => {
         route: 'COMPLEX_ANALYSIS', status: 'SUCCEEDED', attachment_ids: [],
         response_payload: {
           analysis: { primary: { steps: [{ code: 'VERIFY', agent_role: 'VerificationAgent', tool_name: 'VERIFY_RESULT', status: 'SUCCEEDED' }], knowledge: { citations: [{ citation_id: 'citation-1', title: '收入口径', text: '退款在确认后冲减收入。', document_version_id: 'version-1', locator: '第 2 节', chunk_id: 'chunk-1' }] } } },
-          file_analysis: { operation: 'SUM', trace: { complete: true }, artifacts: [{ attachment_id: 'attachment-1', csv_url: '/api/v1/attachments/attachment-1/artifact?format=csv', json_url: '/api/v1/attachments/attachment-1/artifact?format=json' }] },
+          file_analysis: { operation: 'SUM', trace: { complete: true }, result: { columns: ['region', 'revenue'], rows: [{ region: '华东', revenue: 270 }] }, chart: { chart_type: 'bar', x: 'region', y: 'revenue', rows: [{ region: '华东', revenue: 270 }] }, artifacts: [{ attachment_id: 'attachment-1', csv_url: '/api/v1/attachments/attachment-1/artifact?format=csv', json_url: '/api/v1/attachments/attachment-1/artifact?format=json' }] },
         },
         trace_payload: { trace_id: 'TRACE-GOVERNED-1' }, created_at: '2026-08-18T00:00:02Z',
       }],
@@ -94,6 +94,8 @@ describe('问数据真实多轮界面', () => {
     expect(screen.getByTestId('agent-step-evidence')).toHaveTextContent('VerificationAgent');
     expect(screen.getByTestId('agent-step-evidence')).toHaveTextContent('不展示内部思维');
     expect(screen.getByTestId('file-analysis-evidence')).toHaveTextContent('SUM');
+    expect(screen.getByTestId('file-analysis-evidence')).toHaveTextContent('270');
+    expect(screen.getByRole('img', { name: '文件分析结果图表' })).toBeVisible();
     expect(screen.getByRole('link', { name: '下载 CSV Artifact' })).toHaveAttribute('href', '/api/v1/attachments/attachment-1/artifact?format=csv');
   });
 
