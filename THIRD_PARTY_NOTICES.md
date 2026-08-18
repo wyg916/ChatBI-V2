@@ -24,6 +24,14 @@ The complete eight-project path-level draft and license checksums are in `docs/U
 
 Other pre-existing runtime packages remain pinned in the relevant package manifests. No third-party logo, brand asset, UI source, or restricted project source was introduced in Day 2.
 
+## v2.1 Day 2 clean-room product references
+
+- Chat2DB: reviewed at `5372213f267a087c232cb86cae4b200e00c3389f`; its current custom license is incompatible with the intended product embedding/distribution pattern. The Data Workspace is independently authored and copies or runs no Chat2DB source, UI, service, container, logo or brand asset.
+- DB-GPT: reviewed at `db580e952e544acf9f6c6c153da29dc67e9e40d7`; root MIT concepts are design provenance only. ChatBI's fixed five-role/six-tool orchestrator is project-authored and does not import DB-GPT or its embedded skill assets.
+- PandasAI: reviewed at `bbbb771d31062d81f6fa19bafb40620d5cbe48f4`; community paths are MIT while `ee/**` is excluded. ChatBI does not import or package PandasAI. Structured FILE_QUERY uses a project-authored fixed-operation interpreter that executes no generated Python and reuses the already declared pandas package.
+
+These Day 2 paths add no third-party runtime dependency. Exact selected paths, license boundaries, checksums, forbidden paths and rollback decisions are recorded in `docs/UPSTREAM_LOCK.json` and `docs/OPEN_SOURCE_LICENSE_AUDIT_DRAFT.md`.
+
 ## IBM Text-to-SQL Evaluation Toolkit design reference
 
 - Source repository: `https://github.com/IBM/text2sql-eval-toolkit`

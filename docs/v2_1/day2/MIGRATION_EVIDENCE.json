@@ -1,0 +1,43 @@
+{
+  "verified_at": "2026-08-18T18:35:04.372812+00:00",
+  "tested_sha": "4d463e995855cd8ab5b34ece2ae2b3d7fed1ecf2",
+  "database": "local PostgreSQL isolated temporary schema",
+  "migration_head": "20260818_0010",
+  "temporary_schema_removed": true,
+  "single_head": true,
+  "upgrade_base_upgrade_pass": true,
+  "commands": [
+    {
+      "command": "alembic heads",
+      "returncode": 0,
+      "stdout": "20260818_0010 (head)",
+      "stderr": ""
+    },
+    {
+      "command": "alembic upgrade head",
+      "returncode": 0,
+      "stdout": "",
+      "stderr": "INFO  [alembic.runtime.migration] Context impl PostgresqlImpl.\nINFO  [alembic.runtime.migration] Will assume transactional DDL.\nINFO  [alembic.runtime.migration] Running upgrade  -> 20260816_0001, day1 core\nINFO  [alembic.runtime.migration] Running upgrade 20260816_0001 -> 20260817_0002, verified answer and dashboard libraries\nINFO  [alembic.runtime.migration] Running upgrade 20260817_0002 -> 20260817_0003, evaluation center records\nINFO  [alembic.runtime.migration] Running upgrade 20260817_0003 -> 20260817_0004, day2 query pipeline, audit, feedback, and verified answer evidence\nINFO  [alembic.runtime.migration] Running upgrade 20260817_0004 -> 20260817_0005, day3 chart narrative answer dashboard and evaluation loop\nINFO  [alembic.runtime.migration] Running upgrade 20260817_0005 -> 20260817_0006, day4 semantic governance, minimal rbac, and audit\nINFO  [alembic.runtime.migration] Running upgrade 20260817_0006 -> 20260817_0007, optional legacy RAG and bounded orchestration metadata\nINFO  [alembic.runtime.migration] Running upgrade 20260817_0007 -> 20260817_0008, close the V1 RAG and bounded multi-agent runtime contracts\nINFO  [alembic.runtime.migration] Running upgrade 20260817_0008 -> 20260818_0009, add Phase 2 authenticated chat, conversations and attachments\nINFO  [alembic.runtime.migration] Running upgrade 20260818_0009 -> 20260818_0010, add read-only SQL workspace execution history"
+    },
+    {
+      "command": "alembic downgrade base",
+      "returncode": 0,
+      "stdout": "",
+      "stderr": "INFO  [alembic.runtime.migration] Context impl PostgresqlImpl.\nINFO  [alembic.runtime.migration] Will assume transactional DDL.\nINFO  [alembic.runtime.migration] Running downgrade 20260818_0010 -> 20260818_0009, add read-only SQL workspace execution history\nINFO  [alembic.runtime.migration] Running downgrade 20260818_0009 -> 20260817_0008, add Phase 2 authenticated chat, conversations and attachments\nINFO  [alembic.runtime.migration] Running downgrade 20260817_0008 -> 20260817_0007, close the V1 RAG and bounded multi-agent runtime contracts\nINFO  [alembic.runtime.migration] Running downgrade 20260817_0007 -> 20260817_0006, optional legacy RAG and bounded orchestration metadata\nINFO  [alembic.runtime.migration] Running downgrade 20260817_0006 -> 20260817_0005, day4 semantic governance, minimal rbac, and audit\nINFO  [alembic.runtime.migration] Running downgrade 20260817_0005 -> 20260817_0004, day3 chart narrative answer dashboard and evaluation loop\nINFO  [alembic.runtime.migration] Running downgrade 20260817_0004 -> 20260817_0003, day2 query pipeline, audit, feedback, and verified answer evidence\nINFO  [alembic.runtime.migration] Running downgrade 20260817_0003 -> 20260817_0002, evaluation center records\nINFO  [alembic.runtime.migration] Running downgrade 20260817_0002 -> 20260816_0001, verified answer and dashboard libraries\nINFO  [alembic.runtime.migration] Running downgrade 20260816_0001 -> , day1 core"
+    },
+    {
+      "command": "alembic upgrade head",
+      "returncode": 0,
+      "stdout": "",
+      "stderr": "INFO  [alembic.runtime.migration] Context impl PostgresqlImpl.\nINFO  [alembic.runtime.migration] Will assume transactional DDL.\nINFO  [alembic.runtime.migration] Running upgrade  -> 20260816_0001, day1 core\nINFO  [alembic.runtime.migration] Running upgrade 20260816_0001 -> 20260817_0002, verified answer and dashboard libraries\nINFO  [alembic.runtime.migration] Running upgrade 20260817_0002 -> 20260817_0003, evaluation center records\nINFO  [alembic.runtime.migration] Running upgrade 20260817_0003 -> 20260817_0004, day2 query pipeline, audit, feedback, and verified answer evidence\nINFO  [alembic.runtime.migration] Running upgrade 20260817_0004 -> 20260817_0005, day3 chart narrative answer dashboard and evaluation loop\nINFO  [alembic.runtime.migration] Running upgrade 20260817_0005 -> 20260817_0006, day4 semantic governance, minimal rbac, and audit\nINFO  [alembic.runtime.migration] Running upgrade 20260817_0006 -> 20260817_0007, optional legacy RAG and bounded orchestration metadata\nINFO  [alembic.runtime.migration] Running upgrade 20260817_0007 -> 20260817_0008, close the V1 RAG and bounded multi-agent runtime contracts\nINFO  [alembic.runtime.migration] Running upgrade 20260817_0008 -> 20260818_0009, add Phase 2 authenticated chat, conversations and attachments\nINFO  [alembic.runtime.migration] Running upgrade 20260818_0009 -> 20260818_0010, add read-only SQL workspace execution history"
+    },
+    {
+      "command": "alembic current",
+      "returncode": 0,
+      "stdout": "20260818_0010 (head)",
+      "stderr": "INFO  [alembic.runtime.migration] Context impl PostgresqlImpl.\nINFO  [alembic.runtime.migration] Will assume transactional DDL."
+    }
+  ],
+  "failures": [],
+  "blockers": []
+}

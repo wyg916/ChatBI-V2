@@ -1,5 +1,14 @@
 # 项目状态
 
+## 2026-08-19
+
+- v2.1 Day 2 已完成 B/C/D 集成候选：B 提供 IBM-compatible Evaluation、Golden 50、八维错误分析和 Feedback/Verified SQL 回放；C 提供 PostgreSQL/MySQL Data Workspace；D 提供 ACL/Scenario 隔离混合检索、固定五角色六工具，以及不执行生成代码的结构化文件分析。
+- 候选门禁：Backend 185/185、Frontend 12 files / 33 tests、TypeScript、Vite 738 modules、Playwright 63/63、Golden 50/50、Knowledge 20/20、Agent 15/15、File 10/10、Phase 2 60/60、Day 1 semantic 20/20 全部 PASS；业务数据库写入 0。
+- SSE 复验为 5 并发 30 秒、68 请求 0 错误，TTFE p95 824.427 ms、heartbeat 最大间隔 2506.574 ms、取消清理 42.070 ms、2 个 >10 秒请求流式率 1.0、连接/任务泄漏 0/0。两次停止态启动分别 27.840 秒和 28.362 秒，三项服务均 healthy。
+- Alembic 唯一 head 为 `20260818_0010`，隔离 schema 的 upgrade→base→upgrade 与清理均 PASS。Frozen Zone 交集 22 个文件，均逐文件审查合入，Frozen blob 整体覆盖数 0。
+- Day 2 没有复制 IBM、SQLBot、Chat2DB、DB-GPT 或 PandasAI 的源码/UI/品牌资产，也没有新增直接第三方依赖；PandasAI 未导入，文件问数使用项目自有固定操作解释器。
+- 最终 PASS 只由文档提交后的同一 SHA 门禁、远端相等验证和 `artifacts/v2_1/day2-final/<SHA>/` 原始清单决定。`main` 未推送、Tag 未创建、后续 Day 未执行。
+
 ## 2026-08-18
 
 - v2.1 Day 1（仅 E + A）已在 `codex/v2.1-final-integration` 完成集成候选收口：固定 Seed `20260818` 的 PostgreSQL 10M/5M 事实数据、72 个分区、345 个索引、4 个预聚合、可复现文件集与全链路 SSE 已落地；数据签名为 `34b8ec8023f410ea387003475f84bd63b05743580138ea919880979caf86af4c`。

@@ -157,3 +157,11 @@ V2.1 的 IBM-compatible EvaluationAdapter 只比较 ChatBI 正式 QueryPipeline 
 ## ADR-035：数据工作台复用 ChatBI 安全查询链并对 Chat2DB 采用 clean-room 参考
 
 Chat2DB 当前主线采用带外部分发和嵌入限制的 `LicenseRef-Chat2DB`，因此本项目不复制、依赖、调用、嵌入或分发其源码、服务、容器、UI 与品牌资产，只将公开能力类别作为行为参考。Data Workspace 由项目自有 React/FastAPI 代码实现；所有 SQL 必须经过会话认证、Workspace/资源授权、SQLGlot Guard、QueryExecutor 只读事务、Result Oracle/只读结果校验和审计历史。样例值由服务端懒加载并按敏感列名脱敏，查询历史同时按 Workspace 和用户隔离；浏览器不接触数据库凭据。
+
+## ADR-036：知识检索在 ACL 过滤后使用确定性混合排序并冻结场景身份
+
+RAG Runtime 先验证签名 Workspace、用户和角色，再应用 KnowledgeAcl 与 `scenario_id`，随后执行项目自有 BM25-like、确定性 token vector、RRF 和覆盖率 rerank。历史 `chatbi-v1` 仅作为 `charging_ops` 的兼容别名，其他场景仍 fail closed。注入指令命中的 chunk 不进入候选；没有授权证据时 Answer Guard 拒绝，不能产生确定性伪知识答案。前端只展示文档/版本/chunk/locator、有限阶段和 Trace，不展示 Chain-of-Thought。
+
+## ADR-037：结构化文件问数采用无代码执行面的固定操作解释器
+
+PandasAI 不作为运行依赖，也不导入其 community 或 `ee/**` 代码。CSV/XLS/XLSX/Parquet 在类型、签名、大小、行数、Workspace 和用户校验后提取至受限预览；固定解释器只允许行数、过滤、分组、聚合、Join、客户分层、趋势和 TopN 等白名单操作，最多分析/输出 100 行，不执行模型或用户生成的 Python、Shell、网络、数据库连接、宿主机路径或密钥访问。结果带 SHA-256 签名、表格、ECharts、Trace 和鉴权 Artifact；超过预览上限时必须明确声明非全量结论。

@@ -1,6 +1,6 @@
-# Open-source license audit draft — v2.1 Day 1
+# Open-source license audit draft — v2.1 Day 1–2
 
-- Observed: 2026-08-18 (Asia/Shanghai)
+- Observed: 2026-08-18 through 2026-08-19 (Asia/Shanghai)
 - Evidence cache: `D:\Codex\home\upstream-audit` (outside this repository)
 - Scope: repository tree, root/subdirectory licenses, package manifests, representative headers and exact commit SHA.
 - Result: no third-party source, UI, logo or brand asset is copied by Day 1. The three active semantic integrations are ChatBI-owned clean-room adapters behind explicit interfaces.
@@ -16,4 +16,13 @@
 | DB-GPT | `db580e952e544acf9f6c6c153da29dc67e9e40d7` | MIT root plus path-specific skill licenses | Locked only for later path-level review |
 | PandasAI | `bbbb771d31062d81f6fa19bafb40620d5cbe48f4` | MIT community paths; enterprise license under any `ee/**` path | Community-only candidate; all enterprise paths forbidden |
 
-The machine-readable repository, version, selected paths, checksums, runtime entries, allowed/forbidden usage, fallback and rollback fields are in `docs/UPSTREAM_LOCK.json`. This is an engineering draft, not legal advice; any move from clean-room behavior to source incorporation requires a new path-level review and an update to `THIRD_PARTY_NOTICES.md` before merge.
+## Day 2 landing decision
+
+| Workflow | Upstream boundary | Landed implementation |
+|---|---|---|
+| B Evaluation | IBM toolkit Apache-2.0; SQLBot modified GPL reference-only | Project-authored result comparator and feedback workflow; no source, UI, benchmark bundle or branding copied |
+| C Data Workspace | Chat2DB `LicenseRef-Chat2DB` forbids the intended embedding/distribution pattern | Project-authored React/FastAPI workspace; no Chat2DB source, service, container, UI or brand used |
+| D bounded Agent | DB-GPT MIT root with unreviewed embedded subdirectory licenses | Project-authored fixed five-role/six-tool orchestrator; DB-GPT remains design provenance only |
+| D file analysis | PandasAI community MIT and `ee/**` enterprise boundary | PandasAI is not imported or packaged; the project-owned fixed-operation interpreter executes no generated code and uses the existing pandas dependency |
+
+Day 2 added no direct third-party dependency and copied no upstream source, prompt, UI, logo, trademark asset, model weight or benchmark bundle. The machine-readable repository, version, selected paths, checksums, runtime entries, allowed/forbidden usage, fallback and rollback fields are in `docs/UPSTREAM_LOCK.json`. This is an engineering draft, not legal advice; any move from clean-room behavior to source incorporation requires a new path-level review and an update to `THIRD_PARTY_NOTICES.md` before merge.
