@@ -1,43 +1,58 @@
 {
-  "generated_at": "2026-08-18T18:06:00+08:00",
+  "status": "PASS",
+  "tested_sha": "b766275bd4cff015312b1d0fbdbae26d81611d71",
+  "generated_at": "2026-08-19T01:42:56+08:00",
   "workflow": "C_DATA_WORKSPACE",
   "postgresql": {
     "schema": "chatbi_benchmark_v21",
-    "catalog_tables": 79,
     "fact_sales_rows": 10000000,
+    "schema_search_hits": 1,
+    "table_search_hits": 37,
+    "column_search_hits": 39,
+    "relationship_count": 111,
+    "sample_page": 2,
+    "sample_rows": 50,
+    "format_pass": true,
+    "explain_status": "SUCCEEDED",
     "execute_status": "SUCCEEDED",
     "oracle_status": "PASSED",
     "returned_rows": 5,
-    "duration_ms": 287,
-    "explain_status": "SUCCEEDED",
-    "sample_page": 1,
-    "sample_rows": 50,
-    "verified_sql_status": "VERIFIED",
-    "result_signature_round_trip": true
+    "duration_ms": 265,
+    "history_total": 7,
+    "replay_status": "SUCCEEDED",
+    "result_signature_round_trip": true,
+    "verified_sql_status": "VERIFIED"
   },
   "mysql": {
     "schema": "chatbi_demo_business",
     "table": "charging_orders",
     "column_search_hits": 1,
+    "explain_status": "SUCCEEDED",
     "execute_status": "SUCCEEDED",
     "oracle_status": "PASSED",
     "returned_rows": 5,
-    "duration_ms": 550
+    "duration_ms": 19
   },
   "security": {
-    "dangerous_sql_cases": 1,
-    "dangerous_sql_blocked": 1,
+    "dangerous_sql_cases": 8,
+    "dangerous_sql_blocked": 8,
     "dangerous_sql_block_rate": 1.0,
     "business_database_write_count": 0,
     "cross_workspace_unit_case": "PASS",
-    "sensitive_field_masking_unit_case": "PASS"
+    "sensitive_field_masking_unit_case": "PASS",
+    "browser_database_credentials": 0
   },
   "tests": {
-    "backend": "137/137 PASS",
-    "frontend": "30/30 PASS",
+    "backend": "181/181 PASS",
+    "frontend": "32/32 PASS",
     "frontend_typecheck": "PASS",
-    "frontend_build": "PASS (737 modules; existing ECharts 555.48 kB warning)",
+    "frontend_build": "PASS (738 modules)",
     "browser_e2e": "1/1 PASS",
-    "migration_head": "20260818_0010"
-  }
+    "migration_head": "20260818_0010",
+    "migration_round_trip": "PASS",
+    "b_regression": "PASS",
+    "phase2_regression": "60/60 PASS"
+  },
+  "failures": [],
+  "blockers": []
 }
