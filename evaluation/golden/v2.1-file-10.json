@@ -1,0 +1,16 @@
+{
+  "name": "ChatBI V2.1 File Product 10",
+  "version": "2.1.0",
+  "cases": [
+    {"id":"F01","question":"这个 CSV 有多少行","expected_operation":"ROW_COUNT"},
+    {"id":"F02","question":"计算平均 revenue","expected_operation":"AVERAGE"},
+    {"id":"F03","question":"计算 revenue 合计","expected_operation":"SUM"},
+    {"id":"F04","question":"找出 revenue 最大的行","expected_operation":"TOP_N"},
+    {"id":"F05","question":"找出 revenue 最小的行","expected_operation":"MIN"},
+    {"id":"F06","question":"展示日期收入趋势","expected_operation":"TREND"},
+    {"id":"F07","question":"进行客户分层","expected_operation":"SEGMENT"},
+    {"id":"F08","question":"Join 两个表并关联结果","expected_operation":"JOIN","attachments":2},
+    {"id":"F09","question":"筛选 revenue >= 40 的记录","expected_operation":"FILTER"},
+    {"id":"F10","question":"Top revenue 客户","expected_operation":"TOP_N"}
+  ]
+}

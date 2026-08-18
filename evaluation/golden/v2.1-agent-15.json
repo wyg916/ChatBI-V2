@@ -1,0 +1,21 @@
+{
+  "name": "ChatBI V2.1 Agent Product 15",
+  "version": "2.1.0",
+  "cases": [
+    {"id":"A01","question":"综合分析收入变化与口径"},
+    {"id":"A02","question":"综合分析利润变化与成本规则"},
+    {"id":"A03","question":"综合分析订单量和有效订单口径"},
+    {"id":"A04","question":"综合分析区域收入表现"},
+    {"id":"A05","question":"综合分析同比趋势与口径"},
+    {"id":"A06","question":"综合分析环比趋势与口径"},
+    {"id":"A07","question":"复杂分析收入、利润与订单"},
+    {"id":"A08","question":"复杂分析区域差异并给出图表"},
+    {"id":"A09","question":"复杂分析客户贡献"},
+    {"id":"A10","question":"复杂分析品类利润"},
+    {"id":"A11","question":"综合分析年度收入"},
+    {"id":"A12","question":"综合分析季度订单"},
+    {"id":"A13","question":"复杂分析收入异常"},
+    {"id":"A14","question":"复杂分析成本异常"},
+    {"id":"A15","question":"综合分析经营表现并验证结果"}
+  ]
+}

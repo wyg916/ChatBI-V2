@@ -22,6 +22,7 @@ from app.models import Attachment, ChatMessage, Conversation
 from app.schemas.chat import ChatRequest, ChatResponse, ConversationRead, MessageRead
 from app.services.attachments import attachment_path, get_attachment
 from app.services.conversations import extract_slots, get_conversation, list_messages, refresh_conversation_summary
+from app.services.file_analysis import analyze_structured
 
 
 def _message(item: ChatMessage) -> MessageRead:
@@ -200,8 +201,8 @@ class ChatService:
                 if progress:
                     progress("GENERATING_INSIGHT", {"route": route.value})
             elif route == QuestionRoute.FILE_QUERY:
-                answer, model_provider, model_name, retrieved_sources = self._file_answer(content, attachments, prior_messages)
-                response_payload = {"answer": answer, "citations": retrieved_sources}
+                answer, model_provider, model_name, retrieved_sources, file_analysis = self._file_answer(content, attachments, prior_messages)
+                response_payload = {"answer": answer, "citations": retrieved_sources, "file_analysis": file_analysis}
             elif route == QuestionRoute.MULTIMODAL_QUERY:
                 answer, model_provider, model_name = self._vision_answer(content, attachments, prior_messages)
                 response_payload = {"answer": answer}
@@ -234,6 +235,7 @@ class ChatService:
             "tool_calls": tool_calls,
             "sql_execution": sql_execution,
             "fallback_reason": fallback_reason,
+            "file_analysis": response_payload.get("file_analysis"),
             "elapsed_ms": elapsed_ms,
         }
         assistant = ChatMessage(
@@ -275,6 +277,9 @@ class ChatService:
         if not attachments:
             raise HTTPException(status_code=422, detail="FILE_QUERY_REQUIRES_ATTACHMENT")
         sources = [{"attachment_id": item.id, "filename": item.filename, "kind": item.kind} for item in attachments]
+        if attachments and all(item.kind == "STRUCTURED" for item in attachments):
+            analysis = analyze_structured(question, attachments)
+            return analysis["answer"], "chatbi-safe-dataframe", "fixed-operation-v1", sources, analysis
         context = []
         for item in attachments:
             payload = item.extracted_payload or {}
@@ -290,7 +295,7 @@ class ChatService:
             user=json.dumps({"question": question, "attachments": context}, ensure_ascii=False),
             history=_history(messages),
         )
-        return reply.content, reply.provider, reply.model, sources
+        return reply.content, reply.provider, reply.model, sources, None
 
     def _vision_answer(self, question: str, attachments: list[Attachment], messages: list[ChatMessage]):
         images = [item for item in attachments if item.kind == "IMAGE"]

@@ -82,6 +82,7 @@ def test_cross_workspace_conversation_and_attachment_access_returns_403(raw_clie
     assert raw_client.post("/api/v1/auth/login", json={"email": first.email, "password": PASSWORD, "remember": False}).status_code == 200
     assert raw_client.get(f"/api/v1/conversations/{foreign.id}").status_code == 403
     assert raw_client.get(f"/api/v1/attachments/{attachment.id}").status_code == 403
+    assert raw_client.get(f"/api/v1/attachments/{attachment.id}/artifact?format=json").status_code == 403
     stream = raw_client.post("/api/v1/chat/stream", json={
         "conversation_id": foreign.id,
         "client_message_id": "cross-workspace-stream",

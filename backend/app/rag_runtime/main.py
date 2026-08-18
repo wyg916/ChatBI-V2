@@ -89,6 +89,7 @@ async def retrieve_knowledge(request: Request, response: Response) -> dict[str, 
                 query=payload.query,
                 identity=identity,
                 limit=payload.limit,
+                scenario_id=payload.scenario_id,
             )
     except IdentityDenied as exc:
         raise HTTPException(status_code=403, detail=str(exc)) from exc
@@ -100,7 +101,7 @@ async def retrieve_knowledge(request: Request, response: Response) -> dict[str, 
         return {
             "trace_id": context.trace_id,
             "run_id": run_id,
-            "retrieval_mode": "workspace_acl_token_rank_v1",
+            "retrieval_mode": "hybrid_bm25_vector_rrf_rerank_v2",
             "answer_guard_status": "REFUSED",
             "refusal_reason": "NO_AUTHORIZED_EVIDENCE",
             "citations": [],
@@ -108,9 +109,9 @@ async def retrieve_knowledge(request: Request, response: Response) -> dict[str, 
     return {
         "trace_id": context.trace_id,
         "run_id": run_id,
-        "retrieval_mode": "workspace_acl_token_rank_v1",
+        "retrieval_mode": "hybrid_bm25_vector_rrf_rerank_v2",
         "answer_guard_status": "PASSED",
-        "vector_status": "NOT_REQUIRED_DETERMINISTIC_V1",
+        "vector_status": "DETERMINISTIC_TOKEN_VECTOR_ACTIVE",
         "citations": [
             {
                 "citation_id": f"citation-{index}",

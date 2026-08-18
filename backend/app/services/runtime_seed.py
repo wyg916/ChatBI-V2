@@ -126,12 +126,18 @@ def seed_v1_runtime(db: Session, workspace_id: str) -> None:
                 external_id=f"chatbi-v1-{topic}",
                 title=title,
                 source_path=f"business-glossary/{topic}.md",
-                metadata_payload={"topic": topic, "license": "project-authored"},
+                metadata_payload={"topic": topic, "license": "project-authored", "scenario_id": "charging_ops"},
                 migration_batch_id=MIGRATION_BATCH,
             )
             db.add(document)
             db.flush()
             created_documents += 1
+        document.metadata_payload = {
+            **(document.metadata_payload or {}),
+            "topic": topic,
+            "license": "project-authored",
+            "scenario_id": "charging_ops",
+        }
         version = db.scalar(
             select(KnowledgeDocumentVersion).where(
                 KnowledgeDocumentVersion.document_id == document.id,

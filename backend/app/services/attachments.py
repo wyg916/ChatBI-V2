@@ -109,7 +109,17 @@ def _extract(extension: str, data: bytes) -> tuple[str, dict]:
     if extension == ".csv":
         return "STRUCTURED", _dataframe_payload(pd.read_csv(source))
     if extension in {".xls", ".xlsx"}:
-        return "STRUCTURED", _dataframe_payload(pd.read_excel(source))
+        frames = pd.read_excel(source, sheet_name=None)
+        if not frames:
+            raise ValueError("EMPTY_WORKBOOK")
+        sheets = {str(name): _dataframe_payload(frame) for name, frame in frames.items()}
+        first = next(iter(sheets.values()))
+        return "STRUCTURED", {
+            **first,
+            "row_count": sum(item["row_count"] for item in sheets.values()),
+            "sheet_names": list(sheets),
+            "sheets": sheets,
+        }
     if extension == ".parquet":
         return "STRUCTURED", _dataframe_payload(pd.read_parquet(source))
     if extension == ".pdf":

@@ -1,0 +1,26 @@
+{
+  "name": "ChatBI V2.1 Knowledge Golden 20",
+  "version": "2.1.0",
+  "cases": [
+    {"id":"K01","query":"收入指标口径是什么","topic":"revenue"},
+    {"id":"K02","query":"营收如何处理退款","topic":"revenue"},
+    {"id":"K03","query":"销售额是否包含取消订单","topic":"revenue"},
+    {"id":"K04","query":"revenue 的定义","topic":"revenue"},
+    {"id":"K05","query":"利润和成本口径","topic":"profit"},
+    {"id":"K06","query":"毛利怎么计算","topic":"profit"},
+    {"id":"K07","query":"profit 与 cost 的关系","topic":"profit"},
+    {"id":"K08","query":"订单量统计规则","topic":"orders"},
+    {"id":"K09","query":"有效订单是否排除取消订单","topic":"orders"},
+    {"id":"K10","query":"order count 如何去重","topic":"orders"},
+    {"id":"K11","query":"区域维度如何关联","topic":"region"},
+    {"id":"K12","query":"地区和省份映射到哪个维度","topic":"region"},
+    {"id":"K13","query":"region 使用什么关联键","topic":"region"},
+    {"id":"K14","query":"同比的时间窗口","topic":"time"},
+    {"id":"K15","query":"环比如何计算","topic":"time"},
+    {"id":"K16","query":"季度边界按什么日期","topic":"time"},
+    {"id":"K17","query":"SQL Guard 发布规则","topic":"verification"},
+    {"id":"K18","query":"Result Oracle 如何验证","topic":"verification"},
+    {"id":"K19","query":"知识引用需要哪些版本信息","topic":"verification"},
+    {"id":"K20","query":"只读审计和 citation 规则","topic":"verification"}
+  ]
+}
