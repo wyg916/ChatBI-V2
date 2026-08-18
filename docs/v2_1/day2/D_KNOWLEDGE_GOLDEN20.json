@@ -1,8 +1,8 @@
 {
   "schema_version": "2.1-day2-evidence-v1",
-  "tested_sha": "b77219d0da23ef2724843a749ccf4ce1b0d7f475",
-  "tested_tree_sha": "89161813608f817f7bf5b5eeae8c7b5175bcb8e2",
-  "executed_at": "2026-08-19T02:01:01+08:00",
+  "tested_sha": "5ed2a9a7d012a86f9409c0fb9175709671bd6fe5",
+  "tested_tree_sha": "c32d2b1e4d417b0c6464dc5d9a8b1309730d83ec",
+  "executed_at": "2026-08-19T02:06:07+08:00",
   "command": "python -m pytest tests/test_v21_rag_agent_file_product.py tests/test_rag_runtime_v1.py tests/test_legacy_rag_agent_integration.py tests/test_phase2_auth_chat_attachments.py -q",
   "manifest": "evaluation/golden/v2.1-knowledge-20.json",
   "manifest_sha256": "5e51bc19ab29bcc5293078211e7d4891490a2405d883545afa959b763d141c41",
