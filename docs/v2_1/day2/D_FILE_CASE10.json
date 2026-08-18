@@ -1,0 +1,17 @@
+{
+  "schema_version": "2.1-day2-evidence-v1",
+  "tested_sha": "b77219d0da23ef2724843a749ccf4ce1b0d7f475",
+  "executed_at": "2026-08-19T02:01:01+08:00",
+  "command": "python -m pytest tests/test_v21_rag_agent_file_product.py tests/test_phase2_auth_chat_attachments.py -q",
+  "manifest": "evaluation/golden/v2.1-file-10.json",
+  "manifest_sha256": "b552bacad47e1afa6264de844394ad31cdf8174ec2801c761e087e20a513da01",
+  "cases": 10,
+  "passed": 10,
+  "result_accuracy": 1.0,
+  "operations": ["ROW_COUNT", "AVERAGE", "SUM", "TOP_N", "MIN", "TREND", "SEGMENT", "JOIN", "FILTER"],
+  "format_regression": {"csv": "PASS", "xls": "PASS", "xlsx": "PASS", "parquet": "PASS", "multi_sheet": "PASS", "pdf_doc_image_preserved": "PASS"},
+  "chart": "PASS",
+  "artifact": "PASS",
+  "failures": [],
+  "blockers": []
+}

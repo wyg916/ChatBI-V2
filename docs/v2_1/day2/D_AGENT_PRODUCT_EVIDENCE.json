@@ -1,0 +1,33 @@
+{
+  "schema_version": "2.1-day2-evidence-v1",
+  "tested_sha": "b77219d0da23ef2724843a749ccf4ce1b0d7f475",
+  "executed_at": "2026-08-19T02:01:01+08:00",
+  "commands": [
+    "python -m pytest tests/test_v21_rag_agent_file_product.py tests/test_legacy_rag_agent_integration.py -q",
+    "npm test -- --run src/test/ask-page.test.tsx"
+  ],
+  "test_counts": {"agent_cases": 15, "bounded_agent_regression": 22, "frontend_ask": 9},
+  "actual_metrics": {
+    "agent_success_rate": 1.0,
+    "agent_direct_db_access": 0,
+    "sql_guard_bypass": 0,
+    "result_oracle_bypass": 0,
+    "unauthorized_tool_call": 0,
+    "cross_workspace_leak": 0,
+    "infinite_agent_loop": 0,
+    "trace_complete_rate": 1.0,
+    "timeout_behavior": "PASS",
+    "partial_result_behavior": "PASS",
+    "audit_complete": "PASS"
+  },
+  "workflow": "Fixed graph: plan, guarded data query, signed ACL knowledge retrieval, result and citation verification, chart verification, verified insight.",
+  "security_boundary": "The ToolExecutor has no direct database connector and can invoke only the six frozen tools; QueryPipeline owns SQL Guard, Query Executor and Result Oracle.",
+  "raw_hashes": {"agent_manifest_sha256": "82932ac218dd9216fcb9215c278b96265989e5256389e2abe89e427560ce0c8b"},
+  "frozen_zone_intersection": [],
+  "migration_impact": "NONE",
+  "license_impact": "Clean-room bounded orchestrator; DB-GPT is design provenance only.",
+  "security_result": "PASS",
+  "failures": [],
+  "blockers": [],
+  "rollback": "Revert the D merge commit; DATA_QUERY remains on the deterministic QueryPipeline."
+}

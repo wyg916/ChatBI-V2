@@ -1,0 +1,32 @@
+{
+  "schema_version": "2.1-day2-evidence-v1",
+  "tested_sha": "b77219d0da23ef2724843a749ccf4ce1b0d7f475",
+  "executed_at": "2026-08-19T02:01:01+08:00",
+  "security_model": "non-executable fixed-operation interpreter",
+  "controls": {
+    "generated_code_execution": 0,
+    "shell_access": 0,
+    "host_filesystem_access": 0,
+    "database_credential_access": 0,
+    "provider_secret_access": 0,
+    "network_access": 0,
+    "max_analyzed_rows_per_sheet": 100,
+    "max_output_rows": 100,
+    "temporary_artifact_files": 0,
+    "authenticated_artifact_download": true,
+    "workspace_and_user_scope": true,
+    "file_signature_validation": true,
+    "file_type_allowlist": true,
+    "delete_cleanup": true
+  },
+  "evidence": [
+    "backend/app/services/file_analysis.py",
+    "backend/app/services/attachments.py",
+    "backend/app/api/routes/attachments.py",
+    "backend/tests/test_v21_rag_agent_file_product.py",
+    "backend/tests/test_phase2_auth_chat_attachments.py"
+  ],
+  "result": "PASS",
+  "failures": [],
+  "blockers": []
+}
