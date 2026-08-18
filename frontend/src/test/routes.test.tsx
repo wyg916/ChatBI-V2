@@ -7,15 +7,16 @@ import { routeManifest } from '../router';
 import { AuthContext } from '../auth';
 
 describe('UI route coverage', () => {
-  it('declares all 14 approved pages without duplicate paths', () => {
-    expect(routeManifest).toHaveLength(14);
-    expect(new Set(routeManifest.map((route) => route.path)).size).toBe(14);
+  it('declares the approved pages and data workspace without duplicate paths', () => {
+    expect(routeManifest).toHaveLength(15);
+    expect(new Set(routeManifest.map((route) => route.path)).size).toBe(15);
     expect(routeManifest).toEqual([
       { path: '/login', title: '登录页' },
       { path: '/', title: '问数据 - 空状态' },
       { path: '/ask/results', title: '问数据 - 分析结果' },
       { path: '/datasources', title: '数据源列表' },
       { path: '/datasources/:id', title: '数据源详情与 Schema 管理' },
+      { path: '/datasources/:id/workspace', title: '数据工作台' },
       { path: '/semantic-models', title: '语义模型列表' },
       { path: '/semantic-models/:id', title: '语义模型编辑器' },
       { path: '/answers', title: '答案库' },

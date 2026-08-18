@@ -131,6 +131,7 @@ export function DatasourceDetailPage() {
       title="Schema 与字段管理"
       description="同步数据源元数据，配置字段业务含义，管理 ChatBI 可用字段。"
       actions={<>
+        <Link className="button secondary" to={`/datasources/${id}/workspace`}>数据工作台</Link>
         <button className="button secondary" data-testid="sync-schema" disabled={sync.isPending} onClick={() => sync.mutate()}>{sync.isPending ? '正在刷新…' : '刷新数据'}</button>
         <label className="schema-select-label"><span className="sr-only">切换 Schema</span><select aria-label="切换 Schema" value={activeSchema} onChange={(event) => { setSelectedSchema(event.target.value); setSelected(''); }}>
           {(schemas.data ?? []).map((schema) => <option key={schema.name} value={schema.name}>{schema.name}</option>)}

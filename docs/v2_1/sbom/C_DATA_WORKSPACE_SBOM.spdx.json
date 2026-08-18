@@ -1,0 +1,66 @@
+{
+  "spdxVersion": "SPDX-2.3",
+  "dataLicense": "CC0-1.0",
+  "SPDXID": "SPDXRef-DOCUMENT",
+  "name": "ChatBI-V2-C-Data-Workspace-delta",
+  "documentNamespace": "https://github.com/wyg916/ChatBI-V2/sbom/c-data-workspace/2026-08-18",
+  "creationInfo": {
+    "created": "2026-08-18T10:06:00Z",
+    "creators": ["Tool: Codex", "Organization: ChatBI V2"]
+  },
+  "packages": [
+    {
+      "name": "chatbi-data-workspace",
+      "SPDXID": "SPDXRef-Package-ChatBI-DataWorkspace",
+      "versionInfo": "1.1.0-workflow-c",
+      "downloadLocation": "NOASSERTION",
+      "filesAnalyzed": false,
+      "licenseConcluded": "Apache-2.0",
+      "licenseDeclared": "Apache-2.0",
+      "copyrightText": "NOASSERTION"
+    },
+    {
+      "name": "sqlglot",
+      "SPDXID": "SPDXRef-Package-SQLGlot",
+      "versionInfo": "30.17.0",
+      "downloadLocation": "https://pypi.org/project/sqlglot/30.17.0/",
+      "filesAnalyzed": false,
+      "licenseConcluded": "MIT",
+      "licenseDeclared": "MIT",
+      "copyrightText": "NOASSERTION"
+    },
+    {
+      "name": "SQLAlchemy",
+      "SPDXID": "SPDXRef-Package-SQLAlchemy",
+      "versionInfo": "2.0.43",
+      "downloadLocation": "https://pypi.org/project/SQLAlchemy/2.0.43/",
+      "filesAnalyzed": false,
+      "licenseConcluded": "MIT",
+      "licenseDeclared": "MIT",
+      "copyrightText": "NOASSERTION"
+    },
+    {
+      "name": "@tanstack/react-query",
+      "SPDXID": "SPDXRef-Package-TanStackQuery",
+      "versionInfo": "5.62.8",
+      "downloadLocation": "https://www.npmjs.com/package/@tanstack/react-query/v/5.62.8",
+      "filesAnalyzed": false,
+      "licenseConcluded": "MIT",
+      "licenseDeclared": "MIT",
+      "copyrightText": "NOASSERTION"
+    }
+  ],
+  "relationships": [
+    {"spdxElementId": "SPDXRef-Package-ChatBI-DataWorkspace", "relationshipType": "DEPENDS_ON", "relatedSpdxElement": "SPDXRef-Package-SQLGlot"},
+    {"spdxElementId": "SPDXRef-Package-ChatBI-DataWorkspace", "relationshipType": "DEPENDS_ON", "relatedSpdxElement": "SPDXRef-Package-SQLAlchemy"},
+    {"spdxElementId": "SPDXRef-Package-ChatBI-DataWorkspace", "relationshipType": "DEPENDS_ON", "relatedSpdxElement": "SPDXRef-Package-TanStackQuery"}
+  ],
+  "annotations": [
+    {
+      "annotationDate": "2026-08-18T10:06:00Z",
+      "annotationType": "OTHER",
+      "annotator": "Tool: Codex",
+      "comment": "Workflow C adds no third-party package. Chat2DB is a reference-only audited project and is not a dependency or redistributed component."
+    }
+  ]
+}

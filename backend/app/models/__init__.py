@@ -43,6 +43,7 @@ from app.models.integration_entities import (
     ToolCall,
 )
 from app.models.phase2 import Attachment, AuthSession, ChatMessage, Conversation, LoginAttempt
+from app.models.data_workspace import SqlWorkspaceRun
 
 __all__ = [
     "Workspace", "AppUser", "ResourceGrant", "AuditEvent", "DataSource", "DataSourceSchema", "DataSourceTable",
@@ -54,5 +55,5 @@ __all__ = [
     "KnowledgeSource", "KnowledgeDocument", "KnowledgeDocumentVersion", "KnowledgeChunk", "KnowledgeAcl",
     "KnowledgeIngestionRun", "KnowledgeRetrievalRun", "Citation", "OrchestrationProfile",
     "OrchestrationRun", "OrchestrationStep", "ToolBinding", "ToolCall", "PromptTemplate", "PromptVersion",
-    "Attachment", "AuthSession", "ChatMessage", "Conversation", "LoginAttempt",
+    "Attachment", "AuthSession", "ChatMessage", "Conversation", "LoginAttempt", "SqlWorkspaceRun",
 ]

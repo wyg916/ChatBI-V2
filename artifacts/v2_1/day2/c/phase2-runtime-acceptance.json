@@ -1,0 +1,44 @@
+{
+  "total": 60,
+  "category_counts": {
+    "DATA_QUERY": 15,
+    "KNOWLEDGE_QUERY": 10,
+    "HYBRID_OR_COMPLEX": 10,
+    "FOLLOW_UP": 10,
+    "GENERAL_CHAT": 5,
+    "FILE_QUERY": 5,
+    "MULTIMODAL_QUERY": 5
+  },
+  "open_ended_request_runtime_rate": 1.0,
+  "question_route_coverage": "60/60",
+  "route_failures": [],
+  "trace_complete": "60/60",
+  "trace_failures": [],
+  "follow_up_context_pass": "10/10",
+  "follow_up_failures": [],
+  "data_sql_execution_rate": 1.0,
+  "data_result_value_accuracy": 1.0,
+  "knowledge_citation_accuracy": 1.0,
+  "knowledge_cited_count": 7,
+  "file_result_accuracy": 1.0,
+  "file_failures": [],
+  "image_question_accuracy": 1.0,
+  "image_failures": [],
+  "unsupported_request_hallucination": 0,
+  "status_counts": {
+    "SUCCEEDED": 58,
+    "REFUSED": 1,
+    "PARTIAL": 1
+  },
+  "route_counts": {
+    "DATA_QUERY": 23,
+    "KNOWLEDGE_QUERY": 9,
+    "UNSUPPORTED": 1,
+    "HYBRID_ANALYSIS": 7,
+    "COMPLEX_ANALYSIS": 5,
+    "GENERAL_CHAT": 4,
+    "CLARIFICATION": 1,
+    "FILE_QUERY": 5,
+    "MULTIMODAL_QUERY": 5
+  }
+}

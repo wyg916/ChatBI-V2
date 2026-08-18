@@ -153,3 +153,7 @@ ADR-005 关于“Wren runtime 尚不可用”的历史结论被本 ADR 覆盖，
 ## ADR-034：V2.1 Evaluation 与反馈复用既有证据表，核心 QueryPipeline 保持冻结
 
 V2.1 的 IBM-compatible EvaluationAdapter 只比较 ChatBI 正式 QueryPipeline 已执行的结果，不持有数据库连接，也不以 SQL 文本相等代替正确性。Multiple Ground Truth、八类准确率、Result Diff 与错误分析进入 `EvaluationCaseResult.actual`；评测 Profile 暂存为 `EvaluationRun.trend_points` 的类型化 metadata，并在 API 输出时过滤。SQLBot 仅作产品流程参考，错误修正通过 `VerifiedAnswer.feedback` 与 `AnswerVersion` 保存，只有人工审核且 Oracle PASS 的 SQL 才能晋升；回放时 Verified SQL 仍重新进入 Context、NL2SQL、SQL Guard、只读 Query Executor 和 Result Oracle。专用表和每运行 Provider/Prompt/Engine 注入由 `docs/integration_requests/EVAL_FEEDBACK_INTEGRATION_REQUEST.md` 交给主控 Migration/Runtime 统一处理。
+
+## ADR-035：数据工作台复用 ChatBI 安全查询链并对 Chat2DB 采用 clean-room 参考
+
+Chat2DB 当前主线采用带外部分发和嵌入限制的 `LicenseRef-Chat2DB`，因此本项目不复制、依赖、调用、嵌入或分发其源码、服务、容器、UI 与品牌资产，只将公开能力类别作为行为参考。Data Workspace 由项目自有 React/FastAPI 代码实现；所有 SQL 必须经过会话认证、Workspace/资源授权、SQLGlot Guard、QueryExecutor 只读事务、Result Oracle/只读结果校验和审计历史。样例值由服务端懒加载并按敏感列名脱敏，查询历史同时按 Workspace 和用户隔离；浏览器不接触数据库凭据。

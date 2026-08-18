@@ -6,7 +6,7 @@ const runtimeEnv = (
     process?: { env?: Record<string, string | undefined> };
   }
 ).process?.env;
-const proxyTarget = runtimeEnv?.CHATBI_PROXY_TARGET ?? 'http://localhost:8000';
+const proxyTarget = runtimeEnv?.CHATBI_PROXY_TARGET ?? runtimeEnv?.VITE_BACKEND_PROXY_TARGET ?? 'http://localhost:8000';
 
 export default defineConfig({
   plugins: [react()],
