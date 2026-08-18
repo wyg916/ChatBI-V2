@@ -8,9 +8,13 @@ export default async function globalSetup(_: FullConfig) {
   try {
     const sourceResponse = await api.get(`${apiBase}/datasources`);
     if (!sourceResponse.ok()) throw new Error(`Datasource fixture discovery failed: HTTP ${sourceResponse.status()}`);
-    const sources = await sourceResponse.json() as Array<{ id: string; type: string }>;
+    const sources = await sourceResponse.json() as Array<{ id: string; type: string; schema: string | null }>;
+    const fixtureSchemas = { postgresql: 'demo_business', mysql: 'chatbi_demo_business' } as const;
     for (const dialect of ['postgresql', 'mysql']) {
-      const source = sources.find((item) => item.type === dialect);
+      const source = sources.find((item) => (
+        item.type === dialect
+        && item.schema === fixtureSchemas[dialect as keyof typeof fixtureSchemas]
+      ));
       if (!source) throw new Error(`Missing ${dialect} datasource fixture`);
       const connection = await api.post(`${apiBase}/datasources/${source.id}/test`);
       const connectionBody = await connection.json();

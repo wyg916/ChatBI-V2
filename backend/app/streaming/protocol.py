@@ -44,6 +44,7 @@ STAGE_EVENTS = {
     "GENERATING_INSIGHT": "answer_delta",
     "PYTHON_RUNNING": "python_running",
     "CHART_READY": "chart_ready",
+    "COMPLETED": "completed",
 }
 
 

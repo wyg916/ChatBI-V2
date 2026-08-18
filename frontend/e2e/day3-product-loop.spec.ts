@@ -43,7 +43,7 @@ test('Day3-E2E01 登录进入问数据首页', async ({ page }) => {
 
 test('Day3-E2E02 PostgreSQL 数据源连接并读取隔离 Schema fixture', async ({ request }) => {
   const sources = await list(request, '/datasources');
-  const postgres = sources.find((item: JsonRecord) => item.type === 'postgresql');
+  const postgres = sources.find((item: JsonRecord) => item.type === 'postgresql' && item.schema === 'demo_business');
   expect(postgres).toBeTruthy();
   expect((await json(await request.post(`${apiBase}/datasources/${postgres.id}/test`))).success).toBe(true);
   const schemas = await list(request, `/datasources/${postgres.id}/schemas`);
@@ -52,7 +52,8 @@ test('Day3-E2E02 PostgreSQL 数据源连接并读取隔离 Schema fixture', asyn
 
 test('Day4-E2E03 隔离语义模型完成 V1/V2 发布与 V1 回滚', async ({ request }, testInfo) => {
   const sources = await list(request, '/datasources');
-  const postgres = sources.find((item: JsonRecord) => item.type === 'postgresql');
+  const postgres = sources.find((item: JsonRecord) => item.type === 'postgresql' && item.schema === 'demo_business');
+  expect(postgres).toBeTruthy();
   const model = await json(await request.post(`${apiBase}/semantic-models`, { data: {
     name: `Day4 isolated semantic ${testInfo.workerIndex}-${Date.now()}`,
     description: 'Parallel E2E isolated mutable semantic state',

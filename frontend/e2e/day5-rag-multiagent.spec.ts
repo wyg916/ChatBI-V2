@@ -19,8 +19,8 @@ const complexQuestions = [
 async function runtimeIds(request: APIRequestContext) {
   const sourcesResponse = await request.get(`${apiBase}/datasources`);
   expect(sourcesResponse.ok(), await sourcesResponse.text()).toBeTruthy();
-  const sources = await sourcesResponse.json() as Array<{ id: string; type: string }>;
-  const datasource = sources.find((item) => item.type === 'postgresql');
+  const sources = await sourcesResponse.json() as Array<{ id: string; type: string; schema: string | null }>;
+  const datasource = sources.find((item) => item.type === 'postgresql' && item.schema === 'demo_business');
   expect(datasource).toBeTruthy();
   const modelsResponse = await request.get(`${apiBase}/semantic-models`);
   expect(modelsResponse.ok(), await modelsResponse.text()).toBeTruthy();

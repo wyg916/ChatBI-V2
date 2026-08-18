@@ -44,6 +44,7 @@ def test_stream_event_envelope_is_monotonic_traceable_and_public():
         ("PYTHON_RUNNING", "python_running"),
         ("GENERATING_INSIGHT", "answer_delta"),
         ("CHART_READY", "chart_ready"),
+        ("COMPLETED", "completed"),
     ],
 )
 def test_phase2_stages_map_to_v21_public_protocol(stage, event):

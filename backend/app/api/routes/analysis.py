@@ -75,7 +75,11 @@ def analyze_stream(
                 continue
             if event == "result":
                 yield format_sse("answer_delta", factory.create("answer_delta", capability="analysis"))
-                yield format_sse("completed", factory.create("completed", capability="analysis", data={"status": payload.get("status")}))
+                yield format_sse("completed", factory.create(
+                    "completed",
+                    capability="analysis",
+                    data={"stage": "COMPLETED", "status": payload.get("status")},
+                ))
                 yield format_sse("result", payload)
                 continue
             if event == "error":
