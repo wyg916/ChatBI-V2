@@ -86,6 +86,10 @@ test('Phase2 CSV and image uploads complete real file and multimodal follow-ups'
   await input.fill('请计算华东收入合计，只给出数字。');
   await input.press('Enter');
   await expect(page.locator('.chat-assistant-message').last()).toContainText('270', { timeout: 60_000 });
+  await expect(page.getByTestId('file-analysis-evidence')).toContainText('270');
+  await expect(page.getByRole('img', { name: '文件分析结果图表' })).toBeVisible();
+  await expect(page.getByRole('link', { name: '下载 CSV Artifact' })).toBeVisible();
+  await expect(page.getByRole('link', { name: '下载 JSON Artifact' })).toBeVisible();
   await expect(page.getByRole('button', { name: '提交问题' })).toBeEnabled();
   await page.getByRole('button', { name: '删除附件 phase2-regional-revenue.csv' }).click();
   await expect(page.getByText('phase2-regional-revenue.csv')).toHaveCount(0);

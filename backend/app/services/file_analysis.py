@@ -133,7 +133,7 @@ def analyze_structured(question: str, attachments: list[Any]) -> dict[str, Any]:
     exact = all(item["row_count"] <= len(item["rows"]) for item in datasets)
     result_signature = hashlib.sha256(json.dumps(result_rows, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
     chart = None
-    if operation in {"TREND", "TOP_N", "SEGMENT"} and len(result_columns) >= 2:
+    if operation in {"TREND", "TOP_N", "SEGMENT", "SUM", "AVERAGE"} and len(result_columns) >= 2:
         if operation == "TREND":
             x_field = next((column for column in result_columns if any(token in column.lower() for token in ("date", "time", "日期", "时间"))), result_columns[0])
             y_field = selected if selected in result_columns else next((column for column in result_columns if column != x_field), result_columns[1])
