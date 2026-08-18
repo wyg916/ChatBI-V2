@@ -1,0 +1,154 @@
+{
+  "schema_version": "chatbi-v2.1-day1-final-attestation-v1",
+  "tested_sha": "0e3ee1102eb50659011a3de725820bc437a5d461",
+  "remote_sha": "0e3ee1102eb50659011a3de725820bc437a5d461",
+  "branch": "codex/v2.1-final-integration",
+  "verified_at": "2026-08-19T00:54:06.8673321+08:00",
+  "historical_evidence_window": {
+    "started_at": "2026-08-18T14:27:31+00:00",
+    "published_at": "2026-08-18T14:43:39.030747+00:00"
+  },
+  "current_reverification_window": {
+    "started_at": "2026-08-19T00:31:43+08:00",
+    "completed_at": "2026-08-19T00:54:06.8673321+08:00"
+  },
+  "commands": [
+    {
+      "command": "backend/.venv/Scripts/python.exe -m pytest -q",
+      "status": "PASS",
+      "actual": "174 tests; exit code 0; includes migration upgrade-to-head, downgrade-to-base, upgrade-to-head"
+    },
+    {
+      "command": "backend/.venv/Scripts/python.exe -m pytest --collect-only",
+      "status": "PASS",
+      "actual": "174 tests collected"
+    },
+    {
+      "command": "npm test -- --reporter=dot",
+      "status": "PASS",
+      "actual": "10 files; 29 tests"
+    },
+    {
+      "command": "npm run typecheck",
+      "status": "PASS",
+      "actual": "TypeScript noEmit completed"
+    },
+    {
+      "command": "npm run build",
+      "status": "PASS",
+      "actual": "734 modules transformed"
+    },
+    {
+      "command": "backend/.venv/Scripts/python.exe backend/scripts/phase2_runtime_acceptance.py --base-url http://127.0.0.1:8000 --env-file .env --output temp/day1/d2-0-final-phase2-rerun.json",
+      "status": "PASS",
+      "actual": "60/60 routes; trace 60/60; follow-up 10/10; citation accuracy 1.0"
+    },
+    {
+      "command": "npm run e2e -- --workers=1",
+      "status": "PASS",
+      "actual": "55/55 browser tests; serial release gate"
+    },
+    {
+      "command": "python scripts/performance/run_v21_performance.py --concurrency 4 --duration-minutes 0.5 --db-repeats 3",
+      "status": "PASS_VERIFIED_FROM_FINAL_SHA_RAW_EVIDENCE",
+      "actual": "138 requests; errors 0; terminal completed 138; TTFE p95 266.015 ms; heartbeat max gap 963.485 ms; cancel cleanup 362.430 ms"
+    },
+    {
+      "command": "python scripts/performance/run_v21_performance.py --concurrency 60 --duration-minutes 0.2 --db-repeats 1",
+      "status": "PASS_VERIFIED_FROM_FINAL_SHA_RAW_EVIDENCE",
+      "actual": "116 requests; errors 0; terminal completed 116; real over-10-second requests 34; streaming rate 1.0"
+    },
+    {
+      "command": "scripts/test-release-cold-start.ps1 -EvidencePath temp/day1/final-0e3ee11-cold-start.json",
+      "status": "PASS_VERIFIED_FROM_FINAL_SHA_RAW_EVIDENCE",
+      "actual": "57.8 seconds; temporary PostgreSQL metadata schema cleanup PASS"
+    }
+  ],
+  "raw_evidence_hashes": [
+    {
+      "path": "temp/day1/final-0e3ee11-performance-strict.json",
+      "sha256": "ae6b0882b2b6356f943e8de057b26ecf6013d04237af79c4bfe0619af1c2a728"
+    },
+    {
+      "path": "temp/day1/final-0e3ee11-performance-over10.json",
+      "sha256": "7e6ba6bd1ff6cec1ffa208427d7900932e4f4345e71ffbb60931b5f66d74b917"
+    },
+    {
+      "path": "temp/day1/final-0e3ee11-phase2.json",
+      "sha256": "72776307110a038716486fff500c9f5c1543fe4a0d84e256882156ac85bb7b48"
+    },
+    {
+      "path": "temp/day1/d2-0-final-phase2-rerun.json",
+      "sha256": "72776307110a038716486fff500c9f5c1543fe4a0d84e256882156ac85bb7b48"
+    },
+    {
+      "path": "temp/day1/final-0e3ee11-cold-start.json",
+      "sha256": "c59c38d3a1b8394147d05ed5f38fbdcba78058899cfb90b6027418197e9ea4a0"
+    },
+    {
+      "path": "temp/day1/final-0e3ee11-semantic-post-rebuild.json",
+      "sha256": "1c0cc0312772513cbd336ee72dfcaf56e16162b5580646ae3dd39843ba9b7d37"
+    },
+    {
+      "path": "temp/day1/final-0e3ee11-semantic-post-rebuild-sse.json",
+      "sha256": "7b34029364f8678d682adba93fd3a87e8bed4435bbeaa19f864a6f2f96a0d3b2"
+    },
+    {
+      "path": "temp/day1/final-0e3ee11-published/DAY1_TEST_SUMMARY.json",
+      "sha256": "7d3a8ef523e204ab05b92f98de7660b98ee431d011dc3039763917ed692b46fe"
+    },
+    {
+      "path": "temp/day1/final-0e3ee11-published/SSE_EVENT_EVIDENCE.json",
+      "sha256": "a1a4f95e1bcc6bf89871d7f6da4f5a8e931470897b33fdfb1d8f455d998aa3ce"
+    }
+  ],
+  "final_metrics": {
+    "backend_tests": "174/174",
+    "frontend_tests": "29/29",
+    "frontend_typecheck": "PASS",
+    "frontend_build_modules": 734,
+    "browser_e2e": "55/55",
+    "phase2_runtime": "60/60",
+    "phase2_trace_complete": "60/60",
+    "phase2_follow_up_context": "10/10",
+    "semantic_coverage": "20/20",
+    "semantic_golden": "20/20",
+    "semantic_case_terminal_uniqueness": "20/20",
+    "strict_sse_requests": 138,
+    "strict_sse_errors": 0,
+    "strict_terminal_event_uniqueness": "138/138",
+    "ttfe_p95_ms": 266.015,
+    "heartbeat_max_gap_ms": 963.485,
+    "cancel_cleanup_ms": 362.43,
+    "over_10s_requests": 34,
+    "over_10s_streaming_rate": 1.0,
+    "cold_start_seconds": 57.8,
+    "migration_head": "20260818_0009",
+    "migration_round_trip": "PASS",
+    "data_signature": "34b8ec8023f410ea387003475f84bd63b05743580138ea919880979caf86af4c"
+  },
+  "transient_attempts": [
+    {
+      "attempt": "Frontend unit tests were initially run concurrently with the full Backend suite",
+      "observed": "5 timeout failures and 1 assertion failure under resource contention",
+      "resolution": "Reran Frontend alone without code changes; 29/29 passed in 7.72 seconds"
+    },
+    {
+      "attempt": "Phase 2 acceptance immediately after the Backend migration suite",
+      "observed": "rag-runtime container was Created but not running; citation count 0 and 5 PARTIAL results",
+      "resolution": "Started the declared Compose rag-runtime/frontend services and reran without code changes; citation accuracy returned to 1.0 with cited count 7"
+    }
+  ],
+  "failures": [],
+  "blockers": [],
+  "day1_final_sha_verified": true,
+  "day1_final_gate_reproduced": "PASS",
+  "day1_evidence_sha_aligned": "PASS",
+  "day1_runtime_code_changed": false,
+  "day1_regression_count": 0,
+  "no_tracked_runtime_code_changes": true,
+  "notes": [
+    "The historical tracked Day 1 report remains evidence for 57ab853bfa92bab6e76bcd24020b00903409a6bb and must not be used as the final-SHA performance record.",
+    "The baseline A/B SQL execution rate of 0.0 was caused by TABLE_NOT_AUTHORIZED on every baseline case. It is not a same-authorization, same-data business accuracy A/B and must be repeated on Day 3."
+  ]
+}
