@@ -1,25 +1,25 @@
-# SSE performance baseline — Day 1
+# SSE performance baseline — Day 1 final integration
 
-- Executed: 2026-08-18 18:31:20 +08:00
-- Base SHA: `6cdbf12f6c2e8494afe21262fd092795c4f784c3` plus the E worktree changes under test
-- Profile: four authenticated workers, all four question routes, 30 seconds, real Docker Backend API
-- Raw evidence: `artifacts/v2_1_data10m/day1_sse_baseline.json`
+- Executed at: `2026-08-18T13:52:14.717724+00:00`
+- Evidence Git SHA: `57ab853bfa92bab6e76bcd24020b00903409a6bb`
+- Strict command: `python scripts/performance/run_v21_performance.py --env-file <local-env> --base-url http://127.0.0.1:8000/api/v1 --concurrency 4 --duration-minutes 0.5 --db-repeats 3`
+- Long-request command: same runner with `--concurrency 60 --duration-minutes 0.2 --db-repeats 1`; this is a short non-vacuous Day 1 observation, not the Day 3 15-minute stress gate.
+- Raw evidence: `temp/day1/final-performance-strict.json`, `temp/day1/final-performance-over10-c60.json`
+- Test count: `106` strict requests plus `26` real requests longer than 10 seconds.
 
 | Metric | Actual | Gate | Result |
 |---|---:|---:|---|
-| Requests / errors | 91 / 0 | errors = 0 | PASS |
 | All-query SSE rate | 1.0 | 1.0 | PASS |
-| TTFE p50 | 35.325 ms | evidence | PASS |
-| TTFE p95 | 398.739 ms | <= 1000 ms | PASS |
-| Heartbeat max gap | 2502.979 ms | <= 3000 ms | PASS |
-| Cancellation cleanup | 264.684 ms | <= 5000 ms | PASS |
-| Connection leak | 0 | 0 | PASS |
-| Task leak | 0 | 0 | PASS |
+| TTFE p50 | 50.573 ms | evidence | PASS |
+| TTFE p95 | 213.104 ms | <= 1000 ms | PASS |
+| Heartbeat max gap | 2508.131 ms | <= 3000 ms | PASS |
+| Cancellation cleanup | 250.802 ms | <= 5000 ms | PASS |
+| Over-10s streaming | 1.0 (26 samples) | 1.0, non-empty | PASS |
+| Connection / task leak | 0 / 0 | 0 / 0 | PASS |
 | Anonymous SSE | 401 | 401 | PASS |
-| Envelope errors | 0 | 0 | PASS |
 
-This acceptance profile did not naturally contain a request longer than ten seconds. The over-10-second rate is therefore not claimed from this run; a separate contention profile must contain at least one real >10s request on the final integration SHA before the final Gate can pass.
-
-Database performance from the same command: simple p95 0.294 ms, standard p95 298.972 ms, complex p95 505.687 ms, advanced/pre-aggregated receivable p95 0.541 ms.
-
-Known warning: the earlier 20-worker stress observation had TTFE p95 and heartbeat gaps above the Day 1 acceptance thresholds. It remains stress evidence only and is not used as the acceptance profile. The final SHA must rerun both the strict acceptance profile and a separate long-request streaming observation.
+- Failures: `NONE`; blockers: `NONE`.
+- Frozen Zone intersections: `.env.example, backend/app/api/routes/analysis.py, backend/app/api/routes/chat.py, backend/app/core/config.py, backend/app/query/oracle.py, backend/app/query/service.py, backend/app/semantic/engine.py, backend/app/services/chat.py, backend/scripts/phase2_runtime_acceptance.py, backend/tests/test_phase2_auth_chat_attachments.py, docker-compose.yml, frontend/e2e/day3-product-loop.spec.ts, frontend/e2e/day5-rag-multiagent.spec.ts, frontend/e2e/global-setup.ts, frontend/src/api/chat.ts, frontend/src/pages/AskExperience.tsx`.
+- Migration impact: no new revision; online round trip returned to `20260818_0009`.
+- License impact: project-owned SSE implementation.
+- Rollback: revert the Day 1 SSE integration commits; no migration is required.

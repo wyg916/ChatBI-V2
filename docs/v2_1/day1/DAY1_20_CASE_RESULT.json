@@ -1,6 +1,6 @@
 {
-  "executed_at": "2026-08-18T13:08:34.885434+00:00",
-  "git_sha": "ac1f43506e7cd2a51bf8db11af7233606ef6eb63",
+  "executed_at": "2026-08-18T13:52:14.477722+00:00",
+  "git_sha": "57ab853bfa92bab6e76bcd24020b00903409a6bb",
   "command": "python backend/scripts/run_v21_semantic_cases.py --env-file <local-env> --datasource-id <datasource-id> --semantic-model-id <semantic-model-id> --output temp/day1/semantic-cases.json",
   "test_count": 20,
   "raw_evidence_path": "temp/day1/semantic-cases.json",
@@ -31,7 +31,7 @@
     "filter_linking_accuracy": 1.0,
     "invalid_relation_block_rate": 1.0,
     "semantic_query_trace_complete": 1.0,
-    "catalog_schema_linking_p95_ms": 6.292,
+    "catalog_schema_linking_p95_ms": 7.476,
     "wren_mdl_mapping_coverage": 1.0,
     "wren_golden_result_consistency": 1.0
   },
@@ -630,7 +630,7 @@
         ],
         "row_count": 1,
         "truncated": false,
-        "duration_ms": 130,
+        "duration_ms": 131,
         "datasource_id": "00239d69-00be-41b3-b740-03db864ba7f0",
         "dialect": "postgresql",
         "normalized_sql": "SELECT ROUND(CAST(SUM(f.net_amount - f.refund_amount) AS DECIMAL), 2) AS net_sales FROM \"chatbi_benchmark_v21\".fact_sales AS f WHERE f.order_status <> 'TEST' AND f.tenant_id = 1 AND f.order_date >= CAST('2025-07-01' AS DATE) AND f.order_date < CAST('2025-08-01' AS DATE) LIMIT 100",
@@ -647,11 +647,149 @@
       },
       "result_signature": "396fd4728e9d2940a45024b6d5a6e571465c1d3d90214e4508ca79da15c87112",
       "latency_by_stage": {
-        "openchatbi": 6.292,
-        "supersonic": 0.467,
-        "wren": 0.191
+        "openchatbi": 5.22,
+        "supersonic": 0.46,
+        "wren": 0.208
       },
-      "sse_events": [],
+      "sse_events": [
+        {
+          "trace_id": "STREAM-e9c1ba5c-7447-4c9e-9e63-914ff48c660a",
+          "sequence": 1,
+          "timestamp": "2026-08-18T13:24:06.258692+00:00",
+          "elapsed_ms": 5,
+          "event": "accepted",
+          "capability": "chatbi",
+          "message": "已接收请求",
+          "data": {
+            "conversation_id": "cfb48441-089d-4791-990e-5da39b6ba2fa"
+          }
+        },
+        {
+          "trace_id": "STREAM-e9c1ba5c-7447-4c9e-9e63-914ff48c660a",
+          "sequence": 2,
+          "timestamp": "2026-08-18T13:24:06.269109+00:00",
+          "elapsed_ms": 15,
+          "event": "catalog_retrieving",
+          "capability": "DATA_QUERY",
+          "message": "正在检索业务目录",
+          "data": {
+            "stage": "UNDERSTANDING",
+            "route": "DATA_QUERY"
+          }
+        },
+        {
+          "trace_id": "STREAM-e9c1ba5c-7447-4c9e-9e63-914ff48c660a",
+          "sequence": 3,
+          "timestamp": "2026-08-18T13:24:06.270226+00:00",
+          "elapsed_ms": 16,
+          "event": "schema_linked",
+          "capability": "DATA_QUERY",
+          "message": "已识别候选表与字段",
+          "data": {
+            "stage": "SCHEMA_LINKED",
+            "route": "DATA_QUERY"
+          }
+        },
+        {
+          "trace_id": "STREAM-e9c1ba5c-7447-4c9e-9e63-914ff48c660a",
+          "sequence": 4,
+          "timestamp": "2026-08-18T13:24:06.271175+00:00",
+          "elapsed_ms": 17,
+          "event": "semantic_parsing",
+          "capability": "DATA_QUERY",
+          "message": "正在解析指标、维度、时间与过滤条件",
+          "data": {
+            "stage": "SEMANTIC_PARSING",
+            "route": "DATA_QUERY"
+          }
+        },
+        {
+          "trace_id": "STREAM-e9c1ba5c-7447-4c9e-9e63-914ff48c660a",
+          "sequence": 5,
+          "timestamp": "2026-08-18T13:24:06.272245+00:00",
+          "elapsed_ms": 18,
+          "event": "semantic_compiling",
+          "capability": "DATA_QUERY",
+          "message": "正在编译语义查询",
+          "data": {
+            "stage": "SEMANTIC_COMPILING",
+            "route": "DATA_QUERY"
+          }
+        },
+        {
+          "trace_id": "STREAM-e9c1ba5c-7447-4c9e-9e63-914ff48c660a",
+          "sequence": 6,
+          "timestamp": "2026-08-18T13:24:06.274310+00:00",
+          "elapsed_ms": 21,
+          "event": "sql_validating",
+          "capability": "DATA_QUERY",
+          "message": "正在执行只读 SQL 与权限校验",
+          "data": {
+            "stage": "SQL_VALIDATING",
+            "route": "DATA_QUERY"
+          }
+        },
+        {
+          "trace_id": "STREAM-e9c1ba5c-7447-4c9e-9e63-914ff48c660a",
+          "sequence": 7,
+          "timestamp": "2026-08-18T13:24:06.275324+00:00",
+          "elapsed_ms": 22,
+          "event": "sql_running",
+          "capability": "chatbi",
+          "message": "正在执行只读查询",
+          "data": {
+            "stage": "QUERYING_DATA"
+          }
+        },
+        {
+          "trace_id": "STREAM-e9c1ba5c-7447-4c9e-9e63-914ff48c660a",
+          "sequence": 8,
+          "timestamp": "2026-08-18T13:24:06.451225+00:00",
+          "elapsed_ms": 197,
+          "event": "result_validating",
+          "capability": "DATA_QUERY",
+          "message": "正在校验结果值与业务口径",
+          "data": {
+            "stage": "RESULT_VALIDATING",
+            "route": "DATA_QUERY",
+            "status": "FAILED"
+          }
+        },
+        {
+          "trace_id": "STREAM-e9c1ba5c-7447-4c9e-9e63-914ff48c660a",
+          "sequence": 9,
+          "timestamp": "2026-08-18T13:24:06.498602+00:00",
+          "elapsed_ms": 245,
+          "event": "answer_delta",
+          "capability": "chatbi",
+          "message": "正在生成可验证回答",
+          "data": {
+            "text": "查询未完成，请检查语义范围或数据源状态。"
+          }
+        },
+        {
+          "trace_id": "STREAM-e9c1ba5c-7447-4c9e-9e63-914ff48c660a",
+          "sequence": 10,
+          "timestamp": "2026-08-18T13:24:06.502113+00:00",
+          "elapsed_ms": 248,
+          "event": "chart_ready",
+          "capability": "chatbi",
+          "message": "图表已准备",
+          "data": {}
+        },
+        {
+          "trace_id": "STREAM-e9c1ba5c-7447-4c9e-9e63-914ff48c660a",
+          "sequence": 11,
+          "timestamp": "2026-08-18T13:24:06.503026+00:00",
+          "elapsed_ms": 249,
+          "event": "completed",
+          "capability": "chatbi",
+          "message": "请求已完成",
+          "data": {
+            "status": "FAILED"
+          }
+        }
+      ],
       "final_status": "SUCCEEDED",
       "error_code": null,
       "expected_pass": true
@@ -1259,7 +1397,7 @@
         ],
         "row_count": 1,
         "truncated": false,
-        "duration_ms": 417,
+        "duration_ms": 639,
         "datasource_id": "00239d69-00be-41b3-b740-03db864ba7f0",
         "dialect": "postgresql",
         "normalized_sql": "SELECT ROUND(CAST(SUM(f.net_amount - f.refund_amount) AS DECIMAL), 2) AS net_sales, ROUND(CAST(SUM(f.profit_amount - f.refund_amount) AS DECIMAL), 2) AS net_profit FROM \"chatbi_benchmark_v21\".fact_sales AS f WHERE f.order_status <> 'TEST' AND f.tenant_id = 1 AND f.order_date >= CAST('2025-01-01' AS DATE) AND f.order_date < CAST('2026-01-01' AS DATE) LIMIT 100",
@@ -1277,11 +1415,149 @@
       },
       "result_signature": "84a6b2ce840de63b23f17daa2ce2cacba577c60b92a3d613246abc9bd684320f",
       "latency_by_stage": {
-        "openchatbi": 47.921,
-        "supersonic": 0.191,
-        "wren": 0.139
+        "openchatbi": 43.991,
+        "supersonic": 0.357,
+        "wren": 0.267
       },
-      "sse_events": [],
+      "sse_events": [
+        {
+          "trace_id": "STREAM-47afd9d8-566f-408f-8acc-053ab0a1f395",
+          "sequence": 1,
+          "timestamp": "2026-08-18T13:24:06.631987+00:00",
+          "elapsed_ms": 4,
+          "event": "accepted",
+          "capability": "chatbi",
+          "message": "已接收请求",
+          "data": {
+            "conversation_id": "457379c4-9994-4164-b339-241914b12035"
+          }
+        },
+        {
+          "trace_id": "STREAM-47afd9d8-566f-408f-8acc-053ab0a1f395",
+          "sequence": 2,
+          "timestamp": "2026-08-18T13:24:06.646378+00:00",
+          "elapsed_ms": 19,
+          "event": "catalog_retrieving",
+          "capability": "DATA_QUERY",
+          "message": "正在检索业务目录",
+          "data": {
+            "stage": "UNDERSTANDING",
+            "route": "DATA_QUERY"
+          }
+        },
+        {
+          "trace_id": "STREAM-47afd9d8-566f-408f-8acc-053ab0a1f395",
+          "sequence": 3,
+          "timestamp": "2026-08-18T13:24:06.647738+00:00",
+          "elapsed_ms": 20,
+          "event": "schema_linked",
+          "capability": "DATA_QUERY",
+          "message": "已识别候选表与字段",
+          "data": {
+            "stage": "SCHEMA_LINKED",
+            "route": "DATA_QUERY"
+          }
+        },
+        {
+          "trace_id": "STREAM-47afd9d8-566f-408f-8acc-053ab0a1f395",
+          "sequence": 4,
+          "timestamp": "2026-08-18T13:24:06.648629+00:00",
+          "elapsed_ms": 21,
+          "event": "semantic_parsing",
+          "capability": "DATA_QUERY",
+          "message": "正在解析指标、维度、时间与过滤条件",
+          "data": {
+            "stage": "SEMANTIC_PARSING",
+            "route": "DATA_QUERY"
+          }
+        },
+        {
+          "trace_id": "STREAM-47afd9d8-566f-408f-8acc-053ab0a1f395",
+          "sequence": 5,
+          "timestamp": "2026-08-18T13:24:06.649987+00:00",
+          "elapsed_ms": 22,
+          "event": "semantic_compiling",
+          "capability": "DATA_QUERY",
+          "message": "正在编译语义查询",
+          "data": {
+            "stage": "SEMANTIC_COMPILING",
+            "route": "DATA_QUERY"
+          }
+        },
+        {
+          "trace_id": "STREAM-47afd9d8-566f-408f-8acc-053ab0a1f395",
+          "sequence": 6,
+          "timestamp": "2026-08-18T13:24:06.652861+00:00",
+          "elapsed_ms": 25,
+          "event": "sql_validating",
+          "capability": "DATA_QUERY",
+          "message": "正在执行只读 SQL 与权限校验",
+          "data": {
+            "stage": "SQL_VALIDATING",
+            "route": "DATA_QUERY"
+          }
+        },
+        {
+          "trace_id": "STREAM-47afd9d8-566f-408f-8acc-053ab0a1f395",
+          "sequence": 7,
+          "timestamp": "2026-08-18T13:24:06.654074+00:00",
+          "elapsed_ms": 26,
+          "event": "sql_running",
+          "capability": "chatbi",
+          "message": "正在执行只读查询",
+          "data": {
+            "stage": "QUERYING_DATA"
+          }
+        },
+        {
+          "trace_id": "STREAM-47afd9d8-566f-408f-8acc-053ab0a1f395",
+          "sequence": 8,
+          "timestamp": "2026-08-18T13:24:06.820705+00:00",
+          "elapsed_ms": 193,
+          "event": "result_validating",
+          "capability": "DATA_QUERY",
+          "message": "正在校验结果值与业务口径",
+          "data": {
+            "stage": "RESULT_VALIDATING",
+            "route": "DATA_QUERY",
+            "status": "FAILED"
+          }
+        },
+        {
+          "trace_id": "STREAM-47afd9d8-566f-408f-8acc-053ab0a1f395",
+          "sequence": 9,
+          "timestamp": "2026-08-18T13:24:06.855397+00:00",
+          "elapsed_ms": 228,
+          "event": "answer_delta",
+          "capability": "chatbi",
+          "message": "正在生成可验证回答",
+          "data": {
+            "text": "查询未完成，请检查语义范围或数据源状态。"
+          }
+        },
+        {
+          "trace_id": "STREAM-47afd9d8-566f-408f-8acc-053ab0a1f395",
+          "sequence": 10,
+          "timestamp": "2026-08-18T13:24:06.857617+00:00",
+          "elapsed_ms": 230,
+          "event": "chart_ready",
+          "capability": "chatbi",
+          "message": "图表已准备",
+          "data": {}
+        },
+        {
+          "trace_id": "STREAM-47afd9d8-566f-408f-8acc-053ab0a1f395",
+          "sequence": 11,
+          "timestamp": "2026-08-18T13:24:06.858168+00:00",
+          "elapsed_ms": 230,
+          "event": "completed",
+          "capability": "chatbi",
+          "message": "请求已完成",
+          "data": {
+            "status": "FAILED"
+          }
+        }
+      ],
       "final_status": "SUCCEEDED",
       "error_code": null,
       "expected_pass": true
@@ -1909,7 +2185,7 @@
         ],
         "row_count": 1,
         "truncated": false,
-        "duration_ms": 464,
+        "duration_ms": 559,
         "datasource_id": "00239d69-00be-41b3-b740-03db864ba7f0",
         "dialect": "postgresql",
         "normalized_sql": "SELECT r.region_group AS region, ROUND(CAST(SUM(f.net_amount - f.refund_amount) AS DECIMAL), 2) AS net_sales FROM \"chatbi_benchmark_v21\".fact_sales AS f JOIN \"chatbi_benchmark_v21\".dim_region AS r ON r.region_id = f.region_id WHERE f.order_status <> 'TEST' AND f.tenant_id = 1 AND f.order_date >= CAST('2025-01-01' AS DATE) AND f.order_date < CAST('2026-01-01' AS DATE) GROUP BY r.region_group ORDER BY net_sales DESC LIMIT 100",
@@ -1928,11 +2204,149 @@
       },
       "result_signature": "8e18b75628acbc1ad935325b82c2e5817bec0ca54647b46506caa6218dbda584",
       "latency_by_stage": {
-        "openchatbi": 3.375,
-        "supersonic": 0.081,
-        "wren": 0.118
+        "openchatbi": 6.374,
+        "supersonic": 0.214,
+        "wren": 0.282
       },
-      "sse_events": [],
+      "sse_events": [
+        {
+          "trace_id": "STREAM-81fe8114-2193-41d3-bd31-d4405b0e6862",
+          "sequence": 1,
+          "timestamp": "2026-08-18T13:24:06.961493+00:00",
+          "elapsed_ms": 5,
+          "event": "accepted",
+          "capability": "chatbi",
+          "message": "已接收请求",
+          "data": {
+            "conversation_id": "f716d654-b364-4413-9216-3fd266aa80e8"
+          }
+        },
+        {
+          "trace_id": "STREAM-81fe8114-2193-41d3-bd31-d4405b0e6862",
+          "sequence": 2,
+          "timestamp": "2026-08-18T13:24:06.969939+00:00",
+          "elapsed_ms": 13,
+          "event": "catalog_retrieving",
+          "capability": "DATA_QUERY",
+          "message": "正在检索业务目录",
+          "data": {
+            "stage": "UNDERSTANDING",
+            "route": "DATA_QUERY"
+          }
+        },
+        {
+          "trace_id": "STREAM-81fe8114-2193-41d3-bd31-d4405b0e6862",
+          "sequence": 3,
+          "timestamp": "2026-08-18T13:24:06.971070+00:00",
+          "elapsed_ms": 14,
+          "event": "schema_linked",
+          "capability": "DATA_QUERY",
+          "message": "已识别候选表与字段",
+          "data": {
+            "stage": "SCHEMA_LINKED",
+            "route": "DATA_QUERY"
+          }
+        },
+        {
+          "trace_id": "STREAM-81fe8114-2193-41d3-bd31-d4405b0e6862",
+          "sequence": 4,
+          "timestamp": "2026-08-18T13:24:06.971995+00:00",
+          "elapsed_ms": 15,
+          "event": "semantic_parsing",
+          "capability": "DATA_QUERY",
+          "message": "正在解析指标、维度、时间与过滤条件",
+          "data": {
+            "stage": "SEMANTIC_PARSING",
+            "route": "DATA_QUERY"
+          }
+        },
+        {
+          "trace_id": "STREAM-81fe8114-2193-41d3-bd31-d4405b0e6862",
+          "sequence": 5,
+          "timestamp": "2026-08-18T13:24:06.973113+00:00",
+          "elapsed_ms": 16,
+          "event": "semantic_compiling",
+          "capability": "DATA_QUERY",
+          "message": "正在编译语义查询",
+          "data": {
+            "stage": "SEMANTIC_COMPILING",
+            "route": "DATA_QUERY"
+          }
+        },
+        {
+          "trace_id": "STREAM-81fe8114-2193-41d3-bd31-d4405b0e6862",
+          "sequence": 6,
+          "timestamp": "2026-08-18T13:24:06.975517+00:00",
+          "elapsed_ms": 19,
+          "event": "sql_validating",
+          "capability": "DATA_QUERY",
+          "message": "正在执行只读 SQL 与权限校验",
+          "data": {
+            "stage": "SQL_VALIDATING",
+            "route": "DATA_QUERY"
+          }
+        },
+        {
+          "trace_id": "STREAM-81fe8114-2193-41d3-bd31-d4405b0e6862",
+          "sequence": 7,
+          "timestamp": "2026-08-18T13:24:06.978545+00:00",
+          "elapsed_ms": 22,
+          "event": "sql_running",
+          "capability": "chatbi",
+          "message": "正在执行只读查询",
+          "data": {
+            "stage": "QUERYING_DATA"
+          }
+        },
+        {
+          "trace_id": "STREAM-81fe8114-2193-41d3-bd31-d4405b0e6862",
+          "sequence": 8,
+          "timestamp": "2026-08-18T13:24:07.245208+00:00",
+          "elapsed_ms": 288,
+          "event": "result_validating",
+          "capability": "DATA_QUERY",
+          "message": "正在校验结果值与业务口径",
+          "data": {
+            "stage": "RESULT_VALIDATING",
+            "route": "DATA_QUERY",
+            "status": "FAILED"
+          }
+        },
+        {
+          "trace_id": "STREAM-81fe8114-2193-41d3-bd31-d4405b0e6862",
+          "sequence": 9,
+          "timestamp": "2026-08-18T13:24:07.270874+00:00",
+          "elapsed_ms": 314,
+          "event": "answer_delta",
+          "capability": "chatbi",
+          "message": "正在生成可验证回答",
+          "data": {
+            "text": "查询未完成，请检查语义范围或数据源状态。"
+          }
+        },
+        {
+          "trace_id": "STREAM-81fe8114-2193-41d3-bd31-d4405b0e6862",
+          "sequence": 10,
+          "timestamp": "2026-08-18T13:24:07.273028+00:00",
+          "elapsed_ms": 316,
+          "event": "chart_ready",
+          "capability": "chatbi",
+          "message": "图表已准备",
+          "data": {}
+        },
+        {
+          "trace_id": "STREAM-81fe8114-2193-41d3-bd31-d4405b0e6862",
+          "sequence": 11,
+          "timestamp": "2026-08-18T13:24:07.273479+00:00",
+          "elapsed_ms": 317,
+          "event": "completed",
+          "capability": "chatbi",
+          "message": "请求已完成",
+          "data": {
+            "status": "FAILED"
+          }
+        }
+      ],
       "final_status": "SUCCEEDED",
       "error_code": null,
       "expected_pass": true
@@ -2575,7 +2989,7 @@
         ],
         "row_count": 5,
         "truncated": true,
-        "duration_ms": 1989,
+        "duration_ms": 1539,
         "datasource_id": "00239d69-00be-41b3-b740-03db864ba7f0",
         "dialect": "postgresql",
         "normalized_sql": "SELECT pr.product_name AS product, ROUND(CAST(SUM(f.net_amount - f.refund_amount) AS DECIMAL), 2) AS net_sales FROM \"chatbi_benchmark_v21\".fact_sales AS f JOIN \"chatbi_benchmark_v21\".dim_product AS pr ON pr.product_id = f.product_id WHERE f.order_status <> 'TEST' AND f.tenant_id = 1 AND f.order_date >= CAST('2025-01-01' AS DATE) AND f.order_date < CAST('2026-01-01' AS DATE) GROUP BY pr.product_name ORDER BY net_sales DESC LIMIT 5",
@@ -2594,11 +3008,149 @@
       },
       "result_signature": "e622893a3daed37d783d390546dc7a921805a347dc7c0407c901afb10f0f2b11",
       "latency_by_stage": {
-        "openchatbi": 3.558,
-        "supersonic": 0.079,
-        "wren": 0.108
+        "openchatbi": 5.182,
+        "supersonic": 0.113,
+        "wren": 0.214
       },
-      "sse_events": [],
+      "sse_events": [
+        {
+          "trace_id": "STREAM-e0630821-9341-495d-a840-d8d004bf73eb",
+          "sequence": 1,
+          "timestamp": "2026-08-18T13:24:07.364514+00:00",
+          "elapsed_ms": 5,
+          "event": "accepted",
+          "capability": "chatbi",
+          "message": "已接收请求",
+          "data": {
+            "conversation_id": "f3d9ec33-8bbe-4218-88f3-a11a8495138c"
+          }
+        },
+        {
+          "trace_id": "STREAM-e0630821-9341-495d-a840-d8d004bf73eb",
+          "sequence": 2,
+          "timestamp": "2026-08-18T13:24:07.369963+00:00",
+          "elapsed_ms": 10,
+          "event": "catalog_retrieving",
+          "capability": "DATA_QUERY",
+          "message": "正在检索业务目录",
+          "data": {
+            "stage": "UNDERSTANDING",
+            "route": "DATA_QUERY"
+          }
+        },
+        {
+          "trace_id": "STREAM-e0630821-9341-495d-a840-d8d004bf73eb",
+          "sequence": 3,
+          "timestamp": "2026-08-18T13:24:07.371090+00:00",
+          "elapsed_ms": 11,
+          "event": "schema_linked",
+          "capability": "DATA_QUERY",
+          "message": "已识别候选表与字段",
+          "data": {
+            "stage": "SCHEMA_LINKED",
+            "route": "DATA_QUERY"
+          }
+        },
+        {
+          "trace_id": "STREAM-e0630821-9341-495d-a840-d8d004bf73eb",
+          "sequence": 4,
+          "timestamp": "2026-08-18T13:24:07.371962+00:00",
+          "elapsed_ms": 12,
+          "event": "semantic_parsing",
+          "capability": "DATA_QUERY",
+          "message": "正在解析指标、维度、时间与过滤条件",
+          "data": {
+            "stage": "SEMANTIC_PARSING",
+            "route": "DATA_QUERY"
+          }
+        },
+        {
+          "trace_id": "STREAM-e0630821-9341-495d-a840-d8d004bf73eb",
+          "sequence": 5,
+          "timestamp": "2026-08-18T13:24:07.373696+00:00",
+          "elapsed_ms": 14,
+          "event": "semantic_compiling",
+          "capability": "DATA_QUERY",
+          "message": "正在编译语义查询",
+          "data": {
+            "stage": "SEMANTIC_COMPILING",
+            "route": "DATA_QUERY"
+          }
+        },
+        {
+          "trace_id": "STREAM-e0630821-9341-495d-a840-d8d004bf73eb",
+          "sequence": 6,
+          "timestamp": "2026-08-18T13:24:07.375319+00:00",
+          "elapsed_ms": 15,
+          "event": "sql_validating",
+          "capability": "DATA_QUERY",
+          "message": "正在执行只读 SQL 与权限校验",
+          "data": {
+            "stage": "SQL_VALIDATING",
+            "route": "DATA_QUERY"
+          }
+        },
+        {
+          "trace_id": "STREAM-e0630821-9341-495d-a840-d8d004bf73eb",
+          "sequence": 7,
+          "timestamp": "2026-08-18T13:24:07.376323+00:00",
+          "elapsed_ms": 16,
+          "event": "sql_running",
+          "capability": "chatbi",
+          "message": "正在执行只读查询",
+          "data": {
+            "stage": "QUERYING_DATA"
+          }
+        },
+        {
+          "trace_id": "STREAM-e0630821-9341-495d-a840-d8d004bf73eb",
+          "sequence": 8,
+          "timestamp": "2026-08-18T13:24:07.508985+00:00",
+          "elapsed_ms": 149,
+          "event": "result_validating",
+          "capability": "DATA_QUERY",
+          "message": "正在校验结果值与业务口径",
+          "data": {
+            "stage": "RESULT_VALIDATING",
+            "route": "DATA_QUERY",
+            "status": "FAILED"
+          }
+        },
+        {
+          "trace_id": "STREAM-e0630821-9341-495d-a840-d8d004bf73eb",
+          "sequence": 9,
+          "timestamp": "2026-08-18T13:24:07.538340+00:00",
+          "elapsed_ms": 178,
+          "event": "answer_delta",
+          "capability": "chatbi",
+          "message": "正在生成可验证回答",
+          "data": {
+            "text": "查询未完成，请检查语义范围或数据源状态。"
+          }
+        },
+        {
+          "trace_id": "STREAM-e0630821-9341-495d-a840-d8d004bf73eb",
+          "sequence": 10,
+          "timestamp": "2026-08-18T13:24:07.540387+00:00",
+          "elapsed_ms": 181,
+          "event": "chart_ready",
+          "capability": "chatbi",
+          "message": "图表已准备",
+          "data": {}
+        },
+        {
+          "trace_id": "STREAM-e0630821-9341-495d-a840-d8d004bf73eb",
+          "sequence": 11,
+          "timestamp": "2026-08-18T13:24:07.541054+00:00",
+          "elapsed_ms": 181,
+          "event": "completed",
+          "capability": "chatbi",
+          "message": "请求已完成",
+          "data": {
+            "status": "FAILED"
+          }
+        }
+      ],
       "final_status": "SUCCEEDED",
       "error_code": null,
       "expected_pass": true
@@ -3241,7 +3793,7 @@
         ],
         "row_count": 5,
         "truncated": true,
-        "duration_ms": 1075,
+        "duration_ms": 2915,
         "datasource_id": "00239d69-00be-41b3-b740-03db864ba7f0",
         "dialect": "postgresql",
         "normalized_sql": "SELECT c.customer_name AS customer, ROUND(CAST(SUM(f.net_amount - f.refund_amount) AS DECIMAL), 2) AS net_sales FROM \"chatbi_benchmark_v21\".fact_sales AS f JOIN \"chatbi_benchmark_v21\".dim_customer AS c ON c.customer_id = f.customer_id WHERE f.order_status <> 'TEST' AND f.tenant_id = 1 AND f.order_date >= CAST('2025-01-01' AS DATE) AND f.order_date < CAST('2026-01-01' AS DATE) GROUP BY c.customer_name ORDER BY net_sales DESC LIMIT 5",
@@ -3260,11 +3812,149 @@
       },
       "result_signature": "7b0c1c5fe2d7067cda47c7453efdb869b809433712817e1db6e38823a19c9566",
       "latency_by_stage": {
-        "openchatbi": 3.312,
-        "supersonic": 0.077,
-        "wren": 0.114
+        "openchatbi": 4.618,
+        "supersonic": 0.104,
+        "wren": 0.14
       },
-      "sse_events": [],
+      "sse_events": [
+        {
+          "trace_id": "STREAM-889f1a4a-6386-4e52-b71d-d4ee863a6f20",
+          "sequence": 1,
+          "timestamp": "2026-08-18T13:24:07.647342+00:00",
+          "elapsed_ms": 5,
+          "event": "accepted",
+          "capability": "chatbi",
+          "message": "已接收请求",
+          "data": {
+            "conversation_id": "6814855e-4d2f-4141-8fcf-3e93e5ef3179"
+          }
+        },
+        {
+          "trace_id": "STREAM-889f1a4a-6386-4e52-b71d-d4ee863a6f20",
+          "sequence": 2,
+          "timestamp": "2026-08-18T13:24:07.654702+00:00",
+          "elapsed_ms": 12,
+          "event": "catalog_retrieving",
+          "capability": "DATA_QUERY",
+          "message": "正在检索业务目录",
+          "data": {
+            "stage": "UNDERSTANDING",
+            "route": "DATA_QUERY"
+          }
+        },
+        {
+          "trace_id": "STREAM-889f1a4a-6386-4e52-b71d-d4ee863a6f20",
+          "sequence": 3,
+          "timestamp": "2026-08-18T13:24:07.655970+00:00",
+          "elapsed_ms": 14,
+          "event": "schema_linked",
+          "capability": "DATA_QUERY",
+          "message": "已识别候选表与字段",
+          "data": {
+            "stage": "SCHEMA_LINKED",
+            "route": "DATA_QUERY"
+          }
+        },
+        {
+          "trace_id": "STREAM-889f1a4a-6386-4e52-b71d-d4ee863a6f20",
+          "sequence": 4,
+          "timestamp": "2026-08-18T13:24:07.657781+00:00",
+          "elapsed_ms": 15,
+          "event": "semantic_parsing",
+          "capability": "DATA_QUERY",
+          "message": "正在解析指标、维度、时间与过滤条件",
+          "data": {
+            "stage": "SEMANTIC_PARSING",
+            "route": "DATA_QUERY"
+          }
+        },
+        {
+          "trace_id": "STREAM-889f1a4a-6386-4e52-b71d-d4ee863a6f20",
+          "sequence": 5,
+          "timestamp": "2026-08-18T13:24:07.660066+00:00",
+          "elapsed_ms": 18,
+          "event": "semantic_compiling",
+          "capability": "DATA_QUERY",
+          "message": "正在编译语义查询",
+          "data": {
+            "stage": "SEMANTIC_COMPILING",
+            "route": "DATA_QUERY"
+          }
+        },
+        {
+          "trace_id": "STREAM-889f1a4a-6386-4e52-b71d-d4ee863a6f20",
+          "sequence": 6,
+          "timestamp": "2026-08-18T13:24:07.661343+00:00",
+          "elapsed_ms": 19,
+          "event": "sql_validating",
+          "capability": "DATA_QUERY",
+          "message": "正在执行只读 SQL 与权限校验",
+          "data": {
+            "stage": "SQL_VALIDATING",
+            "route": "DATA_QUERY"
+          }
+        },
+        {
+          "trace_id": "STREAM-889f1a4a-6386-4e52-b71d-d4ee863a6f20",
+          "sequence": 7,
+          "timestamp": "2026-08-18T13:24:07.662497+00:00",
+          "elapsed_ms": 20,
+          "event": "sql_running",
+          "capability": "chatbi",
+          "message": "正在执行只读查询",
+          "data": {
+            "stage": "QUERYING_DATA"
+          }
+        },
+        {
+          "trace_id": "STREAM-889f1a4a-6386-4e52-b71d-d4ee863a6f20",
+          "sequence": 8,
+          "timestamp": "2026-08-18T13:24:07.802700+00:00",
+          "elapsed_ms": 160,
+          "event": "result_validating",
+          "capability": "DATA_QUERY",
+          "message": "正在校验结果值与业务口径",
+          "data": {
+            "stage": "RESULT_VALIDATING",
+            "route": "DATA_QUERY",
+            "status": "FAILED"
+          }
+        },
+        {
+          "trace_id": "STREAM-889f1a4a-6386-4e52-b71d-d4ee863a6f20",
+          "sequence": 9,
+          "timestamp": "2026-08-18T13:24:07.840756+00:00",
+          "elapsed_ms": 198,
+          "event": "answer_delta",
+          "capability": "chatbi",
+          "message": "正在生成可验证回答",
+          "data": {
+            "text": "查询未完成，请检查语义范围或数据源状态。"
+          }
+        },
+        {
+          "trace_id": "STREAM-889f1a4a-6386-4e52-b71d-d4ee863a6f20",
+          "sequence": 10,
+          "timestamp": "2026-08-18T13:24:07.843762+00:00",
+          "elapsed_ms": 201,
+          "event": "chart_ready",
+          "capability": "chatbi",
+          "message": "图表已准备",
+          "data": {}
+        },
+        {
+          "trace_id": "STREAM-889f1a4a-6386-4e52-b71d-d4ee863a6f20",
+          "sequence": 11,
+          "timestamp": "2026-08-18T13:24:07.844432+00:00",
+          "elapsed_ms": 202,
+          "event": "completed",
+          "capability": "chatbi",
+          "message": "请求已完成",
+          "data": {
+            "status": "FAILED"
+          }
+        }
+      ],
       "final_status": "SUCCEEDED",
       "error_code": null,
       "expected_pass": true
@@ -3915,7 +4605,7 @@
         ],
         "row_count": 12,
         "truncated": false,
-        "duration_ms": 484,
+        "duration_ms": 597,
         "datasource_id": "00239d69-00be-41b3-b740-03db864ba7f0",
         "dialect": "postgresql",
         "normalized_sql": "SELECT CAST(DATE_TRUNC('MONTH', f.order_date) AS DATE) AS month, ROUND(CAST(SUM(f.net_amount - f.refund_amount) AS DECIMAL), 2) AS net_sales FROM \"chatbi_benchmark_v21\".fact_sales AS f WHERE f.order_status <> 'TEST' AND f.tenant_id = 1 AND f.order_date >= CAST('2025-01-01' AS DATE) AND f.order_date < CAST('2026-01-01' AS DATE) GROUP BY CAST(DATE_TRUNC('MONTH', f.order_date) AS DATE) ORDER BY month ASC LIMIT 100",
@@ -3934,11 +4624,149 @@
       },
       "result_signature": "b8a945da8ceea472660b1598ef979d8fe37f46aefc7034c244ddc9914adadf16",
       "latency_by_stage": {
-        "openchatbi": 4.189,
-        "supersonic": 0.076,
-        "wren": 0.106
+        "openchatbi": 5.507,
+        "supersonic": 0.1,
+        "wren": 0.15
       },
-      "sse_events": [],
+      "sse_events": [
+        {
+          "trace_id": "STREAM-fec4dd60-f0b3-40dd-945c-949b625e0e00",
+          "sequence": 1,
+          "timestamp": "2026-08-18T13:24:07.945460+00:00",
+          "elapsed_ms": 4,
+          "event": "accepted",
+          "capability": "chatbi",
+          "message": "已接收请求",
+          "data": {
+            "conversation_id": "fca9286e-a8df-4c4e-90dd-eb2b91131fe3"
+          }
+        },
+        {
+          "trace_id": "STREAM-fec4dd60-f0b3-40dd-945c-949b625e0e00",
+          "sequence": 2,
+          "timestamp": "2026-08-18T13:24:07.952626+00:00",
+          "elapsed_ms": 11,
+          "event": "catalog_retrieving",
+          "capability": "DATA_QUERY",
+          "message": "正在检索业务目录",
+          "data": {
+            "stage": "UNDERSTANDING",
+            "route": "DATA_QUERY"
+          }
+        },
+        {
+          "trace_id": "STREAM-fec4dd60-f0b3-40dd-945c-949b625e0e00",
+          "sequence": 3,
+          "timestamp": "2026-08-18T13:24:07.953796+00:00",
+          "elapsed_ms": 13,
+          "event": "schema_linked",
+          "capability": "DATA_QUERY",
+          "message": "已识别候选表与字段",
+          "data": {
+            "stage": "SCHEMA_LINKED",
+            "route": "DATA_QUERY"
+          }
+        },
+        {
+          "trace_id": "STREAM-fec4dd60-f0b3-40dd-945c-949b625e0e00",
+          "sequence": 4,
+          "timestamp": "2026-08-18T13:24:07.954947+00:00",
+          "elapsed_ms": 14,
+          "event": "semantic_parsing",
+          "capability": "DATA_QUERY",
+          "message": "正在解析指标、维度、时间与过滤条件",
+          "data": {
+            "stage": "SEMANTIC_PARSING",
+            "route": "DATA_QUERY"
+          }
+        },
+        {
+          "trace_id": "STREAM-fec4dd60-f0b3-40dd-945c-949b625e0e00",
+          "sequence": 5,
+          "timestamp": "2026-08-18T13:24:07.956959+00:00",
+          "elapsed_ms": 16,
+          "event": "semantic_compiling",
+          "capability": "DATA_QUERY",
+          "message": "正在编译语义查询",
+          "data": {
+            "stage": "SEMANTIC_COMPILING",
+            "route": "DATA_QUERY"
+          }
+        },
+        {
+          "trace_id": "STREAM-fec4dd60-f0b3-40dd-945c-949b625e0e00",
+          "sequence": 6,
+          "timestamp": "2026-08-18T13:24:07.958230+00:00",
+          "elapsed_ms": 17,
+          "event": "sql_validating",
+          "capability": "DATA_QUERY",
+          "message": "正在执行只读 SQL 与权限校验",
+          "data": {
+            "stage": "SQL_VALIDATING",
+            "route": "DATA_QUERY"
+          }
+        },
+        {
+          "trace_id": "STREAM-fec4dd60-f0b3-40dd-945c-949b625e0e00",
+          "sequence": 7,
+          "timestamp": "2026-08-18T13:24:07.960988+00:00",
+          "elapsed_ms": 20,
+          "event": "sql_running",
+          "capability": "chatbi",
+          "message": "正在执行只读查询",
+          "data": {
+            "stage": "QUERYING_DATA"
+          }
+        },
+        {
+          "trace_id": "STREAM-fec4dd60-f0b3-40dd-945c-949b625e0e00",
+          "sequence": 8,
+          "timestamp": "2026-08-18T13:24:08.139983+00:00",
+          "elapsed_ms": 199,
+          "event": "result_validating",
+          "capability": "DATA_QUERY",
+          "message": "正在校验结果值与业务口径",
+          "data": {
+            "stage": "RESULT_VALIDATING",
+            "route": "DATA_QUERY",
+            "status": "FAILED"
+          }
+        },
+        {
+          "trace_id": "STREAM-fec4dd60-f0b3-40dd-945c-949b625e0e00",
+          "sequence": 9,
+          "timestamp": "2026-08-18T13:24:08.163820+00:00",
+          "elapsed_ms": 223,
+          "event": "answer_delta",
+          "capability": "chatbi",
+          "message": "正在生成可验证回答",
+          "data": {
+            "text": "查询未完成，请检查语义范围或数据源状态。"
+          }
+        },
+        {
+          "trace_id": "STREAM-fec4dd60-f0b3-40dd-945c-949b625e0e00",
+          "sequence": 10,
+          "timestamp": "2026-08-18T13:24:08.165482+00:00",
+          "elapsed_ms": 224,
+          "event": "chart_ready",
+          "capability": "chatbi",
+          "message": "图表已准备",
+          "data": {}
+        },
+        {
+          "trace_id": "STREAM-fec4dd60-f0b3-40dd-945c-949b625e0e00",
+          "sequence": 11,
+          "timestamp": "2026-08-18T13:24:08.166069+00:00",
+          "elapsed_ms": 225,
+          "event": "completed",
+          "capability": "chatbi",
+          "message": "请求已完成",
+          "data": {
+            "status": "FAILED"
+          }
+        }
+      ],
       "final_status": "SUCCEEDED",
       "error_code": null,
       "expected_pass": true
@@ -4619,7 +5447,7 @@
         ],
         "row_count": 12,
         "truncated": false,
-        "duration_ms": 767,
+        "duration_ms": 989,
         "datasource_id": "00239d69-00be-41b3-b740-03db864ba7f0",
         "dialect": "postgresql",
         "normalized_sql": "WITH base AS (SELECT CAST(DATE_TRUNC('MONTH', f.order_date) AS DATE) AS month, ROUND(CAST(SUM(f.net_amount - f.refund_amount) AS DECIMAL), 2) AS net_sales FROM \"chatbi_benchmark_v21\".fact_sales AS f WHERE f.order_status <> 'TEST' AND f.tenant_id = 1 AND f.order_date >= CAST('2024-01-01' AS DATE) AND f.order_date < CAST('2026-01-01' AS DATE) GROUP BY CAST(DATE_TRUNC('MONTH', f.order_date) AS DATE)), compared AS (SELECT month, net_sales, LAG(net_sales, 12) OVER (ORDER BY month) AS previous_net_sales FROM base) SELECT month, net_sales, previous_net_sales, ROUND((net_sales - previous_net_sales) * 100.0 / NULLIF(previous_net_sales, 0), 4) AS comparison_rate FROM compared WHERE month >= CAST('2025-01-01' AS DATE) ORDER BY month ASC LIMIT 100",
@@ -4638,11 +5466,149 @@
       },
       "result_signature": "81c0922d9c37fd0d9d6dacd714d18a71ed180481ee7922a9c37094eb496eb706",
       "latency_by_stage": {
-        "openchatbi": 3.23,
-        "supersonic": 0.072,
-        "wren": 0.115
+        "openchatbi": 5.386,
+        "supersonic": 0.17,
+        "wren": 0.392
       },
-      "sse_events": [],
+      "sse_events": [
+        {
+          "trace_id": "STREAM-ec223d10-d87e-41d0-9338-80af1b669c5c",
+          "sequence": 1,
+          "timestamp": "2026-08-18T13:24:08.241783+00:00",
+          "elapsed_ms": 3,
+          "event": "accepted",
+          "capability": "chatbi",
+          "message": "已接收请求",
+          "data": {
+            "conversation_id": "52ded325-fe48-4baf-82e5-1e187d24740e"
+          }
+        },
+        {
+          "trace_id": "STREAM-ec223d10-d87e-41d0-9338-80af1b669c5c",
+          "sequence": 2,
+          "timestamp": "2026-08-18T13:24:08.247759+00:00",
+          "elapsed_ms": 9,
+          "event": "catalog_retrieving",
+          "capability": "DATA_QUERY",
+          "message": "正在检索业务目录",
+          "data": {
+            "stage": "UNDERSTANDING",
+            "route": "DATA_QUERY"
+          }
+        },
+        {
+          "trace_id": "STREAM-ec223d10-d87e-41d0-9338-80af1b669c5c",
+          "sequence": 3,
+          "timestamp": "2026-08-18T13:24:08.248531+00:00",
+          "elapsed_ms": 9,
+          "event": "schema_linked",
+          "capability": "DATA_QUERY",
+          "message": "已识别候选表与字段",
+          "data": {
+            "stage": "SCHEMA_LINKED",
+            "route": "DATA_QUERY"
+          }
+        },
+        {
+          "trace_id": "STREAM-ec223d10-d87e-41d0-9338-80af1b669c5c",
+          "sequence": 4,
+          "timestamp": "2026-08-18T13:24:08.249998+00:00",
+          "elapsed_ms": 11,
+          "event": "semantic_parsing",
+          "capability": "DATA_QUERY",
+          "message": "正在解析指标、维度、时间与过滤条件",
+          "data": {
+            "stage": "SEMANTIC_PARSING",
+            "route": "DATA_QUERY"
+          }
+        },
+        {
+          "trace_id": "STREAM-ec223d10-d87e-41d0-9338-80af1b669c5c",
+          "sequence": 5,
+          "timestamp": "2026-08-18T13:24:08.251964+00:00",
+          "elapsed_ms": 13,
+          "event": "semantic_compiling",
+          "capability": "DATA_QUERY",
+          "message": "正在编译语义查询",
+          "data": {
+            "stage": "SEMANTIC_COMPILING",
+            "route": "DATA_QUERY"
+          }
+        },
+        {
+          "trace_id": "STREAM-ec223d10-d87e-41d0-9338-80af1b669c5c",
+          "sequence": 6,
+          "timestamp": "2026-08-18T13:24:08.252827+00:00",
+          "elapsed_ms": 14,
+          "event": "sql_validating",
+          "capability": "DATA_QUERY",
+          "message": "正在执行只读 SQL 与权限校验",
+          "data": {
+            "stage": "SQL_VALIDATING",
+            "route": "DATA_QUERY"
+          }
+        },
+        {
+          "trace_id": "STREAM-ec223d10-d87e-41d0-9338-80af1b669c5c",
+          "sequence": 7,
+          "timestamp": "2026-08-18T13:24:08.253597+00:00",
+          "elapsed_ms": 14,
+          "event": "sql_running",
+          "capability": "chatbi",
+          "message": "正在执行只读查询",
+          "data": {
+            "stage": "QUERYING_DATA"
+          }
+        },
+        {
+          "trace_id": "STREAM-ec223d10-d87e-41d0-9338-80af1b669c5c",
+          "sequence": 8,
+          "timestamp": "2026-08-18T13:24:08.384406+00:00",
+          "elapsed_ms": 145,
+          "event": "result_validating",
+          "capability": "DATA_QUERY",
+          "message": "正在校验结果值与业务口径",
+          "data": {
+            "stage": "RESULT_VALIDATING",
+            "route": "DATA_QUERY",
+            "status": "FAILED"
+          }
+        },
+        {
+          "trace_id": "STREAM-ec223d10-d87e-41d0-9338-80af1b669c5c",
+          "sequence": 9,
+          "timestamp": "2026-08-18T13:24:08.409520+00:00",
+          "elapsed_ms": 170,
+          "event": "answer_delta",
+          "capability": "chatbi",
+          "message": "正在生成可验证回答",
+          "data": {
+            "text": "查询未完成，请检查语义范围或数据源状态。"
+          }
+        },
+        {
+          "trace_id": "STREAM-ec223d10-d87e-41d0-9338-80af1b669c5c",
+          "sequence": 10,
+          "timestamp": "2026-08-18T13:24:08.412245+00:00",
+          "elapsed_ms": 173,
+          "event": "chart_ready",
+          "capability": "chatbi",
+          "message": "图表已准备",
+          "data": {}
+        },
+        {
+          "trace_id": "STREAM-ec223d10-d87e-41d0-9338-80af1b669c5c",
+          "sequence": 11,
+          "timestamp": "2026-08-18T13:24:08.412750+00:00",
+          "elapsed_ms": 174,
+          "event": "completed",
+          "capability": "chatbi",
+          "message": "请求已完成",
+          "data": {
+            "status": "FAILED"
+          }
+        }
+      ],
       "final_status": "SUCCEEDED",
       "error_code": null,
       "expected_pass": true
@@ -5323,7 +6289,7 @@
         ],
         "row_count": 12,
         "truncated": false,
-        "duration_ms": 537,
+        "duration_ms": 655,
         "datasource_id": "00239d69-00be-41b3-b740-03db864ba7f0",
         "dialect": "postgresql",
         "normalized_sql": "WITH base AS (SELECT CAST(DATE_TRUNC('MONTH', f.order_date) AS DATE) AS month, ROUND(CAST(SUM(f.net_amount - f.refund_amount) AS DECIMAL), 2) AS net_sales FROM \"chatbi_benchmark_v21\".fact_sales AS f WHERE f.order_status <> 'TEST' AND f.tenant_id = 1 AND f.order_date >= CAST('2024-12-01' AS DATE) AND f.order_date < CAST('2026-01-01' AS DATE) GROUP BY CAST(DATE_TRUNC('MONTH', f.order_date) AS DATE)), compared AS (SELECT month, net_sales, LAG(net_sales, 1) OVER (ORDER BY month) AS previous_net_sales FROM base) SELECT month, net_sales, previous_net_sales, ROUND((net_sales - previous_net_sales) * 100.0 / NULLIF(previous_net_sales, 0), 4) AS comparison_rate FROM compared WHERE month >= CAST('2025-01-01' AS DATE) ORDER BY month ASC LIMIT 100",
@@ -5342,11 +6308,149 @@
       },
       "result_signature": "957b14c54cead9ee10bd5691ff3c687c6ef58307a1b227d26eb33ed181551502",
       "latency_by_stage": {
-        "openchatbi": 3.458,
-        "supersonic": 0.074,
-        "wren": 0.121
+        "openchatbi": 5.882,
+        "supersonic": 0.118,
+        "wren": 0.189
       },
-      "sse_events": [],
+      "sse_events": [
+        {
+          "trace_id": "STREAM-99d22245-479a-4527-ac81-ea066fdd8cbe",
+          "sequence": 1,
+          "timestamp": "2026-08-18T13:24:08.495332+00:00",
+          "elapsed_ms": 3,
+          "event": "accepted",
+          "capability": "chatbi",
+          "message": "已接收请求",
+          "data": {
+            "conversation_id": "98ae32ad-4d46-4723-b438-5efe200d4018"
+          }
+        },
+        {
+          "trace_id": "STREAM-99d22245-479a-4527-ac81-ea066fdd8cbe",
+          "sequence": 2,
+          "timestamp": "2026-08-18T13:24:08.500253+00:00",
+          "elapsed_ms": 8,
+          "event": "catalog_retrieving",
+          "capability": "DATA_QUERY",
+          "message": "正在检索业务目录",
+          "data": {
+            "stage": "UNDERSTANDING",
+            "route": "DATA_QUERY"
+          }
+        },
+        {
+          "trace_id": "STREAM-99d22245-479a-4527-ac81-ea066fdd8cbe",
+          "sequence": 3,
+          "timestamp": "2026-08-18T13:24:08.501351+00:00",
+          "elapsed_ms": 9,
+          "event": "schema_linked",
+          "capability": "DATA_QUERY",
+          "message": "已识别候选表与字段",
+          "data": {
+            "stage": "SCHEMA_LINKED",
+            "route": "DATA_QUERY"
+          }
+        },
+        {
+          "trace_id": "STREAM-99d22245-479a-4527-ac81-ea066fdd8cbe",
+          "sequence": 4,
+          "timestamp": "2026-08-18T13:24:08.503232+00:00",
+          "elapsed_ms": 11,
+          "event": "semantic_parsing",
+          "capability": "DATA_QUERY",
+          "message": "正在解析指标、维度、时间与过滤条件",
+          "data": {
+            "stage": "SEMANTIC_PARSING",
+            "route": "DATA_QUERY"
+          }
+        },
+        {
+          "trace_id": "STREAM-99d22245-479a-4527-ac81-ea066fdd8cbe",
+          "sequence": 5,
+          "timestamp": "2026-08-18T13:24:08.504209+00:00",
+          "elapsed_ms": 12,
+          "event": "semantic_compiling",
+          "capability": "DATA_QUERY",
+          "message": "正在编译语义查询",
+          "data": {
+            "stage": "SEMANTIC_COMPILING",
+            "route": "DATA_QUERY"
+          }
+        },
+        {
+          "trace_id": "STREAM-99d22245-479a-4527-ac81-ea066fdd8cbe",
+          "sequence": 6,
+          "timestamp": "2026-08-18T13:24:08.505783+00:00",
+          "elapsed_ms": 14,
+          "event": "sql_validating",
+          "capability": "DATA_QUERY",
+          "message": "正在执行只读 SQL 与权限校验",
+          "data": {
+            "stage": "SQL_VALIDATING",
+            "route": "DATA_QUERY"
+          }
+        },
+        {
+          "trace_id": "STREAM-99d22245-479a-4527-ac81-ea066fdd8cbe",
+          "sequence": 7,
+          "timestamp": "2026-08-18T13:24:08.507280+00:00",
+          "elapsed_ms": 15,
+          "event": "sql_running",
+          "capability": "chatbi",
+          "message": "正在执行只读查询",
+          "data": {
+            "stage": "QUERYING_DATA"
+          }
+        },
+        {
+          "trace_id": "STREAM-99d22245-479a-4527-ac81-ea066fdd8cbe",
+          "sequence": 8,
+          "timestamp": "2026-08-18T13:24:08.715431+00:00",
+          "elapsed_ms": 223,
+          "event": "result_validating",
+          "capability": "DATA_QUERY",
+          "message": "正在校验结果值与业务口径",
+          "data": {
+            "stage": "RESULT_VALIDATING",
+            "route": "DATA_QUERY",
+            "status": "FAILED"
+          }
+        },
+        {
+          "trace_id": "STREAM-99d22245-479a-4527-ac81-ea066fdd8cbe",
+          "sequence": 9,
+          "timestamp": "2026-08-18T13:24:08.740524+00:00",
+          "elapsed_ms": 248,
+          "event": "answer_delta",
+          "capability": "chatbi",
+          "message": "正在生成可验证回答",
+          "data": {
+            "text": "查询未完成，请检查语义范围或数据源状态。"
+          }
+        },
+        {
+          "trace_id": "STREAM-99d22245-479a-4527-ac81-ea066fdd8cbe",
+          "sequence": 10,
+          "timestamp": "2026-08-18T13:24:08.742599+00:00",
+          "elapsed_ms": 250,
+          "event": "chart_ready",
+          "capability": "chatbi",
+          "message": "图表已准备",
+          "data": {}
+        },
+        {
+          "trace_id": "STREAM-99d22245-479a-4527-ac81-ea066fdd8cbe",
+          "sequence": 11,
+          "timestamp": "2026-08-18T13:24:08.743614+00:00",
+          "elapsed_ms": 251,
+          "event": "completed",
+          "capability": "chatbi",
+          "message": "请求已完成",
+          "data": {
+            "status": "FAILED"
+          }
+        }
+      ],
       "final_status": "SUCCEEDED",
       "error_code": null,
       "expected_pass": true
@@ -5973,7 +7077,7 @@
         ],
         "row_count": 1,
         "truncated": false,
-        "duration_ms": 503,
+        "duration_ms": 639,
         "datasource_id": "00239d69-00be-41b3-b740-03db864ba7f0",
         "dialect": "postgresql",
         "normalized_sql": "SELECT pr.category AS category, ROUND(CAST(SUM(f.net_amount - f.refund_amount) AS DECIMAL), 2) AS net_sales FROM \"chatbi_benchmark_v21\".fact_sales AS f JOIN \"chatbi_benchmark_v21\".dim_product AS pr ON pr.product_id = f.product_id WHERE f.order_status <> 'TEST' AND f.tenant_id = 1 AND f.order_date >= CAST('2025-01-01' AS DATE) AND f.order_date < CAST('2026-01-01' AS DATE) GROUP BY pr.category ORDER BY net_sales DESC LIMIT 10",
@@ -5992,11 +7096,149 @@
       },
       "result_signature": "944ecdfd650a031b07f666c7209d34bd7c4b2d71665f8edd384b79c47c7307e6",
       "latency_by_stage": {
-        "openchatbi": 4.374,
-        "supersonic": 0.093,
-        "wren": 0.131
+        "openchatbi": 5.743,
+        "supersonic": 0.111,
+        "wren": 0.16
       },
-      "sse_events": [],
+      "sse_events": [
+        {
+          "trace_id": "STREAM-740efc5a-840d-44ff-aa24-83125cdc9e41",
+          "sequence": 1,
+          "timestamp": "2026-08-18T13:24:08.824338+00:00",
+          "elapsed_ms": 3,
+          "event": "accepted",
+          "capability": "chatbi",
+          "message": "已接收请求",
+          "data": {
+            "conversation_id": "12e977ee-ba41-44e2-b1fc-a561398f365b"
+          }
+        },
+        {
+          "trace_id": "STREAM-740efc5a-840d-44ff-aa24-83125cdc9e41",
+          "sequence": 2,
+          "timestamp": "2026-08-18T13:24:08.830836+00:00",
+          "elapsed_ms": 9,
+          "event": "catalog_retrieving",
+          "capability": "DATA_QUERY",
+          "message": "正在检索业务目录",
+          "data": {
+            "stage": "UNDERSTANDING",
+            "route": "DATA_QUERY"
+          }
+        },
+        {
+          "trace_id": "STREAM-740efc5a-840d-44ff-aa24-83125cdc9e41",
+          "sequence": 3,
+          "timestamp": "2026-08-18T13:24:08.831675+00:00",
+          "elapsed_ms": 10,
+          "event": "schema_linked",
+          "capability": "DATA_QUERY",
+          "message": "已识别候选表与字段",
+          "data": {
+            "stage": "SCHEMA_LINKED",
+            "route": "DATA_QUERY"
+          }
+        },
+        {
+          "trace_id": "STREAM-740efc5a-840d-44ff-aa24-83125cdc9e41",
+          "sequence": 4,
+          "timestamp": "2026-08-18T13:24:08.832405+00:00",
+          "elapsed_ms": 11,
+          "event": "semantic_parsing",
+          "capability": "DATA_QUERY",
+          "message": "正在解析指标、维度、时间与过滤条件",
+          "data": {
+            "stage": "SEMANTIC_PARSING",
+            "route": "DATA_QUERY"
+          }
+        },
+        {
+          "trace_id": "STREAM-740efc5a-840d-44ff-aa24-83125cdc9e41",
+          "sequence": 5,
+          "timestamp": "2026-08-18T13:24:08.834328+00:00",
+          "elapsed_ms": 13,
+          "event": "semantic_compiling",
+          "capability": "DATA_QUERY",
+          "message": "正在编译语义查询",
+          "data": {
+            "stage": "SEMANTIC_COMPILING",
+            "route": "DATA_QUERY"
+          }
+        },
+        {
+          "trace_id": "STREAM-740efc5a-840d-44ff-aa24-83125cdc9e41",
+          "sequence": 6,
+          "timestamp": "2026-08-18T13:24:08.835322+00:00",
+          "elapsed_ms": 14,
+          "event": "sql_validating",
+          "capability": "DATA_QUERY",
+          "message": "正在执行只读 SQL 与权限校验",
+          "data": {
+            "stage": "SQL_VALIDATING",
+            "route": "DATA_QUERY"
+          }
+        },
+        {
+          "trace_id": "STREAM-740efc5a-840d-44ff-aa24-83125cdc9e41",
+          "sequence": 7,
+          "timestamp": "2026-08-18T13:24:08.837656+00:00",
+          "elapsed_ms": 16,
+          "event": "sql_running",
+          "capability": "chatbi",
+          "message": "正在执行只读查询",
+          "data": {
+            "stage": "QUERYING_DATA"
+          }
+        },
+        {
+          "trace_id": "STREAM-740efc5a-840d-44ff-aa24-83125cdc9e41",
+          "sequence": 8,
+          "timestamp": "2026-08-18T13:24:08.974382+00:00",
+          "elapsed_ms": 153,
+          "event": "result_validating",
+          "capability": "DATA_QUERY",
+          "message": "正在校验结果值与业务口径",
+          "data": {
+            "stage": "RESULT_VALIDATING",
+            "route": "DATA_QUERY",
+            "status": "FAILED"
+          }
+        },
+        {
+          "trace_id": "STREAM-740efc5a-840d-44ff-aa24-83125cdc9e41",
+          "sequence": 9,
+          "timestamp": "2026-08-18T13:24:08.998087+00:00",
+          "elapsed_ms": 177,
+          "event": "answer_delta",
+          "capability": "chatbi",
+          "message": "正在生成可验证回答",
+          "data": {
+            "text": "查询未完成，请检查语义范围或数据源状态。"
+          }
+        },
+        {
+          "trace_id": "STREAM-740efc5a-840d-44ff-aa24-83125cdc9e41",
+          "sequence": 10,
+          "timestamp": "2026-08-18T13:24:09.000459+00:00",
+          "elapsed_ms": 179,
+          "event": "chart_ready",
+          "capability": "chatbi",
+          "message": "图表已准备",
+          "data": {}
+        },
+        {
+          "trace_id": "STREAM-740efc5a-840d-44ff-aa24-83125cdc9e41",
+          "sequence": 11,
+          "timestamp": "2026-08-18T13:24:09.000998+00:00",
+          "elapsed_ms": 180,
+          "event": "completed",
+          "capability": "chatbi",
+          "message": "请求已完成",
+          "data": {
+            "status": "FAILED"
+          }
+        }
+      ],
       "final_status": "SUCCEEDED",
       "error_code": null,
       "expected_pass": true
@@ -6626,7 +7868,7 @@
         ],
         "row_count": 1,
         "truncated": false,
-        "duration_ms": 490,
+        "duration_ms": 555,
         "datasource_id": "00239d69-00be-41b3-b740-03db864ba7f0",
         "dialect": "postgresql",
         "normalized_sql": "SELECT r.region_group AS region, ROUND(CAST(SUM(f.net_amount - f.refund_amount) AS DECIMAL), 2) AS net_sales, ROUND(SUM(f.net_amount - f.refund_amount) * 100.0 / NULLIF(SUM(SUM(f.net_amount - f.refund_amount)) OVER (), 0), 4) AS contribution_rate FROM \"chatbi_benchmark_v21\".fact_sales AS f JOIN \"chatbi_benchmark_v21\".dim_region AS r ON r.region_id = f.region_id WHERE f.order_status <> 'TEST' AND f.tenant_id = 1 AND f.order_date >= CAST('2025-01-01' AS DATE) AND f.order_date < CAST('2026-01-01' AS DATE) GROUP BY r.region_group ORDER BY net_sales DESC LIMIT 100",
@@ -6645,11 +7887,149 @@
       },
       "result_signature": "115006491433cb4e0354915d0024da5bd4f7534047ca248ffae5036b2821de4e",
       "latency_by_stage": {
-        "openchatbi": 3.338,
-        "supersonic": 0.071,
-        "wren": 0.096
+        "openchatbi": 5.26,
+        "supersonic": 0.113,
+        "wren": 0.152
       },
-      "sse_events": [],
+      "sse_events": [
+        {
+          "trace_id": "STREAM-dc5bb324-03ed-44dd-9574-36558bf06924",
+          "sequence": 1,
+          "timestamp": "2026-08-18T13:24:09.104128+00:00",
+          "elapsed_ms": 4,
+          "event": "accepted",
+          "capability": "chatbi",
+          "message": "已接收请求",
+          "data": {
+            "conversation_id": "145a700f-dc58-4e6c-9377-1b34351bb855"
+          }
+        },
+        {
+          "trace_id": "STREAM-dc5bb324-03ed-44dd-9574-36558bf06924",
+          "sequence": 2,
+          "timestamp": "2026-08-18T13:24:09.110270+00:00",
+          "elapsed_ms": 10,
+          "event": "catalog_retrieving",
+          "capability": "DATA_QUERY",
+          "message": "正在检索业务目录",
+          "data": {
+            "stage": "UNDERSTANDING",
+            "route": "DATA_QUERY"
+          }
+        },
+        {
+          "trace_id": "STREAM-dc5bb324-03ed-44dd-9574-36558bf06924",
+          "sequence": 3,
+          "timestamp": "2026-08-18T13:24:09.111269+00:00",
+          "elapsed_ms": 11,
+          "event": "schema_linked",
+          "capability": "DATA_QUERY",
+          "message": "已识别候选表与字段",
+          "data": {
+            "stage": "SCHEMA_LINKED",
+            "route": "DATA_QUERY"
+          }
+        },
+        {
+          "trace_id": "STREAM-dc5bb324-03ed-44dd-9574-36558bf06924",
+          "sequence": 4,
+          "timestamp": "2026-08-18T13:24:09.113101+00:00",
+          "elapsed_ms": 13,
+          "event": "semantic_parsing",
+          "capability": "DATA_QUERY",
+          "message": "正在解析指标、维度、时间与过滤条件",
+          "data": {
+            "stage": "SEMANTIC_PARSING",
+            "route": "DATA_QUERY"
+          }
+        },
+        {
+          "trace_id": "STREAM-dc5bb324-03ed-44dd-9574-36558bf06924",
+          "sequence": 5,
+          "timestamp": "2026-08-18T13:24:09.114149+00:00",
+          "elapsed_ms": 14,
+          "event": "semantic_compiling",
+          "capability": "DATA_QUERY",
+          "message": "正在编译语义查询",
+          "data": {
+            "stage": "SEMANTIC_COMPILING",
+            "route": "DATA_QUERY"
+          }
+        },
+        {
+          "trace_id": "STREAM-dc5bb324-03ed-44dd-9574-36558bf06924",
+          "sequence": 6,
+          "timestamp": "2026-08-18T13:24:09.115970+00:00",
+          "elapsed_ms": 16,
+          "event": "sql_validating",
+          "capability": "DATA_QUERY",
+          "message": "正在执行只读 SQL 与权限校验",
+          "data": {
+            "stage": "SQL_VALIDATING",
+            "route": "DATA_QUERY"
+          }
+        },
+        {
+          "trace_id": "STREAM-dc5bb324-03ed-44dd-9574-36558bf06924",
+          "sequence": 7,
+          "timestamp": "2026-08-18T13:24:09.118493+00:00",
+          "elapsed_ms": 18,
+          "event": "sql_running",
+          "capability": "chatbi",
+          "message": "正在执行只读查询",
+          "data": {
+            "stage": "QUERYING_DATA"
+          }
+        },
+        {
+          "trace_id": "STREAM-dc5bb324-03ed-44dd-9574-36558bf06924",
+          "sequence": 8,
+          "timestamp": "2026-08-18T13:24:09.518814+00:00",
+          "elapsed_ms": 419,
+          "event": "result_validating",
+          "capability": "DATA_QUERY",
+          "message": "正在校验结果值与业务口径",
+          "data": {
+            "stage": "RESULT_VALIDATING",
+            "route": "DATA_QUERY",
+            "status": "FAILED"
+          }
+        },
+        {
+          "trace_id": "STREAM-dc5bb324-03ed-44dd-9574-36558bf06924",
+          "sequence": 9,
+          "timestamp": "2026-08-18T13:24:09.545786+00:00",
+          "elapsed_ms": 446,
+          "event": "answer_delta",
+          "capability": "chatbi",
+          "message": "正在生成可验证回答",
+          "data": {
+            "text": "查询未完成，请检查语义范围或数据源状态。"
+          }
+        },
+        {
+          "trace_id": "STREAM-dc5bb324-03ed-44dd-9574-36558bf06924",
+          "sequence": 10,
+          "timestamp": "2026-08-18T13:24:09.548263+00:00",
+          "elapsed_ms": 448,
+          "event": "chart_ready",
+          "capability": "chatbi",
+          "message": "图表已准备",
+          "data": {}
+        },
+        {
+          "trace_id": "STREAM-dc5bb324-03ed-44dd-9574-36558bf06924",
+          "sequence": 11,
+          "timestamp": "2026-08-18T13:24:09.548802+00:00",
+          "elapsed_ms": 449,
+          "event": "completed",
+          "capability": "chatbi",
+          "message": "请求已完成",
+          "data": {
+            "status": "FAILED"
+          }
+        }
+      ],
       "final_status": "SUCCEEDED",
       "error_code": null,
       "expected_pass": true
@@ -7246,7 +8626,7 @@
         ],
         "row_count": 1,
         "truncated": false,
-        "duration_ms": 464,
+        "duration_ms": 497,
         "datasource_id": "00239d69-00be-41b3-b740-03db864ba7f0",
         "dialect": "postgresql",
         "normalized_sql": "SELECT ROUND(CAST(SUM(f.refund_amount) AS DECIMAL), 2) AS refund_amount FROM \"chatbi_benchmark_v21\".fact_sales AS f WHERE f.order_status <> 'TEST' AND f.tenant_id = 1 AND f.order_date >= CAST('2025-01-01' AS DATE) AND f.order_date < CAST('2026-01-01' AS DATE) LIMIT 100",
@@ -7263,11 +8643,149 @@
       },
       "result_signature": "314c2b76d4351bf84505fdcdd37c0dd2e29ef902d0f40ae0aabd47d7e699d95c",
       "latency_by_stage": {
-        "openchatbi": 4.605,
-        "supersonic": 0.079,
-        "wren": 0.116
+        "openchatbi": 5.678,
+        "supersonic": 0.111,
+        "wren": 0.138
       },
-      "sse_events": [],
+      "sse_events": [
+        {
+          "trace_id": "STREAM-58f1a82f-9e51-4b9f-b5fb-87ec92720e42",
+          "sequence": 1,
+          "timestamp": "2026-08-18T13:24:09.665630+00:00",
+          "elapsed_ms": 3,
+          "event": "accepted",
+          "capability": "chatbi",
+          "message": "已接收请求",
+          "data": {
+            "conversation_id": "75ae1993-1966-4736-9666-465cd3824438"
+          }
+        },
+        {
+          "trace_id": "STREAM-58f1a82f-9e51-4b9f-b5fb-87ec92720e42",
+          "sequence": 2,
+          "timestamp": "2026-08-18T13:24:09.672655+00:00",
+          "elapsed_ms": 10,
+          "event": "catalog_retrieving",
+          "capability": "DATA_QUERY",
+          "message": "正在检索业务目录",
+          "data": {
+            "stage": "UNDERSTANDING",
+            "route": "DATA_QUERY"
+          }
+        },
+        {
+          "trace_id": "STREAM-58f1a82f-9e51-4b9f-b5fb-87ec92720e42",
+          "sequence": 3,
+          "timestamp": "2026-08-18T13:24:09.673615+00:00",
+          "elapsed_ms": 11,
+          "event": "schema_linked",
+          "capability": "DATA_QUERY",
+          "message": "已识别候选表与字段",
+          "data": {
+            "stage": "SCHEMA_LINKED",
+            "route": "DATA_QUERY"
+          }
+        },
+        {
+          "trace_id": "STREAM-58f1a82f-9e51-4b9f-b5fb-87ec92720e42",
+          "sequence": 4,
+          "timestamp": "2026-08-18T13:24:09.674491+00:00",
+          "elapsed_ms": 11,
+          "event": "semantic_parsing",
+          "capability": "DATA_QUERY",
+          "message": "正在解析指标、维度、时间与过滤条件",
+          "data": {
+            "stage": "SEMANTIC_PARSING",
+            "route": "DATA_QUERY"
+          }
+        },
+        {
+          "trace_id": "STREAM-58f1a82f-9e51-4b9f-b5fb-87ec92720e42",
+          "sequence": 5,
+          "timestamp": "2026-08-18T13:24:09.677301+00:00",
+          "elapsed_ms": 14,
+          "event": "semantic_compiling",
+          "capability": "DATA_QUERY",
+          "message": "正在编译语义查询",
+          "data": {
+            "stage": "SEMANTIC_COMPILING",
+            "route": "DATA_QUERY"
+          }
+        },
+        {
+          "trace_id": "STREAM-58f1a82f-9e51-4b9f-b5fb-87ec92720e42",
+          "sequence": 6,
+          "timestamp": "2026-08-18T13:24:09.679105+00:00",
+          "elapsed_ms": 16,
+          "event": "sql_validating",
+          "capability": "DATA_QUERY",
+          "message": "正在执行只读 SQL 与权限校验",
+          "data": {
+            "stage": "SQL_VALIDATING",
+            "route": "DATA_QUERY"
+          }
+        },
+        {
+          "trace_id": "STREAM-58f1a82f-9e51-4b9f-b5fb-87ec92720e42",
+          "sequence": 7,
+          "timestamp": "2026-08-18T13:24:09.679863+00:00",
+          "elapsed_ms": 17,
+          "event": "sql_running",
+          "capability": "chatbi",
+          "message": "正在执行只读查询",
+          "data": {
+            "stage": "QUERYING_DATA"
+          }
+        },
+        {
+          "trace_id": "STREAM-58f1a82f-9e51-4b9f-b5fb-87ec92720e42",
+          "sequence": 8,
+          "timestamp": "2026-08-18T13:24:09.844214+00:00",
+          "elapsed_ms": 181,
+          "event": "result_validating",
+          "capability": "DATA_QUERY",
+          "message": "正在校验结果值与业务口径",
+          "data": {
+            "stage": "RESULT_VALIDATING",
+            "route": "DATA_QUERY",
+            "status": "FAILED"
+          }
+        },
+        {
+          "trace_id": "STREAM-58f1a82f-9e51-4b9f-b5fb-87ec92720e42",
+          "sequence": 9,
+          "timestamp": "2026-08-18T13:24:09.870638+00:00",
+          "elapsed_ms": 208,
+          "event": "answer_delta",
+          "capability": "chatbi",
+          "message": "正在生成可验证回答",
+          "data": {
+            "text": "查询未完成，请检查语义范围或数据源状态。"
+          }
+        },
+        {
+          "trace_id": "STREAM-58f1a82f-9e51-4b9f-b5fb-87ec92720e42",
+          "sequence": 10,
+          "timestamp": "2026-08-18T13:24:09.872697+00:00",
+          "elapsed_ms": 210,
+          "event": "chart_ready",
+          "capability": "chatbi",
+          "message": "图表已准备",
+          "data": {}
+        },
+        {
+          "trace_id": "STREAM-58f1a82f-9e51-4b9f-b5fb-87ec92720e42",
+          "sequence": 11,
+          "timestamp": "2026-08-18T13:24:09.873468+00:00",
+          "elapsed_ms": 210,
+          "event": "completed",
+          "capability": "chatbi",
+          "message": "请求已完成",
+          "data": {
+            "status": "FAILED"
+          }
+        }
+      ],
       "final_status": "SUCCEEDED",
       "error_code": null,
       "expected_pass": true
@@ -7870,7 +9388,7 @@
         ],
         "row_count": 1,
         "truncated": false,
-        "duration_ms": 468,
+        "duration_ms": 567,
         "datasource_id": "00239d69-00be-41b3-b740-03db864ba7f0",
         "dialect": "postgresql",
         "normalized_sql": "SELECT COUNT(*) FILTER(WHERE f.order_status = 'CANCELLED') AS cancelled_orders FROM \"chatbi_benchmark_v21\".fact_sales AS f WHERE f.order_status <> 'TEST' AND f.tenant_id = 1 AND f.order_status = 'CANCELLED' AND f.order_date >= CAST('2025-01-01' AS DATE) AND f.order_date < CAST('2026-01-01' AS DATE) LIMIT 100",
@@ -7887,11 +9405,149 @@
       },
       "result_signature": "2afdf20ede2b94b832b3c3ba6f6065ad883cfcbe9a6c1add5a679101dbb910f5",
       "latency_by_stage": {
-        "openchatbi": 3.641,
-        "supersonic": 0.069,
-        "wren": 0.207
+        "openchatbi": 4.377,
+        "supersonic": 0.105,
+        "wren": 0.128
       },
-      "sse_events": [],
+      "sse_events": [
+        {
+          "trace_id": "STREAM-ff1c194e-d817-40d0-b45e-539a50b7fba7",
+          "sequence": 1,
+          "timestamp": "2026-08-18T13:24:09.956405+00:00",
+          "elapsed_ms": 3,
+          "event": "accepted",
+          "capability": "chatbi",
+          "message": "已接收请求",
+          "data": {
+            "conversation_id": "95159056-3aa2-42e2-b1cc-621ab96074d7"
+          }
+        },
+        {
+          "trace_id": "STREAM-ff1c194e-d817-40d0-b45e-539a50b7fba7",
+          "sequence": 2,
+          "timestamp": "2026-08-18T13:24:09.962669+00:00",
+          "elapsed_ms": 9,
+          "event": "catalog_retrieving",
+          "capability": "DATA_QUERY",
+          "message": "正在检索业务目录",
+          "data": {
+            "stage": "UNDERSTANDING",
+            "route": "DATA_QUERY"
+          }
+        },
+        {
+          "trace_id": "STREAM-ff1c194e-d817-40d0-b45e-539a50b7fba7",
+          "sequence": 3,
+          "timestamp": "2026-08-18T13:24:09.963555+00:00",
+          "elapsed_ms": 10,
+          "event": "schema_linked",
+          "capability": "DATA_QUERY",
+          "message": "已识别候选表与字段",
+          "data": {
+            "stage": "SCHEMA_LINKED",
+            "route": "DATA_QUERY"
+          }
+        },
+        {
+          "trace_id": "STREAM-ff1c194e-d817-40d0-b45e-539a50b7fba7",
+          "sequence": 4,
+          "timestamp": "2026-08-18T13:24:09.965324+00:00",
+          "elapsed_ms": 12,
+          "event": "semantic_parsing",
+          "capability": "DATA_QUERY",
+          "message": "正在解析指标、维度、时间与过滤条件",
+          "data": {
+            "stage": "SEMANTIC_PARSING",
+            "route": "DATA_QUERY"
+          }
+        },
+        {
+          "trace_id": "STREAM-ff1c194e-d817-40d0-b45e-539a50b7fba7",
+          "sequence": 5,
+          "timestamp": "2026-08-18T13:24:09.966856+00:00",
+          "elapsed_ms": 13,
+          "event": "semantic_compiling",
+          "capability": "DATA_QUERY",
+          "message": "正在编译语义查询",
+          "data": {
+            "stage": "SEMANTIC_COMPILING",
+            "route": "DATA_QUERY"
+          }
+        },
+        {
+          "trace_id": "STREAM-ff1c194e-d817-40d0-b45e-539a50b7fba7",
+          "sequence": 6,
+          "timestamp": "2026-08-18T13:24:09.967967+00:00",
+          "elapsed_ms": 14,
+          "event": "sql_validating",
+          "capability": "DATA_QUERY",
+          "message": "正在执行只读 SQL 与权限校验",
+          "data": {
+            "stage": "SQL_VALIDATING",
+            "route": "DATA_QUERY"
+          }
+        },
+        {
+          "trace_id": "STREAM-ff1c194e-d817-40d0-b45e-539a50b7fba7",
+          "sequence": 7,
+          "timestamp": "2026-08-18T13:24:09.969870+00:00",
+          "elapsed_ms": 16,
+          "event": "sql_running",
+          "capability": "chatbi",
+          "message": "正在执行只读查询",
+          "data": {
+            "stage": "QUERYING_DATA"
+          }
+        },
+        {
+          "trace_id": "STREAM-ff1c194e-d817-40d0-b45e-539a50b7fba7",
+          "sequence": 8,
+          "timestamp": "2026-08-18T13:24:10.182883+00:00",
+          "elapsed_ms": 229,
+          "event": "result_validating",
+          "capability": "DATA_QUERY",
+          "message": "正在校验结果值与业务口径",
+          "data": {
+            "stage": "RESULT_VALIDATING",
+            "route": "DATA_QUERY",
+            "status": "FAILED"
+          }
+        },
+        {
+          "trace_id": "STREAM-ff1c194e-d817-40d0-b45e-539a50b7fba7",
+          "sequence": 9,
+          "timestamp": "2026-08-18T13:24:10.216414+00:00",
+          "elapsed_ms": 263,
+          "event": "answer_delta",
+          "capability": "chatbi",
+          "message": "正在生成可验证回答",
+          "data": {
+            "text": "查询未完成，请检查语义范围或数据源状态。"
+          }
+        },
+        {
+          "trace_id": "STREAM-ff1c194e-d817-40d0-b45e-539a50b7fba7",
+          "sequence": 10,
+          "timestamp": "2026-08-18T13:24:10.219116+00:00",
+          "elapsed_ms": 266,
+          "event": "chart_ready",
+          "capability": "chatbi",
+          "message": "图表已准备",
+          "data": {}
+        },
+        {
+          "trace_id": "STREAM-ff1c194e-d817-40d0-b45e-539a50b7fba7",
+          "sequence": 11,
+          "timestamp": "2026-08-18T13:24:10.219712+00:00",
+          "elapsed_ms": 266,
+          "event": "completed",
+          "capability": "chatbi",
+          "message": "请求已完成",
+          "data": {
+            "status": "FAILED"
+          }
+        }
+      ],
       "final_status": "SUCCEEDED",
       "error_code": null,
       "expected_pass": true
@@ -8496,7 +10152,7 @@
         ],
         "row_count": 1,
         "truncated": false,
-        "duration_ms": 458,
+        "duration_ms": 486,
         "datasource_id": "00239d69-00be-41b3-b740-03db864ba7f0",
         "dialect": "postgresql",
         "normalized_sql": "SELECT ROUND(CAST(SUM(f.net_amount - f.refund_amount) AS DECIMAL), 2) AS net_sales FROM \"chatbi_benchmark_v21\".fact_sales AS f WHERE f.order_status <> 'TEST' AND f.tenant_id = 1 AND f.discount_rate IS NULL AND f.order_date >= CAST('2025-01-01' AS DATE) AND f.order_date < CAST('2026-01-01' AS DATE) LIMIT 100",
@@ -8513,11 +10169,149 @@
       },
       "result_signature": "565efebc0643a04a68de50a3c1c62ce00d42c09a436e2e909119bc2e0a9cd838",
       "latency_by_stage": {
-        "openchatbi": 2.563,
-        "supersonic": 0.07,
-        "wren": 0.102
+        "openchatbi": 4.0,
+        "supersonic": 0.118,
+        "wren": 0.148
       },
-      "sse_events": [],
+      "sse_events": [
+        {
+          "trace_id": "STREAM-e350221f-e27e-4626-89e3-2aef4e0b065e",
+          "sequence": 1,
+          "timestamp": "2026-08-18T13:24:10.321801+00:00",
+          "elapsed_ms": 3,
+          "event": "accepted",
+          "capability": "chatbi",
+          "message": "已接收请求",
+          "data": {
+            "conversation_id": "ea35edad-6440-42ae-86f2-b8de6dc04834"
+          }
+        },
+        {
+          "trace_id": "STREAM-e350221f-e27e-4626-89e3-2aef4e0b065e",
+          "sequence": 2,
+          "timestamp": "2026-08-18T13:24:10.328302+00:00",
+          "elapsed_ms": 10,
+          "event": "catalog_retrieving",
+          "capability": "DATA_QUERY",
+          "message": "正在检索业务目录",
+          "data": {
+            "stage": "UNDERSTANDING",
+            "route": "DATA_QUERY"
+          }
+        },
+        {
+          "trace_id": "STREAM-e350221f-e27e-4626-89e3-2aef4e0b065e",
+          "sequence": 3,
+          "timestamp": "2026-08-18T13:24:10.329358+00:00",
+          "elapsed_ms": 11,
+          "event": "schema_linked",
+          "capability": "DATA_QUERY",
+          "message": "已识别候选表与字段",
+          "data": {
+            "stage": "SCHEMA_LINKED",
+            "route": "DATA_QUERY"
+          }
+        },
+        {
+          "trace_id": "STREAM-e350221f-e27e-4626-89e3-2aef4e0b065e",
+          "sequence": 4,
+          "timestamp": "2026-08-18T13:24:10.331547+00:00",
+          "elapsed_ms": 13,
+          "event": "semantic_parsing",
+          "capability": "DATA_QUERY",
+          "message": "正在解析指标、维度、时间与过滤条件",
+          "data": {
+            "stage": "SEMANTIC_PARSING",
+            "route": "DATA_QUERY"
+          }
+        },
+        {
+          "trace_id": "STREAM-e350221f-e27e-4626-89e3-2aef4e0b065e",
+          "sequence": 5,
+          "timestamp": "2026-08-18T13:24:10.332571+00:00",
+          "elapsed_ms": 14,
+          "event": "semantic_compiling",
+          "capability": "DATA_QUERY",
+          "message": "正在编译语义查询",
+          "data": {
+            "stage": "SEMANTIC_COMPILING",
+            "route": "DATA_QUERY"
+          }
+        },
+        {
+          "trace_id": "STREAM-e350221f-e27e-4626-89e3-2aef4e0b065e",
+          "sequence": 6,
+          "timestamp": "2026-08-18T13:24:10.333442+00:00",
+          "elapsed_ms": 15,
+          "event": "sql_validating",
+          "capability": "DATA_QUERY",
+          "message": "正在执行只读 SQL 与权限校验",
+          "data": {
+            "stage": "SQL_VALIDATING",
+            "route": "DATA_QUERY"
+          }
+        },
+        {
+          "trace_id": "STREAM-e350221f-e27e-4626-89e3-2aef4e0b065e",
+          "sequence": 7,
+          "timestamp": "2026-08-18T13:24:10.335822+00:00",
+          "elapsed_ms": 17,
+          "event": "sql_running",
+          "capability": "chatbi",
+          "message": "正在执行只读查询",
+          "data": {
+            "stage": "QUERYING_DATA"
+          }
+        },
+        {
+          "trace_id": "STREAM-e350221f-e27e-4626-89e3-2aef4e0b065e",
+          "sequence": 8,
+          "timestamp": "2026-08-18T13:24:10.489976+00:00",
+          "elapsed_ms": 171,
+          "event": "result_validating",
+          "capability": "DATA_QUERY",
+          "message": "正在校验结果值与业务口径",
+          "data": {
+            "stage": "RESULT_VALIDATING",
+            "route": "DATA_QUERY",
+            "status": "FAILED"
+          }
+        },
+        {
+          "trace_id": "STREAM-e350221f-e27e-4626-89e3-2aef4e0b065e",
+          "sequence": 9,
+          "timestamp": "2026-08-18T13:24:10.515671+00:00",
+          "elapsed_ms": 197,
+          "event": "answer_delta",
+          "capability": "chatbi",
+          "message": "正在生成可验证回答",
+          "data": {
+            "text": "查询未完成，请检查语义范围或数据源状态。"
+          }
+        },
+        {
+          "trace_id": "STREAM-e350221f-e27e-4626-89e3-2aef4e0b065e",
+          "sequence": 10,
+          "timestamp": "2026-08-18T13:24:10.518143+00:00",
+          "elapsed_ms": 200,
+          "event": "chart_ready",
+          "capability": "chatbi",
+          "message": "图表已准备",
+          "data": {}
+        },
+        {
+          "trace_id": "STREAM-e350221f-e27e-4626-89e3-2aef4e0b065e",
+          "sequence": 11,
+          "timestamp": "2026-08-18T13:24:10.519173+00:00",
+          "elapsed_ms": 201,
+          "event": "completed",
+          "capability": "chatbi",
+          "message": "请求已完成",
+          "data": {
+            "status": "FAILED"
+          }
+        }
+      ],
       "final_status": "SUCCEEDED",
       "error_code": null,
       "expected_pass": true
@@ -9149,7 +10943,7 @@
         ],
         "row_count": 2,
         "truncated": false,
-        "duration_ms": 549,
+        "duration_ms": 605,
         "datasource_id": "00239d69-00be-41b3-b740-03db864ba7f0",
         "dialect": "postgresql",
         "normalized_sql": "SELECT c.customer_tier AS customer_tier, ROUND(CAST(SUM(f.net_amount - f.refund_amount) AS DECIMAL), 2) AS net_sales FROM \"chatbi_benchmark_v21\".fact_sales AS f JOIN \"chatbi_benchmark_v21\".dim_customer AS c ON c.customer_id = f.customer_id WHERE f.order_status <> 'TEST' AND f.tenant_id = 1 AND f.order_date >= CAST('2025-01-01' AS DATE) AND f.order_date < CAST('2026-01-01' AS DATE) GROUP BY c.customer_tier ORDER BY net_sales DESC LIMIT 100",
@@ -9168,11 +10962,149 @@
       },
       "result_signature": "259d0ba1b9baa61f84d36c3d44c7e9e09883c96c545d15b93cb334c8a1720d95",
       "latency_by_stage": {
-        "openchatbi": 4.696,
-        "supersonic": 0.078,
-        "wren": 0.106
+        "openchatbi": 4.741,
+        "supersonic": 0.153,
+        "wren": 0.191
       },
-      "sse_events": [],
+      "sse_events": [
+        {
+          "trace_id": "STREAM-57914fcf-0dc8-4712-8e03-1c4f5280a15c",
+          "sequence": 1,
+          "timestamp": "2026-08-18T13:24:10.612106+00:00",
+          "elapsed_ms": 4,
+          "event": "accepted",
+          "capability": "chatbi",
+          "message": "已接收请求",
+          "data": {
+            "conversation_id": "6f317b2b-7f42-4abb-909b-3229ad121677"
+          }
+        },
+        {
+          "trace_id": "STREAM-57914fcf-0dc8-4712-8e03-1c4f5280a15c",
+          "sequence": 2,
+          "timestamp": "2026-08-18T13:24:10.618814+00:00",
+          "elapsed_ms": 11,
+          "event": "catalog_retrieving",
+          "capability": "DATA_QUERY",
+          "message": "正在检索业务目录",
+          "data": {
+            "stage": "UNDERSTANDING",
+            "route": "DATA_QUERY"
+          }
+        },
+        {
+          "trace_id": "STREAM-57914fcf-0dc8-4712-8e03-1c4f5280a15c",
+          "sequence": 3,
+          "timestamp": "2026-08-18T13:24:10.620106+00:00",
+          "elapsed_ms": 12,
+          "event": "schema_linked",
+          "capability": "DATA_QUERY",
+          "message": "已识别候选表与字段",
+          "data": {
+            "stage": "SCHEMA_LINKED",
+            "route": "DATA_QUERY"
+          }
+        },
+        {
+          "trace_id": "STREAM-57914fcf-0dc8-4712-8e03-1c4f5280a15c",
+          "sequence": 4,
+          "timestamp": "2026-08-18T13:24:10.621131+00:00",
+          "elapsed_ms": 14,
+          "event": "semantic_parsing",
+          "capability": "DATA_QUERY",
+          "message": "正在解析指标、维度、时间与过滤条件",
+          "data": {
+            "stage": "SEMANTIC_PARSING",
+            "route": "DATA_QUERY"
+          }
+        },
+        {
+          "trace_id": "STREAM-57914fcf-0dc8-4712-8e03-1c4f5280a15c",
+          "sequence": 5,
+          "timestamp": "2026-08-18T13:24:10.623175+00:00",
+          "elapsed_ms": 16,
+          "event": "semantic_compiling",
+          "capability": "DATA_QUERY",
+          "message": "正在编译语义查询",
+          "data": {
+            "stage": "SEMANTIC_COMPILING",
+            "route": "DATA_QUERY"
+          }
+        },
+        {
+          "trace_id": "STREAM-57914fcf-0dc8-4712-8e03-1c4f5280a15c",
+          "sequence": 6,
+          "timestamp": "2026-08-18T13:24:10.624867+00:00",
+          "elapsed_ms": 17,
+          "event": "sql_validating",
+          "capability": "DATA_QUERY",
+          "message": "正在执行只读 SQL 与权限校验",
+          "data": {
+            "stage": "SQL_VALIDATING",
+            "route": "DATA_QUERY"
+          }
+        },
+        {
+          "trace_id": "STREAM-57914fcf-0dc8-4712-8e03-1c4f5280a15c",
+          "sequence": 7,
+          "timestamp": "2026-08-18T13:24:10.627001+00:00",
+          "elapsed_ms": 19,
+          "event": "sql_running",
+          "capability": "chatbi",
+          "message": "正在执行只读查询",
+          "data": {
+            "stage": "QUERYING_DATA"
+          }
+        },
+        {
+          "trace_id": "STREAM-57914fcf-0dc8-4712-8e03-1c4f5280a15c",
+          "sequence": 8,
+          "timestamp": "2026-08-18T13:24:10.777008+00:00",
+          "elapsed_ms": 169,
+          "event": "result_validating",
+          "capability": "DATA_QUERY",
+          "message": "正在校验结果值与业务口径",
+          "data": {
+            "stage": "RESULT_VALIDATING",
+            "route": "DATA_QUERY",
+            "status": "FAILED"
+          }
+        },
+        {
+          "trace_id": "STREAM-57914fcf-0dc8-4712-8e03-1c4f5280a15c",
+          "sequence": 9,
+          "timestamp": "2026-08-18T13:24:10.803009+00:00",
+          "elapsed_ms": 195,
+          "event": "answer_delta",
+          "capability": "chatbi",
+          "message": "正在生成可验证回答",
+          "data": {
+            "text": "查询未完成，请检查语义范围或数据源状态。"
+          }
+        },
+        {
+          "trace_id": "STREAM-57914fcf-0dc8-4712-8e03-1c4f5280a15c",
+          "sequence": 10,
+          "timestamp": "2026-08-18T13:24:10.805296+00:00",
+          "elapsed_ms": 198,
+          "event": "chart_ready",
+          "capability": "chatbi",
+          "message": "图表已准备",
+          "data": {}
+        },
+        {
+          "trace_id": "STREAM-57914fcf-0dc8-4712-8e03-1c4f5280a15c",
+          "sequence": 11,
+          "timestamp": "2026-08-18T13:24:10.805843+00:00",
+          "elapsed_ms": 198,
+          "event": "completed",
+          "capability": "chatbi",
+          "message": "请求已完成",
+          "data": {
+            "status": "FAILED"
+          }
+        }
+      ],
       "final_status": "SUCCEEDED",
       "error_code": null,
       "expected_pass": true
@@ -9769,7 +11701,7 @@
         ],
         "row_count": 1,
         "truncated": false,
-        "duration_ms": 263,
+        "duration_ms": 308,
         "datasource_id": "00239d69-00be-41b3-b740-03db864ba7f0",
         "dialect": "postgresql",
         "normalized_sql": "SELECT ROUND(CAST(SUM(p.outstanding_amount) AS DECIMAL), 2) AS outstanding_amount FROM \"chatbi_benchmark_v21\".fact_payment AS p WHERE p.tenant_id = 1 AND p.invoice_date >= CAST('2025-01-01' AS DATE) AND p.invoice_date < CAST('2026-01-01' AS DATE) LIMIT 100",
@@ -9786,11 +11718,149 @@
       },
       "result_signature": "255f5f0c87f9cade3b5faacd7e2fbae9b22f1b4cdeefff069d5f594b8e382006",
       "latency_by_stage": {
-        "openchatbi": 3.433,
-        "supersonic": 0.075,
-        "wren": 0.099
+        "openchatbi": 5.232,
+        "supersonic": 0.101,
+        "wren": 0.131
       },
-      "sse_events": [],
+      "sse_events": [
+        {
+          "trace_id": "STREAM-98cb140e-c5a9-459f-a9c9-c7f5124b25d8",
+          "sequence": 1,
+          "timestamp": "2026-08-18T13:24:10.959753+00:00",
+          "elapsed_ms": 3,
+          "event": "accepted",
+          "capability": "chatbi",
+          "message": "已接收请求",
+          "data": {
+            "conversation_id": "9812b388-cae2-4ee3-83dd-bdb6ffd5e944"
+          }
+        },
+        {
+          "trace_id": "STREAM-98cb140e-c5a9-459f-a9c9-c7f5124b25d8",
+          "sequence": 2,
+          "timestamp": "2026-08-18T13:24:10.965903+00:00",
+          "elapsed_ms": 10,
+          "event": "catalog_retrieving",
+          "capability": "DATA_QUERY",
+          "message": "正在检索业务目录",
+          "data": {
+            "stage": "UNDERSTANDING",
+            "route": "DATA_QUERY"
+          }
+        },
+        {
+          "trace_id": "STREAM-98cb140e-c5a9-459f-a9c9-c7f5124b25d8",
+          "sequence": 3,
+          "timestamp": "2026-08-18T13:24:10.967093+00:00",
+          "elapsed_ms": 11,
+          "event": "schema_linked",
+          "capability": "DATA_QUERY",
+          "message": "已识别候选表与字段",
+          "data": {
+            "stage": "SCHEMA_LINKED",
+            "route": "DATA_QUERY"
+          }
+        },
+        {
+          "trace_id": "STREAM-98cb140e-c5a9-459f-a9c9-c7f5124b25d8",
+          "sequence": 4,
+          "timestamp": "2026-08-18T13:24:10.969987+00:00",
+          "elapsed_ms": 14,
+          "event": "semantic_parsing",
+          "capability": "DATA_QUERY",
+          "message": "正在解析指标、维度、时间与过滤条件",
+          "data": {
+            "stage": "SEMANTIC_PARSING",
+            "route": "DATA_QUERY"
+          }
+        },
+        {
+          "trace_id": "STREAM-98cb140e-c5a9-459f-a9c9-c7f5124b25d8",
+          "sequence": 5,
+          "timestamp": "2026-08-18T13:24:10.971122+00:00",
+          "elapsed_ms": 15,
+          "event": "semantic_compiling",
+          "capability": "DATA_QUERY",
+          "message": "正在编译语义查询",
+          "data": {
+            "stage": "SEMANTIC_COMPILING",
+            "route": "DATA_QUERY"
+          }
+        },
+        {
+          "trace_id": "STREAM-98cb140e-c5a9-459f-a9c9-c7f5124b25d8",
+          "sequence": 6,
+          "timestamp": "2026-08-18T13:24:10.973039+00:00",
+          "elapsed_ms": 17,
+          "event": "sql_validating",
+          "capability": "DATA_QUERY",
+          "message": "正在执行只读 SQL 与权限校验",
+          "data": {
+            "stage": "SQL_VALIDATING",
+            "route": "DATA_QUERY"
+          }
+        },
+        {
+          "trace_id": "STREAM-98cb140e-c5a9-459f-a9c9-c7f5124b25d8",
+          "sequence": 7,
+          "timestamp": "2026-08-18T13:24:10.975035+00:00",
+          "elapsed_ms": 19,
+          "event": "sql_running",
+          "capability": "chatbi",
+          "message": "正在执行只读查询",
+          "data": {
+            "stage": "QUERYING_DATA"
+          }
+        },
+        {
+          "trace_id": "STREAM-98cb140e-c5a9-459f-a9c9-c7f5124b25d8",
+          "sequence": 8,
+          "timestamp": "2026-08-18T13:24:11.125990+00:00",
+          "elapsed_ms": 170,
+          "event": "result_validating",
+          "capability": "DATA_QUERY",
+          "message": "正在校验结果值与业务口径",
+          "data": {
+            "stage": "RESULT_VALIDATING",
+            "route": "DATA_QUERY",
+            "status": "FAILED"
+          }
+        },
+        {
+          "trace_id": "STREAM-98cb140e-c5a9-459f-a9c9-c7f5124b25d8",
+          "sequence": 9,
+          "timestamp": "2026-08-18T13:24:11.155958+00:00",
+          "elapsed_ms": 200,
+          "event": "answer_delta",
+          "capability": "chatbi",
+          "message": "正在生成可验证回答",
+          "data": {
+            "text": "查询未完成，请检查语义范围或数据源状态。"
+          }
+        },
+        {
+          "trace_id": "STREAM-98cb140e-c5a9-459f-a9c9-c7f5124b25d8",
+          "sequence": 10,
+          "timestamp": "2026-08-18T13:24:11.158126+00:00",
+          "elapsed_ms": 202,
+          "event": "chart_ready",
+          "capability": "chatbi",
+          "message": "图表已准备",
+          "data": {}
+        },
+        {
+          "trace_id": "STREAM-98cb140e-c5a9-459f-a9c9-c7f5124b25d8",
+          "sequence": 11,
+          "timestamp": "2026-08-18T13:24:11.158980+00:00",
+          "elapsed_ms": 203,
+          "event": "completed",
+          "capability": "chatbi",
+          "message": "请求已完成",
+          "data": {
+            "status": "FAILED"
+          }
+        }
+      ],
       "final_status": "SUCCEEDED",
       "error_code": null,
       "expected_pass": true
@@ -10413,7 +12483,7 @@
         ],
         "row_count": 5,
         "truncated": false,
-        "duration_ms": 271,
+        "duration_ms": 309,
         "datasource_id": "00239d69-00be-41b3-b740-03db864ba7f0",
         "dialect": "postgresql",
         "normalized_sql": "SELECT p.aging_bucket AS aging_bucket, ROUND(CAST(SUM(p.outstanding_amount) AS DECIMAL), 2) AS outstanding_amount FROM \"chatbi_benchmark_v21\".fact_payment AS p WHERE p.tenant_id = 1 AND p.invoice_date >= CAST('2025-01-01' AS DATE) AND p.invoice_date < CAST('2026-01-01' AS DATE) GROUP BY p.aging_bucket ORDER BY outstanding_amount DESC LIMIT 100",
@@ -10432,11 +12502,149 @@
       },
       "result_signature": "cfc0d07160811ac1cd5512d58e4efb68bd6b6de7388da044ec9348c61a828f1b",
       "latency_by_stage": {
-        "openchatbi": 4.13,
-        "supersonic": 0.093,
-        "wren": 0.191
+        "openchatbi": 5.242,
+        "supersonic": 0.105,
+        "wren": 0.15
       },
-      "sse_events": [],
+      "sse_events": [
+        {
+          "trace_id": "STREAM-fcbc7d1c-4c3c-44ca-84c0-fd0f7e5a169a",
+          "sequence": 1,
+          "timestamp": "2026-08-18T13:24:11.254357+00:00",
+          "elapsed_ms": 4,
+          "event": "accepted",
+          "capability": "chatbi",
+          "message": "已接收请求",
+          "data": {
+            "conversation_id": "d69c2dd6-50a0-4aba-b44d-a4f3297b2e62"
+          }
+        },
+        {
+          "trace_id": "STREAM-fcbc7d1c-4c3c-44ca-84c0-fd0f7e5a169a",
+          "sequence": 2,
+          "timestamp": "2026-08-18T13:24:11.260386+00:00",
+          "elapsed_ms": 10,
+          "event": "catalog_retrieving",
+          "capability": "DATA_QUERY",
+          "message": "正在检索业务目录",
+          "data": {
+            "stage": "UNDERSTANDING",
+            "route": "DATA_QUERY"
+          }
+        },
+        {
+          "trace_id": "STREAM-fcbc7d1c-4c3c-44ca-84c0-fd0f7e5a169a",
+          "sequence": 3,
+          "timestamp": "2026-08-18T13:24:11.261531+00:00",
+          "elapsed_ms": 11,
+          "event": "schema_linked",
+          "capability": "DATA_QUERY",
+          "message": "已识别候选表与字段",
+          "data": {
+            "stage": "SCHEMA_LINKED",
+            "route": "DATA_QUERY"
+          }
+        },
+        {
+          "trace_id": "STREAM-fcbc7d1c-4c3c-44ca-84c0-fd0f7e5a169a",
+          "sequence": 4,
+          "timestamp": "2026-08-18T13:24:11.263603+00:00",
+          "elapsed_ms": 13,
+          "event": "semantic_parsing",
+          "capability": "DATA_QUERY",
+          "message": "正在解析指标、维度、时间与过滤条件",
+          "data": {
+            "stage": "SEMANTIC_PARSING",
+            "route": "DATA_QUERY"
+          }
+        },
+        {
+          "trace_id": "STREAM-fcbc7d1c-4c3c-44ca-84c0-fd0f7e5a169a",
+          "sequence": 5,
+          "timestamp": "2026-08-18T13:24:11.264384+00:00",
+          "elapsed_ms": 14,
+          "event": "semantic_compiling",
+          "capability": "DATA_QUERY",
+          "message": "正在编译语义查询",
+          "data": {
+            "stage": "SEMANTIC_COMPILING",
+            "route": "DATA_QUERY"
+          }
+        },
+        {
+          "trace_id": "STREAM-fcbc7d1c-4c3c-44ca-84c0-fd0f7e5a169a",
+          "sequence": 6,
+          "timestamp": "2026-08-18T13:24:11.265398+00:00",
+          "elapsed_ms": 15,
+          "event": "sql_validating",
+          "capability": "DATA_QUERY",
+          "message": "正在执行只读 SQL 与权限校验",
+          "data": {
+            "stage": "SQL_VALIDATING",
+            "route": "DATA_QUERY"
+          }
+        },
+        {
+          "trace_id": "STREAM-fcbc7d1c-4c3c-44ca-84c0-fd0f7e5a169a",
+          "sequence": 7,
+          "timestamp": "2026-08-18T13:24:11.267128+00:00",
+          "elapsed_ms": 17,
+          "event": "sql_running",
+          "capability": "chatbi",
+          "message": "正在执行只读查询",
+          "data": {
+            "stage": "QUERYING_DATA"
+          }
+        },
+        {
+          "trace_id": "STREAM-fcbc7d1c-4c3c-44ca-84c0-fd0f7e5a169a",
+          "sequence": 8,
+          "timestamp": "2026-08-18T13:24:11.404137+00:00",
+          "elapsed_ms": 154,
+          "event": "result_validating",
+          "capability": "DATA_QUERY",
+          "message": "正在校验结果值与业务口径",
+          "data": {
+            "stage": "RESULT_VALIDATING",
+            "route": "DATA_QUERY",
+            "status": "FAILED"
+          }
+        },
+        {
+          "trace_id": "STREAM-fcbc7d1c-4c3c-44ca-84c0-fd0f7e5a169a",
+          "sequence": 9,
+          "timestamp": "2026-08-18T13:24:11.430685+00:00",
+          "elapsed_ms": 181,
+          "event": "answer_delta",
+          "capability": "chatbi",
+          "message": "正在生成可验证回答",
+          "data": {
+            "text": "查询未完成，请检查语义范围或数据源状态。"
+          }
+        },
+        {
+          "trace_id": "STREAM-fcbc7d1c-4c3c-44ca-84c0-fd0f7e5a169a",
+          "sequence": 10,
+          "timestamp": "2026-08-18T13:24:11.432702+00:00",
+          "elapsed_ms": 183,
+          "event": "chart_ready",
+          "capability": "chatbi",
+          "message": "图表已准备",
+          "data": {}
+        },
+        {
+          "trace_id": "STREAM-fcbc7d1c-4c3c-44ca-84c0-fd0f7e5a169a",
+          "sequence": 11,
+          "timestamp": "2026-08-18T13:24:11.433137+00:00",
+          "elapsed_ms": 183,
+          "event": "completed",
+          "capability": "chatbi",
+          "message": "请求已完成",
+          "data": {
+            "status": "FAILED"
+          }
+        }
+      ],
       "final_status": "SUCCEEDED",
       "error_code": null,
       "expected_pass": true
@@ -11087,7 +13295,7 @@
         ],
         "row_count": 12,
         "truncated": false,
-        "duration_ms": 509,
+        "duration_ms": 742,
         "datasource_id": "00239d69-00be-41b3-b740-03db864ba7f0",
         "dialect": "postgresql",
         "normalized_sql": "SELECT CAST(DATE_TRUNC('MONTH', f.order_date) AS DATE) AS month, ROUND(CAST(SUM(f.net_amount - f.refund_amount) AS DECIMAL), 2) AS net_sales FROM \"chatbi_benchmark_v21\".fact_sales AS f WHERE f.order_status <> 'TEST' AND f.tenant_id = 2 AND f.order_date >= CAST('2025-01-01' AS DATE) AND f.order_date < CAST('2026-01-01' AS DATE) GROUP BY CAST(DATE_TRUNC('MONTH', f.order_date) AS DATE) ORDER BY month ASC LIMIT 100",
@@ -11106,11 +13314,149 @@
       },
       "result_signature": "f332797caf62f96e6860c178951eb2ac60680784b7d6dc563dd471666fd5eaa3",
       "latency_by_stage": {
-        "openchatbi": 4.399,
-        "supersonic": 0.102,
-        "wren": 0.122
+        "openchatbi": 7.476,
+        "supersonic": 0.106,
+        "wren": 0.136
       },
-      "sse_events": [],
+      "sse_events": [
+        {
+          "trace_id": "STREAM-41758f73-4441-4ef3-9885-0809d78de5be",
+          "sequence": 1,
+          "timestamp": "2026-08-18T13:24:11.518162+00:00",
+          "elapsed_ms": 3,
+          "event": "accepted",
+          "capability": "chatbi",
+          "message": "已接收请求",
+          "data": {
+            "conversation_id": "86e4371a-1daf-4f90-ae3b-9760e740eeac"
+          }
+        },
+        {
+          "trace_id": "STREAM-41758f73-4441-4ef3-9885-0809d78de5be",
+          "sequence": 2,
+          "timestamp": "2026-08-18T13:24:11.524363+00:00",
+          "elapsed_ms": 10,
+          "event": "catalog_retrieving",
+          "capability": "DATA_QUERY",
+          "message": "正在检索业务目录",
+          "data": {
+            "stage": "UNDERSTANDING",
+            "route": "DATA_QUERY"
+          }
+        },
+        {
+          "trace_id": "STREAM-41758f73-4441-4ef3-9885-0809d78de5be",
+          "sequence": 3,
+          "timestamp": "2026-08-18T13:24:11.525389+00:00",
+          "elapsed_ms": 11,
+          "event": "schema_linked",
+          "capability": "DATA_QUERY",
+          "message": "已识别候选表与字段",
+          "data": {
+            "stage": "SCHEMA_LINKED",
+            "route": "DATA_QUERY"
+          }
+        },
+        {
+          "trace_id": "STREAM-41758f73-4441-4ef3-9885-0809d78de5be",
+          "sequence": 4,
+          "timestamp": "2026-08-18T13:24:11.527301+00:00",
+          "elapsed_ms": 13,
+          "event": "semantic_parsing",
+          "capability": "DATA_QUERY",
+          "message": "正在解析指标、维度、时间与过滤条件",
+          "data": {
+            "stage": "SEMANTIC_PARSING",
+            "route": "DATA_QUERY"
+          }
+        },
+        {
+          "trace_id": "STREAM-41758f73-4441-4ef3-9885-0809d78de5be",
+          "sequence": 5,
+          "timestamp": "2026-08-18T13:24:11.528757+00:00",
+          "elapsed_ms": 14,
+          "event": "semantic_compiling",
+          "capability": "DATA_QUERY",
+          "message": "正在编译语义查询",
+          "data": {
+            "stage": "SEMANTIC_COMPILING",
+            "route": "DATA_QUERY"
+          }
+        },
+        {
+          "trace_id": "STREAM-41758f73-4441-4ef3-9885-0809d78de5be",
+          "sequence": 6,
+          "timestamp": "2026-08-18T13:24:11.529750+00:00",
+          "elapsed_ms": 15,
+          "event": "sql_validating",
+          "capability": "DATA_QUERY",
+          "message": "正在执行只读 SQL 与权限校验",
+          "data": {
+            "stage": "SQL_VALIDATING",
+            "route": "DATA_QUERY"
+          }
+        },
+        {
+          "trace_id": "STREAM-41758f73-4441-4ef3-9885-0809d78de5be",
+          "sequence": 7,
+          "timestamp": "2026-08-18T13:24:11.531635+00:00",
+          "elapsed_ms": 17,
+          "event": "sql_running",
+          "capability": "chatbi",
+          "message": "正在执行只读查询",
+          "data": {
+            "stage": "QUERYING_DATA"
+          }
+        },
+        {
+          "trace_id": "STREAM-41758f73-4441-4ef3-9885-0809d78de5be",
+          "sequence": 8,
+          "timestamp": "2026-08-18T13:24:11.744493+00:00",
+          "elapsed_ms": 230,
+          "event": "result_validating",
+          "capability": "DATA_QUERY",
+          "message": "正在校验结果值与业务口径",
+          "data": {
+            "stage": "RESULT_VALIDATING",
+            "route": "DATA_QUERY",
+            "status": "FAILED"
+          }
+        },
+        {
+          "trace_id": "STREAM-41758f73-4441-4ef3-9885-0809d78de5be",
+          "sequence": 9,
+          "timestamp": "2026-08-18T13:24:11.770292+00:00",
+          "elapsed_ms": 256,
+          "event": "answer_delta",
+          "capability": "chatbi",
+          "message": "正在生成可验证回答",
+          "data": {
+            "text": "查询未完成，请检查语义范围或数据源状态。"
+          }
+        },
+        {
+          "trace_id": "STREAM-41758f73-4441-4ef3-9885-0809d78de5be",
+          "sequence": 10,
+          "timestamp": "2026-08-18T13:24:11.772251+00:00",
+          "elapsed_ms": 257,
+          "event": "chart_ready",
+          "capability": "chatbi",
+          "message": "图表已准备",
+          "data": {}
+        },
+        {
+          "trace_id": "STREAM-41758f73-4441-4ef3-9885-0809d78de5be",
+          "sequence": 11,
+          "timestamp": "2026-08-18T13:24:11.772695+00:00",
+          "elapsed_ms": 258,
+          "event": "completed",
+          "capability": "chatbi",
+          "message": "请求已完成",
+          "data": {
+            "status": "FAILED"
+          }
+        }
+      ],
       "final_status": "SUCCEEDED",
       "error_code": null,
       "expected_pass": true
@@ -11708,7 +14054,7 @@
         ],
         "row_count": 1,
         "truncated": false,
-        "duration_ms": 160,
+        "duration_ms": 283,
         "datasource_id": "00239d69-00be-41b3-b740-03db864ba7f0",
         "dialect": "postgresql",
         "normalized_sql": "SELECT COUNT(DISTINCT f.customer_id) FILTER(WHERE f.order_status IN ('VALID', 'PARTIAL_REFUND', 'REFUNDED')) AS active_customers FROM \"chatbi_benchmark_v21\".fact_sales AS f WHERE f.order_status <> 'TEST' AND f.tenant_id = 7 AND f.order_date >= CAST('2025-02-01' AS DATE) AND f.order_date < CAST('2025-03-01' AS DATE) LIMIT 100",
@@ -11725,11 +14071,149 @@
       },
       "result_signature": "6da845300397f36695606a497ab57654c2497dbe4fae040fa4ed97e08b5ea7b2",
       "latency_by_stage": {
-        "openchatbi": 4.063,
-        "supersonic": 0.102,
-        "wren": 0.124
+        "openchatbi": 4.622,
+        "supersonic": 0.106,
+        "wren": 0.134
       },
-      "sse_events": [],
+      "sse_events": [
+        {
+          "trace_id": "STREAM-00b09ca8-5466-466f-a7d0-d20e4654ff28",
+          "sequence": 1,
+          "timestamp": "2026-08-18T13:24:11.852777+00:00",
+          "elapsed_ms": 3,
+          "event": "accepted",
+          "capability": "chatbi",
+          "message": "已接收请求",
+          "data": {
+            "conversation_id": "f5ebf518-08d9-4fd3-b54d-86667c18848d"
+          }
+        },
+        {
+          "trace_id": "STREAM-00b09ca8-5466-466f-a7d0-d20e4654ff28",
+          "sequence": 2,
+          "timestamp": "2026-08-18T13:24:11.857344+00:00",
+          "elapsed_ms": 8,
+          "event": "catalog_retrieving",
+          "capability": "DATA_QUERY",
+          "message": "正在检索业务目录",
+          "data": {
+            "stage": "UNDERSTANDING",
+            "route": "DATA_QUERY"
+          }
+        },
+        {
+          "trace_id": "STREAM-00b09ca8-5466-466f-a7d0-d20e4654ff28",
+          "sequence": 3,
+          "timestamp": "2026-08-18T13:24:11.858177+00:00",
+          "elapsed_ms": 8,
+          "event": "schema_linked",
+          "capability": "DATA_QUERY",
+          "message": "已识别候选表与字段",
+          "data": {
+            "stage": "SCHEMA_LINKED",
+            "route": "DATA_QUERY"
+          }
+        },
+        {
+          "trace_id": "STREAM-00b09ca8-5466-466f-a7d0-d20e4654ff28",
+          "sequence": 4,
+          "timestamp": "2026-08-18T13:24:11.860165+00:00",
+          "elapsed_ms": 10,
+          "event": "semantic_parsing",
+          "capability": "DATA_QUERY",
+          "message": "正在解析指标、维度、时间与过滤条件",
+          "data": {
+            "stage": "SEMANTIC_PARSING",
+            "route": "DATA_QUERY"
+          }
+        },
+        {
+          "trace_id": "STREAM-00b09ca8-5466-466f-a7d0-d20e4654ff28",
+          "sequence": 5,
+          "timestamp": "2026-08-18T13:24:11.860845+00:00",
+          "elapsed_ms": 11,
+          "event": "semantic_compiling",
+          "capability": "DATA_QUERY",
+          "message": "正在编译语义查询",
+          "data": {
+            "stage": "SEMANTIC_COMPILING",
+            "route": "DATA_QUERY"
+          }
+        },
+        {
+          "trace_id": "STREAM-00b09ca8-5466-466f-a7d0-d20e4654ff28",
+          "sequence": 6,
+          "timestamp": "2026-08-18T13:24:11.862597+00:00",
+          "elapsed_ms": 13,
+          "event": "sql_validating",
+          "capability": "DATA_QUERY",
+          "message": "正在执行只读 SQL 与权限校验",
+          "data": {
+            "stage": "SQL_VALIDATING",
+            "route": "DATA_QUERY"
+          }
+        },
+        {
+          "trace_id": "STREAM-00b09ca8-5466-466f-a7d0-d20e4654ff28",
+          "sequence": 7,
+          "timestamp": "2026-08-18T13:24:11.864205+00:00",
+          "elapsed_ms": 14,
+          "event": "sql_running",
+          "capability": "chatbi",
+          "message": "正在执行只读查询",
+          "data": {
+            "stage": "QUERYING_DATA"
+          }
+        },
+        {
+          "trace_id": "STREAM-00b09ca8-5466-466f-a7d0-d20e4654ff28",
+          "sequence": 8,
+          "timestamp": "2026-08-18T13:24:11.992106+00:00",
+          "elapsed_ms": 142,
+          "event": "result_validating",
+          "capability": "DATA_QUERY",
+          "message": "正在校验结果值与业务口径",
+          "data": {
+            "stage": "RESULT_VALIDATING",
+            "route": "DATA_QUERY",
+            "status": "FAILED"
+          }
+        },
+        {
+          "trace_id": "STREAM-00b09ca8-5466-466f-a7d0-d20e4654ff28",
+          "sequence": 9,
+          "timestamp": "2026-08-18T13:24:12.018742+00:00",
+          "elapsed_ms": 169,
+          "event": "answer_delta",
+          "capability": "chatbi",
+          "message": "正在生成可验证回答",
+          "data": {
+            "text": "查询未完成，请检查语义范围或数据源状态。"
+          }
+        },
+        {
+          "trace_id": "STREAM-00b09ca8-5466-466f-a7d0-d20e4654ff28",
+          "sequence": 10,
+          "timestamp": "2026-08-18T13:24:12.021523+00:00",
+          "elapsed_ms": 172,
+          "event": "chart_ready",
+          "capability": "chatbi",
+          "message": "图表已准备",
+          "data": {}
+        },
+        {
+          "trace_id": "STREAM-00b09ca8-5466-466f-a7d0-d20e4654ff28",
+          "sequence": 11,
+          "timestamp": "2026-08-18T13:24:12.022331+00:00",
+          "elapsed_ms": 172,
+          "event": "completed",
+          "capability": "chatbi",
+          "message": "请求已完成",
+          "data": {
+            "status": "FAILED"
+          }
+        }
+      ],
       "final_status": "SUCCEEDED",
       "error_code": null,
       "expected_pass": true
@@ -12238,10 +14722,148 @@
       },
       "result_signature": null,
       "latency_by_stage": {
-        "openchatbi": 5.186,
-        "supersonic": 0.063
+        "openchatbi": 4.699,
+        "supersonic": 0.073
       },
-      "sse_events": [],
+      "sse_events": [
+        {
+          "trace_id": "STREAM-05dbabd9-e1f3-4164-8cb9-55c1e01e8709",
+          "sequence": 1,
+          "timestamp": "2026-08-18T13:24:12.107180+00:00",
+          "elapsed_ms": 3,
+          "event": "accepted",
+          "capability": "chatbi",
+          "message": "已接收请求",
+          "data": {
+            "conversation_id": "3611e5ac-708f-49cf-a42b-c719d15167de"
+          }
+        },
+        {
+          "trace_id": "STREAM-05dbabd9-e1f3-4164-8cb9-55c1e01e8709",
+          "sequence": 2,
+          "timestamp": "2026-08-18T13:24:12.112745+00:00",
+          "elapsed_ms": 9,
+          "event": "catalog_retrieving",
+          "capability": "DATA_QUERY",
+          "message": "正在检索业务目录",
+          "data": {
+            "stage": "UNDERSTANDING",
+            "route": "DATA_QUERY"
+          }
+        },
+        {
+          "trace_id": "STREAM-05dbabd9-e1f3-4164-8cb9-55c1e01e8709",
+          "sequence": 3,
+          "timestamp": "2026-08-18T13:24:12.113648+00:00",
+          "elapsed_ms": 9,
+          "event": "schema_linked",
+          "capability": "DATA_QUERY",
+          "message": "已识别候选表与字段",
+          "data": {
+            "stage": "SCHEMA_LINKED",
+            "route": "DATA_QUERY"
+          }
+        },
+        {
+          "trace_id": "STREAM-05dbabd9-e1f3-4164-8cb9-55c1e01e8709",
+          "sequence": 4,
+          "timestamp": "2026-08-18T13:24:12.115657+00:00",
+          "elapsed_ms": 11,
+          "event": "semantic_parsing",
+          "capability": "DATA_QUERY",
+          "message": "正在解析指标、维度、时间与过滤条件",
+          "data": {
+            "stage": "SEMANTIC_PARSING",
+            "route": "DATA_QUERY"
+          }
+        },
+        {
+          "trace_id": "STREAM-05dbabd9-e1f3-4164-8cb9-55c1e01e8709",
+          "sequence": 5,
+          "timestamp": "2026-08-18T13:24:12.117439+00:00",
+          "elapsed_ms": 13,
+          "event": "semantic_compiling",
+          "capability": "DATA_QUERY",
+          "message": "正在编译语义查询",
+          "data": {
+            "stage": "SEMANTIC_COMPILING",
+            "route": "DATA_QUERY"
+          }
+        },
+        {
+          "trace_id": "STREAM-05dbabd9-e1f3-4164-8cb9-55c1e01e8709",
+          "sequence": 6,
+          "timestamp": "2026-08-18T13:24:12.118797+00:00",
+          "elapsed_ms": 15,
+          "event": "sql_validating",
+          "capability": "DATA_QUERY",
+          "message": "正在执行只读 SQL 与权限校验",
+          "data": {
+            "stage": "SQL_VALIDATING",
+            "route": "DATA_QUERY"
+          }
+        },
+        {
+          "trace_id": "STREAM-05dbabd9-e1f3-4164-8cb9-55c1e01e8709",
+          "sequence": 7,
+          "timestamp": "2026-08-18T13:24:12.119764+00:00",
+          "elapsed_ms": 16,
+          "event": "sql_running",
+          "capability": "chatbi",
+          "message": "正在执行只读查询",
+          "data": {
+            "stage": "QUERYING_DATA"
+          }
+        },
+        {
+          "trace_id": "STREAM-05dbabd9-e1f3-4164-8cb9-55c1e01e8709",
+          "sequence": 8,
+          "timestamp": "2026-08-18T13:24:12.243574+00:00",
+          "elapsed_ms": 139,
+          "event": "result_validating",
+          "capability": "DATA_QUERY",
+          "message": "正在校验结果值与业务口径",
+          "data": {
+            "stage": "RESULT_VALIDATING",
+            "route": "DATA_QUERY",
+            "status": "FAILED"
+          }
+        },
+        {
+          "trace_id": "STREAM-05dbabd9-e1f3-4164-8cb9-55c1e01e8709",
+          "sequence": 9,
+          "timestamp": "2026-08-18T13:24:12.266333+00:00",
+          "elapsed_ms": 162,
+          "event": "answer_delta",
+          "capability": "chatbi",
+          "message": "正在生成可验证回答",
+          "data": {
+            "text": "查询未完成，请检查语义范围或数据源状态。"
+          }
+        },
+        {
+          "trace_id": "STREAM-05dbabd9-e1f3-4164-8cb9-55c1e01e8709",
+          "sequence": 10,
+          "timestamp": "2026-08-18T13:24:12.268487+00:00",
+          "elapsed_ms": 164,
+          "event": "chart_ready",
+          "capability": "chatbi",
+          "message": "图表已准备",
+          "data": {}
+        },
+        {
+          "trace_id": "STREAM-05dbabd9-e1f3-4164-8cb9-55c1e01e8709",
+          "sequence": 11,
+          "timestamp": "2026-08-18T13:24:12.269346+00:00",
+          "elapsed_ms": 165,
+          "event": "completed",
+          "capability": "chatbi",
+          "message": "请求已完成",
+          "data": {
+            "status": "FAILED"
+          }
+        }
+      ],
       "final_status": "FAILED",
       "error_code": "INVALID_RELATION",
       "expected_pass": true
@@ -12832,7 +15454,7 @@
         ],
         "row_count": 1,
         "truncated": false,
-        "duration_ms": 975,
+        "duration_ms": 2906,
         "datasource_id": "00239d69-00be-41b3-b740-03db864ba7f0",
         "dialect": "postgresql",
         "normalized_sql": "SELECT ROUND(CAST(SUM(f.net_amount - f.refund_amount) AS DECIMAL), 2) AS net_sales FROM \"chatbi_benchmark_v21\".fact_sales AS f WHERE f.order_status <> 'TEST' AND f.tenant_id = 1 LIMIT 100",
@@ -12847,11 +15469,149 @@
       },
       "result_signature": "d072d956c333d825774405d903ca6338485fd56c20be2b4a5c7472b228ad521d",
       "latency_by_stage": {
-        "openchatbi": 3.299,
-        "supersonic": 0.064,
-        "wren": 0.095
+        "openchatbi": 4.648,
+        "supersonic": 0.132,
+        "wren": 0.138
       },
-      "sse_events": [],
+      "sse_events": [
+        {
+          "trace_id": "STREAM-3ac12314-83dc-4626-8c32-87a23e886369",
+          "sequence": 1,
+          "timestamp": "2026-08-18T13:24:12.349885+00:00",
+          "elapsed_ms": 3,
+          "event": "accepted",
+          "capability": "chatbi",
+          "message": "已接收请求",
+          "data": {
+            "conversation_id": "5d102609-a067-4404-8231-f2c8f650704b"
+          }
+        },
+        {
+          "trace_id": "STREAM-3ac12314-83dc-4626-8c32-87a23e886369",
+          "sequence": 2,
+          "timestamp": "2026-08-18T13:24:12.355156+00:00",
+          "elapsed_ms": 8,
+          "event": "catalog_retrieving",
+          "capability": "DATA_QUERY",
+          "message": "正在检索业务目录",
+          "data": {
+            "stage": "UNDERSTANDING",
+            "route": "DATA_QUERY"
+          }
+        },
+        {
+          "trace_id": "STREAM-3ac12314-83dc-4626-8c32-87a23e886369",
+          "sequence": 3,
+          "timestamp": "2026-08-18T13:24:12.356042+00:00",
+          "elapsed_ms": 9,
+          "event": "schema_linked",
+          "capability": "DATA_QUERY",
+          "message": "已识别候选表与字段",
+          "data": {
+            "stage": "SCHEMA_LINKED",
+            "route": "DATA_QUERY"
+          }
+        },
+        {
+          "trace_id": "STREAM-3ac12314-83dc-4626-8c32-87a23e886369",
+          "sequence": 4,
+          "timestamp": "2026-08-18T13:24:12.356882+00:00",
+          "elapsed_ms": 10,
+          "event": "semantic_parsing",
+          "capability": "DATA_QUERY",
+          "message": "正在解析指标、维度、时间与过滤条件",
+          "data": {
+            "stage": "SEMANTIC_PARSING",
+            "route": "DATA_QUERY"
+          }
+        },
+        {
+          "trace_id": "STREAM-3ac12314-83dc-4626-8c32-87a23e886369",
+          "sequence": 5,
+          "timestamp": "2026-08-18T13:24:12.357798+00:00",
+          "elapsed_ms": 11,
+          "event": "semantic_compiling",
+          "capability": "DATA_QUERY",
+          "message": "正在编译语义查询",
+          "data": {
+            "stage": "SEMANTIC_COMPILING",
+            "route": "DATA_QUERY"
+          }
+        },
+        {
+          "trace_id": "STREAM-3ac12314-83dc-4626-8c32-87a23e886369",
+          "sequence": 6,
+          "timestamp": "2026-08-18T13:24:12.360494+00:00",
+          "elapsed_ms": 14,
+          "event": "sql_validating",
+          "capability": "DATA_QUERY",
+          "message": "正在执行只读 SQL 与权限校验",
+          "data": {
+            "stage": "SQL_VALIDATING",
+            "route": "DATA_QUERY"
+          }
+        },
+        {
+          "trace_id": "STREAM-3ac12314-83dc-4626-8c32-87a23e886369",
+          "sequence": 7,
+          "timestamp": "2026-08-18T13:24:12.363131+00:00",
+          "elapsed_ms": 16,
+          "event": "sql_running",
+          "capability": "chatbi",
+          "message": "正在执行只读查询",
+          "data": {
+            "stage": "QUERYING_DATA"
+          }
+        },
+        {
+          "trace_id": "STREAM-3ac12314-83dc-4626-8c32-87a23e886369",
+          "sequence": 8,
+          "timestamp": "2026-08-18T13:24:12.497283+00:00",
+          "elapsed_ms": 150,
+          "event": "result_validating",
+          "capability": "DATA_QUERY",
+          "message": "正在校验结果值与业务口径",
+          "data": {
+            "stage": "RESULT_VALIDATING",
+            "route": "DATA_QUERY",
+            "status": "FAILED"
+          }
+        },
+        {
+          "trace_id": "STREAM-3ac12314-83dc-4626-8c32-87a23e886369",
+          "sequence": 9,
+          "timestamp": "2026-08-18T13:24:12.522404+00:00",
+          "elapsed_ms": 175,
+          "event": "answer_delta",
+          "capability": "chatbi",
+          "message": "正在生成可验证回答",
+          "data": {
+            "text": "查询未完成，请检查语义范围或数据源状态。"
+          }
+        },
+        {
+          "trace_id": "STREAM-3ac12314-83dc-4626-8c32-87a23e886369",
+          "sequence": 10,
+          "timestamp": "2026-08-18T13:24:12.524232+00:00",
+          "elapsed_ms": 177,
+          "event": "chart_ready",
+          "capability": "chatbi",
+          "message": "图表已准备",
+          "data": {}
+        },
+        {
+          "trace_id": "STREAM-3ac12314-83dc-4626-8c32-87a23e886369",
+          "sequence": 11,
+          "timestamp": "2026-08-18T13:24:12.524711+00:00",
+          "elapsed_ms": 178,
+          "event": "completed",
+          "capability": "chatbi",
+          "message": "请求已完成",
+          "data": {
+            "status": "FAILED"
+          }
+        }
+      ],
       "final_status": "SUCCEEDED",
       "error_code": null,
       "expected_pass": true

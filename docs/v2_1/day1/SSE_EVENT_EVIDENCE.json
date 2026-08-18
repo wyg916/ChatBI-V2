@@ -1,41 +1,114 @@
 {
-  "executed_at": "2026-08-18T18:31:20+08:00",
-  "base_git_sha": "6cdbf12f6c2e8494afe21262fd092795c4f784c3",
-  "command": "python scripts/performance/run_v21_performance.py --env-file <redacted> --base-url http://127.0.0.1:8000/api/v1 --concurrency 4 --duration-minutes 0.5 --db-repeats 3 --output artifacts/v2_1_data10m/day1_sse_baseline.json",
-  "raw_evidence": "artifacts/v2_1_data10m/day1_sse_baseline.json",
-  "requests": 91,
-  "errors": 0,
-  "all_query_sse_rate": 1.0,
-  "completed_rate": 1.0,
-  "routes": {
-    "DATA_QUERY": 23,
-    "KNOWLEDGE_QUERY": 22,
-    "HYBRID_ANALYSIS": 23,
-    "COMPLEX_ANALYSIS": 23
+  "executed_at": "2026-08-18T13:52:14.717724+00:00",
+  "git_sha": "57ab853bfa92bab6e76bcd24020b00903409a6bb",
+  "raw_evidence_paths": {
+    "strict_performance": "temp/day1/final-performance-strict.json",
+    "over10_performance": "temp/day1/final-performance-over10-c60.json",
+    "semantic": "temp/day1/final-semantic-cases.json",
+    "phase2": "temp/day1/phase2-runtime-acceptance.json",
+    "cold_start": "temp/day1/cold-start.json"
   },
-  "events": {
-    "accepted": 91,
-    "catalog_retrieving": 114,
-    "schema_linked": 69,
-    "semantic_parsing": 69,
-    "semantic_compiling": 69,
-    "sql_validating": 69,
-    "sql_running": 46,
-    "result_validating": 137,
-    "knowledge_retrieving": 91,
-    "answer_delta": 137,
-    "chart_ready": 69,
-    "heartbeat": 5,
-    "completed": 91
-  },
-  "envelope_errors": [],
-  "unauthenticated_sse_401": true,
-  "cancellation": {
-    "cleanup_ms": 264.684,
-    "connection_leak_count": 0,
-    "task_leak_count": 0
-  },
-  "cross_workspace_sse_leak": 0,
   "failures": [],
-  "rollback": "Revert the Day 1 SSE lifecycle and protocol changes; no migration is required."
+  "blockers": [],
+  "frozen_zone_intersection": [
+    ".env.example",
+    "backend/app/api/routes/analysis.py",
+    "backend/app/api/routes/chat.py",
+    "backend/app/core/config.py",
+    "backend/app/query/oracle.py",
+    "backend/app/query/service.py",
+    "backend/app/semantic/engine.py",
+    "backend/app/services/chat.py",
+    "backend/scripts/phase2_runtime_acceptance.py",
+    "backend/tests/test_phase2_auth_chat_attachments.py",
+    "docker-compose.yml",
+    "frontend/e2e/day3-product-loop.spec.ts",
+    "frontend/e2e/day5-rag-multiagent.spec.ts",
+    "frontend/e2e/global-setup.ts",
+    "frontend/src/api/chat.ts",
+    "frontend/src/pages/AskExperience.tsx"
+  ],
+  "frozen_blob_overwrite_count": 0,
+  "migration_impact": "No new Alembic revision; online round trip returned to 20260818_0009 head.",
+  "license_impact": "Eight upstreams locked; clean-room semantic adapters copy no upstream source, UI, logo, or binary.",
+  "rollback": "Set CHATBI_SEMANTIC_RUNTIME_MODE=local; revert Day 1 integration commits for SSE/data scripts; no metadata migration rollback is required.",
+  "commands": [
+    "python scripts/performance/run_v21_performance.py --env-file <local-env> --base-url http://127.0.0.1:8000/api/v1 --concurrency 4 --duration-minutes 0.5 --db-repeats 3 --output temp/day1/final-performance-strict.json",
+    "python scripts/performance/run_v21_performance.py --env-file <local-env> --base-url http://127.0.0.1:8000/api/v1 --concurrency 60 --duration-minutes 0.2 --db-repeats 1 --output temp/day1/final-performance-over10-c60.json"
+  ],
+  "test_count": 132,
+  "strict_profile": {
+    "concurrency": 4,
+    "duration_seconds": 30,
+    "requests": 106,
+    "errors": 0,
+    "error_rate": 0.0,
+    "all_query_sse_rate": 1.0,
+    "completed_rate": 1.0,
+    "ttfe_p50_ms": 50.573,
+    "ttfe_p95_ms": 213.104,
+    "request_p95_ms": 2315.37,
+    "heartbeat_max_gap_ms": 2508.131,
+    "over_10s_requests": 0,
+    "over_10s_streaming_rate": 1.0,
+    "events": {
+      "accepted": 106,
+      "catalog_retrieving": 133,
+      "progress": 827,
+      "schema_linked": 80,
+      "semantic_parsing": 80,
+      "semantic_compiling": 80,
+      "sql_validating": 80,
+      "sql_running": 53,
+      "knowledge_retrieving": 107,
+      "result_validating": 160,
+      "answer_delta": 160,
+      "chart_ready": 80,
+      "completed": 106,
+      "result": 106,
+      "heartbeat": 3
+    },
+    "routes": {
+      "DATA_QUERY": 26,
+      "HYBRID_ANALYSIS": 27,
+      "KNOWLEDGE_QUERY": 26,
+      "COMPLEX_ANALYSIS": 27
+    },
+    "envelope_errors": [],
+    "unauthenticated_sse_401": true,
+    "cancellation": {
+      "cleanup_ms": 250.802,
+      "connection_leak_count": 0,
+      "task_leak_count": 0,
+      "diagnostics": {
+        "active_connections": 0,
+        "active_tasks": 0,
+        "trace_ids": []
+      }
+    },
+    "sse_leak_count": 0,
+    "error_samples": []
+  },
+  "non_vacuous_long_request_profile": {
+    "concurrency": 60,
+    "duration_seconds": 12,
+    "requests": 118,
+    "over_10s_requests": 26,
+    "over_10s_streaming_rate": 1.0,
+    "errors": 0
+  },
+  "gate": {
+    "all_query_sse_rate": 1.0,
+    "ttfe_p50_ms": 50.573,
+    "ttfe_p95_ms": 213.104,
+    "heartbeat_max_gap_ms": 2508.131,
+    "cancel_cleanup_ms": 250.802,
+    "over_10s_requests": 26,
+    "over_10s_streaming_rate": 1.0,
+    "sse_connection_leak": 0,
+    "sse_task_leak": 0,
+    "unauthenticated_sse_401": true,
+    "cross_workspace_sse_leak": 0,
+    "envelope_errors": []
+  }
 }

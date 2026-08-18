@@ -1,0 +1,158 @@
+{
+  "executed_at": "2026-08-18T13:52:14.717724+00:00",
+  "git_sha": "57ab853bfa92bab6e76bcd24020b00903409a6bb",
+  "raw_evidence_paths": {
+    "strict_performance": "temp/day1/final-performance-strict.json",
+    "over10_performance": "temp/day1/final-performance-over10-c60.json",
+    "semantic": "temp/day1/final-semantic-cases.json",
+    "phase2": "temp/day1/phase2-runtime-acceptance.json",
+    "cold_start": "temp/day1/cold-start.json"
+  },
+  "failures": [],
+  "blockers": [],
+  "frozen_zone_intersection": [
+    ".env.example",
+    "backend/app/api/routes/analysis.py",
+    "backend/app/api/routes/chat.py",
+    "backend/app/core/config.py",
+    "backend/app/query/oracle.py",
+    "backend/app/query/service.py",
+    "backend/app/semantic/engine.py",
+    "backend/app/services/chat.py",
+    "backend/scripts/phase2_runtime_acceptance.py",
+    "backend/tests/test_phase2_auth_chat_attachments.py",
+    "docker-compose.yml",
+    "frontend/e2e/day3-product-loop.spec.ts",
+    "frontend/e2e/day5-rag-multiagent.spec.ts",
+    "frontend/e2e/global-setup.ts",
+    "frontend/src/api/chat.ts",
+    "frontend/src/pages/AskExperience.tsx"
+  ],
+  "frozen_blob_overwrite_count": 0,
+  "migration_impact": "No new Alembic revision; online round trip returned to 20260818_0009 head.",
+  "license_impact": "Eight upstreams locked; clean-room semantic adapters copy no upstream source, UI, logo, or binary.",
+  "rollback": "Set CHATBI_SEMANTIC_RUNTIME_MODE=local; revert Day 1 integration commits for SSE/data scripts; no metadata migration rollback is required.",
+  "commands": [
+    "python -m pytest",
+    "npm run typecheck",
+    "npm test -- --reporter=dot",
+    "npm run build",
+    "npm run e2e -- --workers=1",
+    "alembic heads; alembic upgrade head; alembic downgrade -1; alembic upgrade head",
+    "scripts/launch.ps1 -NoOpen -SkipBuild",
+    "scripts/test-release-cold-start.ps1 -EvidencePath temp/day1/cold-start.json"
+  ],
+  "test_count": 357,
+  "backend": {
+    "status": "PASS",
+    "passed": 173
+  },
+  "frontend": {
+    "typecheck": "PASS",
+    "unit_passed": 29,
+    "build": "PASS",
+    "transformed_modules": 734
+  },
+  "browser_e2e": {
+    "status": "PASS",
+    "passed": 55,
+    "console_errors": 0,
+    "page_errors": 0,
+    "blocking_request_errors": 0
+  },
+  "semantic": {
+    "coverage": "20/20",
+    "golden": "20/20",
+    "failures": []
+  },
+  "phase2_runtime": {
+    "total": 60,
+    "category_counts": {
+      "DATA_QUERY": 15,
+      "KNOWLEDGE_QUERY": 10,
+      "HYBRID_OR_COMPLEX": 10,
+      "FOLLOW_UP": 10,
+      "GENERAL_CHAT": 5,
+      "FILE_QUERY": 5,
+      "MULTIMODAL_QUERY": 5
+    },
+    "open_ended_request_runtime_rate": 1.0,
+    "question_route_coverage": "60/60",
+    "route_failures": [],
+    "trace_complete": "60/60",
+    "trace_failures": [],
+    "follow_up_context_pass": "10/10",
+    "follow_up_failures": [],
+    "data_sql_execution_rate": 1.0,
+    "data_result_value_accuracy": 1.0,
+    "knowledge_citation_accuracy": 1.0,
+    "knowledge_cited_count": 7,
+    "file_result_accuracy": 1.0,
+    "file_failures": [],
+    "image_question_accuracy": 1.0,
+    "image_failures": [],
+    "unsupported_request_hallucination": 0,
+    "status_counts": {
+      "SUCCEEDED": 58,
+      "REFUSED": 1,
+      "PARTIAL": 1
+    },
+    "route_counts": {
+      "DATA_QUERY": 23,
+      "KNOWLEDGE_QUERY": 9,
+      "UNSUPPORTED": 1,
+      "HYBRID_ANALYSIS": 7,
+      "COMPLEX_ANALYSIS": 5,
+      "GENERAL_CHAT": 4,
+      "CLARIFICATION": 1,
+      "FILE_QUERY": 5,
+      "MULTIMODAL_QUERY": 5
+    }
+  },
+  "migration": {
+    "single_head": "20260818_0009",
+    "round_trip": "PASS"
+  },
+  "docker": {
+    "build": "PASS",
+    "from_stopped_start_1": "PASS",
+    "from_stopped_start_2": "PASS",
+    "database_containers": 0
+  },
+  "cold_start": {
+    "timestamp": "2026-08-18T21:46:54.2856165+08:00",
+    "cold_start": "PASS",
+    "duration_seconds": 76.8,
+    "project_metadata": "ISOLATED_TEMPORARY_POSTGRES_SCHEMA",
+    "demo_business_data": "EXISTING_REPRODUCIBLE_LOCAL_DATA_READ_ONLY",
+    "local_external_database": "PRESERVED",
+    "bootstrap": "PASS",
+    "migration": "20260818_0009_HEAD",
+    "demo_data": "POSTGRESQL_READY_MYSQL_READY",
+    "backend": "HTTP_200",
+    "frontend": "HTTP_200",
+    "authentication": "ADMIN_SESSION_READY_TOKEN_NOT_RECORDED",
+    "ask": "SUCCEEDED_ORACLE_PASSED",
+    "evaluation": "GOLDEN50_PASS",
+    "model_provider_configuration": "KIMI_MIMO_DEEPSEEK_READY_SECRETS_HIDDEN",
+    "cleanup": "PASS",
+    "stage": "COMPLETE",
+    "secrets_recorded": false
+  },
+  "one_click_start": "PASS",
+  "data_manifest": {
+    "status": "PASS",
+    "counts": {
+      "dim_date": 1096,
+      "dim_region": 50,
+      "dim_product": 50000,
+      "dim_customer": 300000,
+      "fact_sales": 10000000,
+      "fact_payment": 5000000,
+      "golden_expected_result": 100
+    },
+    "data_signature": "34b8ec8023f410ea387003475f84bd63b05743580138ea919880979caf86af4c"
+  },
+  "secret_scan": "PASS_NO_HIGH_CONFIDENCE_CREDENTIAL_PATTERN_IN_TRACKED_FILES",
+  "license_draft": "PASS_8_UPSTREAMS"
+}

@@ -1,6 +1,6 @@
 {
-  "executed_at": "2026-08-18T13:08:34.885434+00:00",
-  "git_sha": "ac1f43506e7cd2a51bf8db11af7233606ef6eb63",
+  "executed_at": "2026-08-18T13:52:14.477722+00:00",
+  "git_sha": "57ab853bfa92bab6e76bcd24020b00903409a6bb",
   "command": "python backend/scripts/run_v21_semantic_cases.py --env-file <local-env> --datasource-id <datasource-id> --semantic-model-id <semantic-model-id> --output temp/day1/semantic-cases.json",
   "test_count": 20,
   "raw_evidence_path": "temp/day1/semantic-cases.json",
