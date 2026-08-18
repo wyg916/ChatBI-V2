@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import re
 from dataclasses import dataclass
+from collections import Counter
 from math import log
 
 from sqlalchemy import exists, or_, select
@@ -77,8 +78,10 @@ def retrieve(
     query: str,
     identity: RuntimeIdentity,
     limit: int,
+    scenario_id: str = "charging_ops",
 ) -> tuple[RetrievedChunk, ...]:
     validate_identity(db, identity)
+    canonical_scenario_id = "charging_ops" if scenario_id in {"chatbi-v1", "charging_ops"} else scenario_id
     acl_predicates = [
         (KnowledgeAcl.principal_type == "WORKSPACE")
         & (KnowledgeAcl.principal_value == identity.workspace_id),
@@ -122,39 +125,55 @@ def retrieve(
     query_tokens = _tokens(query)
     if not query_tokens:
         return ()
-    ranked: list[tuple[float, RetrievedChunk]] = []
+    candidates: list[tuple[RetrievedChunk, frozenset[str], Counter[str]]] = []
     for chunk, version, document, source in rows:
         if any(pattern.search(chunk.content) for pattern in _INJECTION):
+            continue
+        document_metadata = document.metadata_payload or {}
+        if str(document_metadata.get("scenario_id") or "charging_ops") != canonical_scenario_id:
             continue
         metadata = chunk.metadata_payload or {}
         searchable = " ".join(
             (document.title, chunk.content, " ".join(metadata.get("keywords", [])))
         )
         candidate_tokens = _tokens(searchable)
-        overlap = query_tokens.intersection(candidate_tokens)
-        if not overlap:
+        token_counts = Counter(_WORD.findall(searchable.lower()))
+        if not query_tokens.intersection(candidate_tokens):
             continue
-        coverage = len(overlap) / max(1, len(query_tokens))
-        specificity = sum(1.0 + log(1 + len(token)) for token in overlap)
-        score = min(1.0, 0.55 * coverage + 0.45 * specificity / (specificity + 4.0))
         locator = chunk.locator or {}
-        ranked.append(
-            (
-                score,
-                RetrievedChunk(
-                    document_id=document.id,
-                    document_version_id=version.id,
-                    chunk_id=chunk.id,
-                    title=document.title,
-                    text=chunk.content,
-                    source=f"{source.name}:{document.source_path}",
-                    locator=str(locator.get("section") or f"chunk:{chunk.ordinal}"),
-                    score=round(score, 6),
-                ),
-            )
+        candidates.append((RetrievedChunk(
+            document_id=document.id,
+            document_version_id=version.id,
+            chunk_id=chunk.id,
+            title=document.title,
+            text=chunk.content,
+            source=f"{source.name}:{document.source_path}",
+            locator=str(locator.get("section") or f"chunk:{chunk.ordinal}"),
+            score=0,
+        ), candidate_tokens, token_counts))
+    if not candidates:
+        return ()
+
+    document_frequency = Counter(token for _, tokens, _ in candidates for token in query_tokens if token in tokens)
+    bm25_scores: dict[str, float] = {}
+    vector_scores: dict[str, float] = {}
+    for item, tokens, counts in candidates:
+        bm25_scores[item.chunk_id] = sum(
+            (counts.get(token, 0) / (counts.get(token, 0) + 1.2))
+            * log((len(candidates) + 1) / (document_frequency[token] + 0.5) + 1)
+            for token in query_tokens
         )
-    ranked.sort(key=lambda item: (-item[0], item[1].chunk_id))
-    return tuple(item[1] for item in ranked[:limit])
+        vector_scores[item.chunk_id] = len(query_tokens & tokens) / max(1, len(query_tokens | tokens))
+    bm25_rank = {item.chunk_id: index for index, (item, _, _) in enumerate(sorted(candidates, key=lambda row: (-bm25_scores[row[0].chunk_id], row[0].chunk_id)), 1)}
+    vector_rank = {item.chunk_id: index for index, (item, _, _) in enumerate(sorted(candidates, key=lambda row: (-vector_scores[row[0].chunk_id], row[0].chunk_id)), 1)}
+    reranked: list[tuple[float, RetrievedChunk]] = []
+    for item, tokens, _ in candidates:
+        rrf = 1 / (60 + bm25_rank[item.chunk_id]) + 1 / (60 + vector_rank[item.chunk_id])
+        coverage = len(query_tokens & tokens) / max(1, len(query_tokens))
+        final = min(1.0, rrf * 15 + coverage * 0.5)
+        reranked.append((final, RetrievedChunk(**{**item.__dict__, "score": round(final, 6)})))
+    reranked.sort(key=lambda row: (-row[0], row[1].chunk_id))
+    return tuple(item for _, item in reranked[:limit])
 
 
 def content_hash(text: str) -> str:

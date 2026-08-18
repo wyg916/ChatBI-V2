@@ -1,0 +1,18 @@
+{
+  "schema_version": "2.1-day2-evidence-v1",
+  "tested_sha": "b77219d0da23ef2724843a749ccf4ce1b0d7f475",
+  "executed_at": "2026-08-19T02:01:01+08:00",
+  "command": "python -m pytest tests/test_v21_rag_agent_file_product.py tests/test_legacy_rag_agent_integration.py -q",
+  "manifest": "evaluation/golden/v2.1-agent-15.json",
+  "manifest_sha256": "82932ac218dd9216fcb9215c278b96265989e5256389e2abe89e427560ce0c8b",
+  "cases": 15,
+  "passed": 15,
+  "success_rate": 1.0,
+  "tool_calls_per_success": 6,
+  "trace_complete_rate": 1.0,
+  "max_depth_observed": 1,
+  "allowed_roles": ["PlannerAgent", "DataAnalystAgent", "KnowledgeAgent", "VerificationAgent", "InsightAgent"],
+  "allowed_tools": ["QUERY_DATA", "RETRIEVE_KNOWLEDGE", "VERIFY_RESULT", "VERIFY_CITATION", "GENERATE_CHART", "GENERATE_INSIGHT"],
+  "failures": [],
+  "blockers": []
+}

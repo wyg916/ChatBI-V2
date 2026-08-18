@@ -1,0 +1,33 @@
+{
+  "schema_version": "2.1-day2-evidence-v1",
+  "tested_sha": "b77219d0da23ef2724843a749ccf4ce1b0d7f475",
+  "executed_at": "2026-08-19T02:01:01+08:00",
+  "commands": [
+    "python -m pytest tests/test_v21_rag_agent_file_product.py tests/test_rag_runtime_v1.py tests/test_legacy_rag_agent_integration.py tests/test_phase2_auth_chat_attachments.py -q",
+    "npm test -- --run src/test/ask-page.test.tsx"
+  ],
+  "test_counts": {"backend_targeted": 35, "frontend_ask": 9, "knowledge_golden": 20},
+  "actual_metrics": {
+    "citation_accuracy": 1.0,
+    "unauthorized_recall": 0,
+    "cross_workspace_recall": 0,
+    "cross_scenario_recall": 0,
+    "prompt_injection_evidence_used": 0,
+    "frontend_citation_display": "PASS",
+    "answer_guard_no_evidence_refusal": "PASS",
+    "trace_complete_rate": 1.0
+  },
+  "identity_boundary": "workspace, user, role, signed trace context and KnowledgeAcl are validated before ranking",
+  "runtime_boundary": "parser and project-authored deterministic token vector/BM25/RRF/rerank; no external code copied",
+  "raw_hashes": {
+    "knowledge_manifest_sha256": "5e51bc19ab29bcc5293078211e7d4891490a2405d883545afa959b763d141c41",
+    "product_test_sha256": "36dda97c7d97c07ee863a80e8f5ce27696099fc01ab1bfd40f2e6d7980a8ddc4"
+  },
+  "frozen_zone_intersection": [],
+  "migration_impact": "NONE",
+  "license_impact": "Clean-room implementation; no DB-GPT, legacy RAG or other third-party source copied.",
+  "security_result": "PASS",
+  "failures": [],
+  "blockers": [],
+  "rollback": "Revert the D merge commit; the prior signed ACL RAG runtime remains available."
+}

@@ -76,6 +76,27 @@ describe('问数据真实多轮界面', () => {
     expect(queryMocks.feedback).toHaveBeenCalledWith('query-1', 'HELPFUL'); expect(queryMocks.save).toHaveBeenCalledWith('query-1');
   });
 
+  it('展示受控知识引用、固定 Agent 阶段与文件 Artifact，不暴露内部思维', async () => {
+    chatMocks.conversation.mockResolvedValueOnce({
+      ...conversation,
+      messages: [{
+        id: 'assistant-governed', conversation_id: conversation.id, role: 'assistant', content: '已完成受控分析。',
+        route: 'COMPLEX_ANALYSIS', status: 'SUCCEEDED', attachment_ids: [],
+        response_payload: {
+          analysis: { primary: { steps: [{ code: 'VERIFY', agent_role: 'VerificationAgent', tool_name: 'VERIFY_RESULT', status: 'SUCCEEDED' }], knowledge: { citations: [{ citation_id: 'citation-1', title: '收入口径', text: '退款在确认后冲减收入。', document_version_id: 'version-1', locator: '第 2 节', chunk_id: 'chunk-1' }] } } },
+          file_analysis: { operation: 'SUM', trace: { complete: true }, artifacts: [{ attachment_id: 'attachment-1', csv_url: '/api/v1/attachments/attachment-1/artifact?format=csv', json_url: '/api/v1/attachments/attachment-1/artifact?format=json' }] },
+        },
+        trace_payload: { trace_id: 'TRACE-GOVERNED-1' }, created_at: '2026-08-18T00:00:02Z',
+      }],
+    } as ConversationDetail);
+    renderAsk();
+    expect(await screen.findByTestId('citation-evidence')).toHaveTextContent('版本 version-1');
+    expect(screen.getByTestId('agent-step-evidence')).toHaveTextContent('VerificationAgent');
+    expect(screen.getByTestId('agent-step-evidence')).toHaveTextContent('不展示内部思维');
+    expect(screen.getByTestId('file-analysis-evidence')).toHaveTextContent('SUM');
+    expect(screen.getByRole('link', { name: '下载 CSV Artifact' })).toHaveAttribute('href', '/api/v1/attachments/attachment-1/artifact?format=csv');
+  });
+
   it('流式生成期间可停止且取消不显示伪错误', async () => {
     chatMocks.stream.mockImplementationOnce((_input: ChatInput, _progress: unknown, signal: AbortSignal) => new Promise((_resolve, reject) => {
       signal.addEventListener('abort', () => reject(new DOMException('Aborted', 'AbortError')), { once: true });

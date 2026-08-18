@@ -1,0 +1,29 @@
+{
+  "schema_version": "2.1-day2-evidence-v1",
+  "tested_sha": "b77219d0da23ef2724843a749ccf4ce1b0d7f475",
+  "executed_at": "2026-08-19T02:01:01+08:00",
+  "commands": [
+    "python -m pytest tests/test_v21_rag_agent_file_product.py tests/test_phase2_auth_chat_attachments.py -q",
+    "npm test -- --run src/test/ask-page.test.tsx"
+  ],
+  "test_counts": {"file_cases": 10, "file_and_attachment_tests": 10, "frontend_ask": 9},
+  "actual_metrics": {
+    "file_result_accuracy": 1.0,
+    "sandbox_escape": 0,
+    "host_credential_access": 0,
+    "database_credential_access": 0,
+    "provider_secret_access": 0,
+    "unrestricted_network": 0,
+    "cross_workspace_file_access": 0,
+    "resource_cleanup": "PASS"
+  },
+  "sandbox_equivalence": "No model-generated or user-supplied Python is executed. A fixed-operation interpreter receives only validated, workspace-scoped extracted previews capped at 100 rows and emits capped validated JSON plus authenticated artifacts. This removes the executable surface that would otherwise require a Docker code sandbox.",
+  "raw_hashes": {"file_manifest_sha256": "b552bacad47e1afa6264de844394ad31cdf8174ec2801c761e087e20a513da01"},
+  "frozen_zone_intersection": [],
+  "migration_impact": "NONE",
+  "license_impact": "PandasAI is not imported. No ee or enterprise-licensed path is used; pandas remains the pre-existing published dependency.",
+  "security_result": "PASS",
+  "failures": [],
+  "blockers": [],
+  "rollback": "Revert the D merge commit; document and image analysis remain on the previous grounded routes."
+}

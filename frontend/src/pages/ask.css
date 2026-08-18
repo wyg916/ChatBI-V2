@@ -574,6 +574,15 @@
 .attachment-strip > span.failed { border-color: #efbec7; color: #c43e56; }
 .attachment-strip b { display: grid; place-items: center; width: 22px; height: 22px; border-radius: 6px; background: #eeedff; color: #5558d8; }
 .attachment-strip button { border: 0; background: transparent; color: inherit; }
+.citation-evidence,.agent-step-evidence,.file-analysis-evidence { margin-top: 12px; padding: 12px; border: 1px solid #e2e6f0; border-radius: 10px; background: #fafbfe; }
+.citation-evidence h3,.agent-step-evidence h3,.file-analysis-evidence h3 { margin: 0 0 8px; font-size: 13px; }
+.citation-evidence article { padding: 8px 0; border-top: 1px solid #eceef5; }
+.citation-evidence article p { margin: 4px 0; }
+.citation-evidence small,.agent-step-evidence small,.agent-step-evidence footer { color: #657086; }
+.agent-step-evidence div { display: grid; grid-template-columns: 24px 1fr 1fr auto; gap: 8px; align-items: center; padding: 6px 0; }
+.agent-step-evidence div span { display: grid; place-items: center; width: 22px; height: 22px; border-radius: 50%; background: #ececff; color: #5558d8; }
+.file-analysis-evidence span { display: flex; gap: 12px; }
+.file-analysis-evidence a { color: #5558d8; font-weight: 600; }
 
 @media (max-width: 1450px) {
   .chat-workspace { grid-template-columns: 195px minmax(0, 1fr); }

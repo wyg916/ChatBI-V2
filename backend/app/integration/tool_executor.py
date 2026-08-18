@@ -108,7 +108,7 @@ class ChatBIToolExecutor:
             result = self.rag_adapter.retrieve(
                 RagRequest(
                     query=str(call.arguments.get("question") or ""),
-                    scenario_id="chatbi-v1",
+                    scenario_id="charging_ops",
                     context=RagExecutionContext(
                         workspace_id=context.workspace_id,
                         user_id=context.user_id,
