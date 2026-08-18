@@ -126,7 +126,10 @@ export interface EvaluationRun {
   trend_points: Array<{ date: string; value: number }>; completed_at: string; duration_seconds: number;
   manifest_sha256?: string; sql_execution_pass_count: number; result_value_pass_count: number; semantic_pass_count: number;
   dangerous_sql_total: number; dangerous_sql_block_count: number;
+  profile?: EvaluationProfile; accuracy?: Record<string, number>; release_gate?: Record<string, unknown>; multiple_ground_truth?: boolean;
 }
+export interface EvaluationProfile { model: string; prompt: string; semantic_engine: string; nl2sql_engine: string; version: string }
+export interface EvaluationCreate { name: string; profile: EvaluationProfile }
 export interface EvaluationMetric { key: string; label: string; value: number; unit: string; change: number }
 export interface EvaluationOverview { current: EvaluationRun; metrics: EvaluationMetric[]; comparisons: EvaluationRun[] }
 export interface EvaluationCaseResult {
@@ -137,6 +140,27 @@ export interface EvaluationCaseResult {
 }
 export interface EvaluationRunDetail { run: EvaluationRun; cases: EvaluationCaseResult[] }
 export interface EvaluationCaseDetail { run: EvaluationRun; case: EvaluationCaseResult; previous_case_id?: string; next_case_id?: string }
+export interface EvaluationComparison { axes: string[]; runs: EvaluationRun[]; metrics: Array<{ key: string; values: Array<{ run_id: string; value: number }> }>; winner_run_id?: string }
+export interface EvaluationDashboard {
+  current: EvaluationRun;
+  accuracy_cards: Array<{ key: string; label: string; value: number; passed: boolean }>;
+  error_analysis: Array<{ category: string; count: number }>;
+  release_gate: { run_id: string; status: string; thresholds: Record<string, number>; metrics: Record<string, number>; checks: Array<{ key: string; passed: boolean }> };
+  comparison_axes: string[];
+}
+export interface FeedbackCandidate { answer_id: string; question: string; sql: string; score: number; version: number; status: string }
+export interface FeedbackWorkflow {
+  answer_id: string; query_run_id?: string; status: string; workflow_state: string; question: string;
+  corrected_sql?: string; oracle_status?: string; version: number; feedback: Record<string, unknown>;
+}
+export interface FeedbackDashboard {
+  terminology: Array<{ term: string; synonyms: string[]; definition: string; mapped_object: string }>;
+  sql_examples: FeedbackCandidate[]; workflows: FeedbackWorkflow[]; total_replays: number; passed_replays: number; feedback_replay_rate: number;
+}
+export interface FeedbackReplay {
+  candidate: FeedbackCandidate; query_run_id: string; guard_status: string; oracle_status: string;
+  result_signature?: string; replay_passed: boolean; replay_rate: number;
+}
 
 export interface QueryExecution {
   status?: 'SUCCEEDED' | 'FAILED' | 'TIMEOUT' | 'CONCURRENCY_LIMIT';

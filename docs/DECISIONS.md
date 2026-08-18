@@ -149,3 +149,7 @@ Phase 2 起，普通输入、示例问题、推荐追问、文件和图片都通
 ## ADR-033：v2.1 默认语义运行链使用三个 clean-room 兼容 Adapter
 
 ADR-005 关于“Wren runtime 尚不可用”的历史结论被本 ADR 覆盖，但不删除。Day 1 默认 `DATA_QUERY` 依次调用 OpenChatBI-compatible Hybrid Catalog/Schema Linking、SuperSonic-compatible SemanticQuery 和 Wren-compatible MDL/dry-plan/Semantic SQL，再进入既有 SQLGlot、只读 QueryExecutor 与 ResultOracle。三项 Adapter 都由 ChatBI 自行实现，只依据已审计的公开概念和契约，不复制第三方内部类、目录、UI、品牌或受限代码。Trace 保存候选对象、置信度、Evidence、SemanticQuery、MDL 映射覆盖率和 dry-plan，不保存模型私有推理。Workspace 是检索缓存键的第一维。`CHATBI_SEMANTIC_RUNTIME_MODE=local` 是显式回滚，不是默认或 Shadow 模式。
+
+## ADR-034：V2.1 Evaluation 与反馈复用既有证据表，核心 QueryPipeline 保持冻结
+
+V2.1 的 IBM-compatible EvaluationAdapter 只比较 ChatBI 正式 QueryPipeline 已执行的结果，不持有数据库连接，也不以 SQL 文本相等代替正确性。Multiple Ground Truth、八类准确率、Result Diff 与错误分析进入 `EvaluationCaseResult.actual`；评测 Profile 暂存为 `EvaluationRun.trend_points` 的类型化 metadata，并在 API 输出时过滤。SQLBot 仅作产品流程参考，错误修正通过 `VerifiedAnswer.feedback` 与 `AnswerVersion` 保存，只有人工审核且 Oracle PASS 的 SQL 才能晋升；回放时 Verified SQL 仍重新进入 Context、NL2SQL、SQL Guard、只读 Query Executor 和 Result Oracle。专用表和每运行 Provider/Prompt/Engine 注入由 `docs/integration_requests/EVAL_FEEDBACK_INTEGRATION_REQUEST.md` 交给主控 Migration/Runtime 统一处理。

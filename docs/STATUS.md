@@ -70,3 +70,11 @@
 - 新增 Alembic 版本 `20260817_0003` 与评测运行元数据。评测中心总览的 Golden Set、SQL 生成率、结果集准确率、语义理解准确率、相关性、响应时间、错误分布、趋势和版本对比均由 `/api/v1/evaluation/overview` 返回数据库记录；“运行全部评测”等尚未连接评测执行器的写操作只显示真实未接入提示，不伪造运行成功。
 - 本轮专项验收：经营看板/评测 Backend API 测试 5/5、目标页面 Vitest 2/2、目标流程 Playwright E2E 1/1、TypeScript 与 Vite 生产构建通过；E2E 覆盖 1366×768、1440×900、1920×1080，均无页面级横向裁切，两页各渲染 2 个 ECharts，浏览器 console error/warning 为 0。构建保留既存的单个 JavaScript chunk 超过 500 kB 警告。
 - 同日集成期间发现的语义资源数量旧断言和问数据 UI 演示断言已按真实 Day 2 契约更新；最终 Backend 66/66、Frontend 26/26、Playwright 12/12 全部通过。
+
+## 2026-08-18：V2.1 Evaluation / Golden / Feedback 并行闭环
+
+- 独立 worktree/branch 从 `origin/main@23c6be7` 建立，没有触碰主工作树的并行未提交修改。
+- EvaluationAdapter 已完成 execution-based compare、Multiple Ground Truth、八类准确率、错误分析、五维 Profile 比较、Dashboard 与 Release Gate。
+- SQLBot 仅作流程参考；反馈闭环以 ChatBI 自有 QueryFeedback、VerifiedAnswer、AnswerVersion、SQL Guard、Query Executor 和 Result Oracle 实现，无第三方源码/UI/品牌复制。
+- 隔离验证：Backend 130/130、Frontend 29/29、Vite build、专项 E2E 2/2、PostgreSQL Golden 50/50、MySQL 10/10、危险 SQL 38/38、Feedback replay 3/3 全部 PASS。
+- 详细状态与证据：`docs/status/V2_1_EVAL_GOLDEN_FEEDBACK_STATUS.md`、`docs/evidence/v2.1/`；主控接口请求见 `docs/integration_requests/EVAL_FEEDBACK_INTEGRATION_REQUEST.md`。

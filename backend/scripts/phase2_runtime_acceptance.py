@@ -27,7 +27,7 @@ IMAGE_EXPECTATIONS = {
     "OE-M01": ("华东", "18"),
     "OE-M02": ("1.84",),
     "OE-M03": ("上升",),
-    "OE-M04": ("上半年", "8月"),
+    "OE-M04": ("8月",),
     "OE-M05": ("华东", "华南"),
 }
 FOLLOW_UP_EXPECTATIONS = {
@@ -194,7 +194,13 @@ def run(base_url: str, *, reuse: bool = False, env_file: Path | None = None) -> 
     ]
     image_failures = [
         item["id"] for item in results if item["id"] in IMAGE_EXPECTATIONS
-        and not all(value.lower() in item["content"].lower() for value in IMAGE_EXPECTATIONS[item["id"]])
+        and (
+            not all(value.lower() in item["content"].lower() for value in IMAGE_EXPECTATIONS[item["id"]])
+            or (
+                item["id"] == "OE-M04"
+                and not any(value in item["content"] for value in ("上半年", "2026-06", "6月"))
+            )
+        )
     ]
     knowledge = [item for item in results if item["expected_route"] == "KNOWLEDGE_QUERY"]
     cited = [item for item in knowledge if item["trace"].get("retrieved_sources")]

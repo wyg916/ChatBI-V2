@@ -1,0 +1,54 @@
+{
+  "generated_at": "2026-08-18T02:58:00+08:00",
+  "isolation": {
+    "backend_port": 18080,
+    "frontend_port": 15173,
+    "metadata_database": "local PostgreSQL",
+    "metadata_schema": "chatbi_eval_feedback_v21_0818",
+    "docker_used": false,
+    "business_database_access": "read-only"
+  },
+  "backend": { "command": "pytest backend/tests -q", "passed": 130, "failed": 0 },
+  "frontend": {
+    "command": "npm test && npm run build",
+    "test_files_passed": 11,
+    "tests_passed": 29,
+    "failed": 0,
+    "build": "PASS",
+    "modules_transformed": 732,
+    "known_non_blocking_warning": "ECharts lazy chunk is larger than 500 kB"
+  },
+  "e2e": {
+    "command": "playwright test e2e/v21-eval-feedback.spec.ts --workers=1",
+    "passed": 2,
+    "failed": 0,
+    "coverage": [
+      "Evaluation create-execute-dashboard-compare-release-gate",
+      "Feedback correct-incorrect-correction-review-verified-recall-guard-oracle-replay"
+    ]
+  },
+  "golden": {
+    "count": 50,
+    "postgresql_execution": "50/50",
+    "postgresql_result": "50/50",
+    "postgresql_semantic": "50/50",
+    "mysql_execution": "10/10",
+    "mysql_result": "10/10",
+    "sql_execution_rate": 1.0,
+    "result_value_accuracy": 1.0,
+    "dangerous_sql_block_rate": 1.0,
+    "multiple_ground_truth": true,
+    "eight_accuracy_dimensions": {
+      "metric": 1.0,
+      "dimension": 1.0,
+      "time": 1.0,
+      "filter": 1.0,
+      "join": 1.0,
+      "result_value": 1.0,
+      "chart": 1.0,
+      "narrative": 1.0
+    }
+  },
+  "feedback": { "verified_sql": "PASS", "feedback_replays": "3/3", "feedback_replay_rate": 1.0 },
+  "result": "PASS"
+}

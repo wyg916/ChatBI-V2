@@ -1,0 +1,29 @@
+{
+  "evaluated_at": "2026-08-18T17:15:32.567495+00:00",
+  "run_id": "f5500cd0-3fc5-489d-850d-9e901c640e19",
+  "status": "PASS",
+  "golden_count": 50,
+  "sql_execution_rate": 1.0,
+  "result_value_accuracy": 1.0,
+  "dangerous_sql_block_rate": 1.0,
+  "multiple_ground_truth": true,
+  "accuracy": {
+    "metric": 1.0,
+    "dimension": 1.0,
+    "time": 1.0,
+    "filter": 1.0,
+    "join": 1.0,
+    "result_value": 1.0,
+    "chart": 1.0,
+    "narrative": 1.0
+  },
+  "feedback_total_replays": 1,
+  "feedback_replay_rate": 1.0,
+  "checks": {
+    "evaluation_gate": true,
+    "multiple_ground_truth": true,
+    "eight_accuracy_dimensions": true,
+    "evaluation_dashboard": true,
+    "feedback_replay": true
+  }
+}
