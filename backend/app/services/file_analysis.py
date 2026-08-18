@@ -29,6 +29,7 @@ _COLUMN_ALIASES = {
     "amount": ("收入", "营收", "销售额", "金额"),
     "customer_id": ("客户", "用户"),
     "date": ("日期", "时间", "趋势"),
+    "region": ("区域", "地区"),
 }
 
 
@@ -56,10 +57,10 @@ def _numeric_columns(rows: list[dict[str, Any]]) -> list[str]:
 
 def _column(question: str, columns: list[str], numeric: list[str]) -> str | None:
     lowered = question.lower()
-    exact = next((item for item in columns if item.lower() in lowered), None)
+    exact = next((item for item in numeric if item.lower() in lowered), None)
     if exact:
         return exact
-    aliased = next((item for item in columns if any(alias in lowered for alias in _COLUMN_ALIASES.get(item.lower(), ()))), None)
+    aliased = next((item for item in numeric if any(alias in lowered for alias in _COLUMN_ALIASES.get(item.lower(), ()))), None)
     return aliased or (numeric[0] if numeric else None)
 
 
@@ -75,6 +76,13 @@ def _filter_by_mentions(question: str, rows: list[dict[str, Any]], selected: str
     return filtered
 
 
+def _group_column(question: str, columns: list[str], selected: str | None) -> str | None:
+    lowered = question.lower()
+    return next((column for column in columns if column != selected and (
+        column.lower() in lowered or any(alias in lowered for alias in _COLUMN_ALIASES.get(column.lower(), ()))
+    )), None)
+
+
 def analyze_structured(question: str, attachments: list[Any]) -> dict[str, Any]:
     datasets = _datasets(attachments)
     if not datasets:
@@ -86,6 +94,7 @@ def analyze_structured(question: str, attachments: list[Any]) -> dict[str, Any]:
     selected = _column(question, primary["columns"], numeric)
     rows = _filter_by_mentions(question, source_rows, selected)
     values = [float(row[selected]) for row in rows if selected and isinstance(row.get(selected), (int, float))]
+    group_column = _group_column(question, primary["columns"], selected)
     operation = "SUMMARY"
     result_rows: list[dict[str, Any]] = []
 
@@ -116,6 +125,14 @@ def analyze_structured(question: str, attachments: list[Any]) -> dict[str, Any]:
             predicate = checks.get(operator_text)
             if predicate:
                 result_rows = [row for row in rows if isinstance(row.get(selected), (int, float)) and predicate(float(row[selected]))][:100]
+    elif group_column and any(token in question_lower for token in ("汇总", "每个", "group by", "按")) and values:
+        operation = "GROUP_SUM"
+        grouped: dict[str, float] = {}
+        for row in rows:
+            if isinstance(row.get(selected), (int, float)):
+                key = str(row.get(group_column))
+                grouped[key] = grouped.get(key, 0.0) + float(row[selected])
+        result_rows = [{group_column: key, f"{selected}_sum": round(value, 6)} for key, value in sorted(grouped.items())]
     elif any(token in question_lower for token in ("客户分层", "segment", "分层")) and values:
         operation = "SEGMENT"
         ordered = sorted(values)
@@ -146,7 +163,7 @@ def analyze_structured(question: str, attachments: list[Any]) -> dict[str, Any]:
     exact = all(item["row_count"] <= len(item["rows"]) for item in datasets)
     result_signature = hashlib.sha256(json.dumps(result_rows, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
     chart = None
-    if operation in {"TREND", "TOP_N", "SEGMENT"} and len(result_columns) >= 2:
+    if operation in {"TREND", "TOP_N", "SEGMENT", "GROUP_SUM"} and len(result_columns) >= 2:
         if operation == "TREND":
             x_field = next((column for column in result_columns if any(token in column.lower() for token in ("date", "time", "日期", "时间"))), result_columns[0])
             y_field = selected if selected in result_columns else next((column for column in result_columns if column != x_field), result_columns[1])
@@ -166,6 +183,9 @@ def analyze_structured(question: str, attachments: list[Any]) -> dict[str, Any]:
         answer = f"{selected} 最小值为 {float(result_rows[0][selected]):g}。"
     elif operation == "TOP_N" and result_rows:
         answer = f"{selected} 最高值为 {float(result_rows[0][selected]):g}，已返回 Top {len(result_rows)}。"
+    elif operation == "GROUP_SUM" and result_rows:
+        value_column = result_columns[1]
+        answer = "；".join(f"{row[group_column]} {float(row[value_column]):g}" for row in result_rows) + "。"
     else:
         answer = f"已用受限数据解释器完成 {operation}，返回 {len(result_rows)} 行结果。"
     if not exact:

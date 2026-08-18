@@ -101,11 +101,12 @@ def test_file_product_10_fixed_interpreter_has_no_code_network_secret_or_host_ac
         if case["id"] == "F01": assert rows == [{"dataset": "left.csv", "row_count": 6}]
         if case["id"] == "F02": assert rows == [{"column": "revenue", "average": 35.0}]
         if case["id"] == "F03": assert rows == [{"column": "revenue", "sum": 90.0}]
-        if case["id"] in {"F04", "F10"}: assert rows[0]["revenue"] == 60
+        if case["id"] == "F04": assert rows[0]["revenue"] == 60
         if case["id"] == "F05": assert rows[0]["revenue"] == 10
         if case["id"] == "F07": assert [row["count"] for row in rows] == [2, 2, 2]
         if case["id"] == "F08": assert len(rows) == 6 and rows[0]["right_revenue"] == 20
         if case["id"] == "F09": assert [row["revenue"] for row in rows] == [40, 50, 60]
+        if case["id"] == "F10": assert rows == [{"region": "华东", "revenue_sum": 90.0}, {"region": "华南", "revenue_sum": 120.0}]
         assert len(result["result"]["result_signature"]) == 64
         assert result["trace"]["complete"] is True
         assert all(result["sandbox"][key] == 0 for key in (

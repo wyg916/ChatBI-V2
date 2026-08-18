@@ -11,6 +11,6 @@
     {"id":"F07","question":"进行客户分层","expected_operation":"SEGMENT"},
     {"id":"F08","question":"Join 两个表并关联结果","expected_operation":"JOIN","attachments":2},
     {"id":"F09","question":"筛选 revenue >= 40 的记录","expected_operation":"FILTER"},
-    {"id":"F10","question":"Top revenue 客户","expected_operation":"TOP_N"}
+    {"id":"F10","question":"按 region 汇总 revenue","expected_operation":"GROUP_SUM"}
   ]
 }
