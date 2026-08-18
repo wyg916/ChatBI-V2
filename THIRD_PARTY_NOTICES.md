@@ -41,6 +41,18 @@ Other pre-existing runtime packages remain pinned in the relevant package manife
 - Purpose: terminology, SQL-example and feedback-loop product concepts.
 - Source use: no SQLBot source, UI, logo, prompt, text or asset is copied. ChatBI's feedback workflow is independently implemented with existing project-owned `QueryFeedback`, `VerifiedAnswer`, `AnswerVersion`, SQL Guard and Result Oracle contracts.
 
+## Chat2DB design audit (reference only)
+
+- Current official repository: `https://github.com/OtterMind/Chat2DB`
+- Audited revision: `5372213f267a087c232cb86cae4b200e00c3389f`
+- Current license: `LicenseRef-Chat2DB`; Community 5.3.0+ adds source-available restrictions to Apache-2.0.
+- Use in ChatBI: behavioral reference only for the database tree, SQL workspace, formatting, history, and result-view concepts.
+- Copied source, UI, brand asset, logo, package, service, container, or binary: none.
+- Implementation: independently authored against ChatBI's existing FastAPI/React contracts and its SQLGlot Guard, resource authorization, read-only Query Executor, Result Oracle, RBAC, audit, and Workspace isolation.
+- Detailed lock, selected reference paths, hashes, and rollback boundary: `docs/v2_1/audits/C_CHAT2DB_AUDIT.md`.
+
+Chat2DB is not a runtime or build dependency. The C workflow adds no third-party package and does not redistribute Chat2DB. The historical `v0.3.7` tag remains Apache-2.0 according to the current upstream license text, but no historical source was copied either.
+
 ## Direct runtime and test dependencies
 
 ChatBI V2 itself is released under Apache License 2.0. Direct dependencies are consumed as published packages; their source is not copied into this repository. Versions are pinned in `backend/requirements.txt` and `frontend/package-lock.json`.

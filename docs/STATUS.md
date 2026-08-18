@@ -6,6 +6,7 @@
 - 默认 DATA_QUERY 运行链现为 OpenChatBI-compatible Workspace 隔离 Hybrid Schema Linking → SuperSonic-compatible SemanticQuery → Wren-compatible MDL/dry-plan/Semantic SQL → SQLGlot → 只读执行 → Result Oracle；20/20 覆盖 Case、20/20 Golden 值、三个运行时调用率与主要链接准确率均为 1.0，LocalSemanticEngine 仅作为显式回滚。
 - Day 1 集成证据：Backend 174/174、Frontend 29/29、Playwright 55/55、Phase 2 运行时 60/60、迁移单 head 与 upgrade→rollback→upgrade、Docker 两次从停止状态启动、隔离冷启动 76.8 秒、一键启动、Secret/License 检查均 PASS。严格 SSE 106 请求 0 错误，TTFE p95 213.104 ms，心跳最大间隔 2508.131 ms，取消清理 250.802 ms；另有 26 个真实 >10 秒样本流式率 1.0。详见 `docs/v2_1/day1/DAY1_REPORT.md`。
 - Phase 2 Frozen Zone 共有 16 个交集文件，均为基于 Phase 2 的最小差量语义合并；Frozen blob 整体覆盖数 0。B 未合并，main 未推送，Final Tag 未创建，Day 2/3 未执行。
+- v2.1 工作流 C 已形成独立 Data Workspace 候选输入：PostgreSQL/MySQL 目录检索、关系/主外键、10M 表懒加载样例、SQL 格式化/Explain/只读执行、用户级历史/重放与 Verified SQL 均进入真实 UI/API。10M PostgreSQL 查询与 MySQL 查询的 Oracle 均 PASS，危险 SQL 1/1 阻断、业务库写入 0；该结论仅针对 C 功能分支，不代表 v2.1 Final PASS。
 - Phase 2 真实问答、认证、会话与多模态闭环达到预提交硬门槛：开放式 60/60、Trace 60/60、连续追问 10/10，数据 SQL/结果、知识引用、文件与图片准确率均为 1.0，不支持请求幻觉为 0。
 - 统一 Chat/SSE 入口覆盖九类正式路由；DATA_QUERY 继续复用 Semantic/NL2SQL/SQL Guard/只读执行/Result Oracle，GENERAL/FILE/IMAGE 使用真实配置模型且不可用时返回明确错误。
 - 服务端 HttpOnly 会话、登录限流、RBAC/Workspace/用户隔离和统一前端守卫已完成；匿名 API、无效会话为 401，跨 Workspace/附件为 403，logout 只撤销当前会话。一键启动不自动登录或写 Token。

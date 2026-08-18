@@ -124,3 +124,64 @@ class QueryExecutor:
             if engine is not None:
                 engine.dispose()
             semaphore.release()
+
+    def explain(
+        self,
+        *,
+        datasource: DataSource,
+        normalized_sql: str,
+        timeout_ms: int,
+    ) -> ExecutionResult:
+        """Explain a statement only after the caller has passed it through SqlGuard."""
+        semaphore = self._limit_semaphore()
+        if not semaphore.acquire(blocking=False):
+            return ExecutionResult(
+                status="CONCURRENCY_LIMIT", datasource_id=datasource.id, dialect=datasource.type,
+                normalized_sql=normalized_sql, error_code="QUERY_CONCURRENCY_LIMIT",
+                error_message="The query concurrency limit has been reached",
+            )
+        started = time.perf_counter()
+        engine = None
+        try:
+            connector = build_connector(datasource)
+            engine = connector._engine()
+            prefix = "EXPLAIN (FORMAT JSON) " if datasource.type == "postgresql" else "EXPLAIN FORMAT=JSON "
+            with engine.connect() as connection:
+                if datasource.type == "postgresql":
+                    with connection.begin():
+                        connection.exec_driver_sql("SET TRANSACTION READ ONLY")
+                        connection.exec_driver_sql(f"SET LOCAL statement_timeout = {int(timeout_ms)}")
+                        value = connection.execute(text(prefix + normalized_sql)).scalar_one()
+                else:
+                    connection.exec_driver_sql(f"SET SESSION MAX_EXECUTION_TIME = {int(timeout_ms)}")
+                    connection.commit()
+                    with connection.begin():
+                        connection.exec_driver_sql("SET TRANSACTION READ ONLY")
+                        value = connection.execute(text(prefix + normalized_sql)).scalar_one()
+            rows = [{"plan": json_value(value)}]
+            duration_ms = round((time.perf_counter() - started) * 1000)
+            return ExecutionResult(
+                status="SUCCEEDED", columns=["plan"], column_types=["json"], rows=rows,
+                row_count=1, duration_ms=duration_ms, datasource_id=datasource.id,
+                dialect=datasource.type, normalized_sql=normalized_sql,
+                result_signature=result_signature(["plan"], rows),
+            )
+        except (OperationalError, DBAPIError) as exc:
+            duration_ms = round((time.perf_counter() - started) * 1000)
+            message = str(getattr(exc, "orig", exc))
+            code = "QUERY_TIMEOUT" if "timeout" in message.lower() else "QUERY_EXPLAIN_ERROR"
+            return ExecutionResult(
+                status="TIMEOUT" if code == "QUERY_TIMEOUT" else "FAILED",
+                duration_ms=duration_ms, datasource_id=datasource.id, dialect=datasource.type,
+                normalized_sql=normalized_sql, error_code=code, error_message=message[:1000],
+            )
+        except Exception as exc:
+            return ExecutionResult(
+                status="FAILED", duration_ms=round((time.perf_counter() - started) * 1000),
+                datasource_id=datasource.id, dialect=datasource.type, normalized_sql=normalized_sql,
+                error_code="QUERY_EXPLAIN_ERROR", error_message=str(exc)[:1000],
+            )
+        finally:
+            if engine is not None:
+                engine.dispose()
+            semaphore.release()
