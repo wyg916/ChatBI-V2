@@ -1,7 +1,7 @@
 {
   "schema_version": "2.1-day2-evidence-v1",
-  "tested_sha": "b77219d0da23ef2724843a749ccf4ce1b0d7f475",
-  "executed_at": "2026-08-19T02:01:01+08:00",
+  "tested_sha": "5ed2a9a7d012a86f9409c0fb9175709671bd6fe5",
+  "executed_at": "2026-08-19T02:06:07+08:00",
   "commands": [
     "python -m pytest tests/test_v21_rag_agent_file_product.py tests/test_rag_runtime_v1.py tests/test_legacy_rag_agent_integration.py tests/test_phase2_auth_chat_attachments.py -q",
     "npm test -- --run src/test/ask-page.test.tsx"

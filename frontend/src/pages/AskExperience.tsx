@@ -3,6 +3,7 @@ import { useLocation } from 'react-router-dom';
 import { chatApi } from '../api/chat';
 import { queryApi } from '../api/queries';
 import { EChartsRenderer } from '../charting/EChartsRenderer';
+import { EChart } from '../components/EChart';
 import type { Attachment, ChartSpec, ChatMessage, Conversation, ConversationDetail, Narrative, QueryResponse } from '../types/api';
 import './ask.css';
 
@@ -200,13 +201,24 @@ function QueryMessage({ message, onAsk, onRetry }: { message: ChatMessage; onAsk
     const steps = Array.isArray(primary.steps) ? primary.steps as Array<Record<string, unknown>> : [];
     const fileAnalysis = message.response_payload.file_analysis as Record<string, unknown> | undefined;
     const artifacts = Array.isArray(fileAnalysis?.artifacts) ? fileAnalysis.artifacts as Array<Record<string, unknown>> : [];
+    const fileResult = fileAnalysis?.result as { columns?: string[]; rows?: Array<Record<string, unknown>> } | undefined;
+    const fileColumns = Array.isArray(fileResult?.columns) ? fileResult.columns : [];
+    const fileRows = Array.isArray(fileResult?.rows) ? fileResult.rows : [];
+    const fileChart = fileAnalysis?.chart as { chart_type?: string; x?: string; y?: string; rows?: Array<Record<string, unknown>> } | undefined;
+    const chartRows = Array.isArray(fileChart?.rows) ? fileChart.rows : [];
+    const chartOption = fileChart?.x && fileChart?.y ? {
+      tooltip: { trigger: 'axis' },
+      xAxis: { type: 'category', data: chartRows.map((row) => formatValue(row[fileChart.x!])) },
+      yAxis: { type: 'value' },
+      series: [{ type: fileChart.chart_type === 'line' ? 'line' : 'bar', data: chartRows.map((row) => Number(row[fileChart.y!]) || 0) }],
+    } : null;
     return (
     <article className={`chat-answer-bubble ${message.status === 'FAILED' || message.status === 'REFUSED' ? 'failed' : ''}`} data-testid="governed-answer">
       <header><span>BI</span><b>{message.route ?? '回答'}</b><small>{message.status}</small></header>
       <p>{message.content}</p>
       {citations.length > 0 && <section className="citation-evidence" data-testid="citation-evidence"><h3>授权知识引用</h3>{citations.map((item, index) => <article key={String(item.citation_id ?? index)}><strong>{String(item.title ?? '知识文档')}</strong><p>{String(item.text ?? '').slice(0, 280)}</p><small>版本 {String(item.document_version_id ?? '—')} · {String(item.locator ?? '—')} · Chunk {String(item.chunk_id ?? '—')}</small></article>)}</section>}
       {steps.length > 0 && <section className="agent-step-evidence" data-testid="agent-step-evidence"><h3>有限 Agent 执行阶段</h3>{steps.map((step, index) => <div key={String(step.code ?? index)}><span>{index + 1}</span><strong>{String(step.agent_role ?? 'Agent')}</strong><code>{String(step.tool_name ?? step.code ?? 'PLAN')}</code><small>{String(step.status ?? '')}</small></div>)}<footer>Trace {String(message.trace_payload.trace_id ?? message.trace_payload.message_id ?? message.id)} · 仅展示阶段与工具，不展示内部思维</footer></section>}
-      {fileAnalysis && <section className="file-analysis-evidence" data-testid="file-analysis-evidence"><h3>受限文件分析</h3><p>{String(fileAnalysis.operation ?? 'SUMMARY')} · Trace {String((fileAnalysis.trace as Record<string, unknown> | undefined)?.complete ? '完整' : '待复核')}</p>{artifacts.map((artifact) => <span key={String(artifact.attachment_id)}><a href={String(artifact.csv_url)}>下载 CSV Artifact</a><a href={String(artifact.json_url)}>下载 JSON Artifact</a></span>)}</section>}
+      {fileAnalysis && <section className="file-analysis-evidence" data-testid="file-analysis-evidence"><h3>受限文件分析</h3><p>{String(fileAnalysis.operation ?? 'SUMMARY')} · Trace {String((fileAnalysis.trace as Record<string, unknown> | undefined)?.complete ? '完整' : '待复核')}</p>{chartOption && <EChart option={chartOption} label="文件分析结果图表" className="file-analysis-chart" />}{fileColumns.length > 0 && <div className="file-result-table"><table><thead><tr>{fileColumns.map((column) => <th key={column}>{column}</th>)}</tr></thead><tbody>{fileRows.slice(0, 20).map((row, index) => <tr key={index}>{fileColumns.map((column) => <td key={column}>{formatValue(row[column])}</td>)}</tr>)}</tbody></table></div>}{artifacts.map((artifact) => <span key={String(artifact.attachment_id)}><a href={String(artifact.csv_url)}>下载 CSV Artifact</a><a href={String(artifact.json_url)}>下载 JSON Artifact</a></span>)}</section>}
       {message.error_code && <code>{message.error_code}</code>}
       {(message.status === 'FAILED' || message.status === 'REFUSED') && <button type="button" onClick={onRetry}>重试</button>}
     </article>
