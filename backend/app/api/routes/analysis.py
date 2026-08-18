@@ -66,6 +66,10 @@ def analyze_stream(
             event, payload = item
             if event == "progress":
                 stage = str(payload.get("stage", ""))
+                if stage.upper() == "COMPLETED":
+                    envelope = factory.create("completed", capability="analysis", data=payload)
+                    yield format_sse("progress", {**envelope, "stage": stage})
+                    continue
                 protocol_event = event_for_stage(stage)
                 if protocol_event:
                     capability = str(payload.get("tool") or payload.get("role") or "analysis")

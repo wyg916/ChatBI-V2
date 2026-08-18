@@ -113,6 +113,10 @@ def chat_stream(
                 event, payload = item
                 if event == "progress":
                     stage = str(payload.get("stage", ""))
+                    if stage.upper() == "COMPLETED":
+                        envelope = factory.create("completed", capability="chatbi", data=payload)
+                        yield format_sse("progress", {**envelope, "stage": stage})
+                        continue
                     protocol_event = event_for_stage(stage)
                     if protocol_event:
                         capability = str(payload.get("tool") or payload.get("role") or payload.get("route") or "chatbi")
@@ -128,7 +132,10 @@ def chat_stream(
                     response_payload = assistant.get("response_payload") or {}
                     if "chart" in str(response_payload).lower():
                         yield format_sse("chart_ready", factory.create("chart_ready"))
-                    yield format_sse("completed", factory.create("completed", data={"status": assistant.get("status")}))
+                    yield format_sse("completed", factory.create(
+                        "completed",
+                        data={"stage": "COMPLETED", "status": assistant.get("status")},
+                    ))
                     yield format_sse("result", payload)
                     continue
                 if event == "cancelled":
