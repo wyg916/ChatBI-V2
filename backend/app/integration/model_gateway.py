@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import time
 from dataclasses import dataclass
+from collections.abc import Iterator
 from typing import Any
 
 import httpx
@@ -120,6 +121,81 @@ class ModelGateway:
                     break
         error = VisionModelUnavailable if vision else ModelUnavailable
         raise error("All configured model providers failed: " + ", ".join(failures))
+
+    def stream(
+        self,
+        *,
+        system: str,
+        user: str,
+        history: list[dict[str, str]] | None = None,
+        image_data_urls: list[str] | None = None,
+        vision: bool = False,
+    ) -> Iterator[ModelReply]:
+        """Yield normalized OpenAI-compatible content deltas, never provider events."""
+        requested = self.settings.vision_model_provider if vision else self.settings.general_model_provider
+        messages: list[dict[str, Any]] = [{"role": "system", "content": system}]
+        messages.extend(history or [])
+        if image_data_urls:
+            content: list[dict[str, Any]] = [{"type": "text", "text": user}]
+            content.extend({"type": "image_url", "image_url": {"url": value}} for value in image_data_urls)
+            messages.append({"role": "user", "content": content})
+        else:
+            messages.append({"role": "user", "content": user})
+
+        failures: list[str] = []
+        for definition in _definitions(self.settings, requested, vision=vision):
+            base_url, api_key, configured_model = _provider_values(self.settings, definition)
+            model = self.settings.vision_model_name.strip() if vision and self.settings.vision_model_name.strip() else configured_model
+            payload: dict[str, Any] = {"model": model, "stream": True, "messages": messages}
+            payload.update(definition.request_options or {})
+            attempts = 3 if vision else 1
+            for attempt in range(attempts):
+                emitted = False
+                try:
+                    with httpx.Client(timeout=45, transport=self.transport) as client:
+                        with client.stream(
+                            "POST",
+                            f"{base_url}/chat/completions",
+                            headers={definition.auth_header: f"{definition.auth_prefix}{api_key}"},
+                            json=payload,
+                        ) as response:
+                            response.raise_for_status()
+                            for line in response.iter_lines():
+                                if not line or line.startswith(":"):
+                                    continue
+                                if not line.startswith("data:"):
+                                    continue
+                                data = line[5:].strip()
+                                if data == "[DONE]":
+                                    if not emitted:
+                                        raise ValueError("model returned empty stream")
+                                    return
+                                decoded = json.loads(data)
+                                delta = decoded["choices"][0].get("delta", {}).get("content")
+                                if isinstance(delta, str) and delta:
+                                    emitted = True
+                                    yield ModelReply(content=delta, provider=definition.provider_id, model=model)
+                    if not emitted:
+                        raise ValueError("model returned empty stream")
+                    return
+                except httpx.HTTPError as exc:
+                    status = exc.response.status_code if isinstance(exc, httpx.HTTPStatusError) else None
+                    failures.append(f"{definition.provider_id}:{type(exc).__name__}:{status or 'transport'}:attempt{attempt + 1}")
+                    if emitted:
+                        error = VisionModelUnavailable if vision else ModelUnavailable
+                        raise error("Provider stream failed after content was emitted") from exc
+                    if vision and attempt + 1 < attempts and _retryable_vision_error(exc):
+                        time.sleep(_vision_retry_delay(exc, attempt))
+                        continue
+                    break
+                except (KeyError, TypeError, ValueError, json.JSONDecodeError) as exc:
+                    failures.append(f"{definition.provider_id}:{type(exc).__name__}")
+                    if emitted:
+                        error = VisionModelUnavailable if vision else ModelUnavailable
+                        raise error("Provider stream became invalid after content was emitted") from exc
+                    break
+        error = VisionModelUnavailable if vision else ModelUnavailable
+        raise error("All configured model provider streams failed: " + ", ".join(failures))
 
     def classify(self, question: str, *, history_summary: str = "") -> str:
         reply = self.complete(

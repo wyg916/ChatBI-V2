@@ -9,7 +9,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.core.access import Principal
-from app.models import AnswerVersion, BusinessTerm, QueryFeedback, QueryRun, VerifiedAnswer
+from app.models import AnswerVersion, BusinessTerm, QueryFeedback, QueryRun, SemanticModel, VerifiedAnswer
 from app.query.contracts import AskRequest, ExpectedResult
 from app.query.service import QueryPipeline
 from app.schemas.evaluation import (
@@ -348,12 +348,36 @@ def replay_totals(db: Session, *, workspace_id: str | None) -> tuple[int, int]:
     return len(events), sum(bool(event.get("passed")) for event in events)
 
 
-def feedback_dashboard(db: Session, *, workspace_id: str | None) -> dict[str, Any]:
+def _term_business_key(item: BusinessTerm) -> tuple[str, str]:
+    return (
+        " ".join(item.term.split()).casefold(),
+        " ".join(item.mapped_object.split()).casefold(),
+    )
+
+
+def feedback_dashboard(db: Session, *, workspace_id: str) -> dict[str, Any]:
     workflow_statement = select(VerifiedAnswer).where(VerifiedAnswer.feedback.is_not(None))
     if workspace_id:
         workflow_statement = workflow_statement.where(VerifiedAnswer.workspace_id == workspace_id)
     answers = [answer for answer in db.scalars(workflow_statement.order_by(VerifiedAnswer.updated_at.desc())) if (answer.feedback or {}).get("flow") == FLOW_ID]
-    terms = list(db.scalars(select(BusinessTerm).order_by(BusinessTerm.term)))
+    term_rows = list(db.scalars(
+        select(BusinessTerm)
+        .join(SemanticModel, SemanticModel.id == BusinessTerm.semantic_model_id)
+        .where(SemanticModel.workspace_id == workspace_id)
+        .order_by(
+            BusinessTerm.term,
+            BusinessTerm.mapped_object,
+            BusinessTerm.semantic_model_id,
+            BusinessTerm.id,
+        )
+    ))
+    # Duplicate copies of the same term-to-object mapping can exist across
+    # semantic-model versions. Collapse that stable business key, but retain
+    # the same term when it deliberately maps to a different semantic object.
+    terms_by_key: dict[tuple[str, str], BusinessTerm] = {}
+    for item in term_rows:
+        terms_by_key.setdefault(_term_business_key(item), item)
+    terms = list(terms_by_key.values())
     examples = recall_candidates(db, data=FeedbackRecallRequest(question="经营分析"), workspace_id=workspace_id, limit=20)
     # The dashboard shows all approved examples, even if a generic probe has no
     # lexical overlap. Recall endpoints still require a positive similarity.
@@ -368,7 +392,15 @@ def feedback_dashboard(db: Session, *, workspace_id: str | None) -> dict[str, An
         } for answer in verified]
     total, passed = replay_totals(db, workspace_id=workspace_id)
     return {
-        "terminology": [{"term": item.term, "synonyms": item.synonyms, "definition": item.definition, "mapped_object": item.mapped_object} for item in terms],
+        "terminology": [{
+            "id": item.id,
+            "semantic_model_id": item.semantic_model_id,
+            "business_key": "::".join(_term_business_key(item)),
+            "term": item.term,
+            "synonyms": item.synonyms,
+            "definition": item.definition,
+            "mapped_object": item.mapped_object,
+        } for item in terms],
         "sql_examples": examples,
         "workflows": [_workflow(answer, _version(db, answer.id)) for answer in answers],
         "total_replays": total,
