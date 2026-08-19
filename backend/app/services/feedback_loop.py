@@ -252,7 +252,13 @@ def recall_candidates(
     if data.semantic_model_id:
         statement = statement.where(VerifiedAnswer.semantic_model_id == data.semantic_model_id)
     answers = list(db.scalars(statement.order_by(VerifiedAnswer.accuracy_percent.desc(), VerifiedAnswer.updated_at.desc()).limit(100)))
-    ranked = sorted(((_score(data.question, answer.question), answer) for answer in answers), key=lambda item: (-item[0], item[1].id))
+    # Preserve the database's accuracy/freshness order when lexical scores tie.
+    # Sorting tied rows by random UUID makes a newly approved correction fall
+    # outside the top five after repeated feedback runs with the same wording.
+    ranked = sorted(
+        ((_score(data.question, answer.question), rank, answer) for rank, answer in enumerate(answers)),
+        key=lambda item: (-item[0], item[1], item[2].id),
+    )
     return [
         {
             "answer_id": answer.id,
@@ -262,7 +268,7 @@ def recall_candidates(
             "version": _version(db, answer.id),
             "status": answer.status,
         }
-        for score, answer in ranked[:limit]
+        for score, _, answer in ranked[:limit]
         if score > 0
     ]
 

@@ -258,7 +258,29 @@ def test_sqlbot_feedback_verified_sql_recall_and_replay(client, db_session, monk
     assert reviewed.status_code == 200
     assert reviewed.json()["status"] == "VERIFIED"
     assert reviewed.json()["version"] == 2
-    assert db_session.get(VerifiedAnswer, answer_id).sql_text
+    approved = db_session.get(VerifiedAnswer, answer_id)
+    assert approved.sql_text
+
+    # Repeated runs may leave older corrections with identical wording. Their
+    # lexically smaller UUIDs must not displace the newly approved answer when
+    # similarity scores tie.
+    for index in range(1, 7):
+        db_session.add(VerifiedAnswer(
+            id=f"00000000-0000-0000-0000-{index:012d}",
+            workspace_id=approved.workspace_id,
+            question=approved.question,
+            module=approved.module,
+            model_name=approved.model_name,
+            owner_name="Older reviewer",
+            status="VERIFIED",
+            accuracy_percent=approved.accuracy_percent,
+            sql_text=approved.sql_text,
+            oracle_status="PASSED",
+            datasource_id=approved.datasource_id,
+            semantic_model_id=approved.semantic_model_id,
+            updated_at=datetime(2000, 1, 1, tzinfo=timezone.utc),
+        ))
+    db_session.commit()
 
     recall = client.post("/api/v1/evaluation/feedback/recall", json={
         "question": "按区域统计订单营收",

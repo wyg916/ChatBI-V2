@@ -89,9 +89,10 @@ test('V2.1-FEEDBACK Feedback 页面完成错误修正、审核、Verified SQL �
   expect(reviewed.version).toBe(2);
 
   const similarQuestion = '按区域统计订单营收';
-  const recalled = await json(await request.post(`${apiBase}/evaluation/feedback/recall`, { data: { question: similarQuestion } }));
+  const recallContext = { question: similarQuestion, datasource_id: source.id, semantic_model_id: model.id };
+  const recalled = await json(await request.post(`${apiBase}/evaluation/feedback/recall`, { data: recallContext }));
   expect(recalled.candidates.some((item: { answer_id: string }) => item.answer_id === correction.answer_id)).toBe(true);
-  const replay = await json(await request.post(`${apiBase}/evaluation/feedback/${correction.answer_id}/replay`, { data: { question: similarQuestion } }));
+  const replay = await json(await request.post(`${apiBase}/evaluation/feedback/${correction.answer_id}/replay`, { data: recallContext }));
   expect(replay.guard_status).toBe('PASS');
   expect(replay.oracle_status).toBe('PASSED');
   expect(replay.replay_passed).toBe(true);
