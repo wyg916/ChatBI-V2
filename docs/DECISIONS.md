@@ -175,3 +175,7 @@ PandasAI 不作为运行依赖，也不导入其 community 或 `ee/**` 代码。
 ## ADR-039：依赖漏洞审计是发布阻断项并与兼容性回归绑定
 
 首次 Day 3 `pip-audit` 对旧锁定集报告 86 个已知漏洞，候选立即保持不可发布。Backend 直接锁定已修复的 FastAPI/Starlette、cryptography、python-multipart、PyArrow、pypdf、Pillow 与 pytest 版本，并重建正式容器；版本更新只有在 `pip-audit` 为 0、SBOM 重生成、Backend/文件解析/安全攻击/E2E/冷启动全部通过后才可进入候选。审计工具退出 0 不能替代产品兼容性测试，反之测试通过也不能豁免已知漏洞。
+
+## ADR-040：自然时间、业务指标与极值必须进入结构化语义计划
+
+开放问题不能因路由正确或 HTTP 成功就视为正确。`去年` 等自然时间必须解析为基于运行上下文的确定起止边界；不同语义模型对泛化“订单量”的物理指标名可以不同，10M 基准模型统一绑定已发布的 `valid_orders`，不得回退为默认销售额；“最大值/最小值”必须下推为指标排序和 `LIMIT 1`。这些槽位需同时出现在 SemanticQuery、SQLPlan、生成 SQL 与 Trace 中，并以冷缓存 Open Question 回归验证，避免语义遗漏退化成不必要的跨分区全表扫描和偶发超时。

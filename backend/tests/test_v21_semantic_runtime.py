@@ -103,6 +103,7 @@ CASES = [
     ("租户 1 2025年按账龄统计应收余额", {"outstanding_amount"}, {"aging_bucket"}, True, True),
     ("租户 2 2025年销售额异常趋势", {"net_sales"}, {"month"}, True, True),
     ("租户 7 在 2025-02 的活跃客户数", {"active_customers"}, set(), True, True),
+    ("去年每月订单量的最大值是多少？", {"valid_orders"}, {"month"}, True, True),
 ]
 
 
@@ -130,6 +131,11 @@ def test_day1_semantic_runtime_produces_traceable_guarded_plan(question, metrics
     if "环比" in question:
         assert "LAG(net_sales, 1)" in plan.generated_sql
         assert "comparison_rate" in plan.generated_sql
+    if question == "去年每月订单量的最大值是多少？":
+        assert plan.time_range.start == "2025-01-01"
+        assert plan.time_range.end_exclusive == "2026-01-01"
+        assert "ORDER BY valid_orders DESC" in plan.generated_sql
+        assert plan.generated_sql.endswith("LIMIT 1")
 
 
 def test_invalid_relation_is_blocked_with_structured_error():

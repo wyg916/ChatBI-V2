@@ -225,9 +225,16 @@ class WrenRuntimeAdapter:
             )
             selected_columns.append(plan_time.field)
         limit_match = re.search(r"(?:top|前)\s*(\d+)", question, re.IGNORECASE)
-        limit = min(context.row_limit, int(limit_match.group(1)) if limit_match else context.row_limit)
+        extreme = "MAX" if "最大值" in question else ("MIN" if "最小值" in question or "最低项" in question else None)
+        limit = min(
+            context.row_limit,
+            int(limit_match.group(1)) if limit_match else (1 if extreme else context.row_limit),
+        )
         primary_metric = metrics[0]
-        order_by = ["month ASC"] if "month" in semantic_query.dimensions else ([f"{primary_metric} DESC"] if group_by else [])
+        if extreme and group_by:
+            order_by = [f"{primary_metric} {'DESC' if extreme == 'MAX' else 'ASC'}"]
+        else:
+            order_by = ["month ASC"] if "month" in semantic_query.dimensions else ([f"{primary_metric} DESC"] if group_by else [])
         lines = ["SELECT", "  " + ",\n  ".join(select_parts), f"FROM {table(fact)} {alias}", *join_lines]
         if where_parts:
             lines.append("WHERE " + "\n  AND ".join(where_parts))

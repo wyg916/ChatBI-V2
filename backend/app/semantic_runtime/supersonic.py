@@ -54,6 +54,9 @@ def _time_range(question: str, today: date) -> dict | None:
         return {"kind": "NATURAL_YEAR", "start": f"{year_value}-01-01", "end_exclusive": f"{year_value + 1}-01-01"}
     if "今年" in question:
         return {"kind": "NATURAL_YEAR", "start": f"{today.year}-01-01", "end_exclusive": f"{today.year + 1}-01-01"}
+    if "去年" in question:
+        previous_year = today.year - 1
+        return {"kind": "NATURAL_YEAR", "start": f"{previous_year}-01-01", "end_exclusive": f"{today.year}-01-01"}
     return None
 
 
@@ -71,6 +74,16 @@ class SuperSonicSemanticPipeline:
         for name, aliases in _METRIC_ALIASES.items():
             if name in available_metrics and _contains(question, aliases):
                 metrics.append(name)
+        if (
+            not metrics
+            and benchmark
+            and "valid_orders" in available_metrics
+            and _contains(question, ("订单量", "订单数", "多少单"))
+        ):
+            # The benchmark semantic model exposes valid_orders rather than the
+            # legacy order_count metric. Resolve generic order-volume wording
+            # before falling back to the default sales metric.
+            metrics.append("valid_orders")
         if not metrics:
             preferred = "net_sales" if benchmark else "revenue"
             if preferred not in available_metrics:
