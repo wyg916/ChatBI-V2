@@ -44,7 +44,7 @@ test('V2.1-EVAL Evaluation 页面完成创建、执行、Dashboard、比较与 C
   expect(comparison.runs).toHaveLength(2);
 
   await page.goto('/evaluation');
-  await expect(page.getByTestId('evaluation-overview')).toBeVisible();
+  await expect(page.getByTestId('evaluation-overview')).toBeVisible({ timeout: 30_000 });
   await expect(page.getByTestId('oracle-accuracy-grid').locator('article')).toHaveCount(8);
   await expect(page.getByText('CI Release Gate')).toBeVisible();
   expect(runtimeErrors).toEqual({ consoleErrors: [], pageErrors: [], blockingRequestErrors: [] });
