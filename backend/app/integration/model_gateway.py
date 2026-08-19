@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import time
 from dataclasses import dataclass
 from typing import Any
 
@@ -23,6 +24,23 @@ class ModelReply:
     content: str
     provider: str
     model: str
+
+
+def _vision_retry_delay(exc: httpx.HTTPError, attempt: int) -> float:
+    response = getattr(exc, "response", None)
+    retry_after = response.headers.get("Retry-After") if response is not None else None
+    try:
+        return min(2.0, max(0.0, float(retry_after))) if retry_after is not None else 0.25 * (attempt + 1)
+    except ValueError:
+        return 0.25 * (attempt + 1)
+
+
+def _retryable_vision_error(exc: httpx.HTTPError) -> bool:
+    if isinstance(exc, httpx.TransportError):
+        return True
+    if isinstance(exc, httpx.HTTPStatusError):
+        return exc.response.status_code in {408, 425, 429} or exc.response.status_code >= 500
+    return False
 
 
 def _definitions(settings: Settings, requested: str, *, vision: bool = False):
@@ -76,20 +94,30 @@ class ModelGateway:
             if json_mode:
                 payload["response_format"] = {"type": "json_object"}
             payload.update(definition.request_options or {})
-            try:
-                with httpx.Client(timeout=45, transport=self.transport) as client:
-                    response = client.post(
-                        f"{base_url}/chat/completions",
-                        headers={definition.auth_header: f"{definition.auth_prefix}{api_key}"},
-                        json=payload,
-                    )
-                    response.raise_for_status()
-                content = response.json()["choices"][0]["message"]["content"]
-                if not isinstance(content, str) or not content.strip():
-                    raise ValueError("model returned empty content")
-                return ModelReply(content=content.strip(), provider=definition.provider_id, model=model)
-            except (httpx.HTTPError, KeyError, TypeError, ValueError, json.JSONDecodeError) as exc:
-                failures.append(f"{definition.provider_id}:{type(exc).__name__}")
+            attempts = 3 if vision else 1
+            for attempt in range(attempts):
+                try:
+                    with httpx.Client(timeout=45, transport=self.transport) as client:
+                        response = client.post(
+                            f"{base_url}/chat/completions",
+                            headers={definition.auth_header: f"{definition.auth_prefix}{api_key}"},
+                            json=payload,
+                        )
+                        response.raise_for_status()
+                    content = response.json()["choices"][0]["message"]["content"]
+                    if not isinstance(content, str) or not content.strip():
+                        raise ValueError("model returned empty content")
+                    return ModelReply(content=content.strip(), provider=definition.provider_id, model=model)
+                except httpx.HTTPError as exc:
+                    status = exc.response.status_code if isinstance(exc, httpx.HTTPStatusError) else None
+                    failures.append(f"{definition.provider_id}:{type(exc).__name__}:{status or 'transport'}:attempt{attempt + 1}")
+                    if vision and attempt + 1 < attempts and _retryable_vision_error(exc):
+                        time.sleep(_vision_retry_delay(exc, attempt))
+                        continue
+                    break
+                except (KeyError, TypeError, ValueError, json.JSONDecodeError) as exc:
+                    failures.append(f"{definition.provider_id}:{type(exc).__name__}")
+                    break
         error = VisionModelUnavailable if vision else ModelUnavailable
         raise error("All configured model providers failed: " + ", ".join(failures))
 

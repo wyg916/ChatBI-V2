@@ -6,6 +6,7 @@ V1.1.0 turns the V2.1 three-day optimization work into a single release candidat
 
 - The default data path now links schema and semantics through independent OpenChatBI-, SuperSonic-, and Wren-compatible adapters before SQLGlot Guard, read-only execution, Result Oracle, and IBM-compatible evidence.
 - Open-ended Chat handles 12 product routes through one persistent Conversation/Message runtime, with clarification and explicit unsupported/no-evidence behavior instead of forcing unknown prompts into a revenue query.
+- Natural-year and extrema slots are preserved in SemanticQuery/SQLPlan so prompts such as last year's maximum monthly order volume bind the governed order metric, bounded date range, metric ordering and `LIMIT 1`; transient vision transport/rate-limit/server errors use bounded retry without weakening fail-closed 4xx handling.
 - Short-term memory preserves governed metric/dimension/time/region/customer/product/source/model/filter and prior evidence context, scoped to one workspace, user, and conversation.
 - Full-chain SSE authenticates token/user/conversation ownership with one joined metadata read and no authentication cache, flushes acceptance early, emits bounded heartbeats/stages, propagates disconnect cancellation to PostgreSQL, and exposes leak counters.
 - Data Workspace provides PostgreSQL/MySQL catalog search, relationships, masked samples, format/explain/read-only execute, history/replay and Verified SQL, including 10M lazy exploration.

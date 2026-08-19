@@ -288,3 +288,25 @@ def test_model_gateway_auto_fails_over_without_fabricating_an_answer():
     assert reply.content == "真实备用模型回答"
     assert reply.provider == "mimo"
     assert len(calls) == 2
+
+
+def test_model_gateway_vision_retries_a_transient_primary_failure():
+    calls = []
+
+    def handler(request: httpx.Request):
+        calls.append(str(request.url))
+        if len(calls) == 1:
+            return httpx.Response(429, headers={"Retry-After": "0"}, json={"error": "rate limited"})
+        return httpx.Response(200, json={"choices": [{"message": {"content": "真实图片字段"}}]})
+
+    gateway = ModelGateway(Settings(
+        kimi_api_key="kimi-test", mimo_api_key="", deepseek_api_key="",
+        vision_model_provider="auto",
+    ), transport=httpx.MockTransport(handler))
+    reply = gateway.complete(
+        system="system", user="识别字段",
+        image_data_urls=["data:image/png;base64,iVBORw0KGgo="], vision=True,
+    )
+    assert reply.content == "真实图片字段"
+    assert reply.provider == "kimi"
+    assert len(calls) == 2
