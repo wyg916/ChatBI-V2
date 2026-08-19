@@ -23,6 +23,12 @@ def _atomic_json(path: Path, payload: object) -> None:
 
 
 def main() -> int:
+    # The recorder already decodes child output as UTF-8.  Windows otherwise
+    # inherits a GBK console writer, which crashes on Vitest/Playwright glyphs
+    # such as the check mark before the exit code can be recorded.
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+
     parser = argparse.ArgumentParser()
     parser.add_argument("--record", type=Path, required=True)
     parser.add_argument("--name", required=True)
