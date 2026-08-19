@@ -18,6 +18,8 @@ _FORBIDDEN_NODES = tuple(
 _FORBIDDEN_FUNCTIONS = {
     "pg_read_file", "pg_read_binary_file", "pg_ls_dir", "pg_stat_file", "lo_import", "lo_export",
     "dblink", "dblink_exec", "sys_exec", "sys_eval", "load_file", "sleep", "benchmark",
+    "pg_sleep", "current_setting", "set_config", "pg_terminate_backend", "pg_cancel_backend",
+    "pg_export_snapshot", "pg_logical_emit_message", "get_lock", "release_lock", "connection_id",
 }
 _SYSTEM_SCHEMAS = {"information_schema", "pg_catalog", "mysql", "performance_schema", "sys"}
 

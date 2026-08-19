@@ -61,8 +61,10 @@ test('Day2-4 危险 SQL 被 AST Guard 拒绝且不访问数据库', async ({ pag
   expect(apiResult.status).toBe('SECURITY_REJECTED');
   expect(apiResult.execution).toEqual({});
   await page.goto(`/ask/results?q=${encodeURIComponent(question)}`);
-  await expect(page.getByTestId('query-security')).toBeVisible({ timeout: 30_000 });
-  await expect(page.getByTestId('query-security')).toContainText('STATEMENT_NOT_ALLOWED');
+  await expect(page.getByTestId('governed-answer')).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByTestId('governed-answer')).toContainText('REFUSED');
+  await expect(page.getByTestId('governed-answer')).toContainText('UNSUPPORTED');
+  await expect(page.getByTestId('query-success')).toHaveCount(0);
   expect(errors).toEqual([]);
 });
 

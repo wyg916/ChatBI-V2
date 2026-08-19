@@ -337,12 +337,18 @@ def test_tool_executor_rejects_unknown_tool_without_direct_db_access(db_session)
 def test_question_router_covers_governed_data_knowledge_complex_and_general_routes():
     router = QuestionRouter()
     assert router.classify("最近订单有多少") == QuestionRoute.DATA_QUERY
-    assert router.classify("收入指标口径是什么") == QuestionRoute.HYBRID_ANALYSIS
+    assert router.classify("收入指标口径是什么") == QuestionRoute.KNOWLEDGE_QUERY
     assert router.classify("权限制度说明") == QuestionRoute.KNOWLEDGE_QUERY
     assert router.classify("请综合分析收入变化") == QuestionRoute.COMPLEX_ANALYSIS
     assert router.classify("hello") == QuestionRoute.GENERAL_CHAT
     assert router.classify("SELECT order_id FROM demo_business.orders WHERE 1 = 0") == QuestionRoute.DATA_QUERY
-    assert router.classify("DELETE FROM demo_business.orders") == QuestionRoute.DATA_QUERY
+    assert router.classify("DELETE FROM demo_business.orders") == QuestionRoute.UNSUPPORTED
+    assert router.classify("TRUNCATE TABLE demo_business.orders") == QuestionRoute.UNSUPPORTED
+    assert router.classify("CALL dangerous_procedure()") == QuestionRoute.UNSUPPORTED
+    assert router.classify("COPY demo_business.orders TO PROGRAM 'whoami'") == QuestionRoute.UNSUPPORTED
+    assert router.classify("有效订单的业务定义是什么？") == QuestionRoute.KNOWLEDGE_QUERY
+    assert router.classify("第一次使用这个产品，应该从哪里开始？") == QuestionRoute.GENERAL_CHAT
+    assert router.classify("请诊断华东区订单量变化原因并列出验证步骤。") == QuestionRoute.COMPLEX_ANALYSIS
 
 
 def test_feature_modes_are_deterministic_and_safe():

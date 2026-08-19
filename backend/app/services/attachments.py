@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import io
 import json
+import re
 import shutil
 import zipfile
 from datetime import datetime, timedelta, timezone
@@ -27,6 +28,16 @@ STRUCTURED = {".csv", ".xls", ".xlsx", ".parquet"}
 DOCUMENT = {".pdf", ".docx", ".txt", ".md"}
 IMAGES = {".png", ".jpg", ".jpeg", ".webp"}
 ALLOWED = STRUCTURED | DOCUMENT | IMAGES
+PROMPT_INJECTION_PATTERNS = tuple(
+    re.compile(pattern, re.IGNORECASE)
+    for pattern in (
+        r"ignore\s+(all\s+)?previous\s+instructions",
+        r"忽略.{0,12}(之前|以上|系统).{0,8}(指令|提示)",
+        r"(system|developer)\s*prompt",
+        r"(绕过|跳过|disable).{0,16}(权限|guard|acl|安全)",
+        r"(exfiltrate|reveal).{0,24}(secret|credential|prompt)",
+    )
+)
 MIME = {
     ".csv": {"text/csv", "application/csv", "text/plain"},
     ".xls": {"application/vnd.ms-excel", "application/octet-stream"},
@@ -67,8 +78,11 @@ def _validate_signature(extension: str, data: bytes) -> None:
     if extension in {".xlsx", ".docx"}:
         if not data.startswith(b"PK"):
             raise HTTPException(status_code=415, detail="File signature does not match Office document")
-        with zipfile.ZipFile(io.BytesIO(data)) as archive:
-            names = set(archive.namelist())
+        try:
+            with zipfile.ZipFile(io.BytesIO(data)) as archive:
+                names = set(archive.namelist())
+        except (zipfile.BadZipFile, OSError) as exc:
+            raise HTTPException(status_code=415, detail="Invalid Office document archive") from exc
         required = "xl/workbook.xml" if extension == ".xlsx" else "word/document.xml"
         if required not in names:
             raise HTTPException(status_code=415, detail="Office document structure does not match extension")
@@ -103,6 +117,11 @@ def _dataframe_payload(frame: pd.DataFrame) -> dict:
     }
 
 
+def _reject_prompt_injection(text: str) -> None:
+    if any(pattern.search(text) for pattern in PROMPT_INJECTION_PATTERNS):
+        raise ValueError("PROMPT_INJECTION_DETECTED")
+
+
 def _extract(extension: str, data: bytes) -> tuple[str, dict]:
     settings = get_settings()
     source = io.BytesIO(data)
@@ -124,13 +143,16 @@ def _extract(extension: str, data: bytes) -> tuple[str, dict]:
         return "STRUCTURED", _dataframe_payload(pd.read_parquet(source))
     if extension == ".pdf":
         text = "\n".join(page.extract_text() or "" for page in PdfReader(source).pages)
+        _reject_prompt_injection(text)
         return "DOCUMENT", {"text": text[:settings.attachment_text_max_chars], "page_count": len(PdfReader(io.BytesIO(data)).pages)}
     if extension == ".docx":
         document = Document(source)
         text = "\n".join(paragraph.text for paragraph in document.paragraphs)
+        _reject_prompt_injection(text)
         return "DOCUMENT", {"text": text[:settings.attachment_text_max_chars], "paragraph_count": len(document.paragraphs)}
     if extension in {".txt", ".md"}:
         text = data.decode("utf-8-sig")
+        _reject_prompt_injection(text)
         return "DOCUMENT", {"text": text[:settings.attachment_text_max_chars]}
     if extension in IMAGES:
         with Image.open(source) as image:

@@ -3,16 +3,16 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Callable
 
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from fastapi import Depends, HTTPException, Request
-from sqlalchemy import select
+from sqlalchemy import and_, select
 from sqlalchemy.orm import Session
 
 from app.db.session import get_db
 from app.core.auth import token_digest
 from app.core.config import get_settings
-from app.models import AppUser, AuditEvent, AuthSession, Dashboard, DataSource, QueryRun, ResourceGrant, SemanticModel, VerifiedAnswer
+from app.models import AppUser, AuditEvent, AuthSession, Conversation, Dashboard, DataSource, QueryRun, ResourceGrant, SemanticModel, VerifiedAnswer
 
 
 ROLE_PERMISSIONS: dict[str, frozenset[str]] = {
@@ -26,6 +26,8 @@ ROLE_PERMISSIONS: dict[str, frozenset[str]] = {
         "answer.manage", "dashboard.read", "dashboard.manage", "evaluation.read", "evaluation.run",
     }),
 }
+
+_ACTIVITY_WRITE_INTERVAL = timedelta(seconds=60)
 
 
 @dataclass(frozen=True)
@@ -66,10 +68,7 @@ def record_audit(
     return event
 
 
-def get_principal(
-    request: Request,
-    db: Session = Depends(get_db),
-) -> Principal:
+def _request_token(request: Request) -> str:
     settings = get_settings()
     authorization = request.headers.get("authorization")
     token = request.cookies.get(settings.session_cookie_name)
@@ -80,17 +79,22 @@ def get_principal(
         token = value.strip()
     if not token:
         raise HTTPException(status_code=401, detail="Authentication required")
-    session = db.scalar(select(AuthSession).where(AuthSession.token_hash == token_digest(token)))
+    return token
+
+
+def _principal_from_identity(db: Session, session: AuthSession, user: AppUser) -> Principal:
     now = datetime.now(timezone.utc)
-    if session is None or session.revoked_at is not None:
+    # The identity row has already been loaded by the caller's single joined
+    # authentication query. Keep the checks here shared without issuing a
+    # second lookup.
+    if session.revoked_at is not None:
         raise HTTPException(status_code=401, detail="Invalid session")
     expires_at = session.expires_at
     if expires_at.tzinfo is None:
         expires_at = expires_at.replace(tzinfo=timezone.utc)
     if expires_at <= now:
         raise HTTPException(status_code=401, detail="Session expired")
-    user = db.get(AppUser, session.user_id)
-    if user is None or user.workspace_id != session.workspace_id:
+    if user.workspace_id != session.workspace_id:
         raise HTTPException(status_code=401, detail="Invalid session identity")
     principal = Principal(
         user.id, user.workspace_id, user.email, user.display_name, user.role,
@@ -100,9 +104,71 @@ def get_principal(
         record_audit(db, principal, action="AUTHENTICATE", resource_type="WORKSPACE", status="DENIED", details={"reason": "USER_DISABLED"})
         db.commit()
         raise HTTPException(status_code=403, detail="User is disabled")
-    session.last_seen_at = now
-    user.last_active_at = now
-    db.commit()
+    last_seen_at = session.last_seen_at
+    if last_seen_at.tzinfo is None:
+        last_seen_at = last_seen_at.replace(tzinfo=timezone.utc)
+    # Session validation is read-heavy. Updating the same user/session rows on
+    # every SSE/API request serializes an otherwise concurrent workload. A
+    # bounded activity heartbeat preserves the product/audit signal without a
+    # hot-row write for every request.
+    if now - last_seen_at >= _ACTIVITY_WRITE_INTERVAL:
+        session.last_seen_at = now
+        user.last_active_at = now
+        db.commit()
+    return principal
+
+
+def get_principal(
+    request: Request,
+    db: Session = Depends(get_db),
+) -> Principal:
+    token = _request_token(request)
+    identity = db.execute(
+        select(AuthSession, AppUser)
+        .join(AppUser, AppUser.id == AuthSession.user_id)
+        .where(AuthSession.token_hash == token_digest(token))
+    ).first()
+    if identity is None:
+        raise HTTPException(status_code=401, detail="Invalid session")
+    session, user = identity
+    return _principal_from_identity(db, session, user)
+
+
+def get_conversation_principal(
+    request: Request,
+    db: Session,
+    *,
+    conversation_id: str,
+    permission: str = "query.ask",
+) -> Principal:
+    """Authenticate and authorize one conversation in a single joined read."""
+    token = _request_token(request)
+    identity = db.execute(
+        select(AuthSession, AppUser, Conversation.id)
+        .join(AppUser, AppUser.id == AuthSession.user_id)
+        .outerjoin(
+            Conversation,
+            and_(
+                Conversation.id == conversation_id,
+                Conversation.workspace_id == AuthSession.workspace_id,
+                Conversation.user_id == AppUser.id,
+            ),
+        )
+        .where(AuthSession.token_hash == token_digest(token))
+    ).first()
+    if identity is None:
+        raise HTTPException(status_code=401, detail="Invalid session")
+    session, user, authorized_conversation_id = identity
+    principal = _principal_from_identity(db, session, user)
+    if not principal.allows(permission):
+        record_audit(
+            db, principal, action="ACCESS_CHECK", resource_type="PERMISSION",
+            resource_id=permission, status="DENIED", details={"role": principal.role},
+        )
+        db.commit()
+        raise HTTPException(status_code=403, detail=f"Permission denied: {permission}")
+    if authorized_conversation_id is None:
+        raise HTTPException(status_code=403, detail="Conversation access denied")
     return principal
 
 

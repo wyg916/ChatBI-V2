@@ -5,6 +5,7 @@ import httpx
 import pytest
 
 from app.core.config import Settings
+from app.evaluation import DANGEROUS_SQL_CASES
 from app.query.context_builder import ContextBuilder
 from app.query.contracts import (
     ExecutionResult,
@@ -33,46 +34,7 @@ def policy() -> SecurityPolicy:
     )
 
 
-DANGEROUS_SQL = [
-    ("postgresql", "INSERT INTO demo_business.orders(order_id) VALUES (999)"),
-    ("postgresql", "UPDATE demo_business.orders SET revenue = 0"),
-    ("postgresql", "DELETE FROM demo_business.orders"),
-    ("postgresql", "DROP TABLE demo_business.orders"),
-    ("postgresql", "ALTER TABLE demo_business.orders ADD COLUMN hacked int"),
-    ("postgresql", "CREATE TABLE demo_business.hacked(id int)"),
-    ("postgresql", "TRUNCATE TABLE demo_business.orders"),
-    ("postgresql", "GRANT ALL ON demo_business.orders TO public"),
-    ("postgresql", "REVOKE SELECT ON demo_business.orders FROM public"),
-    ("postgresql", "COPY demo_business.orders TO '/tmp/orders.csv'"),
-    ("postgresql", "SET ROLE postgres"),
-    ("postgresql", "SELECT pg_read_file('/etc/passwd')"),
-    ("postgresql", "SELECT pg_read_binary_file('/etc/passwd')"),
-    ("postgresql", "SELECT pg_ls_dir('/')"),
-    ("postgresql", "SELECT lo_import('/tmp/file')"),
-    ("postgresql", "SELECT dblink_exec('x', 'DELETE FROM orders')"),
-    ("postgresql", "SELECT * FROM pg_catalog.pg_user"),
-    ("postgresql", "SELECT * FROM information_schema.tables"),
-    ("postgresql", "SELECT * FROM demo_business.orders"),
-    ("postgresql", "SELECT secret FROM demo_business.orders"),
-    ("postgresql", "SELECT order_id FROM private.orders"),
-    ("postgresql", "SELECT order_id FROM demo_business.unknown_table"),
-    ("postgresql", "SELECT order_id FROM demo_business.orders; DELETE FROM demo_business.orders"),
-    ("mysql", "INSERT INTO orders(order_id) VALUES (999)"),
-    ("mysql", "UPDATE orders SET revenue = 0"),
-    ("mysql", "DELETE FROM orders"),
-    ("mysql", "DROP TABLE orders"),
-    ("mysql", "TRUNCATE TABLE orders"),
-    ("mysql", "LOAD DATA INFILE '/tmp/x' INTO TABLE orders"),
-    ("mysql", "SELECT LOAD_FILE('/etc/passwd')"),
-    ("mysql", "SELECT SLEEP(10)"),
-    ("mysql", "SELECT BENCHMARK(1000000, SHA2('x', 256))"),
-    ("mysql", "SELECT * FROM mysql.user"),
-    ("mysql", "SELECT order_id FROM information_schema.tables"),
-    ("mysql", "SELECT order_id INTO OUTFILE '/tmp/x' FROM orders"),
-    ("mysql", "SELECT order_id FROM unknown_table"),
-    ("mysql", "SELECT password_hash FROM customers"),
-    ("mysql", "SELECT order_id FROM orders; DROP TABLE orders"),
-]
+DANGEROUS_SQL = DANGEROUS_SQL_CASES
 
 
 @pytest.mark.parametrize(("dialect", "sql"), DANGEROUS_SQL)

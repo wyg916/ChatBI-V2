@@ -32,6 +32,8 @@ _CATALOG_SYNONYMS = {
     "outstanding_amount": "未结应收 应收余额 应收",
 }
 
+_MAX_CACHE_ENTRIES = 256
+
 
 def _tokens(value: str) -> list[str]:
     lowered = value.lower()
@@ -65,20 +67,23 @@ class OpenChatBILinker:
     name = "openchatbi-clean-room"
 
     def __init__(self) -> None:
-        self._cache: dict[tuple[str, str, int, str], OpenChatBIState] = {}
+        self._cache: dict[tuple[str, str, str, int, str, str, str], OpenChatBIState] = {}
         self._lock = Lock()
 
     def link(self, *, question: str, context: QueryContext) -> OpenChatBIState:
         cache_key = (
             context.workspace_id,
+            context.cache_role,
             context.semantic_model_id,
             context.semantic_model_version,
-            sha256(question.strip().lower().encode("utf-8")).hexdigest(),
+            context.knowledge_version,
+            context.data_version,
+            context.input_signature or sha256(question.strip().lower().encode("utf-8")).hexdigest(),
         )
         with self._lock:
             cached = self._cache.get(cache_key)
             if cached:
-                return cached.model_copy(deep=True)
+                return cached.model_copy(deep=True, update={"cache_hit": True, "elapsed_ms": 0.0})
 
         started = perf_counter()
         documents: list[dict[str, object]] = []
@@ -139,7 +144,12 @@ class OpenChatBILinker:
         clarification_required = confidence < 0.25 or vague
         state = OpenChatBIState(
             workspace_id=context.workspace_id,
-            cache_scope=f"workspace:{context.workspace_id}:semantic:{context.semantic_model_id}:v{context.semantic_model_version}",
+            cache_scope=(
+                f"workspace:{context.workspace_id}:role:{context.cache_role}:"
+                f"semantic:{context.semantic_model_id}:v{context.semantic_model_version}:"
+                f"knowledge:{context.knowledge_version}:data:{context.data_version}:"
+                f"input:{context.input_signature}"
+            ),
             candidates=selected,
             candidate_tables=[item for item in selected if item.object_type == "table"][:5],
             candidate_columns=[item for item in selected if item.object_type in {"column", "dimension"}][:12],
@@ -152,6 +162,8 @@ class OpenChatBILinker:
             state_history=["START", "CATALOG_RETRIEVING", "HYBRID_RETRIEVAL", "SCHEMA_LINKED", "END"],
         )
         with self._lock:
+            if len(self._cache) >= _MAX_CACHE_ENTRIES and cache_key not in self._cache:
+                self._cache.pop(next(iter(self._cache)))
             self._cache[cache_key] = state.model_copy(deep=True)
         return state
 

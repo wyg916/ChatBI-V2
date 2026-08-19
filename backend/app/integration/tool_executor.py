@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from time import perf_counter
+from threading import Event
 
 from chatbi_agent_contracts import (
     AgentExecutionContext,
@@ -39,10 +40,14 @@ class ChatBIToolExecutor:
     file_access = False
     network_access = False
 
-    def __init__(self, db: Session, principal: Principal, rag_adapter) -> None:
+    def __init__(
+        self, db: Session, principal: Principal, rag_adapter,
+        *, cancellation_event: Event | None = None,
+    ) -> None:
         self.db = db
         self.principal = principal
         self.rag_adapter = rag_adapter
+        self.cancellation_event = cancellation_event
         self.citation_verifier = CitationVerifierV1()
 
     def execute(self, call: ToolCall, context: AgentExecutionContext) -> ToolResult:
@@ -89,6 +94,7 @@ class ChatBIToolExecutor:
                 semantic_model_id=semantic_model_id,
             ),
             principal=self.principal,
+            cancellation_event=self.cancellation_event,
         )
         payload = query_response(run).model_dump(mode="json")
         guard_allowed = bool((payload.get("guard") or {}).get("allowed"))

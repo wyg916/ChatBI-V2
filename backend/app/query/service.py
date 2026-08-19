@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 from sqlalchemy import select
+from threading import Event
+from time import perf_counter
 from sqlalchemy.orm import Session
 
 from app.core.access import Principal, ensure_resource_access, record_audit
@@ -32,7 +34,7 @@ from app.query.executor import QueryExecutor
 from app.query.nl2sql import Nl2SqlRouter
 from app.query.oracle import ResultOracle
 from app.query.sql_guard import SqlGuard
-from app.semantic_runtime import SemanticRuntime, SemanticRuntimeError
+from app.semantic_runtime import SemanticRuntimeError, default_semantic_runtime
 from app.services.datasources import default_workspace
 
 
@@ -147,7 +149,7 @@ class QueryPipeline:
     def __init__(self):
         self.context_builder = ContextBuilder()
         self.router = Nl2SqlRouter()
-        self.semantic_runtime = SemanticRuntime(router=self.router)
+        self.semantic_runtime = default_semantic_runtime()
         self.guard = SqlGuard()
         self.executor = QueryExecutor()
         self.oracle = ResultOracle()
@@ -170,7 +172,10 @@ class QueryPipeline:
         run.narrative_payload = _json(narrative)
         run.follow_up_payload = narrative.recommended_questions
 
-    def execute(self, db: Session, request: AskRequest, principal: Principal | None = None) -> QueryRun:
+    def execute(
+        self, db: Session, request: AskRequest, principal: Principal | None = None,
+        *, cancellation_event: Event | None = None,
+    ) -> QueryRun:
         settings = get_settings()
         workspace = db.get(Workspace, principal.workspace_id) if principal and principal.workspace_id else default_workspace(db)
         if workspace is None:
@@ -200,6 +205,7 @@ class QueryPipeline:
             context = self.context_builder.build(
                 db, question=request.question, workspace=workspace, datasource=datasource,
                 semantic_model=model, row_limit=row_limit,
+                cache_role=principal.role if principal is not None else "SYSTEM",
             )
             run.context_payload = _json(context)
             _audit(db, run, "CONTEXT_BUILT", "PASS", {
@@ -260,12 +266,15 @@ class QueryPipeline:
                 return run
 
             run.normalized_sql = guard.normalized_sql
-            execution = self.executor.execute(
+            executor_arguments = dict(
                 datasource=datasource,
                 normalized_sql=guard.normalized_sql or "",
                 row_limit=guard.applied_limit or row_limit,
                 timeout_ms=context.security_policy.timeout_ms,
             )
+            if cancellation_event is not None:
+                executor_arguments["cancellation_event"] = cancellation_event
+            execution = self.executor.execute(**executor_arguments)
             run.execution_payload = _json(execution)
             run.duration_ms = execution.duration_ms
             run.result_signature = execution.result_signature
@@ -279,11 +288,21 @@ class QueryPipeline:
                 run.error_message = execution.error_message
                 run.oracle_payload = _json(OracleResult(status="NOT_RUN", confidence=0))
             else:
+                oracle_started = perf_counter()
                 oracle = self.oracle.verify(plan=plan, guard=guard, execution=execution)
+                oracle_duration_ms = round((perf_counter() - oracle_started) * 1000, 3)
                 run.oracle_payload = _json(oracle)
+                run.context_payload = {
+                    **(run.context_payload or {}),
+                    "query_performance": {
+                        **((run.context_payload or {}).get("query_performance") or {}),
+                        "oracle_ms": oracle_duration_ms,
+                    },
+                }
                 run.status = "SUCCEEDED" if oracle.status == "PASSED" else "ORACLE_MISMATCH"
                 _audit(db, run, "RESULT_ORACLE", oracle.status, {
                     "confidence": oracle.confidence, "mismatch_count": oracle.mismatch_count,
+                    "duration_ms": oracle_duration_ms,
                 })
                 self._build_presentation(run)
             db.commit()

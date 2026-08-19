@@ -37,6 +37,10 @@ class QueryContext(BaseModel):
     semantic_model_id: str
     semantic_model_name: str
     semantic_model_version: int
+    cache_role: str = "SYSTEM"
+    knowledge_version: str = "none"
+    data_version: str = "unknown"
+    input_signature: str = ""
     entities: list[dict[str, Any]]
     candidate_tables: list[LinkedObject]
     candidate_columns: list[LinkedObject]

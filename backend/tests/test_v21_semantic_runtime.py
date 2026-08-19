@@ -183,6 +183,18 @@ def test_workspace_cache_isolation_and_local_rollback():
     assert trace_b.schema_linking.workspace_id == "workspace-b"
     assert trace_a.schema_linking.cache_scope != trace_b.schema_linking.cache_scope
 
+    role_context = benchmark_context("workspace-a").model_copy(update={
+        "cache_role": "ANALYST",
+        "knowledge_version": "knowledge-v2",
+        "data_version": "data-v3",
+        "input_signature": "input-v4",
+    })
+    _, role_trace = runtime.plan(question="2025年销售额", context=role_context)
+    cache_scope = role_trace.schema_linking.cache_scope
+    for token in ("workspace:workspace-a", "role:ANALYST", "v1", "knowledge:knowledge-v2", "data:data-v3", "input:input-v4"):
+        assert token in cache_scope
+    assert role_trace.schema_linking.cache_scope != trace_a.schema_linking.cache_scope
+
     _, unauthorized = runtime.plan(question="查询 secret_payroll 中的工资", context=benchmark_context("workspace-a"))
     recalled = {item.qualified_name or item.name for item in unauthorized.schema_linking.candidates}
     assert all("secret_payroll" not in item for item in recalled)

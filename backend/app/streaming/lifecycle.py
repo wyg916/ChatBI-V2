@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from contextlib import contextmanager
 from threading import Event, Lock
 from time import monotonic
 
@@ -29,6 +30,26 @@ class StreamRegistry:
     def __init__(self) -> None:
         self._lock = Lock()
         self._streams: dict[str, StreamLifecycle] = {}
+        self._workloads = {"agent": 0, "sandbox": 0}
+        self._workload_max = {"agent": 0, "sandbox": 0}
+        self._workload_total = {"agent": 0, "sandbox": 0}
+
+    @contextmanager
+    def workload(self, kind: str | None):
+        if kind is None:
+            yield
+            return
+        if kind not in self._workloads:
+            raise ValueError(f"Unknown workload kind: {kind}")
+        with self._lock:
+            self._workloads[kind] += 1
+            self._workload_total[kind] += 1
+            self._workload_max[kind] = max(self._workload_max[kind], self._workloads[kind])
+        try:
+            yield
+        finally:
+            with self._lock:
+                self._workloads[kind] = max(0, self._workloads[kind] - 1)
 
     def register(self, trace_id: str) -> StreamLifecycle:
         lifecycle = StreamLifecycle(trace_id=trace_id)
@@ -70,6 +91,12 @@ class StreamRegistry:
             return {
                 "active_connections": sum(item.connection_open for item in self._streams.values()),
                 "active_tasks": sum(item.task_running for item in self._streams.values()),
+                "active_agent_tasks": self._workloads["agent"],
+                "active_sandbox_tasks": self._workloads["sandbox"],
+                "max_agent_tasks": self._workload_max["agent"],
+                "max_sandbox_tasks": self._workload_max["sandbox"],
+                "total_agent_tasks": self._workload_total["agent"],
+                "total_sandbox_tasks": self._workload_total["sandbox"],
                 "trace_ids": sorted(self._streams),
             }
 

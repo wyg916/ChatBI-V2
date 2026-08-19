@@ -1,5 +1,6 @@
 import logging
 from contextlib import asynccontextmanager
+from uuid import uuid4
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -38,6 +39,18 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.middleware("http")
+async def attach_request_trace(request: Request, call_next):
+    """Give every API response a request trace without trusting client identifiers."""
+    trace_id = f"REQUEST-{uuid4()}"
+    response = await call_next(request)
+    if "X-Trace-ID" not in response.headers:
+        response.headers["X-Trace-ID"] = trace_id
+    return response
+
+
 app.include_router(api_router)
 
 

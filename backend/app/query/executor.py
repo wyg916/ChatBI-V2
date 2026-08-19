@@ -60,7 +60,14 @@ class QueryExecutor:
         normalized_sql: str,
         row_limit: int,
         timeout_ms: int,
+        cancellation_event: threading.Event | None = None,
     ) -> ExecutionResult:
+        if cancellation_event is not None and cancellation_event.is_set():
+            return ExecutionResult(
+                status="FAILED", datasource_id=datasource.id, dialect=datasource.type,
+                normalized_sql=normalized_sql, error_code="QUERY_CANCELLED",
+                error_message="Query was cancelled before execution",
+            )
         semaphore = self._limit_semaphore()
         if not semaphore.acquire(blocking=False):
             return ExecutionResult(
@@ -74,23 +81,44 @@ class QueryExecutor:
             connector = build_connector(datasource)
             engine = connector._engine()  # Connector owns URL construction and credentials.
             with engine.connect() as connection:
-                if datasource.type == "postgresql":
-                    with connection.begin():
-                        connection.exec_driver_sql("SET TRANSACTION READ ONLY")
-                        connection.exec_driver_sql(f"SET LOCAL statement_timeout = {int(timeout_ms)}")
-                        result = connection.execute(text(normalized_sql))
-                        keys = list(result.keys())
-                        raw_rows = result.mappings().fetchmany(row_limit)
-                        types = [str(item.type) for item in result.cursor.description] if False else []
-                else:
-                    connection.exec_driver_sql(f"SET SESSION MAX_EXECUTION_TIME = {int(timeout_ms)}")
-                    connection.commit()
-                    with connection.begin():
-                        connection.exec_driver_sql("SET TRANSACTION READ ONLY")
-                        result = connection.execute(text(normalized_sql))
-                        keys = list(result.keys())
-                        raw_rows = result.mappings().fetchmany(row_limit)
-                        types = []
+                monitor_stop = threading.Event()
+                monitor = None
+                if cancellation_event is not None and datasource.type == "postgresql":
+                    def cancel_on_disconnect() -> None:
+                        while not monitor_stop.wait(0.02):
+                            if cancellation_event.is_set():
+                                try:
+                                    connection.connection.driver_connection.cancel()
+                                except Exception:
+                                    pass
+                                return
+
+                    monitor = threading.Thread(
+                        target=cancel_on_disconnect, name="chatbi-query-cancel", daemon=True,
+                    )
+                    monitor.start()
+                try:
+                    if datasource.type == "postgresql":
+                        with connection.begin():
+                            connection.exec_driver_sql("SET TRANSACTION READ ONLY")
+                            connection.exec_driver_sql(f"SET LOCAL statement_timeout = {int(timeout_ms)}")
+                            result = connection.execute(text(normalized_sql))
+                            keys = list(result.keys())
+                            raw_rows = result.mappings().fetchmany(row_limit)
+                            types = [str(item.type) for item in result.cursor.description] if False else []
+                    else:
+                        connection.exec_driver_sql(f"SET SESSION MAX_EXECUTION_TIME = {int(timeout_ms)}")
+                        connection.commit()
+                        with connection.begin():
+                            connection.exec_driver_sql("SET TRANSACTION READ ONLY")
+                            result = connection.execute(text(normalized_sql))
+                            keys = list(result.keys())
+                            raw_rows = result.mappings().fetchmany(row_limit)
+                            types = []
+                finally:
+                    monitor_stop.set()
+                    if monitor is not None:
+                        monitor.join(timeout=0.1)
             rows = [{key: json_value(row[key]) for key in keys} for row in raw_rows]
             duration_ms = round((time.perf_counter() - started) * 1000)
             signature = result_signature(keys, rows)

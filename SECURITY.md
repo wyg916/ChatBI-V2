@@ -17,5 +17,8 @@
 - 生成 SQL 只允许一条 `SELECT` 或 `WITH ... SELECT`，并经过 AST 授权、超时和行数限制。
 - 外部模型和可选 RAG/编排密钥只允许来自 Backend Secret/环境变量。
 - 普通问数必须经过 SQL Guard、Query Executor 与 Result Oracle；可选编排不得绕过这些组件。
+- 会话 Token 只以 HttpOnly Cookie 或显式 Bearer 方式进入 Backend，数据库仅保存哈希；匿名、伪造、过期、撤销和越权请求必须失败。
+- RAG 在检索前验证签名身份并执行 Workspace/场景 ACL；注入文档、无授权证据或伪造 Citation 必须 fail closed。
+- 文件分析不执行用户或模型生成的 Python/Shell，不访问宿主机、数据库/Provider 凭据或不受限网络。
 
-公开前请撤销测试凭据并对日志、截图、trace 和数据库导出进行脱敏。
+公开前请撤销测试凭据并对日志、截图、trace 和数据库导出进行脱敏。V1.1.0 主动攻击范围与结果字段见 `docs/SECURITY_REPORT.md`；依赖和许可证见 `docs/OPEN_SOURCE_LICENSE_AUDIT.md` 与 `docs/sbom/`。

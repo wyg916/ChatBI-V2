@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from functools import lru_cache
 from time import perf_counter
 
 from app.core.config import Settings, get_settings
@@ -69,3 +70,9 @@ class SemanticRuntime:
             wren_mdl=mdl, wren_dry_plan=dry_plan,
         )
         return plan, trace
+
+
+@lru_cache(maxsize=1)
+def default_semantic_runtime() -> SemanticRuntime:
+    """Return the process-wide semantic runtime used by API requests."""
+    return SemanticRuntime()

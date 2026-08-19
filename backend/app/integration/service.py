@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+from threading import Event
 from datetime import datetime, timezone
 from uuid import uuid4
 
@@ -57,37 +58,39 @@ class AnalysisService:
         principal: Principal,
         *,
         progress_callback=None,
+        cancellation_event: Event | None = None,
     ) -> AnalysisResponse:
         settings = get_settings()
         trace_id = f"TRACE-{uuid4()}"
         route = self.router.classify(request.question, request.route)
         if route == QuestionRoute.DATA_QUERY:
-            primary = self._data(db, request, principal)
+            primary = self._data(db, request, principal, cancellation_event=cancellation_event)
             self._audit_route(db, principal, route, trace_id, "SUCCESS", False)
             return self._response(route, trace_id, primary, settings=settings)
 
         rag_decision = decide(settings.rag_mode, trace_id)
         agent_decision = decide(settings.agent_mode, trace_id)
         if route == QuestionRoute.KNOWLEDGE_QUERY:
-            return self._knowledge(db, request, principal, trace_id, rag_decision)
+            return self._knowledge(db, request, principal, trace_id, rag_decision, cancellation_event=cancellation_event)
         if route == QuestionRoute.HYBRID_ANALYSIS:
-            return self._hybrid(db, request, principal, trace_id, rag_decision)
+            return self._hybrid(db, request, principal, trace_id, rag_decision, cancellation_event=cancellation_event)
         if route == QuestionRoute.COMPLEX_ANALYSIS:
             if route.value not in settings.agent_route_allowlist or not agent_decision.publish:
                 if not settings.agent_fallback_enabled:
                     primary = {"status": "REFUSED", "error_code": "AGENT_ROUTE_DISABLED"}
                     self._audit_route(db, principal, route, trace_id, "REFUSED", False)
                     return self._response(route, trace_id, primary, settings=settings)
-                primary = self._data(db, request, principal)
+                primary = self._data(db, request, principal, cancellation_event=cancellation_event)
                 self._audit_route(db, principal, route, trace_id, "FALLBACK", True)
                 return self._response(route, trace_id, primary, fallback=True, settings=settings)
             return self._complex(
                 db, request, principal, trace_id, rag_decision,
                 progress_callback=progress_callback,
+                cancellation_event=cancellation_event,
             )
         raise ValueError(f"unsupported route: {route}")
 
-    def _knowledge(self, db, request, principal, trace_id, decision) -> AnalysisResponse:
+    def _knowledge(self, db, request, principal, trace_id, decision, *, cancellation_event=None) -> AnalysisResponse:
         settings = get_settings()
         shadow = None
         if decision.execute:
@@ -104,15 +107,15 @@ class AnalysisService:
             primary = {"status": "REFUSED", "error_code": "RAG_ROUTE_DISABLED"}
             self._audit_route(db, principal, QuestionRoute.KNOWLEDGE_QUERY, trace_id, "REFUSED", False)
             return self._response(QuestionRoute.KNOWLEDGE_QUERY, trace_id, primary, shadow=shadow, settings=settings)
-        primary = self._data(db, request, principal)
+        primary = self._data(db, request, principal, cancellation_event=cancellation_event)
         self._audit_route(db, principal, QuestionRoute.KNOWLEDGE_QUERY, trace_id, "FALLBACK", True)
         return self._response(
             QuestionRoute.KNOWLEDGE_QUERY, trace_id, primary, shadow=shadow, fallback=True, settings=settings
         )
 
-    def _hybrid(self, db, request, principal, trace_id, decision) -> AnalysisResponse:
+    def _hybrid(self, db, request, principal, trace_id, decision, *, cancellation_event=None) -> AnalysisResponse:
         settings = get_settings()
-        data = self._data(db, request, principal)
+        data = self._data(db, request, principal, cancellation_event=cancellation_event)
         if data.get("status") != "SUCCEEDED":
             self._audit_route(db, principal, QuestionRoute.HYBRID_ANALYSIS, trace_id, "DATA_FAILED", False)
             return self._response(QuestionRoute.HYBRID_ANALYSIS, trace_id, data, settings=settings)
@@ -138,7 +141,8 @@ class AnalysisService:
         )
 
     def _complex(
-        self, db, request, principal, trace_id, rag_decision, *, progress_callback=None
+        self, db, request, principal, trace_id, rag_decision, *, progress_callback=None,
+        cancellation_event=None,
     ) -> AnalysisResponse:
         settings = get_settings()
         context = self._agent_context(db, principal, trace_id)
@@ -153,7 +157,9 @@ class AnalysisService:
             return self._response(
                 QuestionRoute.COMPLEX_ANALYSIS, trace_id, replay.model_dump(mode="json"), settings=settings
             )
-        tool_executor = ChatBIToolExecutor(db, principal, self._rag_adapter_instance())
+        tool_executor = ChatBIToolExecutor(
+            db, principal, self._rag_adapter_instance(), cancellation_event=cancellation_event,
+        )
         result = BoundedAgentOrchestrator(
             tool_executor, progress_callback=progress_callback
         ).run(OrchestrationRequest(
@@ -169,7 +175,7 @@ class AnalysisService:
         self._record_orchestration(db, principal, request, result, idempotency_key)
         if result.status not in {"SUCCEEDED", "PARTIAL"} and settings.agent_fallback_enabled:
             try:
-                fallback = self._data(db, request, principal)
+                fallback = self._data(db, request, principal, cancellation_event=cancellation_event)
             except (LookupError, ValueError):
                 fallback = {
                     "status": "FAILED",
@@ -190,7 +196,9 @@ class AnalysisService:
         )
 
     @staticmethod
-    def _data(db: Session, request: AnalysisRequest, principal: Principal) -> dict:
+    def _data(
+        db: Session, request: AnalysisRequest, principal: Principal, *, cancellation_event=None,
+    ) -> dict:
         run = QueryPipeline().execute(
             db,
             AskRequest(
@@ -200,6 +208,7 @@ class AnalysisService:
                 row_limit=request.row_limit,
             ),
             principal=principal,
+            cancellation_event=cancellation_event,
         )
         return query_response(run).model_dump(mode="json")
 

@@ -8,7 +8,7 @@
 - 本机 PostgreSQL 15+ 与 MySQL 8+
 - Node.js 20+（仅开发与测试需要）
 
-数据库保存在本机服务中；Compose 只启动 Backend 与 Frontend，不创建数据库容器或数据库卷。
+数据库保存在本机服务中；Compose 只启动 Backend、RAG Runtime 与 Frontend，不创建数据库容器或数据库卷。Agent Runtime 和固定操作文件分析在 Backend 进程内执行，详见 `docs/ARCHITECTURE_RUNTIME.md`。
 
 ## 首次安装
 
@@ -59,7 +59,14 @@ npm run build
 npx playwright test --workers=1
 
 cd ..
-.\backend\.venv\Scripts\python.exe backend\scripts\run_day4_golden.py
+.\.venv\Scripts\python.exe backend\scripts\run_day4_golden.py
+.\.venv\Scripts\python.exe -m pip install -r scripts\release\requirements-audit.txt
+$env:PYTHONUTF8 = '1'
+.\.venv\Scripts\python.exe -m pip_audit -r backend\requirements.txt --timeout 60 --format json --output artifacts\v2_1\day3\supply-chain\pip-audit.json
+cd frontend
+npm audit --json
+cd ..
+.\.venv\Scripts\python.exe scripts\release\generate_sbom.py
 ```
 
 Golden runner 必须报告冻结 SHA-256 `25580af42bc76ebddd3d49e6b9c16f8bfabba8ba485a835c453c29175ee2a64a`，PostgreSQL 50/50、MySQL 兼容集 10/10；禁止修改 Expected Result 来迁就失败。
@@ -88,6 +95,8 @@ CHATBI_AGENT_MAX_DEPTH=2
 ```
 
 `GET /api/v1/query-capabilities` 必须显示 live bridge、签名身份映射和五角色编排均可用。`off/shadow/canary` 只用于诊断或事故回滚，不满足 V1 发布门禁。
+
+一键启动不会自动登录、向浏览器注入 Token、创建匿名管理员或开启 Backend 认证绕过。首次打开受保护入口必须跳转 `/login`，只有真实登录后才能进入产品。
 
 离线迁移只接受已脱敏 JSON 快照，不接受旧数据库 URL，默认 dry-run：
 

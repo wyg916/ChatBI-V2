@@ -2,6 +2,10 @@
 
 ## 2026-08-19
 
+- v2.1 Day 3 Final Product 的提交前门禁已收口：18 项产品能力均为 PRODUCT_PASS；Open Question 100/100、Memory 30×5（150 turns）、Golden 50/50、Knowledge 20/20、Agent 15/15、File 10/10 均通过，硬编码/幻觉/跨会话与跨对话泄漏均为 0。
+- 全量回归为 Backend 207/207、Frontend 12 files / 33 tests、TypeScript、Vite 738 modules、Playwright 69/69；Alembic 唯一 head `20260818_0010` 的 upgrade→base→upgrade 与隔离 Schema 清理通过。两次发布冷启动分别 60.8 秒、55.6 秒，连续停止后启动 2/2 通过，三项服务均 healthy。
+- 20 并发 15 分钟正式负载完成 3,763 请求且错误率 0：TTFE p50/p95 171.932/676.301 ms、请求 p95 10,592.950 ms、心跳最大间隔 2,056.274 ms、取消清理 241.300 ms；数据库连接、内存、SSE、后台任务和缓存泄漏均为 0。
+- 安全攻击集 110/110 通过，56/56 危险 SQL 拦截，业务库写入 0；Python 55 项与前端锁文件 255 项依赖的已知漏洞均为 0，合并 SBOM 319 components、未知许可证 0。发布候选仍须在提交并推送后的同一 SHA 完整复验；`main` 与 `chatbi-v2-v1.1.0` 标签未获授权且未触碰。
 - v2.1 Day 2 已完成 B/C/D 集成候选：B 提供 IBM-compatible Evaluation、Golden 50、八维错误分析和 Feedback/Verified SQL 回放；C 提供 PostgreSQL/MySQL Data Workspace；D 提供 ACL/Scenario 隔离混合检索、固定五角色六工具，以及不执行生成代码的结构化文件分析。
 - 候选门禁：Backend 185/185、Frontend 12 files / 33 tests、TypeScript、Vite 738 modules、Playwright 63/63、Golden 50/50、Knowledge 20/20、Agent 15/15、File 10/10、Phase 2 60/60、Day 1 semantic 20/20 全部 PASS；业务数据库写入 0。
 - SSE 复验为 5 并发 30 秒、68 请求 0 错误，TTFE p95 824.427 ms、heartbeat 最大间隔 2506.574 ms、取消清理 42.070 ms、2 个 >10 秒请求流式率 1.0、连接/任务泄漏 0/0。两次停止态启动分别 27.840 秒和 28.362 秒，三项服务均 healthy。

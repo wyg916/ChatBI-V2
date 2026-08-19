@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import hashlib
+import json
 import re
 from datetime import datetime, timezone
 
@@ -66,6 +68,7 @@ class ContextBuilder:
         datasource: DataSource,
         semantic_model: SemanticModel,
         row_limit: int,
+        cache_role: str = "SYSTEM",
     ) -> QueryContext:
         model = get_semantic_model(db, semantic_model.id)
         if model is None:
@@ -173,6 +176,21 @@ class ContextBuilder:
              "definition": item.definition, "mapped_object": item.mapped_object}
             for item in sorted(model.business_terms, key=lambda item: item.term)
         ]
+        knowledge_version = hashlib.sha256(json.dumps(
+            {"terms": terms, "verified_sql": verified_examples},
+            ensure_ascii=False, sort_keys=True, default=str,
+        ).encode("utf-8")).hexdigest()
+        data_version = hashlib.sha256(json.dumps(
+            {
+                "datasource_id": datasource.id,
+                "last_sync_at": datasource.last_sync_at,
+                "schemas": [item.name for item in schema_rows],
+                "tables": [item.qualified_name for item in table_rows],
+                "columns": [item.qualified_name for item in column_rows],
+            },
+            ensure_ascii=False, sort_keys=True, default=str,
+        ).encode("utf-8")).hexdigest()
+        input_signature = hashlib.sha256(question.strip().lower().encode("utf-8")).hexdigest()
 
         estimated_tokens = (
             len(question) + sum(len(str(value)) for value in entities + metrics + dimensions + relationships + terms)
@@ -197,6 +215,10 @@ class ContextBuilder:
             semantic_model_id=model.id,
             semantic_model_name=model.name,
             semantic_model_version=model.version,
+            cache_role=cache_role,
+            knowledge_version=knowledge_version,
+            data_version=data_version,
+            input_signature=input_signature,
             entities=entities,
             candidate_tables=table_candidates,
             candidate_columns=column_candidates,

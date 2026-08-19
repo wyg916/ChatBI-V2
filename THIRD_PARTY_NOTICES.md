@@ -10,7 +10,7 @@ No source, UI, logo, trademark asset or binary from the following projects is co
 | OpenChatBI | `c8786cb180081dbdd18d841efa33b70d77b633e9` (`1.0.0b1`) | MIT | Public catalog, hybrid retrieval and workflow concepts only; independently implemented |
 | SuperSonic | `af08d869c4609bf8d48d64e78c61427fe93f7489` | Apache-2.0 with an additional derivative-distribution condition | Public semantic-pipeline concepts only; no source-derived distributed work |
 
-The complete eight-project path-level draft and license checksums are in `docs/UPSTREAM_LOCK.json` and `docs/OPEN_SOURCE_LICENSE_AUDIT_DRAFT.md` after Day 1 integration.
+The final eight-project path-level decisions and license checksums are in `docs/UPSTREAM_LOCK.json` and `docs/OPEN_SOURCE_LICENSE_AUDIT.md`; the Day 1 draft remains only as historical evidence.
 
 ## SQLGlot
 
@@ -30,7 +30,7 @@ Other pre-existing runtime packages remain pinned in the relevant package manife
 - DB-GPT: reviewed at `db580e952e544acf9f6c6c153da29dc67e9e40d7`; root MIT concepts are design provenance only. ChatBI's fixed five-role/six-tool orchestrator is project-authored and does not import DB-GPT or its embedded skill assets.
 - PandasAI: reviewed at `bbbb771d31062d81f6fa19bafb40620d5cbe48f4`; community paths are MIT while `ee/**` is excluded. ChatBI does not import or package PandasAI. Structured FILE_QUERY uses a project-authored fixed-operation interpreter that executes no generated Python and reuses the already declared pandas package.
 
-These Day 2 paths add no third-party runtime dependency. Exact selected paths, license boundaries, checksums, forbidden paths and rollback decisions are recorded in `docs/UPSTREAM_LOCK.json` and `docs/OPEN_SOURCE_LICENSE_AUDIT_DRAFT.md`.
+These Day 2 paths add no third-party runtime dependency. Exact selected paths, license boundaries, checksums, forbidden paths and rollback decisions are recorded in `docs/UPSTREAM_LOCK.json` and the final `docs/OPEN_SOURCE_LICENSE_AUDIT.md`.
 
 ## IBM Text-to-SQL Evaluation Toolkit design reference
 
@@ -44,7 +44,7 @@ These Day 2 paths add no third-party runtime dependency. Exact selected paths, l
 ## SQLBot product-flow reference
 
 - Source repository: `https://github.com/dataease/SQLBot`
-- Audited upstream revision: `0c885d5a677ed3f6551645a4c5a630ee4c4eb437`
+- Audited upstream revision: `2a86aa926c4a22400a4ab4506c3ec384f7855a9d`
 - License boundary: modified GPLv3 with additional logo/copyright conditions; reference-only.
 - Purpose: terminology, SQL-example and feedback-loop product concepts.
 - Source use: no SQLBot source, UI, logo, prompt, text or asset is copied. ChatBI's feedback workflow is independently implemented with existing project-owned `QueryFeedback`, `VerifiedAnswer`, `AnswerVersion`, SQL Guard and Result Oracle contracts.
@@ -68,18 +68,25 @@ ChatBI V2 itself is released under Apache License 2.0. Direct dependencies are c
 | Component | License |
 | --- | --- |
 | FastAPI, SQLAlchemy, Alembic, Pydantic, pydantic-settings, PyMySQL, pytest, SQLGlot | MIT |
-| Uvicorn, HTTPX | BSD-3-Clause |
+| Starlette, Uvicorn, HTTPX | BSD-3-Clause |
 | psycopg / psycopg-binary | LGPL-3.0-only |
 | cryptography | Apache-2.0 OR BSD-3-Clause |
+| pandas | BSD-3-Clause |
+| openpyxl, python-docx | MIT |
+| xlrd, xlwt | BSD-3-Clause |
+| PyArrow, python-multipart | Apache-2.0 |
+| pypdf | BSD-3-Clause |
+| Pillow | MIT-CMU |
 | React, React DOM, React Router, TanStack Query, Testing Library, jsdom, Vite, Vitest | MIT |
 | TypeScript, Playwright, Apache ECharts | Apache-2.0 |
+| pip-audit (release audit tooling only) | Apache-2.0 |
 
 This table covers direct project dependencies used by the released build. Transitive notices remain governed by their package metadata and lockfiles.
 
 ## Apache ECharts
 
 - Source repository: `https://github.com/apache/echarts`
-- Package version: `echarts==6.1.0` (npm)
+- Package version: `echarts@6.1.0` (npm)
 - License: Apache-2.0
 - Project files: `frontend/package.json`, `frontend/src/charting/EChartsRenderer.tsx`
 - Purpose: render the project-owned controlled ChartSpec as KPI, line, bar, grouped/stacked bar, donut, or table-compatible visuals.

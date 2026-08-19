@@ -40,7 +40,7 @@ class Settings(BaseSettings):
     deepseek_base_url: str = "https://api.deepseek.com"
     deepseek_api_key: SecretStr = SecretStr("")
     deepseek_model_name: str = "deepseek-v4-flash"
-    query_timeout_ms: int = 8000
+    query_timeout_ms: int = 30000
     query_row_limit: int = 500
     query_concurrency: int = 4
     context_token_budget: int = 6000

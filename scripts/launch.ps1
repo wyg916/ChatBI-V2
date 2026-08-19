@@ -27,7 +27,7 @@ try {
     throw 'Docker Desktop is not ready. Start Docker Desktop, wait for it to finish loading, then try again.'
   }
 
-  Write-Stage 'Starting Backend and Frontend...'
+  Write-Stage 'Starting Backend, governed RAG Runtime, and Frontend...'
   $startScript = Join-Path $PSScriptRoot 'start.ps1'
   if ($SkipBuild) {
     & $startScript -SkipBuild

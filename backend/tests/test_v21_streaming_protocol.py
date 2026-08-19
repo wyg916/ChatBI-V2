@@ -78,4 +78,18 @@ def test_stream_lifecycle_prunes_connection_and_task_after_cancel():
     stream_registry.connection_closed(trace_id)
     thread.join(timeout=1)
     assert observed == ["cancelled"]
-    assert stream_registry.snapshot() == {"active_connections": 0, "active_tasks": 0, "trace_ids": []}
+    snapshot = stream_registry.snapshot()
+    assert snapshot["active_connections"] == snapshot["active_tasks"] == 0
+    assert snapshot["trace_ids"] == []
+
+
+def test_workload_diagnostics_track_agent_and_sandbox_without_leaks():
+    before = stream_registry.snapshot()
+    with stream_registry.workload("agent"):
+        assert stream_registry.snapshot()["active_agent_tasks"] == 1
+    with stream_registry.workload("sandbox"):
+        assert stream_registry.snapshot()["active_sandbox_tasks"] == 1
+    after = stream_registry.snapshot()
+    assert after["active_agent_tasks"] == after["active_sandbox_tasks"] == 0
+    assert after["total_agent_tasks"] == before["total_agent_tasks"] + 1
+    assert after["total_sandbox_tasks"] == before["total_sandbox_tasks"] + 1

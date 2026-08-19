@@ -1,5 +1,6 @@
 import { expect, test, type APIResponse } from '@playwright/test';
 import { analystCredentials, loginApi } from './auth';
+import { captureRuntimeErrors } from './runtime-errors';
 
 const apiBase = process.env.CHATBI_API_BASE ?? 'http://127.0.0.1:8000/api/v1';
 
@@ -34,10 +35,12 @@ test('Day4-RBAC01 ANALYST 仅访问授权资源且拒绝事件进入审计', asy
 });
 
 test('Day4-UI14 Permission Denied 使用真实 Backend 403 状态', async ({ page }) => {
+  const runtime = captureRuntimeErrors(page, [403]);
   await page.context().clearCookies();
   const login = await page.request.post(`${apiBase}/auth/login`, { data: analystCredentials });
   expect(login.ok()).toBeTruthy();
   await page.goto('/settings/security');
   await expect(page.getByTestId('permission-denied')).toContainText('仅 ADMIN');
   await expect(page.getByRole('heading', { name: '用户、角色与审计' })).toBeVisible();
+  expect(runtime).toEqual({ consoleErrors: [], pageErrors: [], blockingRequestErrors: [] });
 });

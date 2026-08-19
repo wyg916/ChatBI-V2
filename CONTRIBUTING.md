@@ -8,6 +8,7 @@
 2. 从最新 `main` 创建短生命周期分支。
 3. 不提交 `.env`、API Key、数据库口令、日志、数据库 dump、构建目录或测试缓存。
 4. 第三方代码或资产进入仓库前，必须核验许可证并更新 `THIRD_PARTY_NOTICES.md`。
+5. 上游版本或依赖变化必须同步更新 `docs/UPSTREAM_LOCK.json`、路径级许可证审计和 CycloneDX/SPDX SBOM；未知许可证会阻断合并。
 
 ## 本地验证
 
@@ -22,6 +23,15 @@ npm run typecheck
 npm test -- --run
 npm run build
 npx playwright test --workers=1
+
+cd ..
+.\.venv\Scripts\python.exe -m pip install -r scripts\release\requirements-audit.txt
+$env:PYTHONUTF8 = '1'
+.\.venv\Scripts\python.exe -m pip_audit -r backend\requirements.txt --timeout 60 --format json --output artifacts\v2_1\day3\supply-chain\pip-audit.json
+cd frontend
+npm audit --json
+cd ..
+.\.venv\Scripts\python.exe scripts\release\generate_sbom.py
 ```
 
 涉及共享状态、迁移、语义发布或评测的变更还应执行 5-worker E2E。不得通过 retry、固定 sleep 或降低 worker 数量掩盖竞态。

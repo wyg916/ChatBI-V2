@@ -165,3 +165,13 @@ RAG Runtime 先验证签名 Workspace、用户和角色，再应用 KnowledgeAcl
 ## ADR-037：结构化文件问数采用无代码执行面的固定操作解释器
 
 PandasAI 不作为运行依赖，也不导入其 community 或 `ee/**` 代码。CSV/XLS/XLSX/Parquet 在类型、签名、大小、行数、Workspace 和用户校验后提取至受限预览；固定解释器只允许行数、过滤、分组、聚合、Join、客户分层、趋势和 TopN 等白名单操作，最多分析/输出 100 行，不执行模型或用户生成的 Python、Shell、网络、数据库连接、宿主机路径或密钥访问。结果带 SHA-256 签名、表格、ECharts、Trace 和鉴权 Artifact；超过预览上限时必须明确声明非全量结论。
+
+## ADR-038：SSE 使用有界复用执行器并把认证写入移出请求热路径
+
+20 并发长稳态负载表明，为每条 SSE 请求创建一个新的业务 OS Thread 会让 Python/系统分配器为已退出线程保留 arena，高并发处理能力虽然正常，Backend RSS 却随累计请求持续上升。正式流式入口因此使用线程安全事件队列、框架复用的同步 StreamingResponse worker，以及 6 个可复用业务 worker 的进程内有界执行器：20 个客户端仍可同时连接、立即收到 `accepted` 并在排队时每 0.5 秒获得 heartbeat，但双核发布拓扑不会让重 CPU/DB 工作阻断共享事件循环。同步 Token/Workspace/RBAC 与 Conversation 授权由 FastAPI 的有界同步工作池完成，不在 async 入口内直接执行阻塞 SQL。每条流仍有独立 Session、取消事件与 Trace，连接关闭继续传播到 SQL 执行，Agent/Sandbox 计数保持独立。该执行器不是通用任务平台，也不改变固定路由或工具边界。
+
+认证仍对每次请求校验 Token 哈希、撤销、过期、用户状态、Workspace 和权限，但 AuthSession/AppUser 改为一次联表读取；SSE 再把 Conversation 所有权合并进同一查询，不使用可能延迟撤销生效的认证缓存。`last_seen_at` 与 `last_active_at` 只按 60 秒活动心跳写入，避免所有并发请求争用同一认证行。语义检索缓存固定上限为 256，Key 必含 Workspace、Role、Semantic/Knowledge/Data Version 与 Input Signature。正式性能门禁必须在完整路由预热后真实运行 20×15 分钟，并同时满足 TTFE、阶段时延、错误率以及 DB/SSE/后台任务/缓存隔离和内存无持续增长；短时 smoke 不可替代该门禁。
+
+## ADR-039：依赖漏洞审计是发布阻断项并与兼容性回归绑定
+
+首次 Day 3 `pip-audit` 对旧锁定集报告 86 个已知漏洞，候选立即保持不可发布。Backend 直接锁定已修复的 FastAPI/Starlette、cryptography、python-multipart、PyArrow、pypdf、Pillow 与 pytest 版本，并重建正式容器；版本更新只有在 `pip-audit` 为 0、SBOM 重生成、Backend/文件解析/安全攻击/E2E/冷启动全部通过后才可进入候选。审计工具退出 0 不能替代产品兼容性测试，反之测试通过也不能豁免已知漏洞。

@@ -1,4 +1,5 @@
 import { expect, test, type APIRequestContext, type APIResponse } from '@playwright/test';
+import { captureRuntimeErrors } from './runtime-errors';
 
 
 const apiBase = process.env.CHATBI_API_BASE ?? 'http://127.0.0.1:8000/api/v1';
@@ -20,6 +21,7 @@ async function runtime(request: APIRequestContext) {
 
 test('V2.1-EVAL Evaluation 页面完成创建、执行、Dashboard、比较与 CI Gate', async ({ page, request }) => {
   test.setTimeout(240_000);
+  const runtimeErrors = captureRuntimeErrors(page);
   const created = await json(await request.post(`${apiBase}/evaluation/definitions`, { data: {
     name: 'V2.1 Evaluation E2E',
     profile: { model: 'deterministic', prompt: 'e2e-prompt', semantic_engine: 'chatbi-semantic', nl2sql_engine: 'chatbi-nl2sql', version: 'e2e' },
@@ -45,10 +47,12 @@ test('V2.1-EVAL Evaluation 页面完成创建、执行、Dashboard、比较与 C
   await expect(page.getByTestId('evaluation-overview')).toBeVisible();
   await expect(page.getByTestId('oracle-accuracy-grid').locator('article')).toHaveCount(8);
   await expect(page.getByText('CI Release Gate')).toBeVisible();
+  expect(runtimeErrors).toEqual({ consoleErrors: [], pageErrors: [], blockingRequestErrors: [] });
 });
 
 test('V2.1-FEEDBACK Feedback 页面完成错误修正、审核、Verified SQL 召回和 Oracle 回放', async ({ page, request }) => {
   test.setTimeout(120_000);
+  const runtimeErrors = captureRuntimeErrors(page);
   const { source, model } = await runtime(request);
   const question = '按地区统计订单收入';
   const asked = await json(await request.post(`${apiBase}/ask`, { data: {
@@ -97,4 +101,5 @@ test('V2.1-FEEDBACK Feedback 页面完成错误修正、审核、Verified SQL �
   await expect(page.getByTestId('feedback-page')).toBeVisible();
   await expect(page.getByText('FEEDBACK_REPLAY_RATE')).toBeVisible();
   await expect(page.getByTestId('feedback-workflows')).toContainText('REGRESSION_PASS');
+  expect(runtimeErrors).toEqual({ consoleErrors: [], pageErrors: [], blockingRequestErrors: [] });
 });

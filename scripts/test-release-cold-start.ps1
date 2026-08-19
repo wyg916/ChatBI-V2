@@ -74,8 +74,8 @@ try {
 
   $result.stage = 'MIGRATION'
   $migration = (& docker compose exec -T backend sh -c 'alembic current 2>&1' | Out-String)
-  if($LASTEXITCODE -ne 0 -or $migration -notmatch '20260818_0009') { throw 'Migration head mismatch' }
-  $result.migration = '20260818_0009_HEAD'
+  if($LASTEXITCODE -ne 0 -or $migration -notmatch '20260818_0010') { throw 'Migration head mismatch' }
+  $result.migration = '20260818_0010_HEAD'
 
   $adminPassword = $localEnv['CHATBI_BOOTSTRAP_ADMIN_PASSWORD']
   if(-not $adminPassword) { throw 'CHATBI_BOOTSTRAP_ADMIN_PASSWORD is missing from local .env' }

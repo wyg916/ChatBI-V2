@@ -20,6 +20,7 @@ class OpenChatBIState(BaseModel):
     workflow: Literal["catalog_retrieval", "schema_linking"] = "schema_linking"
     workspace_id: str
     cache_scope: str
+    cache_hit: bool = False
     candidates: list[CatalogCandidate]
     candidate_tables: list[CatalogCandidate]
     candidate_columns: list[CatalogCandidate]

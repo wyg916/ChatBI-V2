@@ -1,12 +1,12 @@
 # ChatBI V2
 
-ChatBI V2 是围绕“数据源 → Schema → 语义层 → 问数 → 可验证结果 → 图表与洞察 → 答案 → 看板 → 评测”构建的开源企业级 ChatBI 产品。V1.0.1 已实现完整、可验证的产品闭环以及受控 Live RAG 与受限 Multi-Agent；最终发布 Gate 以 [`docs/status/DAY5_STATUS.md`](docs/status/DAY5_STATUS.md) 为准。
+ChatBI V2 是围绕“数据源 → Schema → 语义层 → 问数 → 可验证结果 → 图表与洞察 → 答案 → 看板 → 评测”构建的开源企业级 ChatBI 产品。V1.1.0 候选实现完整、可验证的产品闭环、受控 Live RAG 与受限 Multi-Agent；发布真实性以 Final Candidate SHA 下的原始证据为准，能力清单见 [`docs/v2_1/day3/V2_1_FINAL_CAPABILITY_AUDIT.md`](docs/v2_1/day3/V2_1_FINAL_CAPABILITY_AUDIT.md)。
 
 ## 一键启动
 
-前置条件：Windows PowerShell、Python 3.11、本机 PostgreSQL 15+、本机 MySQL 8+、Docker Desktop（仅运行 Backend/Frontend）。
+前置条件：Windows PowerShell、Python 3.11、本机 PostgreSQL 15+、本机 MySQL 8+、Docker Desktop（仅运行 Backend/RAG Runtime/Frontend）。
 
-完成首次数据库初始化后，直接双击仓库根目录的 `一键启动-ChatBI-V2.cmd`。它会检查 Docker Desktop、构建并启动 Backend/Frontend、验证 PostgreSQL/MySQL 数据源，然后自动打开 <http://localhost:5173>。启动失败时窗口会保留错误提示，不会 reset、提交或修改当前 Git 工作树。
+完成首次数据库初始化后，直接双击仓库根目录的 `一键启动-ChatBI-V2.cmd`。它会检查 Docker Desktop、构建并启动 Backend/RAG Runtime/Frontend、验证 PostgreSQL/MySQL 数据源，然后自动打开 <http://localhost:5173>。启动失败时窗口会保留错误提示，不会 reset、提交或修改当前 Git 工作树。
 
 ```powershell
 git clone https://github.com/wyg916/ChatBI-V2.git
@@ -30,7 +30,7 @@ cd "ChatBI-V2"
 .\scripts\stop.ps1
 ```
 
-首次初始化会安全提示输入本机 PostgreSQL/MySQL 管理员口令；口令仅用于当前进程，不写入文件。脚本在本机 PostgreSQL 创建 ChatBI 元数据库与主模拟业务 Schema，并在本机 MySQL 创建辅助兼容模拟库，同时生成 Git 忽略的项目账号配置。Compose 只运行 Backend/Frontend，数据库服务数和数据库数据卷数均为 0。
+首次初始化会安全提示输入本机 PostgreSQL/MySQL 管理员口令；口令仅用于当前进程，不写入文件。脚本在本机 PostgreSQL 创建 ChatBI 元数据库与主模拟业务 Schema，并在本机 MySQL 创建辅助兼容模拟库，同时生成 Git 忽略的项目账号配置。Compose 只运行 Backend/RAG Runtime/Frontend，数据库服务数和数据库数据卷数均为 0。
 
 仅在需要明确重建项目模拟数据时使用 `-ResetDemoData`；该开关只替换 `demo_business` / `chatbi_demo_business`，不会删除 ChatBI 元数据数据库。
 
@@ -122,4 +122,4 @@ npm run build
 npm run e2e
 ```
 
-Golden 50 冻结清单位于 [`evaluation/golden/day4-golden-50.json`](evaluation/golden/day4-golden-50.json)。完整安装说明见 [`INSTALL.md`](INSTALL.md)，15 分钟演示见 [`DEMO.md`](DEMO.md)，发布说明见 [`RELEASE_NOTES_V1.md`](RELEASE_NOTES_V1.md)，许可证与第三方声明见 [`LICENSE`](LICENSE) 和 [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md)。
+Golden 50 冻结清单位于 [`evaluation/golden/day4-golden-50.json`](evaluation/golden/day4-golden-50.json)。完整安装说明见 [`INSTALL.md`](INSTALL.md)，运行架构见 [`docs/ARCHITECTURE_RUNTIME.md`](docs/ARCHITECTURE_RUNTIME.md)，V1.1.0 发布说明见 [`docs/releases/V1_1_0_RELEASE_NOTES.md`](docs/releases/V1_1_0_RELEASE_NOTES.md)，许可证、SBOM 与第三方声明见 [`docs/OPEN_SOURCE_LICENSE_AUDIT.md`](docs/OPEN_SOURCE_LICENSE_AUDIT.md)、[`docs/sbom/`](docs/sbom/) 和 [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md)。

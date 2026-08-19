@@ -5,6 +5,7 @@ import json
 import re
 from datetime import datetime, timezone
 from time import perf_counter
+from threading import Event
 from typing import Callable
 
 from chatbi_agent_contracts import QuestionRoute
@@ -21,8 +22,15 @@ from app.integration.service import AnalysisService
 from app.models import Attachment, ChatMessage, Conversation
 from app.schemas.chat import ChatRequest, ChatResponse, ConversationRead, MessageRead
 from app.services.attachments import attachment_path, get_attachment
-from app.services.conversations import extract_slots, get_conversation, list_messages, refresh_conversation_summary
+from app.services.conversations import (
+    extract_slots,
+    get_conversation,
+    list_messages,
+    merge_runtime_context,
+    refresh_conversation_summary,
+)
 from app.services.file_analysis import analyze_structured
+from app.streaming.lifecycle import stream_registry
 
 
 def _message(item: ChatMessage) -> MessageRead:
@@ -81,6 +89,7 @@ class ChatService:
         request: ChatRequest,
         principal: Principal,
         progress: Callable[[str, dict], None] | None = None,
+        cancellation_event: Event | None = None,
     ) -> ChatResponse:
         started = perf_counter()
         conversation = get_conversation(db, request.conversation_id, principal)
@@ -108,6 +117,10 @@ class ChatService:
         prior_messages = list_messages(db, conversation.id)
         content = request.content.strip() or "请分析当前附件。"
         slots, resolved_question = extract_slots(content, conversation.slot_state)
+        if request.datasource_id:
+            slots["datasource"] = request.datasource_id
+        if request.semantic_model_id:
+            slots["semantic_model"] = request.semantic_model_id
         route = self.router.classify(
             resolved_question,
             request.route,
@@ -158,18 +171,21 @@ class ChatService:
             }:
                 if progress:
                     progress("QUERYING_DATA" if route == QuestionRoute.DATA_QUERY else "RETRIEVING_KNOWLEDGE", {})
-                result = AnalysisService().execute(
-                    db,
-                    AnalysisRequest(
-                        question=resolved_question,
-                        route=route,
-                        datasource_id=request.datasource_id,
-                        semantic_model_id=request.semantic_model_id,
-                        idempotency_key=request.client_message_id,
-                    ),
-                    principal,
-                    progress_callback=(lambda stage, detail: progress(stage.value, detail)) if progress else None,
-                )
+                workload = "agent" if route == QuestionRoute.COMPLEX_ANALYSIS else None
+                with stream_registry.workload(workload):
+                    result = AnalysisService().execute(
+                        db,
+                        AnalysisRequest(
+                            question=resolved_question,
+                            route=route,
+                            datasource_id=request.datasource_id,
+                            semantic_model_id=request.semantic_model_id,
+                            idempotency_key=request.client_message_id,
+                        ),
+                        principal,
+                        progress_callback=(lambda stage, detail: progress(stage.value, detail)) if progress else None,
+                        cancellation_event=cancellation_event,
+                    )
                 response_payload = {"analysis": result.model_dump(mode="json")}
                 trace_id = result.trace_id
                 status = result.status
@@ -201,7 +217,8 @@ class ChatService:
                 if progress:
                     progress("GENERATING_INSIGHT", {"route": route.value})
             elif route == QuestionRoute.FILE_QUERY:
-                answer, model_provider, model_name, retrieved_sources, file_analysis = self._file_answer(content, attachments, prior_messages)
+                with stream_registry.workload("sandbox"):
+                    answer, model_provider, model_name, retrieved_sources, file_analysis = self._file_answer(content, attachments, prior_messages)
                 response_payload = {"answer": answer, "citations": retrieved_sources, "file_analysis": file_analysis}
             elif route == QuestionRoute.MULTIMODAL_QUERY:
                 answer, model_provider, model_name = self._vision_answer(content, attachments, prior_messages)
@@ -255,6 +272,15 @@ class ChatService:
         )
         db.add(assistant)
         conversation.active_attachment_ids = [item.id for item in attachments]
+        slots = merge_runtime_context(
+            slots,
+            datasource_id=request.datasource_id,
+            semantic_model_id=request.semantic_model_id,
+            response_payload=response_payload,
+            retrieved_sources=retrieved_sources,
+            attachments=attachments,
+        )
+        user_message.context_payload = {"resolved_question": resolved_question, "slots": slots}
         refresh_conversation_summary(conversation, content, slots)
         record_audit(
             db,

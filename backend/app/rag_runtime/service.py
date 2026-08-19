@@ -81,6 +81,11 @@ def retrieve(
     scenario_id: str = "charging_ops",
 ) -> tuple[RetrievedChunk, ...]:
     validate_identity(db, identity)
+    # A malicious request must not be allowed to use even otherwise legitimate
+    # governed evidence as fuel for prompt injection. Fail closed before any
+    # retrieval run or ranking is performed.
+    if any(pattern.search(query) for pattern in _INJECTION):
+        return ()
     canonical_scenario_id = "charging_ops" if scenario_id in {"chatbi-v1", "charging_ops"} else scenario_id
     acl_predicates = [
         (KnowledgeAcl.principal_type == "WORKSPACE")

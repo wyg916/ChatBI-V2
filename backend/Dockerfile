@@ -23,4 +23,4 @@ COPY evaluation/golden/day4-golden-50.json ./evaluation/golden/day4-golden-50.js
 COPY evaluation/golden/v2.1-multiple-ground-truth.json ./evaluation/golden/v2.1-multiple-ground-truth.json
 
 EXPOSE 8000
-CMD ["sh", "-c", "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000"]
+CMD ["sh", "-c", "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000 --timeout-keep-alive 30"]

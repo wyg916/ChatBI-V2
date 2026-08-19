@@ -9,7 +9,11 @@ from app.core.config import get_settings
 def _engine_options(url: str) -> dict:
     if url.startswith("sqlite"):
         return {"connect_args": {"check_same_thread": False}}
-    return {"pool_pre_ping": True}
+    # A streaming request validates identity/conversation before handing work
+    # to a background session.  Size the metadata pool for the supported
+    # 20-request release load so authentication does not queue behind query
+    # persistence while still keeping an explicit finite bound.
+    return {"pool_pre_ping": True, "pool_size": 20, "max_overflow": 20, "pool_timeout": 10}
 
 
 settings = get_settings()
