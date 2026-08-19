@@ -139,7 +139,9 @@ test('内容中心、经营看板详情与评测总览由 API 驱动并适配三
     expect(await page.locator('body').evaluate((body) => body.scrollWidth <= window.innerWidth), `dashboard detail @ ${viewport.width}x${viewport.height}`).toBe(true);
 
     await page.goto('/evaluation');
-    await expect(page.getByTestId('evaluation-overview')).toBeVisible();
+    // The overview aggregates real evaluation history and can exceed the
+    // default UI assertion timeout on a cold or resource-contended database.
+    await expect(page.getByTestId('evaluation-overview')).toBeVisible({ timeout: 30_000 });
     await expect(page.getByText('最近评测运行')).toBeVisible();
     expect(await page.locator('body').evaluate((body) => body.scrollWidth <= window.innerWidth), `evaluation @ ${viewport.width}x${viewport.height}`).toBe(true);
   }

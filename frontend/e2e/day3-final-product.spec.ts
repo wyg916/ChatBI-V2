@@ -81,9 +81,12 @@ test('Day3-FINAL-02 twenty-turn conversation keeps independent scroll, fixed com
     await input.fill('查一下');
     await input.press('Enter');
     await expect(page.locator('.chat-user-bubble')).toHaveCount(21);
+    // The user bubble is optimistic. Wait for the corresponding assistant
+    // message so the server transaction is committed before testing reload.
+    await expect(page.locator('.chat-assistant-message')).toHaveCount(21, { timeout: 30_000 });
     await expect.poll(() => messageArea.evaluate((node) => node.scrollHeight - node.scrollTop - node.clientHeight)).toBeLessThan(100);
     await page.reload();
-    await expect(page.locator('.chat-user-bubble')).toHaveCount(21);
+    await expect(page.locator('.chat-user-bubble')).toHaveCount(21, { timeout: 30_000 });
     expect(errors).toEqual([]);
   } finally {
     expect((await request.delete(`${apiBase}/conversations/${conversation.id}`)).status()).toBe(204);

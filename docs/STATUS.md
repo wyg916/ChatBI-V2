@@ -6,6 +6,7 @@
 - 全量回归为 Backend 209/209、Frontend 12 files / 33 tests、TypeScript、Vite 738 modules、Playwright 69/69；Alembic 唯一 head `20260818_0010` 的 upgrade→base→upgrade 与隔离 Schema 清理通过。两次发布冷启动分别 60.8 秒、55.6 秒，连续停止后启动 2/2 通过，三项服务均 healthy。
 - 最终候选前的 Open 100 冷缓存复验发现“去年每月订单量的最大值”曾错误回退为全时段净销售额并触发查询超时；语义运行时现将“去年”解析为确定自然年、在 10M 模型中将泛化订单量绑定 `valid_orders`，并把最大值下推为指标降序与 `LIMIT 1`。专项用例、Backend 209/209、Open 100/100 与 Playwright 69/69 复验通过；该修复后的提交才可作为最终候选。
 - 最终 Open 100 还暴露一次外部视觉主提供商瞬时失败；视觉网关现仅对网络错误与 408/425/429/5xx 做最多三次有界重试并遵循最多 2 秒的 `Retry-After`，其余 4xx/无效响应仍立即失败或降级。MockTransport 瞬时 429 回归、真实图片 6/6、Open 100/100、Backend 209/209 与 E2E 69/69 通过。
+- 最终 E2E 对资源争用场景完成确定性加固：真实评测聚合保持 30 秒有界等待，长会话刷新前先等待对应助手消息完成服务端提交。两条竞态用例连续 5 轮 10/10、完整 Playwright 69/69 通过；等待仍以真实元素和消息计数为条件，不使用固定 sleep 或忽略错误。
 - 20 并发 15 分钟正式负载完成 3,763 请求且错误率 0：TTFE p50/p95 171.932/676.301 ms、请求 p95 10,592.950 ms、心跳最大间隔 2,056.274 ms、取消清理 241.300 ms；数据库连接、内存、SSE、后台任务和缓存泄漏均为 0。
 - 安全攻击集 110/110 通过，56/56 危险 SQL 拦截，业务库写入 0；Python 55 项与前端锁文件 255 项依赖的已知漏洞均为 0，合并 SBOM 319 components、未知许可证 0。发布候选仍须在提交并推送后的同一 SHA 完整复验；`main` 与 `chatbi-v2-v1.1.0` 标签未获授权且未触碰。
 - v2.1 Day 2 已完成 B/C/D 集成候选：B 提供 IBM-compatible Evaluation、Golden 50、八维错误分析和 Feedback/Verified SQL 回放；C 提供 PostgreSQL/MySQL Data Workspace；D 提供 ACL/Scenario 隔离混合检索、固定五角色六工具，以及不执行生成代码的结构化文件分析。
