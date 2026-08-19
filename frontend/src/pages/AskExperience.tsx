@@ -1,13 +1,33 @@
-import { ClipboardEvent, DragEvent, FormEvent, KeyboardEvent as ReactKeyboardEvent, useEffect, useRef, useState } from 'react';
+import {
+  ClipboardEvent,
+  DragEvent,
+  FormEvent,
+  KeyboardEvent as ReactKeyboardEvent,
+  type RefObject,
+  useEffect,
+  useRef,
+  useState,
+} from 'react';
 import { useLocation } from 'react-router-dom';
 import { chatApi } from '../api/chat';
 import { queryApi } from '../api/queries';
 import { EChartsRenderer } from '../charting/EChartsRenderer';
 import { EChart } from '../components/EChart';
-import type { Attachment, ChartSpec, ChatMessage, Conversation, ConversationDetail, Narrative, QueryResponse } from '../types/api';
+import type {
+  Attachment,
+  ChartSpec,
+  ChatInput,
+  ChatMessage,
+  ChatResponse,
+  Conversation,
+  ConversationDetail,
+  Narrative,
+  QueryResponse,
+} from '../types/api';
+import { ConversationSidebar, isVisibleConversation } from './chat-ui/ConversationSidebar';
+import { EvidenceDrawer, type EvidenceDrawerData, type PublicCitation } from './chat-ui/EvidenceDrawer';
 import './ask.css';
 
-const DEFAULT_QUESTION = '2026年按地区按月统计已支付订单收入趋势';
 const prompts = [
   ['销', '统计全部订单收入', '收入、订单数、利润等关键指标'],
   ['区', '按地区统计订单收入', '区域对比与经营分布'],
@@ -15,260 +35,438 @@ const prompts = [
   ['品', '按品类统计订单利润前4名', '品类表现与利润结构'],
 ] as const;
 
+type ResultSemantic = 'VALUE' | 'ZERO' | 'NO_ROWS' | 'NULL_VALUE' | 'FAILED';
+type RunStatus = 'SUBMITTING' | 'RUNNING' | 'STREAMING' | 'COMPLETED' | 'FAILED' | 'CANCELLED';
+type UiPart = { type: string; [key: string]: unknown };
+
+interface ChatStreamEvent {
+  seq?: number;
+  event_type: string;
+  phase?: string;
+  label?: string;
+  delta?: string;
+  artifact_type?: string;
+  artifact?: Record<string, unknown>;
+  citations?: Array<Record<string, unknown>>;
+  message_parts?: UiPart[];
+  result_semantic?: ResultSemantic;
+  code?: string;
+  message?: string;
+  retryable?: boolean;
+  response?: ChatResponse;
+}
+
+interface StreamHandlers {
+  onEvent?: (event: ChatStreamEvent) => void;
+  onDelta?: (delta: string, event: ChatStreamEvent) => void;
+  onStateChange?: (state: string, event?: ChatStreamEvent) => void;
+}
+
+interface UiChatApi {
+  stream: (input: ChatInput, handlers: StreamHandlers, signal: AbortSignal) => Promise<ChatResponse>;
+  renameConversation: (id: string, title: string) => Promise<Conversation>;
+}
+
+interface PendingTurn {
+  runId: string;
+  conversationId: string;
+  user: ChatMessage;
+  content: string;
+  parts: UiPart[];
+  stage: string;
+  status: RunStatus;
+  semantic?: ResultSemantic;
+  error?: string;
+}
+
+interface UploadState { id: string; name: string; progress: number; error?: string; file: File }
+
+const streamingApi = chatApi as unknown as UiChatApi;
+
+const PUBLIC_PHASES: Record<string, string> = {
+  understanding: '正在理解问题……',
+  semantic_mapping: '正在识别指标和维度……',
+  querying_data: '正在查询数据……',
+  retrieving_knowledge: '正在检索业务规则……',
+  verifying: '正在校验结果……',
+  composing_answer: '正在整理回答……',
+};
+
 function formatValue(value: unknown) {
   if (typeof value === 'number') return value.toLocaleString('zh-CN', { maximumFractionDigits: 2 });
   return value == null ? '—' : String(value);
 }
 
-function AskComposer({ compact = false, initialValue = '', onAsk }: { compact?: boolean; initialValue?: string; onAsk: (question: string) => void }) {
-  const [question, setQuestion] = useState(initialValue);
-  function submit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    onAsk(question.trim() || DEFAULT_QUESTION);
-  }
-  if (compact) return (
-    <form className="follow-up-composer" onSubmit={submit}>
-      <input aria-label="继续追问" value={question} onChange={(event) => setQuestion(event.target.value)} placeholder="继续追问，例如：按地区查看订单量……" />
-      <button type="submit" aria-label="提交追问">→</button>
-    </form>
-  );
-  return (
-    <form className="ask-box" onSubmit={submit}>
-      <textarea aria-label="输入业务问题" value={question} onChange={(event) => setQuestion(event.target.value)} placeholder="例如：2026年按地区按月统计已支付订单收入趋势" />
-      <div className="ask-composer-actions">
-        <span className="ask-runtime-note">由语义模型约束 · SQL 只读校验 · 结果独立验证</span>
-        <button type="submit" className="ask-submit" aria-label="提交问题">→</button>
-      </div>
-    </form>
-  );
+function record(value: unknown): Record<string, unknown> {
+  return value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : {};
 }
 
-function EmptyAskPage({ onAsk }: { onAsk: (question: string) => void }) {
-  return (
-    <section className="ask-empty">
-      <div className="hero-mark" aria-hidden="true">BI</div>
-      <h1>今天想了解哪些业务数据？</h1>
-      <p>直接用自然语言提问，系统会基于已发布语义模型生成并验证只读查询。</p>
-      <AskComposer onAsk={onAsk} />
-      <div className="prompt-section">
-        <span>猜你想问</span>
-        <div className="prompt-grid">
-          {prompts.map(([icon, title, sub]) => (
-            <button key={title} type="button" onClick={() => onAsk(title)}>
-              <b aria-hidden="true">{icon}</b><span><strong>{title}</strong><small>{sub}</small></span>
-            </button>
-          ))}
-        </div>
-      </div>
-      <footer className="ask-footer">所有结果来自 Backend API 与本机只读数据库连接</footer>
-    </section>
-  );
-}
-
-function QueryState({ kind, title, detail, onRetry }: { kind: string; title: string; detail: string; onRetry?: () => void }) {
-  return (
-    <section className={`query-state-card ${kind}`} data-testid={`query-${kind}`}>
-      <span className="query-state-icon" aria-hidden="true">{kind === 'loading' ? '···' : kind === 'security' ? '盾' : '!'}</span>
-      <h1>{title}</h1><p>{detail}</p>
-      {onRetry && <button type="button" onClick={onRetry}>重新查询</button>}
-    </section>
-  );
-}
-
-function QueryDetailDialog({ result, onClose }: { result: QueryResponse; onClose: () => void }) {
-  useEffect(() => {
-    const close = (event: KeyboardEvent) => { if (event.key === 'Escape') onClose(); };
-    window.addEventListener('keydown', close);
-    return () => window.removeEventListener('keydown', close);
-  }, [onClose]);
-  const columns = result.execution.columns ?? [];
-  const rows = result.execution.rows ?? [];
-  const semanticRuntime = (result.context.semantic_runtime ?? {}) as Record<string, unknown>;
-  const schemaLinking = (semanticRuntime.schema_linking ?? {}) as Record<string, unknown>;
-  const runtimePlan = result.plan as unknown as Record<string, unknown>;
-  const semanticQuery = (semanticRuntime.semantic_query ?? runtimePlan.semantic_query ?? {}) as Record<string, unknown>;
-  const dryPlan = (semanticRuntime.wren_dry_plan ?? runtimePlan.wren_dry_plan ?? {}) as Record<string, unknown>;
-  const candidates = Array.isArray(schemaLinking.candidates) ? schemaLinking.candidates as Array<Record<string, unknown>> : [];
-  const candidateSummary = (key: string) => {
-    const items = Array.isArray(schemaLinking[key]) ? schemaLinking[key] as Array<Record<string, unknown>> : [];
-    return items.slice(0, 5).map((item) => String(item.qualified_name ?? item.name)).join('、') || '—';
-  };
-  const callChain = Array.isArray(semanticRuntime.call_chain) ? semanticRuntime.call_chain.map(String) : [];
-  return (
-    <div className="query-dialog-backdrop" role="presentation" onMouseDown={onClose}>
-      <section className="query-dialog" role="dialog" aria-modal="true" aria-labelledby="query-detail-title" onMouseDown={(event) => event.stopPropagation()}>
-        <header><div><span>可核验查询依据</span><h2 id="query-detail-title">SQL 与执行明细</h2></div><button type="button" aria-label="关闭查询明细" onClick={onClose}>×</button></header>
-        <dl className="query-dialog-meta">
-          <div><dt>Query ID</dt><dd>{result.id}</dd></div>
-          <div><dt>执行状态</dt><dd>{result.execution.status ?? result.status}</dd></div>
-          <div><dt>耗时 / 行数</dt><dd>{result.execution.duration_ms ?? 0} ms / {result.execution.row_count ?? 0} 行</dd></div>
-          <div><dt>结果签名</dt><dd className="signature-value">{result.execution.result_signature ?? '—'}</dd></div>
-          <div><dt>语义模型</dt><dd>{String(result.context.semantic_model_name ?? result.semantic_model_id)} v{result.semantic_model_version}</dd></div>
-          <div><dt>数据源</dt><dd>{String(result.context.datasource_name ?? result.datasource_id)}</dd></div>
-          <div><dt>Metric / Dimension</dt><dd>{result.plan.metrics?.join('、') || '明细'} / {result.plan.dimensions?.join('、') || '无分组'}</dd></div>
-          <div><dt>Time / Filter / Join</dt><dd>{result.plan.time_range?.kind ?? '全部时间'} / {result.plan.filters?.length ?? 0} / {Array.isArray(result.plan.joins) ? result.plan.joins.length : 0}</dd></div>
-          <div><dt>Result Oracle</dt><dd>{result.oracle.status}</dd></div>
-          <div><dt>Semantic Runtime</dt><dd>{callChain.join(' → ') || result.provider}</dd></div>
-          <div><dt>Trace ID</dt><dd>{result.id}</dd></div>
-          <div><dt>Schema Candidates</dt><dd>{candidates.slice(0, 8).map((item) => `${String(item.object_type)}:${String(item.qualified_name ?? item.name)}(${Number(item.score ?? 0).toFixed(2)})`).join('、') || '—'}</dd></div>
-          <div><dt>Candidate Tables</dt><dd>{candidateSummary('candidate_tables')}</dd></div>
-          <div><dt>Candidate Columns</dt><dd>{candidateSummary('candidate_columns')}</dd></div>
-          <div><dt>Candidate Metrics</dt><dd>{candidateSummary('candidate_metrics')}</dd></div>
-          <div><dt>Candidate Relationships</dt><dd>{candidateSummary('candidate_relationships')}</dd></div>
-          <div><dt>Clarification</dt><dd>{schemaLinking.clarification_required ? String(schemaLinking.clarification_reason ?? '需要澄清') : '不需要'}</dd></div>
-          <div><dt>SemanticQuery Evidence</dt><dd>{Array.isArray(semanticQuery.evidence) ? semanticQuery.evidence.slice(0, 8).map(String).join('、') : '—'}</dd></div>
-          <div><dt>Wren Dry-plan</dt><dd>{String(dryPlan.status ?? '—')} · v{String(dryPlan.semantic_model_version ?? result.semantic_model_version)}</dd></div>
-        </dl>
-        <pre><code>{result.guard.normalized_sql ?? result.plan.generated_sql ?? 'SQL 未生成'}</code></pre>
-        <div className="query-detail-table-wrap">
-          <table><caption>真实查询明细</caption><thead><tr>{columns.map((column) => <th key={column}>{column}</th>)}</tr></thead>
-            <tbody>{rows.map((row, index) => <tr key={index}>{columns.map((column) => <td key={column}>{formatValue(row[column])}</td>)}</tr>)}</tbody>
-          </table>
-        </div>
-      </section>
-    </div>
-  );
-}
-
-function SuccessfulResult({ result, onAsk }: { result: QueryResponse; onAsk: (question: string) => void }) {
-  const [showDetails, setShowDetails] = useState(false);
-  const [feedback, setFeedback] = useState('');
-  const [saved, setSaved] = useState(false);
-  const rows = result.execution.rows ?? [];
-  const columns = result.execution.columns ?? [];
-  const confidence = Math.round(Number(result.oracle.confidence ?? 0) * 100);
-  const metrics = result.plan.metrics ?? [];
-  const dimensions = result.plan.dimensions ?? [];
-  const filters = result.plan.filters ?? [];
-  const checks = result.oracle.checks ?? [];
-  const chartSpec = 'chart_type' in result.chart_spec ? result.chart_spec as ChartSpec : null;
-  const narrative = 'conclusion' in result.narrative ? result.narrative as Narrative : null;
-
-  async function recordFeedback(type: 'HELPFUL' | 'NOT_HELPFUL') {
-    await queryApi.feedback(result.id, type);
-    setFeedback(type === 'HELPFUL' ? '已记录“有帮助”' : '已记录改进反馈');
-  }
-  async function save() {
-    await queryApi.save(result.id);
-    setSaved(true);
-  }
-  const runtimeKpis = result.kpis.length ? result.kpis : [
-    { label: '返回行数', value: result.execution.row_count ?? 0, unit: ' 行' },
-    { label: '查询耗时', value: result.execution.duration_ms ?? 0, unit: ' ms' },
-    { label: '只读校验', value: result.guard.allowed ? '通过' : '拒绝', unit: '' },
-    { label: '结果校验', value: result.oracle.status ?? 'NOT_RUN', unit: '' },
-  ];
-  return (
-    <section className="ask-results-shell" data-testid="query-success">
-      <div className="ask-result-main">
-        <div className="analysis-context-bar"><div><span className="context-tag context-tag-brand">真实查询</span><span className="context-tag">{String(result.context.datasource_name ?? '本机数据库')}</span><span className="context-tag">{result.execution.truncated ? '已达行数上限' : `${result.execution.row_count ?? 0} 行`}</span></div><p>语义模型 v{result.semantic_model_version} · {result.provider}</p></div>
-        <div className="answer-query">{result.question}</div>
-        <article className="analysis-answer-card">
-          <header className="analysis-answer-header"><span className="analysis-bi-mark" aria-hidden="true">BI</span><div><h1>分析结论</h1><p>{result.summary} · {result.execution.duration_ms ?? 0} ms</p></div><span className="confidence-badge">可信度 {confidence}%</span></header>
-          <div className="analysis-kpi-grid">{runtimeKpis.slice(0, 4).map((kpi) => <section key={kpi.label}><span>{kpi.label}</span><strong>{formatValue(kpi.value)}{kpi.unit}</strong><small>{result.oracle.status === 'PASSED' ? '已通过结果校验' : '需复核'}</small></section>)}</div>
-          {chartSpec ? <section className="analysis-chart-card real-chart"><header><h3>{chartSpec.title}</h3><span>{chartSpec.chart_type} · 绑定 Query {chartSpec.data_source_query_id.slice(0, 8)}</span></header><EChartsRenderer spec={chartSpec} execution={result.execution} label="真实查询结果图表" />{chartSpec.warnings.map((warning) => <small key={warning}>{warning}</small>)}</section> : <QueryState kind="empty" title="查询完成，无可绘制图表" detail="明细仍可在下方核验。" />}
-          <section className="analysis-insight"><strong>业务洞察：</strong><p>{narrative?.insights.length ? narrative.insights.join('；') : `${checks.filter((check) => check.passed).length}/${checks.length} 项 Oracle 检查通过，当前结果未发现可证明的趋势、贡献或异常。`}</p><small>证据：Query {result.id.slice(0, 8)} · Signature {result.execution.result_signature?.slice(0, 12) ?? '—'} · Semantic v{result.semantic_model_version}</small></section>
-          <div className="query-inline-table"><table><thead><tr>{columns.map((column) => <th key={column}>{column}</th>)}</tr></thead><tbody>{rows.slice(0, 8).map((row, index) => <tr key={index}>{columns.map((column) => <td key={column}>{formatValue(row[column])}</td>)}</tr>)}</tbody></table></div>
-          <details className="query-evidence-inline"><summary>查询依据</summary><dl><div><dt>Metric</dt><dd>{metrics.join('、') || '明细查询'}</dd></div><div><dt>Dimension</dt><dd>{dimensions.join('、') || '无分组'}</dd></div><div><dt>Time</dt><dd>{result.plan.time_range?.kind ?? '全部时间'}</dd></div><div><dt>Filter</dt><dd>{filters.map((item) => `${item.field}${item.operator}${String(item.value)}`).join('、') || '无过滤'}</dd></div><div><dt>Join</dt><dd>{Array.isArray(result.plan.joins) ? `${result.plan.joins.length} 个` : '0 个'}</dd></div><div><dt>SQL</dt><dd>默认折叠，点击右侧查看</dd></div><div><dt>Semantic Model Version</dt><dd>v{result.semantic_model_version}</dd></div><div><dt>Datasource</dt><dd>{String(result.context.datasource_name ?? result.datasource_id)}</dd></div><div><dt>Execution Time</dt><dd>{result.execution.duration_ms ?? 0} ms</dd></div><div><dt>Result Oracle</dt><dd>{result.oracle.status}</dd></div><div><dt>Result Signature</dt><dd>{result.execution.result_signature ?? '—'}</dd></div></dl></details>
-          <section className="followup-suggestions"><h3>推荐追问</h3>{result.recommended_questions.slice(0, 5).map((question) => <button type="button" key={question} onClick={() => onAsk(question)}>{question}</button>)}</section>
-        </article>
-      </div>
-      <aside className="analysis-side-panel" aria-label="查询验证信息">
-        <section className="trust-card"><h2>查询可信度</h2><div><span className="trust-ring" style={{ background: `conic-gradient(#5b5cf6 0 ${confidence}%, #eceefe ${confidence}% 100%)` }}><b>{confidence}%</b></span><p><strong>{result.oracle.status === 'PASSED' ? '结果通过校验' : '结果需复核'}</strong><small>指标、维度、过滤、Join 与结果签名</small></p></div></section>
-        <section className="evidence-card"><h2>查询依据</h2><dl><div><dt>指标</dt><dd>{metrics.join('、') || '明细查询'}</dd></div><div><dt>维度</dt><dd>{dimensions.join('、') || '无分组'}</dd></div><div><dt>时间 / 过滤</dt><dd>{result.plan.time_range?.kind ?? '全部时间'}；{filters.map((item) => `${item.field}${item.operator}${String(item.value)}`).join('、') || '无过滤'}</dd></div><div><dt>SQL / Oracle</dt><dd>{result.guard.allowed ? '只读校验通过' : '未通过'}；{result.oracle.status}</dd></div></dl><button type="button" className="sql-detail-button" onClick={() => setShowDetails(true)}>查看 SQL 与执行明细</button></section>
-        <section className="recommend-card"><h2>反馈与沉淀</h2><div className="feedback-actions"><button type="button" onClick={() => recordFeedback('HELPFUL')}>结果有帮助</button><button type="button" onClick={() => recordFeedback('NOT_HELPFUL')}>需要改进</button></div>{feedback && <p className="action-status">{feedback}</p>}<button type="button" disabled={feedback !== '已记录“有帮助”' || saved} onClick={save}>{saved ? '已保存到答案库' : '保存为已验证答案'}</button></section>
-      </aside>
-      {showDetails && <QueryDetailDialog result={result} onClose={() => setShowDetails(false)} />}
-    </section>
-  );
+function messageParts(message: ChatMessage): UiPart[] {
+  const extended = message as ChatMessage & { message_parts?: UiPart[] };
+  if (Array.isArray(extended.message_parts)) return extended.message_parts;
+  const payload = record(message.response_payload);
+  const parts = payload.message_parts ?? payload.parts;
+  return Array.isArray(parts) ? parts.filter((part): part is UiPart => Boolean(part && typeof part === 'object' && 'type' in part)) : [];
 }
 
 function queryFromMessage(message: ChatMessage): QueryResponse | null {
-  const analysis = message.response_payload.analysis as { primary?: Record<string, unknown> } | undefined;
-  let primary = analysis?.primary;
-  if (message.route === 'HYBRID_ANALYSIS' && primary?.data) primary = primary.data as Record<string, unknown>;
-  if (primary && typeof primary.id === 'string' && typeof primary.execution === 'object') return primary as unknown as QueryResponse;
+  const analysis = record(message.response_payload.analysis);
+  let primary = record(analysis.primary);
+  if (message.route === 'HYBRID_ANALYSIS' && primary.data) primary = record(primary.data);
+  if (typeof primary.id === 'string' && primary.execution && typeof primary.execution === 'object') return primary as unknown as QueryResponse;
   return null;
 }
 
-function QueryMessage({ message, onAsk, onRetry }: { message: ChatMessage; onAsk: (question: string) => void; onRetry: () => void }) {
-  const result = queryFromMessage(message);
-  if (!result) {
-    const analysis = message.response_payload.analysis as { primary?: Record<string, unknown> } | undefined;
-    const primary = analysis?.primary ?? {};
-    const knowledge = (primary.knowledge ?? primary) as Record<string, unknown>;
-    const citations = Array.isArray(knowledge.citations) ? knowledge.citations as Array<Record<string, unknown>> : [];
-    const steps = Array.isArray(primary.steps) ? primary.steps as Array<Record<string, unknown>> : [];
-    const fileAnalysis = message.response_payload.file_analysis as Record<string, unknown> | undefined;
-    const artifacts = Array.isArray(fileAnalysis?.artifacts) ? fileAnalysis.artifacts as Array<Record<string, unknown>> : [];
-    const fileResult = fileAnalysis?.result as { columns?: string[]; rows?: Array<Record<string, unknown>> } | undefined;
-    const fileColumns = Array.isArray(fileResult?.columns) ? fileResult.columns : [];
-    const fileRows = Array.isArray(fileResult?.rows) ? fileResult.rows : [];
-    const fileChart = fileAnalysis?.chart as { chart_type?: string; x?: string; y?: string; rows?: Array<Record<string, unknown>> } | undefined;
-    const chartRows = Array.isArray(fileChart?.rows) ? fileChart.rows : [];
-    const chartOption = fileChart?.x && fileChart?.y ? {
-      tooltip: { trigger: 'axis' },
-      xAxis: { type: 'category', data: chartRows.map((row) => formatValue(row[fileChart.x!])) },
-      yAxis: { type: 'value' },
-      series: [{ type: fileChart.chart_type === 'line' ? 'line' : 'bar', data: chartRows.map((row) => Number(row[fileChart.y!]) || 0) }],
-    } : null;
-    return (
-    <article className={`chat-answer-bubble ${message.status === 'FAILED' || message.status === 'REFUSED' ? 'failed' : ''}`} data-testid="governed-answer">
-      <header><span>BI</span><b>{message.route ?? '回答'}</b><small>{message.status}</small></header>
-      <p>{message.content}</p>
-      {citations.length > 0 && <section className="citation-evidence" data-testid="citation-evidence"><h3>授权知识引用</h3>{citations.map((item, index) => <article key={String(item.citation_id ?? index)}><strong>{String(item.title ?? '知识文档')}</strong><p>{String(item.text ?? '').slice(0, 280)}</p><small>版本 {String(item.document_version_id ?? '—')} · {String(item.locator ?? '—')} · Chunk {String(item.chunk_id ?? '—')}</small></article>)}</section>}
-      {steps.length > 0 && <section className="agent-step-evidence" data-testid="agent-step-evidence"><h3>有限 Agent 执行阶段</h3>{steps.map((step, index) => <div key={String(step.code ?? index)}><span>{index + 1}</span><strong>{String(step.agent_role ?? 'Agent')}</strong><code>{String(step.tool_name ?? step.code ?? 'PLAN')}</code><small>{String(step.status ?? '')}</small></div>)}<footer>Trace {String(message.trace_payload.trace_id ?? message.trace_payload.message_id ?? message.id)} · 仅展示阶段与工具，不展示内部思维</footer></section>}
-      {fileAnalysis && <section className="file-analysis-evidence" data-testid="file-analysis-evidence"><h3>受限文件分析</h3><p>{String(fileAnalysis.operation ?? 'SUMMARY')} · Trace {String((fileAnalysis.trace as Record<string, unknown> | undefined)?.complete ? '完整' : '待复核')}</p>{chartOption && <EChart option={chartOption} label="文件分析结果图表" className="file-analysis-chart" />}{fileColumns.length > 0 && <div className="file-result-table"><table><thead><tr>{fileColumns.map((column) => <th key={column}>{column}</th>)}</tr></thead><tbody>{fileRows.slice(0, 20).map((row, index) => <tr key={index}>{fileColumns.map((column) => <td key={column}>{formatValue(row[column])}</td>)}</tr>)}</tbody></table></div>}{artifacts.map((artifact) => <span key={String(artifact.attachment_id)}><a href={String(artifact.csv_url)}>下载 CSV Artifact</a><a href={String(artifact.json_url)}>下载 JSON Artifact</a></span>)}</section>}
-      {message.error_code && <code>{message.error_code}</code>}
-      {(message.status === 'FAILED' || message.status === 'REFUSED') && <button type="button" onClick={onRetry}>重试</button>}
-    </article>
-    );
-  }
-  if (result.status === 'SECURITY_REJECTED') return <QueryState kind="security" title="查询已被安全策略拒绝" detail={`${result.error_code ?? 'SQL_GUARD_REJECTED'}：${result.error_message ?? '未访问数据库'}`} />;
-  if (result.status === 'ORACLE_MISMATCH') return <QueryState kind="mismatch" title="结果未通过一致性校验" detail={`${result.oracle.mismatch_count ?? 0} 项差异；该结果不会保存为标准答案。`} />;
-  if (result.status === 'FAILED') return <QueryState kind="error" title="查询执行失败" detail={`${result.error_code ?? 'QUERY_FAILED'}：${result.error_message ?? '请稍后重试'}`} onRetry={onRetry} />;
-  if ((result.execution.rows ?? []).length === 0) return <QueryState kind="empty" title="查询完成，暂无匹配数据" detail="可调整时间范围或过滤条件后重新提问。" />;
-  return <SuccessfulResult result={result} onAsk={onAsk} />;
+function explicitSemantic(message: ChatMessage): ResultSemantic | undefined {
+  const extended = message as ChatMessage & { result_semantic?: ResultSemantic };
+  const value = extended.result_semantic ?? record(message.response_payload).result_semantic;
+  return ['VALUE', 'ZERO', 'NO_ROWS', 'NULL_VALUE', 'FAILED'].includes(String(value)) ? value as ResultSemantic : undefined;
 }
 
-const stageLabels: Record<string, string> = {
-  UNDERSTANDING: '正在理解问题', QUERYING_DATA: '正在查询并校验数据', RETRIEVING_KNOWLEDGE: '正在检索授权知识',
-  VERIFYING: '正在验证证据', GENERATING_INSIGHT: '正在生成业务结论', COMPLETED: '回答完成',
-};
+function inferSemantic(message: ChatMessage, result: QueryResponse | null): ResultSemantic {
+  const explicit = explicitSemantic(message);
+  if (explicit) return explicit;
+  if (message.status === 'FAILED' || message.status === 'REFUSED' || result?.status === 'FAILED' || result?.status === 'SECURITY_REJECTED' || result?.status === 'ORACLE_MISMATCH') return 'FAILED';
+  if (!result) return 'VALUE';
+  const rows = result.execution.rows ?? [];
+  if ((result.execution.row_count ?? rows.length) === 0) return 'NO_ROWS';
+  const primaryColumn = (result.execution.columns ?? [])[1] ?? (result.execution.columns ?? [])[0];
+  const primaryValue = result.kpis[0]?.value ?? (rows[0] && primaryColumn ? rows[0][primaryColumn] : undefined);
+  if (primaryValue === null) return 'NULL_VALUE';
+  if (typeof primaryValue === 'number' && primaryValue === 0) return 'ZERO';
+  return 'VALUE';
+}
+
+function citationsFromMessage(message: ChatMessage, parts = messageParts(message)): PublicCitation[] {
+  const fromParts = parts
+    .filter((part) => part.type === 'citations')
+    .flatMap((part) => Array.isArray(part.items) ? part.items : [])
+    .map(record);
+  const analysis = record(message.response_payload.analysis);
+  const primary = record(analysis.primary);
+  const knowledge = record(primary.knowledge ?? primary);
+  const legacy = Array.isArray(knowledge.citations) ? knowledge.citations.map(record) : [];
+  const source = fromParts.length > 0 ? fromParts : legacy;
+  const citations = new Map<string, PublicCitation>();
+  source.forEach((item, index) => {
+    const resourceId = String(item.resource_id ?? item.document_id ?? item.attachment_id ?? item.citation_id ?? item.id ?? '');
+    const title = String(item.title ?? '业务资料');
+    const version = String(item.version ?? item.document_version_id ?? '—');
+    const locator = String(item.locator ?? item.chunk_id ?? '未提供定位');
+    const stableKey = `${resourceId || title}\u0000${version}\u0000${locator}`;
+    const renderId = `${resourceId || `${message.id}-${index}`}::${version}::${locator}`;
+    if (!citations.has(stableKey)) citations.set(stableKey, { id: renderId, title, version, locator });
+  });
+  return [...citations.values()];
+}
+
+function evidenceData(message: ChatMessage, result: QueryResponse | null, parts = messageParts(message)): EvidenceDrawerData {
+  const evidencePart = record(parts.find((part) => part.type === 'evidence'));
+  const semantic = record(evidencePart.semantic);
+  const guard = record(evidencePart.guard);
+  const oracle = record(evidencePart.oracle);
+  const phaseValues = Array.isArray(evidencePart.phases) ? evidencePart.phases : [];
+  const phaseLabels = phaseValues
+    .map((phase) => typeof phase === 'string' ? PUBLIC_PHASES[phase] ?? '' : PUBLIC_PHASES[String(record(phase).phase ?? '')] ?? '')
+    .filter(Boolean);
+  const defaultPhases = result
+    ? ['已理解业务问题', '已识别指标和维度', '已执行只读查询', '已校验结果', '已整理业务回答']
+    : message.route === 'KNOWLEDGE_QUERY'
+      ? ['已理解业务问题', '已检索授权业务规则', '已核验引用', '已整理业务回答']
+      : ['已理解业务问题', '已获取所需证据', '已校验结果', '已整理业务回答'];
+  const filters = result?.plan.filters ?? [];
+  const resultContext = result?.context ?? {};
+  return {
+    dataAndSemantics: result ? [
+      { label: '数据源', value: String(resultContext.datasource_name ?? result.datasource_id ?? '—') },
+      { label: '语义模型', value: `${String(resultContext.semantic_model_name ?? result.semantic_model_id ?? '—')} · v${result.semantic_model_version}` },
+      { label: '指标', value: result.plan.metrics?.join('、') || '明细查询' },
+      { label: '维度', value: result.plan.dimensions?.join('、') || '无分组' },
+      { label: '时间', value: result.plan.time_range?.kind ?? '全部时间' },
+      { label: '过滤', value: filters.map((item) => `${item.field} ${item.operator} ${String(item.value)}`).join('、') || '无过滤' },
+      { label: '返回数据', value: `${result.execution.row_count ?? 0} 行${result.execution.truncated ? '（已达上限）' : ''}` },
+    ] : [
+      { label: '回答类型', value: message.route === 'KNOWLEDGE_QUERY' ? '业务知识问答' : message.route === 'FILE_QUERY' ? '附件分析' : '综合业务分析' },
+      { label: '证据范围', value: citationsFromMessage(message, parts).length ? '当前工作空间内授权资料' : '当前会话上下文' },
+    ],
+    sql: String(evidencePart.sql ?? result?.guard.normalized_sql ?? result?.plan.generated_sql ?? '') || undefined,
+    businessEvidence: citationsFromMessage(message, parts),
+    phases: phaseLabels.length ? phaseLabels : defaultPhases,
+    verification: [
+      guard.allowed === true || result?.guard.allowed ? '只读查询安全校验通过' : '',
+      String(oracle.status ?? result?.oracle.status ?? '') === 'PASSED' ? '指标、维度、过滤与结果值已校验' : '',
+      semantic.model_version || result?.semantic_model_version ? '语义口径版本已绑定' : '',
+    ].filter(Boolean),
+  };
+}
+
+function ResultStateNotice({ semantic, message, onRetry, testId }: { semantic: ResultSemantic; message?: string; onRetry: () => void; testId?: string }) {
+  if (semantic === 'VALUE') return null;
+  if (semantic === 'ZERO') return <section className="result-state-notice zero"><strong>当前条件下结果为 0</strong><p>查询命中了记录，指标值经过校验后确认为数值 0。</p></section>;
+  if (semantic === 'NO_ROWS') return <section className="result-state-notice no-rows" data-testid="query-empty"><strong>没有匹配记录</strong><p>当前条件下查询成功但没有返回记录，这并不代表指标为 0。可调整时间或筛选条件后重试。</p></section>;
+  if (semantic === 'NULL_VALUE') return <section className="result-state-notice null-value"><strong>查询到记录，但指标字段为空</strong><p>空值不会转换为 0，也不会据此生成趋势或因果结论。</p></section>;
+  return <section className="result-state-notice failed" data-testid={testId}><h2>回答未完成</h2><p>{message || '查询、权限、模型、数据源或结果校验失败。'}</p><button type="button" onClick={onRetry}>重新查询</button></section>;
+}
+
+function AnswerActions({ message, result, onRetry, onEvidence, evidenceButtonRef }: { message: ChatMessage; result: QueryResponse | null; onRetry: () => void; onEvidence: () => void; evidenceButtonRef: RefObject<HTMLButtonElement> }) {
+  const [copyStatus, setCopyStatus] = useState('');
+  const [feedback, setFeedback] = useState('');
+  const [saved, setSaved] = useState(false);
+
+  async function copyAnswer() {
+    try {
+      await navigator.clipboard.writeText(message.content);
+      setCopyStatus('已复制');
+    } catch {
+      setCopyStatus('复制失败');
+    }
+  }
+
+  async function recordFeedback(type: 'HELPFUL' | 'NOT_HELPFUL') {
+    if (!result) return;
+    await queryApi.feedback(result.id, type);
+    setFeedback(type === 'HELPFUL' ? '已记录“有帮助”' : '已记录改进反馈');
+  }
+
+  async function saveAnswer() {
+    if (!result) return;
+    await queryApi.save(result.id);
+    setSaved(true);
+  }
+
+  return (
+    <footer className="answer-actions">
+      <button type="button" onClick={() => void copyAnswer()} aria-label="复制回答">复制</button>
+      <button type="button" onClick={onRetry}>重新生成</button>
+      <button ref={evidenceButtonRef} type="button" onClick={onEvidence}>查看 SQL 与执行明细</button>
+      {result && <button type="button" onClick={() => void recordFeedback('HELPFUL')}>结果有帮助</button>}
+      {result && <button type="button" onClick={() => void recordFeedback('NOT_HELPFUL')}>需要改进</button>}
+      {result && <button type="button" disabled={feedback !== '已记录“有帮助”' || saved} onClick={() => void saveAnswer()}>{saved ? '已保存到答案库' : '保存为已验证答案'}</button>}
+      {(copyStatus || feedback) && <span role="status">{copyStatus || feedback}</span>}
+    </footer>
+  );
+}
+
+function QueryAnswer({ message, result, onAsk, onRetry }: { message: ChatMessage; result: QueryResponse; onAsk: (question: string) => void; onRetry: () => void }) {
+  const semantic = inferSemantic(message, result);
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const evidenceButtonRef = useRef<HTMLButtonElement>(null);
+  const rows = result.execution.rows ?? [];
+  const columns = result.execution.columns ?? [];
+  const chartSpec = 'chart_type' in result.chart_spec ? result.chart_spec as ChartSpec : null;
+  const narrative = 'conclusion' in result.narrative ? result.narrative as Narrative : null;
+  const kpis = result.kpis.length ? result.kpis : narrative?.key_metrics ?? [];
+  const citations = citationsFromMessage(message);
+  const conclusion = semantic === 'ZERO' ? '当前条件下结果为 0。' : narrative?.conclusion || message.content || result.summary;
+  const stateError = result.status === 'SECURITY_REJECTED'
+    ? `${result.error_code ?? 'SQL_GUARD_REJECTED'}：${result.error_message ?? '查询已被安全策略拒绝，未访问数据库。'}`
+    : result.status === 'ORACLE_MISMATCH'
+      ? `结果未通过一致性校验（${result.oracle.mismatch_count ?? 0} 项差异），不会作为已验证答案发布。`
+      : `${result.error_code ?? message.error_code ?? 'QUERY_FAILED'}：${result.error_message ?? '请稍后重试。'}`;
+  const success = semantic !== 'FAILED';
+
+  return (
+    <article className="assistant-response" data-testid={`result-state-${semantic}`}>
+      <header className="assistant-response-head"><span aria-hidden="true">BI</span><strong>ChatBI</strong>{success && result.guard.allowed && result.oracle.status === 'PASSED' && <small>查询执行已校验</small>}</header>
+      {success && semantic !== 'NO_ROWS' && semantic !== 'NULL_VALUE' && <section className="answer-conclusion"><h2 className="sr-only">分析结论</h2><h2>核心结论</h2><p>{conclusion}</p></section>}
+      <ResultStateNotice semantic={semantic} message={stateError} onRetry={onRetry} testId={result.status === 'SECURITY_REJECTED' ? 'query-security' : result.status === 'ORACLE_MISMATCH' ? 'query-mismatch' : undefined} />
+
+      {(semantic === 'VALUE' || semantic === 'ZERO') && (
+        <div data-testid="query-success">
+          {kpis.length > 0 && <section className="answer-card kpi-card"><h3>KPI</h3><div className="answer-kpi-grid">{kpis.slice(0, 4).map((kpi) => <article key={kpi.label}><span>{kpi.label}</span><strong>{formatValue(kpi.value)}{kpi.unit ?? ''}</strong><small>已验证指标</small></article>)}</div></section>}
+          {chartSpec && <section className="answer-card chart-card"><header><h3>{chartSpec.title}</h3><small>绑定本次查询结果</small></header><EChartsRenderer spec={chartSpec} execution={result.execution} label="真实查询结果图表" />{chartSpec.warnings.map((warning) => <p className="chart-warning" key={warning}>{warning}</p>)}</section>}
+          {narrative?.insights.length ? <section className="answer-insights"><h3>业务洞察</h3>{narrative.insights.map((insight) => <p key={insight}>{insight}</p>)}</section> : null}
+          {columns.length > 0 && rows.length > 0 && <section className="answer-card table-card"><header><h3>明细数据</h3><small>{result.execution.row_count ?? rows.length} 行</small></header><div className="answer-table-scroll"><table><thead><tr>{columns.map((column) => <th key={column}>{column}</th>)}</tr></thead><tbody>{rows.slice(0, 20).map((row, index) => <tr key={index}>{columns.map((column) => <td key={column}>{formatValue(row[column])}</td>)}</tr>)}</tbody></table></div></section>}
+          {citations.length > 0 && <section className="answer-card citations-card" data-testid="citation-evidence"><h3>业务依据</h3>{citations.map((citation) => <article key={citation.id}><strong>{citation.title}</strong><small>版本 {citation.version} · {citation.locator}</small></article>)}</section>}
+          {result.recommended_questions.length > 0 && <section className="answer-followups"><h3>推荐追问</h3><div>{result.recommended_questions.slice(0, 5).map((question) => <button type="button" key={question} onClick={() => onAsk(question)}>{question}</button>)}</div></section>}
+        </div>
+      )}
+      {semantic === 'NULL_VALUE' && columns.length > 0 && rows.length > 0 && <section className="answer-card table-card"><header><h3>明细数据</h3><small>{result.execution.row_count ?? rows.length} 行</small></header><div className="answer-table-scroll"><table><thead><tr>{columns.map((column) => <th key={column}>{column}</th>)}</tr></thead><tbody>{rows.slice(0, 20).map((row, index) => <tr key={index}>{columns.map((column) => <td key={column}>{formatValue(row[column])}</td>)}</tr>)}</tbody></table></div></section>}
+
+      <AnswerActions message={message} result={success ? result : null} onRetry={onRetry} onEvidence={() => setDrawerOpen(true)} evidenceButtonRef={evidenceButtonRef} />
+      {drawerOpen && <EvidenceDrawer data={evidenceData(message, result)} onClose={() => setDrawerOpen(false)} returnFocusRef={evidenceButtonRef} />}
+    </article>
+  );
+}
+
+function safeArtifactUrl(value: unknown) {
+  const url = String(value ?? '');
+  return url.startsWith('/api/') ? url : '';
+}
+
+function GeneralAnswer({ message, onAsk, onRetry }: { message: ChatMessage; onAsk: (question: string) => void; onRetry: () => void }) {
+  const semantic = inferSemantic(message, null);
+  const artifactSuccess = semantic === 'VALUE' || semantic === 'ZERO';
+  const parts = messageParts(message);
+  const citations = citationsFromMessage(message, parts);
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const evidenceButtonRef = useRef<HTMLButtonElement>(null);
+  const kpis = parts.filter((part) => part.type === 'kpi').flatMap((part) => Array.isArray(part.items) ? part.items.map(record) : []);
+  const insightTexts = parts.filter((part) => part.type === 'text' && part.role === 'insights').map((part) => String(part.text ?? '')).filter(Boolean);
+  const followups = parts
+    .filter((part) => part.type === 'text' && part.role === 'followups')
+    .flatMap((part) => String(part.text ?? '').split('\n').map((item) => item.trim()).filter(Boolean));
+  const table = record(parts.find((part) => part.type === 'table'));
+  const tableColumns = Array.isArray(table.columns) ? table.columns.map(String) : [];
+  const tableRows = Array.isArray(table.rows) ? table.rows.map(record) : [];
+  const chartPart = record(parts.find((part) => part.type === 'chart'));
+  const structuredChartSpec = record(chartPart.chart_spec);
+  const hasStructuredChart = typeof structuredChartSpec.chart_type === 'string'
+    && typeof structuredChartSpec.version === 'string'
+    && Array.isArray(structuredChartSpec.series)
+    && Array.isArray(structuredChartSpec.y_fields)
+    && tableColumns.length > 0
+    && tableRows.length > 0;
+  const fileAnalysis = record(record(message.response_payload).file_analysis);
+  const fileResult = record(fileAnalysis.result);
+  const fallbackColumns = Array.isArray(fileResult.columns) ? fileResult.columns.map(String) : [];
+  const fallbackRows = Array.isArray(fileResult.rows) ? fileResult.rows.map(record) : [];
+  const fileChart = record(fileAnalysis.chart);
+  const chartDefinition = Object.keys(fileChart).length ? fileChart : structuredChartSpec;
+  const chartRows = Array.isArray(chartDefinition.rows) ? chartDefinition.rows.map(record) : tableRows;
+  const xField = typeof chartDefinition.x === 'string' ? chartDefinition.x : typeof chartDefinition.x_field === 'string' ? chartDefinition.x_field : '';
+  const yFields = Array.isArray(chartDefinition.y_fields) ? chartDefinition.y_fields.map(String) : [];
+  const yField = typeof chartDefinition.y === 'string' ? chartDefinition.y : yFields[0] ?? '';
+  const chartOption = xField && yField ? {
+    tooltip: { trigger: 'axis' },
+    xAxis: { type: 'category', data: chartRows.map((row) => formatValue(row[xField])) },
+    yAxis: { type: 'value' },
+    series: [{ type: chartDefinition.chart_type === 'line' || chartDefinition.chart_type === 'LINE' ? 'line' : 'bar', data: chartRows.map((row) => Number(row[yField]) || 0) }],
+  } : null;
+  const artifacts = Array.isArray(fileAnalysis.artifacts) ? fileAnalysis.artifacts.map(record) : [];
+  const displayColumns = tableColumns.length ? tableColumns : fallbackColumns;
+  const displayRows = tableRows.length ? tableRows : fallbackRows;
+  const displayRowCount = Number(table.row_count ?? fileResult.row_count ?? displayRows.length);
+
+  return (
+    <article className="assistant-response" data-testid={`result-state-${semantic}`}>
+      <header className="assistant-response-head"><span aria-hidden="true">BI</span><strong>ChatBI</strong>{artifactSuccess && <small>回答已完成</small>}</header>
+      {artifactSuccess && <section className="answer-conclusion"><h2>核心结论</h2><p>{message.content}</p></section>}
+      <ResultStateNotice semantic={semantic} message={message.error_code ? `${message.error_code}：${message.content}` : message.content} onRetry={onRetry} />
+      {artifactSuccess && kpis.length > 0 && <section className="answer-card kpi-card"><h3>KPI</h3><div className="answer-kpi-grid">{kpis.slice(0, 4).map((kpi, index) => <article key={String(kpi.label ?? index)}><span>{String(kpi.label ?? '指标')}</span><strong>{formatValue(kpi.value)}{String(kpi.unit ?? '')}</strong></article>)}</div></section>}
+      {artifactSuccess && hasStructuredChart && <section className="answer-card chart-card"><header><h3>{String(structuredChartSpec.title ?? '分析图表')}</h3><small>绑定本次查询结果</small></header><EChartsRenderer spec={structuredChartSpec as unknown as ChartSpec} execution={{ columns: tableColumns, rows: tableRows, row_count: displayRowCount, result_signature: String(chartPart.result_signature ?? '') }} label="真实查询结果图表" /></section>}
+      {artifactSuccess && !hasStructuredChart && chartOption && <section className="answer-card chart-card"><h3>分析图表</h3><EChart option={chartOption} label="文件分析结果图表" className="file-analysis-chart" /></section>}
+      {artifactSuccess && insightTexts.length > 0 && <section className="answer-insights"><h3>业务洞察</h3>{insightTexts.map((insight) => <p key={insight}>{insight}</p>)}</section>}
+      {(artifactSuccess || semantic === 'NULL_VALUE') && displayColumns.length > 0 && displayRows.length > 0 && <section className="answer-card table-card" data-testid="file-analysis-evidence"><header><h3>明细数据</h3><small>{displayRowCount} 行</small></header><div className="answer-table-scroll"><table><thead><tr>{displayColumns.map((column) => <th key={column}>{column}</th>)}</tr></thead><tbody>{displayRows.slice(0, 20).map((row, index) => <tr key={index}>{displayColumns.map((column) => <td key={column}>{formatValue(row[column])}</td>)}</tr>)}</tbody></table></div>{artifacts.length > 0 && <footer className="artifact-links">{artifacts.flatMap((artifact, index) => {
+        const csv = safeArtifactUrl(artifact.csv_url);
+        const json = safeArtifactUrl(artifact.json_url);
+        return [csv && <a key={`csv-${index}`} href={csv}>下载 CSV Artifact</a>, json && <a key={`json-${index}`} href={json}>下载 JSON Artifact</a>].filter(Boolean);
+      })}</footer>}</section>}
+      {semantic !== 'FAILED' && semantic !== 'NO_ROWS' && citations.length > 0 && <section className="answer-card citations-card" data-testid="citation-evidence"><h3>业务依据</h3>{citations.map((citation) => <article key={citation.id}><strong>{citation.title}</strong><small>版本 {citation.version} · {citation.locator}</small></article>)}</section>}
+      {artifactSuccess && followups.length > 0 && <section className="answer-followups"><h3>推荐追问</h3><div>{followups.slice(0, 5).map((question) => <button type="button" key={question} onClick={() => onAsk(question)}>{question}</button>)}</div></section>}
+      <AnswerActions message={message} result={null} onRetry={onRetry} onEvidence={() => setDrawerOpen(true)} evidenceButtonRef={evidenceButtonRef} />
+      {drawerOpen && <EvidenceDrawer data={evidenceData(message, null, parts)} onClose={() => setDrawerOpen(false)} returnFocusRef={evidenceButtonRef} />}
+    </article>
+  );
+}
+
+function AssistantMessage({ message, onAsk, onRetry }: { message: ChatMessage; onAsk: (question: string) => void; onRetry: () => void }) {
+  const result = queryFromMessage(message);
+  return result ? <QueryAnswer message={message} result={result} onAsk={onAsk} onRetry={onRetry} /> : <GeneralAnswer message={message} onAsk={onAsk} onRetry={onRetry} />;
+}
+
+function PendingAssistant({ turn, onRetry }: { turn: PendingTurn; onRetry: () => void }) {
+  if (turn.status === 'FAILED') return <article className="assistant-response pending" data-testid="result-state-FAILED"><header className="assistant-response-head"><span aria-hidden="true">BI</span><strong>ChatBI</strong></header><ResultStateNotice semantic="FAILED" message={turn.error} onRetry={onRetry} /></article>;
+  return (
+    <article className="assistant-response pending" aria-busy={turn.status !== 'CANCELLED'}>
+      <header className="assistant-response-head"><span aria-hidden="true">BI</span><strong>ChatBI</strong></header>
+      {turn.content && <section className="pending-answer-text"><p>{turn.content}</p><span className="stream-caret" aria-hidden="true" /></section>}
+      {turn.status === 'CANCELLED' ? <p className="cancelled-run">已停止生成，不会继续追加内容。</p> : <p className="public-stage" role="status" aria-live="polite"><span aria-hidden="true" />{turn.stage || '正在开始分析……'}</p>}
+    </article>
+  );
+}
+
+function mergeResponseMessages(current: ChatMessage[], response: ChatResponse) {
+  const ids = new Set([response.user_message.id, response.assistant_message.id]);
+  return [...current.filter((message) => !ids.has(message.id)), response.user_message, response.assistant_message];
+}
 
 export function AskPage({ results = false }: { results?: boolean }) {
   const location = useLocation();
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [detail, setDetail] = useState<ConversationDetail | null>(null);
   const [attachments, setAttachments] = useState<Attachment[]>([]);
-  const [uploading, setUploading] = useState<Array<{ name: string; progress: number; error?: string }>>([]);
+  const [uploading, setUploading] = useState<UploadState[]>([]);
   const [draft, setDraft] = useState('');
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
-  const [stage, setStage] = useState('');
-  const [error, setError] = useState('');
+  const [pendingTurn, setPendingTurn] = useState<PendingTurn | null>(null);
   const [lastQuestion, setLastQuestion] = useState('');
   const [isAtBottom, setIsAtBottom] = useState(true);
+  const [collapsed, setCollapsed] = useState(false);
+  const [pageError, setPageError] = useState('');
   const abortRef = useRef<AbortController | null>(null);
+  const activeRunRef = useRef<{ id: string; conversationId: string; cancelled: boolean } | null>(null);
+  const interactionRef = useRef<{ generation: number; submissionId: string | null }>({ generation: 0, submissionId: null });
+  const creationPromiseRef = useRef<{ generation: number; promise: Promise<ConversationDetail> } | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
   const messageAreaRef = useRef<HTMLDivElement | null>(null);
   const compositionRef = useRef(false);
   const initialQuestionRef = useRef('');
 
+  function cancelActiveRunForNavigation() {
+    interactionRef.current.generation += 1;
+    interactionRef.current.submissionId = null;
+    const run = activeRunRef.current;
+    setSending(false);
+    if (!run) return interactionRef.current.generation;
+    run.cancelled = true;
+    activeRunRef.current = null;
+    const controller = abortRef.current;
+    abortRef.current = null;
+    setPendingTurn((current) => current?.runId === run.id ? null : current);
+    controller?.abort();
+    return interactionRef.current.generation;
+  }
+
   async function openConversation(id: string) {
+    const generation = id !== detail?.id ? cancelActiveRunForNavigation() : interactionRef.current.generation;
     const [value, files] = await Promise.all([chatApi.conversation(id), chatApi.attachments(id)]);
+    if (interactionRef.current.generation !== generation) return;
     localStorage.setItem('chatbi_conversation_id', id);
-    setDetail(value); setAttachments(files); setError('');
+    setDetail(value);
+    setAttachments(files);
+    setPageError('');
+    setIsAtBottom(true);
   }
 
   async function refreshConversations() {
-    const items = await chatApi.conversations(); setConversations(items); return items;
+    const items = await chatApi.conversations();
+    setConversations(items);
+    return items;
   }
 
-  async function createConversation() {
-    const item = await chatApi.createConversation();
-    setConversations((values) => [item, ...values]);
-    await openConversation(item.id);
+  function startLocalConversation() {
+    cancelActiveRunForNavigation();
+    localStorage.removeItem('chatbi_conversation_id');
+    setDetail(null);
+    setAttachments([]);
+    setUploading([]);
+    setDraft('');
+    setPageError('');
+    setPendingTurn((current) => current?.status === 'FAILED' || current?.status === 'CANCELLED' ? null : current);
+    setIsAtBottom(true);
+  }
+
+  async function ensureConversation() {
+    if (detail) return detail;
+    const generation = interactionRef.current.generation;
+    if (creationPromiseRef.current?.generation === generation) return creationPromiseRef.current.promise;
+    const promise = chatApi.createConversation()
+      .then((item) => ({ ...item, messages: [] } as ConversationDetail))
+      .finally(() => {
+        if (creationPromiseRef.current?.promise === promise) creationPromiseRef.current = null;
+      });
+    creationPromiseRef.current = { generation, promise };
+    return promise;
+  }
+
+  function adoptCreatedConversation(target: ConversationDetail, generation: number) {
+    if (interactionRef.current.generation !== generation) return false;
+    setConversations((items) => [target, ...items.filter((value) => value.id !== target.id)]);
+    setDetail((current) => current ?? target);
+    localStorage.setItem('chatbi_conversation_id', target.id);
+    return true;
   }
 
   useEffect(() => {
@@ -279,131 +477,303 @@ export function AskPage({ results = false }: { results?: boolean }) {
         if (!active) return;
         const params = new URLSearchParams(location.search);
         const requested = params.get('conversation_id');
-        const startsNewConversation = params.get('new') === '1' || Boolean(params.get('q')?.trim() && !params.get('query_id'));
-        if (startsNewConversation) {
-          await createConversation();
+        const localNew = params.get('new') === '1' || Boolean(params.get('q')?.trim() && !params.get('query_id'));
+        if (localNew) {
+          startLocalConversation();
           return;
         }
+        const visibleItems = items.filter(isVisibleConversation);
         const remembered = localStorage.getItem('chatbi_conversation_id');
-        const id = [requested, remembered, items[0]?.id].find((candidate) => candidate && items.some((item) => item.id === candidate));
-        if (id) await openConversation(id); else await createConversation();
-      } catch (reason) { if (active) setError(reason instanceof Error ? reason.message : '会话加载失败'); }
-      finally { if (active) setLoading(false); }
+        const id = [requested, remembered, visibleItems[0]?.id].find((candidate) => candidate && visibleItems.some((item) => item.id === candidate));
+        if (id) await openConversation(id);
+        else startLocalConversation();
+      } catch (reason) {
+        if (active) setPageError(reason instanceof Error ? reason.message : '会话加载失败');
+      } finally {
+        if (active) setLoading(false);
+      }
     })();
-    return () => { active = false; abortRef.current?.abort(); };
+    return () => {
+      active = false;
+      interactionRef.current.generation += 1;
+      interactionRef.current.submissionId = null;
+      if (activeRunRef.current) activeRunRef.current.cancelled = true;
+      abortRef.current?.abort();
+    };
   }, []);
 
   useEffect(() => {
     const messageArea = messageAreaRef.current;
     if (!isAtBottom || !messageArea) return;
-    if (typeof messageArea.scrollTo === 'function') {
-      messageArea.scrollTo({ top: messageArea.scrollHeight, behavior: 'smooth' });
-    } else {
-      messageArea.scrollTop = messageArea.scrollHeight;
-    }
-  }, [detail?.messages.length, sending, isAtBottom]);
+    if (typeof messageArea.scrollTo === 'function') messageArea.scrollTo({ top: messageArea.scrollHeight, behavior: 'smooth' });
+    else messageArea.scrollTop = messageArea.scrollHeight;
+  }, [detail?.messages.length, pendingTurn?.content, pendingTurn?.stage, isAtBottom]);
 
   async function sendMessage(value = draft) {
     const question = value.trim();
-    if (!detail || sending || (!question && attachments.length === 0)) return;
-    const clientMessageId = crypto.randomUUID();
-    const parent = [...detail.messages].reverse().find((item) => item.role === 'assistant')?.id;
-    const optimisticUser: ChatMessage = {
-      id: `pending-${clientMessageId}`,
-      conversation_id: detail.id,
-      parent_message_id: parent,
-      role: 'user',
-      content: question || '请分析当前附件。',
-      status: 'SENDING',
-      attachment_ids: attachments.filter((item) => item.status === 'READY').map((item) => item.id),
-      response_payload: {},
-      trace_payload: {},
-      created_at: new Date().toISOString(),
-    };
-    setSending(true); setStage('UNDERSTANDING'); setError(''); setLastQuestion(question); setDraft(''); setIsAtBottom(true);
-    setDetail((current) => current?.id === detail.id ? { ...current, messages: [...current.messages, optimisticUser] } : current);
-    const controller = new AbortController(); abortRef.current = controller;
+    if (sending || interactionRef.current.submissionId || (!question && attachments.length === 0)) return;
+    const submissionId = crypto.randomUUID();
+    const submissionGeneration = interactionRef.current.generation;
+    interactionRef.current.submissionId = submissionId;
+    const isCurrentSubmission = () => interactionRef.current.generation === submissionGeneration && interactionRef.current.submissionId === submissionId;
+
     try {
-      const response = await chatApi.stream({
-        conversation_id: detail.id, content: question, parent_message_id: parent, client_message_id: clientMessageId,
-        attachment_ids: attachments.filter((item) => item.status === 'READY').map((item) => item.id),
-      }, setStage, controller.signal);
-      setDetail((current) => current ? {
-        ...response.conversation,
-        messages: [...current.messages.filter((item) => item.id !== optimisticUser.id), response.user_message, response.assistant_message],
-      } : current);
-      setConversations((items) => [response.conversation, ...items.filter((item) => item.id !== response.conversation.id)]);
-    } catch (reason) {
-      if ((reason as Error).name !== 'AbortError') setError(reason instanceof Error ? reason.message : '回答失败');
-    } finally { setSending(false); setStage(''); abortRef.current = null; }
+      let target: ConversationDetail;
+      try {
+        target = await ensureConversation();
+      } catch (reason) {
+        if (isCurrentSubmission()) setPageError(reason instanceof Error ? reason.message : '创建会话失败');
+        return;
+      }
+      if (!isCurrentSubmission()) return;
+      if (!adoptCreatedConversation(target, submissionGeneration)) return;
+
+      const clientMessageId = submissionId;
+      const parent = [...target.messages].reverse().find((item) => item.role === 'assistant')?.id;
+      const readyAttachmentIds = attachments.filter((item) => item.status === 'READY' && item.conversation_id === target.id).map((item) => item.id);
+      const optimisticUser: ChatMessage = {
+        id: `pending-${clientMessageId}`,
+        conversation_id: target.id,
+        parent_message_id: parent,
+        role: 'user',
+        content: question || '请分析当前附件。',
+        status: 'SENDING',
+        attachment_ids: readyAttachmentIds,
+        response_payload: {},
+        trace_payload: {},
+        created_at: new Date().toISOString(),
+      };
+      const controller = new AbortController();
+      abortRef.current = controller;
+      activeRunRef.current = { id: clientMessageId, conversationId: target.id, cancelled: false };
+      setSending(true);
+      setPageError('');
+      setLastQuestion(question || optimisticUser.content);
+      setDraft('');
+      setIsAtBottom(true);
+      setPendingTurn({ runId: clientMessageId, conversationId: target.id, user: optimisticUser, content: '', parts: [], stage: PUBLIC_PHASES.understanding, status: 'SUBMITTING' });
+
+      const isCurrentRun = () => isCurrentSubmission() && activeRunRef.current?.id === clientMessageId && !activeRunRef.current.cancelled;
+      const handlers: StreamHandlers = {
+        onStateChange: (state) => {
+          if (!isCurrentRun()) return;
+          const normalized = state.toUpperCase() as RunStatus;
+          setPendingTurn((current) => current?.runId === clientMessageId ? { ...current, status: normalized } : current);
+        },
+        onDelta: (delta) => {
+          if (!delta || !isCurrentRun()) return;
+          setPendingTurn((current) => current?.runId === clientMessageId && current.status !== 'CANCELLED' ? { ...current, content: `${current.content}${delta}`, status: 'STREAMING' } : current);
+        },
+        onEvent: (event) => {
+          if (!isCurrentRun()) return;
+          if (event.event_type === 'phase.started' || event.event_type === 'phase.completed') {
+            const label = PUBLIC_PHASES[String(event.phase ?? '')];
+            if (label) setPendingTurn((current) => current?.runId === clientMessageId ? { ...current, stage: label, status: 'RUNNING' } : current);
+          } else if (event.event_type === 'artifact.ready' && event.artifact_type && event.artifact) {
+            setPendingTurn((current) => current?.runId === clientMessageId ? { ...current, parts: [...current.parts, { type: event.artifact_type!, ...event.artifact }] } : current);
+          } else if (event.event_type === 'citations.ready' && Array.isArray(event.citations)) {
+            setPendingTurn((current) => current?.runId === clientMessageId ? { ...current, parts: [...current.parts, { type: 'citations', items: event.citations }] } : current);
+          } else if (event.event_type === 'run.failed') {
+            setPendingTurn((current) => current?.runId === clientMessageId ? { ...current, status: 'FAILED', semantic: 'FAILED', error: event.message ?? event.code ?? '回答失败' } : current);
+          } else if (event.event_type === 'run.cancelled') {
+            if (activeRunRef.current) activeRunRef.current.cancelled = true;
+            setPendingTurn((current) => current?.runId === clientMessageId ? { ...current, status: 'CANCELLED' } : current);
+          } else if (event.event_type === 'run.completed') {
+            setPendingTurn((current) => current?.runId === clientMessageId ? { ...current, status: 'COMPLETED', semantic: event.result_semantic, parts: event.message_parts ?? current.parts } : current);
+          }
+        },
+      };
+
+      try {
+        const response = await streamingApi.stream({
+          conversation_id: target.id,
+          content: question,
+          parent_message_id: parent,
+          client_message_id: clientMessageId,
+          attachment_ids: readyAttachmentIds,
+        }, handlers, controller.signal);
+        if (!isCurrentRun()) return;
+        setDetail((current) => current?.id === target.id ? { ...response.conversation, messages: mergeResponseMessages(current.messages, response) } : current);
+        setConversations((items) => [response.conversation, ...items.filter((item) => item.id !== response.conversation.id)]);
+        setPendingTurn((current) => current?.runId === clientMessageId ? null : current);
+      } catch (reason) {
+        if (!isCurrentSubmission()) return;
+        const aborted = controller.signal.aborted || (reason as Error).name === 'AbortError';
+        if (aborted) {
+          setPendingTurn((current) => current?.runId === clientMessageId ? { ...current, status: 'CANCELLED', stage: '' } : current);
+        } else {
+          setPendingTurn((current) => current?.runId === clientMessageId ? { ...current, status: 'FAILED', semantic: 'FAILED', error: reason instanceof Error ? reason.message : '回答失败' } : current);
+        }
+      } finally {
+        if (activeRunRef.current?.id === clientMessageId) {
+          setSending(false);
+          abortRef.current = null;
+          if (activeRunRef.current) activeRunRef.current.cancelled = activeRunRef.current.cancelled || controller.signal.aborted;
+        }
+      }
+    } finally {
+      if (interactionRef.current.submissionId === submissionId) interactionRef.current.submissionId = null;
+    }
   }
 
   useEffect(() => {
     const initial = new URLSearchParams(location.search).get('q')?.trim();
-    if (!results || !initial || !detail || sending || initialQuestionRef.current === initial) return;
-    if (detail.messages.some((item) => item.role === 'user' && item.content === initial)) { initialQuestionRef.current = initial; return; }
-    initialQuestionRef.current = initial; void sendMessage(initial);
-  }, [detail?.id, results]);
+    if (!results || !initial || loading || sending || initialQuestionRef.current === initial) return;
+    if (detail?.messages.some((item) => item.role === 'user' && item.content === initial)) {
+      initialQuestionRef.current = initial;
+      return;
+    }
+    initialQuestionRef.current = initial;
+    void sendMessage(initial);
+  }, [loading, results, location.search, detail?.id]);
 
   async function uploadFiles(files: File[]) {
-    if (!detail) return;
-    for (const file of files.slice(0, 8)) {
-      setUploading((items) => [...items, { name: file.name, progress: 0 }]);
+    const selected = files.slice(0, 8);
+    if (!selected.length) return;
+    const uploadGeneration = interactionRef.current.generation;
+    const isCurrentUpload = () => interactionRef.current.generation === uploadGeneration;
+    const entries = selected.map((file, index) => ({ id: `${Date.now()}-${index}-${file.name}`, name: file.name, progress: 0, file }));
+    setUploading((items) => [...items, ...entries]);
+    let target: ConversationDetail;
+    try {
+      target = await ensureConversation();
+    } catch (reason) {
+      if (!isCurrentUpload()) return;
+      const message = reason instanceof Error ? reason.message : '创建会话失败';
+      setUploading((items) => items.map((item) => entries.some((entry) => entry.id === item.id) ? { ...item, error: message } : item));
+      return;
+    }
+    if (!isCurrentUpload() || !adoptCreatedConversation(target, uploadGeneration)) return;
+    for (const entry of entries) {
+      if (!isCurrentUpload()) return;
       try {
-        const item = await chatApi.upload(detail.id, file, (progress) => setUploading((items) => items.map((entry) => entry.name === file.name ? { ...entry, progress } : entry)));
-        setAttachments((items) => [...items, item]); setUploading((items) => items.filter((entry) => entry.name !== file.name));
+        const item = await chatApi.upload(target.id, entry.file, (progress) => {
+          if (isCurrentUpload()) setUploading((items) => items.map((value) => value.id === entry.id ? { ...value, progress } : value));
+        });
+        if (!isCurrentUpload()) return;
+        setAttachments((items) => [...items.filter((value) => value.id !== item.id), item]);
+        setUploading((items) => items.filter((value) => value.id !== entry.id));
       } catch (reason) {
-        setUploading((items) => items.map((entry) => entry.name === file.name ? { ...entry, error: reason instanceof Error ? reason.message : '上传失败' } : entry));
+        if (isCurrentUpload()) setUploading((items) => items.map((value) => value.id === entry.id ? { ...value, error: reason instanceof Error ? reason.message : '上传失败' } : value));
       }
     }
   }
 
+  function retryUpload(item: UploadState) {
+    setUploading((items) => items.filter((value) => value.id !== item.id));
+    void uploadFiles([item.file]);
+  }
+
   function onPaste(event: ClipboardEvent<HTMLTextAreaElement>) {
     const images = Array.from(event.clipboardData.files).filter((file) => file.type.startsWith('image/'));
-    if (images.length) { event.preventDefault(); void uploadFiles(images); }
+    if (images.length) {
+      event.preventDefault();
+      void uploadFiles(images);
+    }
   }
 
   function onDrop(event: DragEvent<HTMLFormElement>) {
-    event.preventDefault(); void uploadFiles(Array.from(event.dataTransfer.files));
+    event.preventDefault();
+    void uploadFiles(Array.from(event.dataTransfer.files));
   }
 
   function onKeyDown(event: ReactKeyboardEvent<HTMLTextAreaElement>) {
     if (event.key === 'Enter' && !event.shiftKey && !compositionRef.current && !event.nativeEvent.isComposing) {
-      event.preventDefault(); void sendMessage();
+      event.preventDefault();
+      void sendMessage();
     }
   }
 
   async function removeAttachment(item: Attachment) {
-    await chatApi.deleteAttachment(item.id); setAttachments((items) => items.filter((value) => value.id !== item.id));
+    await chatApi.deleteAttachment(item.id);
+    setAttachments((items) => items.filter((value) => value.id !== item.id));
+  }
+
+  async function renameConversation(id: string, title: string) {
+    const item = await streamingApi.renameConversation(id, title);
+    setConversations((items) => items.map((value) => value.id === id ? item : value));
+    setDetail((current) => current?.id === id ? { ...current, ...item } : current);
   }
 
   async function deleteConversation(id: string) {
-    await chatApi.deleteConversation(id); const items = await refreshConversations();
-    if (items[0]) await openConversation(items[0].id); else await createConversation();
+    if (detail?.id === id || activeRunRef.current?.conversationId === id) cancelActiveRunForNavigation();
+    await chatApi.deleteConversation(id);
+    const items = await refreshConversations();
+    if (detail?.id !== id) return;
+    const next = items.find(isVisibleConversation);
+    if (next) await openConversation(next.id);
+    else startLocalConversation();
   }
+
+  function stopGeneration() {
+    if (activeRunRef.current) activeRunRef.current.cancelled = true;
+    abortRef.current?.abort();
+    setPendingTurn((current) => current ? { ...current, status: 'CANCELLED', stage: '' } : current);
+  }
+
+  const pendingForCurrent = pendingTurn && pendingTurn.conversationId === detail?.id ? pendingTurn : null;
+  const messages = detail?.messages ?? [];
+  const isEmpty = messages.length === 0 && !pendingForCurrent;
 
   if (loading) return <div className="loading">正在恢复会话…</div>;
   return (
-    <section className="chat-workspace">
-      <aside className="conversation-panel">
-        <button type="button" className="new-conversation" onClick={() => void createConversation()}>＋ 新会话</button>
-        <div className="conversation-list">{conversations.map((item) => <div key={item.id} data-conversation-id={item.id} className={detail?.id === item.id ? 'active' : ''}><button type="button" onClick={() => void openConversation(item.id)}><strong>{item.title}</strong><small>{item.summary || '暂无消息'}</small></button><button type="button" aria-label={`删除会话 ${item.title}`} onClick={() => void deleteConversation(item.id)}>×</button></div>)}</div>
-      </aside>
+    <section className={`chat-workspace${collapsed ? ' conversations-collapsed' : ''}`}>
+      <ConversationSidebar
+        conversations={conversations}
+        activeId={detail?.id}
+        collapsed={collapsed}
+        localEmpty={!detail}
+        generatingConversationId={sending ? activeRunRef.current?.conversationId : undefined}
+        onCollapse={() => setCollapsed((value) => !value)}
+        onNew={startLocalConversation}
+        onOpen={openConversation}
+        onRename={renameConversation}
+        onDelete={deleteConversation}
+      />
+
       <div className="chat-panel">
-        <div className="chat-message-area" ref={messageAreaRef} onScroll={(event) => { const node = event.currentTarget; setIsAtBottom(node.scrollHeight - node.scrollTop - node.clientHeight < 80); }}>
-          {!detail?.messages.length && <section className="chat-empty"><div className="hero-mark">BI</div><h1>今天想了解哪些业务数据？</h1><p>直接提问、连续追问，或上传文件与图片开始分析。</p><div className="prompt-grid">{prompts.map(([icon, title, sub]) => <button key={title} type="button" onClick={() => void sendMessage(title)}><b>{icon}</b><span><strong>{title}</strong><small>{sub}</small></span></button>)}</div></section>}
-          {detail?.messages.map((message) => message.role === 'user'
-            ? <article className="chat-user-bubble" key={message.id}><p>{message.content}</p>{message.attachment_ids.length > 0 && <small>{message.attachment_ids.length} 个附件</small>}</article>
-            : <div className="chat-assistant-message" key={message.id}><QueryMessage message={message} onAsk={(question) => void sendMessage(question)} onRetry={() => void sendMessage(lastQuestion || detail.messages.find((item) => item.id === message.parent_message_id)?.content || '')} /></div>)}
-          {sending && <QueryState kind="loading" title={stageLabels[stage] ?? '正在生成回答'} detail="只公开执行阶段，不展示模型内部推理。" />}
-          {error && <QueryState kind="error" title="回答未完成" detail={error} onRetry={lastQuestion ? () => void sendMessage(lastQuestion) : undefined} />}
+        <div className="chat-message-area" ref={messageAreaRef} onScroll={(event) => {
+          const node = event.currentTarget;
+          setIsAtBottom(node.scrollHeight - node.scrollTop - node.clientHeight < 96);
+        }}>
+          <div className="chat-message-column">
+            {isEmpty && <section className="chat-empty"><div className="hero-mark" aria-hidden="true">BI</div><h1>今天想了解哪些业务数据？</h1><p>直接提问、连续追问，或上传文件与图片开始分析。</p><div className="prompt-grid">{prompts.map(([icon, title, sub]) => <button key={title} type="button" onClick={() => void sendMessage(title)}><b aria-hidden="true">{icon}</b><span><strong>{title}</strong><small>{sub}</small></span></button>)}</div></section>}
+            {messages.map((message) => message.role === 'user'
+              ? <article className="chat-user-bubble" key={message.id}><p>{message.content}</p>{message.attachment_ids.length > 0 && <small>{message.attachment_ids.length} 个附件</small>}</article>
+              : <div className="chat-assistant-message" key={message.id}><AssistantMessage message={message} onAsk={(question) => void sendMessage(question)} onRetry={() => void sendMessage(messages.find((item) => item.id === message.parent_message_id)?.content || lastQuestion)} /></div>)}
+            {pendingForCurrent && <><article className="chat-user-bubble pending-user" key={pendingForCurrent.user.id}><p>{pendingForCurrent.user.content}</p>{pendingForCurrent.user.attachment_ids.length > 0 && <small>{pendingForCurrent.user.attachment_ids.length} 个附件</small>}</article><div className="chat-assistant-message"><PendingAssistant turn={pendingForCurrent} onRetry={() => void sendMessage(lastQuestion)} /></div></>}
+            {pageError && <section className="page-chat-error" role="alert"><strong>会话暂时不可用</strong><p>{pageError}</p></section>}
+          </div>
         </div>
-        {!isAtBottom && <button className="back-to-latest" type="button" onClick={() => { setIsAtBottom(true); messageAreaRef.current?.scrollTo({ top: messageAreaRef.current.scrollHeight, behavior: 'smooth' }); }}>回到最新消息</button>}
-        <form className="chat-composer" onSubmit={(event) => { event.preventDefault(); void sendMessage(); }} onDragOver={(event) => event.preventDefault()} onDrop={onDrop}>
-          {(attachments.length > 0 || uploading.length > 0) && <div className="attachment-strip">{attachments.map((item) => <span key={item.id}><b>{item.kind === 'IMAGE' ? '图' : item.kind === 'STRUCTURED' ? '表' : '文'}</b>{item.filename}<button type="button" aria-label={`删除附件 ${item.filename}`} onClick={() => void removeAttachment(item)}>×</button></span>)}{uploading.map((item) => <span key={item.name} className={item.error ? 'failed' : ''}>{item.name}<small>{item.error ?? `${item.progress}%`}</small>{item.error && <button type="button" onClick={() => inputRef.current?.click()}>重试</button>}</span>)}</div>}
-          <textarea aria-label="输入业务问题" value={draft} onChange={(event) => setDraft(event.target.value)} onKeyDown={onKeyDown} onPaste={onPaste} onCompositionStart={() => { compositionRef.current = true; }} onCompositionEnd={() => { compositionRef.current = false; }} placeholder="输入问题；Enter 发送，Shift+Enter 换行，也可拖拽或粘贴附件" />
-          <div><input ref={inputRef} hidden multiple type="file" accept=".csv,.xls,.xlsx,.parquet,.pdf,.docx,.txt,.md,.png,.jpg,.jpeg,.webp" onChange={(event) => { void uploadFiles(Array.from(event.target.files ?? [])); event.target.value = ''; }} /><button type="button" className="attach-button" onClick={() => inputRef.current?.click()}>＋ 文件 / 图片</button><span>附件仅在当前用户、工作空间和会话内可用</span>{sending ? <button type="button" className="stop-button" onClick={() => abortRef.current?.abort()}>停止生成</button> : <button type="submit" className="ask-submit" aria-label="提交问题" disabled={!draft.trim() && attachments.length === 0}>→</button>}</div>
-        </form>
+
+        {!isAtBottom && <button className="back-to-latest" type="button" onClick={() => {
+          setIsAtBottom(true);
+          const node = messageAreaRef.current;
+          if (node && typeof node.scrollTo === 'function') node.scrollTo({ top: node.scrollHeight, behavior: 'smooth' });
+        }}>回到最新消息 ↓</button>}
+
+        <div className="chat-composer-zone">
+          <form className="chat-composer" onSubmit={(event: FormEvent<HTMLFormElement>) => { event.preventDefault(); void sendMessage(); }} onDragOver={(event) => event.preventDefault()} onDrop={onDrop}>
+            {(attachments.length > 0 || uploading.length > 0) && <div className="attachment-strip">{attachments.map((item) => <span key={item.id} className={item.status === 'FAILED' ? 'failed' : ''}><b aria-hidden="true">{item.kind === 'IMAGE' ? '图' : item.kind === 'STRUCTURED' ? '表' : '文'}</b><em>{item.filename}</em><small>{item.status === 'PROCESSING' ? '处理中' : item.status === 'FAILED' ? '失败' : '就绪'}</small><button type="button" aria-label={`删除附件 ${item.filename}`} onClick={() => void removeAttachment(item)}>×</button></span>)}{uploading.map((item) => <span key={item.id} className={item.error ? 'failed' : ''}><b aria-hidden="true">传</b><em>{item.name}</em><small>{item.error ?? `${item.progress}%`}</small>{item.error && <button type="button" onClick={() => retryUpload(item)}>重试</button>}</span>)}</div>}
+            <textarea
+              aria-label="输入业务问题"
+              value={draft}
+              onChange={(event) => setDraft(event.target.value)}
+              onKeyDown={onKeyDown}
+              onPaste={onPaste}
+              onCompositionStart={() => { compositionRef.current = true; }}
+              onCompositionEnd={() => { compositionRef.current = false; }}
+              placeholder="输入问题；Enter 发送，Shift+Enter 换行，也可拖拽或粘贴附件"
+            />
+            <div className="composer-toolbar">
+              <input ref={inputRef} hidden multiple type="file" accept=".csv,.xls,.xlsx,.parquet,.pdf,.docx,.txt,.md,.png,.jpg,.jpeg,.webp" onChange={(event) => { void uploadFiles(Array.from(event.target.files ?? [])); event.target.value = ''; }} />
+              <button type="button" className="attach-button" onClick={() => inputRef.current?.click()} aria-label="添加文件或图片">＋ 文件 / 图片</button>
+              <span>附件仅在当前用户、工作空间和会话内可用</span>
+              {sending ? <button type="button" className="stop-button" onClick={stopGeneration} aria-label="停止生成"><span aria-hidden="true" />停止生成</button> : <button type="submit" className="ask-submit" aria-label="提交问题" disabled={!draft.trim() && attachments.length === 0}>↑</button>}
+            </div>
+          </form>
+          <p className="composer-footnote">ChatBI 可能出错，请核验关键经营决策。查询始终经过只读与结果校验。</p>
+        </div>
       </div>
     </section>
   );

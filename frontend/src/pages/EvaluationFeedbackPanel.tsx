@@ -112,7 +112,7 @@ export function EvaluationFeedbackPanel() {
     </section>
 
     <section className="feedback-grid compact">
-      <article className="evaluation-card feedback-list"><header><div><h2>术语库</h2><p>来自已发布语义模型</p></div></header>{data.terminology.slice(0, 12).map((item) => <div key={`${item.term}-${item.mapped_object}`}><b>{item.term}</b><span>{item.synonyms.join('、')}</span><small>{item.definition}</small></div>)}</article>
+      <article className="evaluation-card feedback-list"><header><div><h2>术语库</h2><p>来自已发布语义模型</p></div></header>{data.terminology.slice(0, 12).map((item, index) => <div key={item.id ?? item.business_key ?? `${item.term}-${item.mapped_object}-${index}`}><b>{item.term}</b><span>{item.synonyms.join('、')}</span><small>{item.definition}</small></div>)}</article>
       <article className="evaluation-card feedback-list"><header><div><h2>SQL 示例</h2><p>仅展示 Verified / Oracle PASS</p></div></header>{data.sql_examples.slice(0, 12).map((item) => <div key={item.answer_id}><b>{item.question}</b><code>{item.sql}</code><small>v{item.version}</small></div>)}</article>
     </section>
   </div>;

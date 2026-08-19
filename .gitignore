@@ -23,6 +23,7 @@ temp/
 
 playwright-report/
 test-results/
+frontend/e2e/.auth/
 
 # Reproducible v2.1 benchmark outputs are generated locally and may be large.
 artifacts/v2_1_data10m/

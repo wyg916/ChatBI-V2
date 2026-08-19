@@ -154,7 +154,15 @@ export interface FeedbackWorkflow {
   corrected_sql?: string; oracle_status?: string; version: number; feedback: Record<string, unknown>;
 }
 export interface FeedbackDashboard {
-  terminology: Array<{ term: string; synonyms: string[]; definition: string; mapped_object: string }>;
+  terminology: Array<{
+    id?: string;
+    semantic_model_id?: string;
+    business_key?: string;
+    term: string;
+    synonyms: string[];
+    definition: string;
+    mapped_object: string;
+  }>;
   sql_examples: FeedbackCandidate[]; workflows: FeedbackWorkflow[]; total_replays: number; passed_replays: number; feedback_replay_rate: number;
 }
 export interface FeedbackReplay {
@@ -212,17 +220,147 @@ export interface LoginInput { email: string; password: string; remember: boolean
 export interface Conversation {
   id: string; title: string; summary: string; active_attachment_ids: string[]; created_at: string; updated_at: string;
 }
+
+export type ResultSemantic = 'VALUE' | 'ZERO' | 'NO_ROWS' | 'NULL_VALUE' | 'FAILED';
+export type ChatRunState = 'IDLE' | 'UPLOADING' | 'SUBMITTING' | 'RUNNING' | 'STREAMING' | 'COMPLETED' | 'FAILED' | 'CANCELLED';
+
+export interface CitationItem {
+  title: string;
+  version: string | number;
+  locator: string;
+  resource_id: string;
+}
+
+export interface TextMessagePart { type: 'text'; text: string; role?: string }
+export interface KpiMessagePart {
+  type: 'kpi';
+  items: Array<{ label: string; value: string | number | null; unit: string }>;
+}
+export interface ChartMessagePart { type: 'chart'; chart_spec: ChartSpec; result_signature: string }
+export interface TableMessagePart {
+  type: 'table';
+  columns: string[];
+  rows: Array<Record<string, unknown>>;
+  row_count: number;
+  result_signature: string;
+}
+export interface CitationsMessagePart { type: 'citations'; items: CitationItem[] }
+export interface EvidenceMessagePart {
+  type: 'evidence';
+  sql: string | null;
+  guard: Record<string, unknown>;
+  oracle: Record<string, unknown>;
+  semantic: Record<string, unknown>;
+  phases: Array<Record<string, unknown>>;
+}
+export interface ErrorMessagePart { type: 'error'; code: string; message: string; retryable: boolean }
+
+export type MessagePart =
+  | TextMessagePart
+  | KpiMessagePart
+  | ChartMessagePart
+  | TableMessagePart
+  | CitationsMessagePart
+  | EvidenceMessagePart
+  | ErrorMessagePart;
+
 export interface ChatMessage {
   id: string; conversation_id: string; parent_message_id?: string; role: 'user' | 'assistant'; content: string;
   route?: QuestionRoute; status: string; attachment_ids: string[]; context_payload?: Record<string, unknown>; response_payload: Record<string, unknown>;
   trace_payload: Record<string, unknown>; error_code?: string; created_at: string;
+  message_parts?: MessagePart[]; result_semantic?: ResultSemantic;
 }
 export interface ConversationDetail extends Conversation { messages: ChatMessage[] }
 export interface ChatInput {
   conversation_id: string; content: string; parent_message_id?: string; client_message_id: string;
   attachment_ids: string[]; route?: QuestionRoute; datasource_id?: string; semantic_model_id?: string;
 }
-export interface ChatResponse { conversation: Conversation; user_message: ChatMessage; assistant_message: ChatMessage }
+export interface ChatResponse {
+  conversation: Conversation;
+  user_message: ChatMessage;
+  assistant_message: ChatMessage;
+  message_parts?: MessagePart[];
+  result_semantic?: ResultSemantic;
+}
+
+export type ChatPublicPhase =
+  | 'understanding'
+  | 'semantic_mapping'
+  | 'querying_data'
+  | 'retrieving_knowledge'
+  | 'verifying'
+  | 'composing_answer';
+
+export type ChatStreamEventType =
+  | 'run.started'
+  | 'phase.started'
+  | 'phase.completed'
+  | 'answer.delta'
+  | 'artifact.ready'
+  | 'citations.ready'
+  | 'run.completed'
+  | 'run.failed'
+  | 'run.cancelled'
+  | 'heartbeat';
+
+export interface ChatStreamEnvelope<T extends ChatStreamEventType> {
+  seq: number;
+  run_id: string;
+  conversation_id: string;
+  message_id: string;
+  timestamp: string;
+  event_type: T;
+}
+
+export interface ChatRunStartedEvent extends ChatStreamEnvelope<'run.started'> {
+  route?: QuestionRoute;
+  capabilities?: string[];
+}
+export interface ChatPhaseEvent extends ChatStreamEnvelope<'phase.started' | 'phase.completed'> {
+  phase: ChatPublicPhase;
+  label: string;
+  duration_ms?: number;
+  metadata?: Record<string, unknown>;
+}
+export interface ChatAnswerDeltaEvent extends ChatStreamEnvelope<'answer.delta'> { delta: string }
+export interface ChatArtifactReadyEvent extends ChatStreamEnvelope<'artifact.ready'> {
+  artifact_type: 'kpi' | 'chart' | 'table' | 'file' | 'evidence' | string;
+  artifact: MessagePart | Record<string, unknown>;
+}
+export interface ChatCitationsReadyEvent extends ChatStreamEnvelope<'citations.ready'> { citations: CitationItem[] }
+export interface ChatRunCompletedEvent extends ChatStreamEnvelope<'run.completed'> {
+  status: 'SUCCEEDED' | 'PARTIAL';
+  result_semantic: ResultSemantic;
+  message_parts: MessagePart[];
+  response: ChatResponse;
+}
+export interface ChatRunFailedEvent extends ChatStreamEnvelope<'run.failed'> {
+  code: string;
+  message: string;
+  retryable: boolean;
+}
+export interface ChatRunCancelledEvent extends ChatStreamEnvelope<'run.cancelled'> {
+  code: 'RUN_CANCELLED';
+  message?: string;
+}
+export interface ChatHeartbeatEvent extends ChatStreamEnvelope<'heartbeat'> {}
+
+export type ChatStreamEvent =
+  | ChatRunStartedEvent
+  | ChatPhaseEvent
+  | ChatAnswerDeltaEvent
+  | ChatArtifactReadyEvent
+  | ChatCitationsReadyEvent
+  | ChatRunCompletedEvent
+  | ChatRunFailedEvent
+  | ChatRunCancelledEvent
+  | ChatHeartbeatEvent;
+
+export interface ChatStreamHandlers {
+  onEvent?: (event: ChatStreamEvent) => void;
+  onDelta?: (delta: string, event: ChatStreamEvent) => void;
+  onStateChange?: (state: ChatRunState, event?: ChatStreamEvent) => void;
+}
 export interface Attachment {
   id: string; conversation_id: string; filename: string; extension: string; mime_type: string; kind: 'STRUCTURED' | 'DOCUMENT' | 'IMAGE' | 'UNKNOWN';
   size_bytes: number; status: 'PROCESSING' | 'READY' | 'FAILED'; error_code?: string; created_at: string; expires_at: string;
