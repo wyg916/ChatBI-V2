@@ -183,3 +183,11 @@ PandasAI 不作为运行依赖，也不导入其 community 或 `ee/**` 代码。
 ## ADR-041：视觉模型只对可恢复错误做有界重试
 
 真实多模态回答继续依赖已配置的外部视觉模型，不用本地固定答案掩盖不可用状态。为避免单次网络抖动或服务端限流让整条图片主链路失败，视觉请求对 Transport Error、408、425、429 和 5xx 在同一提供商内最多尝试三次，并把 `Retry-After` 等待限制在 2 秒；普通文本模型的既有快速 failover 不变，权限、请求格式、模型不支持等非重试型 4xx 立即进入下一提供商或明确失败。重试次数和状态只进入安全错误摘要，不记录密钥、请求正文或图片内容。
+
+## ADR-042：对话运行使用 canonical 九事件，答案以结构化部件持久化
+
+“问数据”统一消费 `run.started`、成对 `phase.started/phase.completed`、`answer.delta`、`artifact.ready`、`citations.ready` 与唯一末尾 `run.completed/run.failed/run.cancelled`。每个事件必须携带单调递增 `seq` 和稳定的 Run/Conversation/Message 身份；客户端拒绝倒序、重复、终态后事件和 delta 与最终正文不一致。Provider 输出通过 Adapter 增量转发；确定性查询由 Answer Composer 从已验证结果逐部件产出，禁止定时器、`sleep` 或字符动画伪装流式。
+
+Assistant 消息以 Text、KPI、Chart、Table、Citation、Evidence、Artifact 和 Follow-up 等 Message Parts 保存，并显式记录 `VALUE/ZERO/NO_ROWS/NULL_VALUE/FAILED`；数值 0 不得按空结果处理。SQL、数据口径、公开阶段和校验结论默认进入右侧证据抽屉，Agent 类名、工具名、Trace 与模型内部推理不得进入业务消息。新会话只在首条消息或附件上传时服务端创建，重命名/删除继续按 Workspace 和用户隔离。旧事件适配只允许留在客户端内部用于短期滚动兼容，不得作为真实流式发布证据。
+
+为控制流式终态的宽表放大，Table Part 只携带前 20 行可视预览，`row_count` 与结果签名保留真实总量，Result Oracle 使用的原始 execution 不截断。Feedback 术语必须经 Semantic Model 所属关系显式按当前 Workspace 过滤，并以规范化 `(term, mapped_object)` 业务键稳定去重；前端展示键不得掩盖跨 Workspace 混入或重复资源问题。

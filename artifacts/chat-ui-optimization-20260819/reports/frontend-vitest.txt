@@ -1,0 +1,50 @@
+
+> chatbi-v2-frontend@0.1.0 test
+> vitest run
+
+
+ RUN  v3.2.6 E:/ChatBI V2 项目/frontend
+
+ ✓ src/test/routes.test.tsx (2 tests) 226ms
+ ✓ src/test/components.test.tsx (3 tests) 191ms
+ ✓ src/test/evaluation-detail-page.test.tsx (2 tests) 640ms
+   ✓ 评测用例详情真实证据界面 > 展示 Expected、Actual、SQL 与持久化 PASS 证据  472ms
+ ✓ src/test/data-workspace.test.tsx (1 test) 838ms
+   ✓ Data Workspace > connects catalog, lazy masked samples, guarded SQL, history replay and Verified SQL  833ms
+ ✓ src/test/chat-stream.test.ts (10 tests) 69ms
+ ✓ src/test/login-page.test.tsx (2 tests) 645ms
+   ✓ LoginPage > renders the approved product message and accessible login controls  494ms
+ ✓ src/test/datasource-pages.test.tsx (2 tests) 1700ms
+   ✓ 数据源高保真页面 > 用 Backend API 统计渲染列表，并支持搜索和状态筛选  1022ms
+   ✓ 数据源高保真页面 > 展示真实 Schema、字段角色和样例值，并可切换 Schema  673ms
+ ✓ src/test/system-settings-pages.test.tsx (3 tests) 1667ms
+   ✓ 系统设置高保真页面 > 从 Backend API 展示模型服务且不在浏览器提供密钥编辑  1000ms
+   ✓ 系统设置高保真页面 > 从 Backend API 展示 ADMIN/ANALYST、权限矩阵与审计事件  651ms
+ ✓ src/test/semantic-pages.test.tsx (2 tests) 1734ms
+   ✓ 语义模型高保真界面 > 用 Backend API 数据渲染模型卡片、状态计数和变更记录  783ms
+   ✓ 语义模型高保真界面 > 在关系画布选择真实资源并通过现有 API 保存配置  947ms
+ ✓ src/test/content-library-pages.test.tsx (3 tests) 1274ms
+   ✓ 答案库和看板列表高保真界面 > 从 Backend API 渲染答案统计、分类和表格  434ms
+   ✓ 答案库和看板列表高保真界面 > 新建标准答案通过 API 保存并刷新列表  688ms
+ ✓ src/test/ask-page.test.tsx (16 tests) 7191ms
+   ✓ 问数据真实多轮界面 > 从空状态提交自然语言问题并展示真实 API 结果  2005ms
+   ✓ 问数据真实多轮界面 > 空态创建会话未完成时快速双击只启动一次流  412ms
+   ✓ 问数据真实多轮界面 > 等待创建会话时新建本地会话会使旧提交失效  371ms
+   ✓ 问数据真实多轮界面 > 快速打开 B 后再打开 C 时，迟到的 B 响应不会覆盖 C  660ms
+   ✓ 问数据真实多轮界面 > 空态首次上传采用同一会话，随后提问携带就绪附件  646ms
+   ✓ 问数据真实多轮界面 > Enter 发送、Shift+Enter 换行且中文输入法组合态不误发  306ms
+   ✓ 问数据真实多轮界面 > 默认折叠 SQL 并支持反馈保存  682ms
+   ✓ 问数据真实多轮界面 > 流式生成期间可停止且取消不显示伪错误  458ms
+   ✓ 问数据真实多轮界面 > 切换会话会立即取消旧流并释放发送锁，迟到 delta 不串入新会话  696ms
+   ✓ 问数据真实多轮界面 > 失败消息支持按原问题重试  411ms
+ ✓ src/test/evaluation-feedback-v21.test.tsx (2 tests) 956ms
+   ✓ v2.1 评测与反馈闭环页面 > 展示八类 Oracle 指标并按创建后执行  563ms
+   ✓ v2.1 评测与反馈闭环页面 > 展示反馈审核、召回和安全回放入口  391ms
+ ✓ src/test/dashboard-evaluation-pages.test.tsx (2 tests) 1268ms
+   ✓ 经营看板详情渲染 API 指标、图表和洞察  937ms
+   ✓ 评测中心总览渲染数据库评测记录  329ms
+
+ Test Files  13 passed (13)
+      Tests  50 passed (50)
+   Start at  23:20:58
+   Duration  287.21s (transform 42.33s, setup 638.65s, collect 383.48s, tests 18.40s, environment 1138.74s, prepare 71.98s)

@@ -3,7 +3,9 @@ import path from 'node:path';
 import { request, type APIRequestContext } from '@playwright/test';
 
 export const apiBase = process.env.CHATBI_API_BASE ?? 'http://127.0.0.1:8000/api/v1';
-export const adminStorageState = path.resolve('test-results/.auth/admin.json');
+// Keep authentication state outside Playwright's cleaned output directory so a
+// worker restart after a failed test cannot delete the shared login fixture.
+export const adminStorageState = path.resolve('e2e/.auth/admin.json');
 
 function localEnvironment(): Record<string, string> {
   const envPath = path.resolve('..', '.env');

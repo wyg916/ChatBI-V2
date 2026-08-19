@@ -1,0 +1,51 @@
+
+> chatbi-v2-frontend@0.1.0 build
+> tsc --noEmit && vite build
+
+vite v6.4.3 building for production...
+transforming...
+✓ 741 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/index.html                                    0.46 kB │ gzip:   0.30 kB
+dist/assets/DataWorkspacePage-DRZej7Zy.css         5.40 kB │ gzip:   1.45 kB
+dist/assets/DashboardDetailPage-DMeJxx7w.css       5.58 kB │ gzip:   1.44 kB
+dist/assets/LoginPage-CKSCTGPJ.css                 6.27 kB │ gzip:   1.79 kB
+dist/assets/EvaluationOverviewPage-DJKdvgt_.css    7.25 kB │ gzip:   1.89 kB
+dist/assets/EvaluationDetailPage-ZbQSh3xc.css      7.56 kB │ gzip:   1.85 kB
+dist/assets/content-library-DejQymAJ.css           9.42 kB │ gzip:   2.24 kB
+dist/assets/datasources-B46Z2nRF.css               9.67 kB │ gzip:   2.27 kB
+dist/assets/system-settings-DBkYvRNR.css          12.27 kB │ gzip:   2.73 kB
+dist/assets/semantic-D3CUOHFM.css                 14.87 kB │ gzip:   3.19 kB
+dist/assets/AskPage-C6VOPsJQ.css                  18.35 kB │ gzip:   4.54 kB
+dist/assets/index-Mv1SsaZi.css                    19.37 kB │ gzip:   4.57 kB
+dist/assets/content-C0_M-z2X.js                    1.05 kB │ gzip:   0.47 kB
+dist/assets/evaluation-CV_dKwE-.js                 1.10 kB │ gzip:   0.41 kB
+dist/assets/UI-DkJIOiFi.js                         1.68 kB │ gzip:   0.85 kB
+dist/assets/EChartsRenderer-De0HrzP3.js            1.71 kB │ gzip:   0.94 kB
+dist/assets/useData-CYr7-M5V.js                    1.85 kB │ gzip:   0.59 kB
+dist/assets/useMutation-CvWfPGiL.js                2.91 kB │ gzip:   1.23 kB
+dist/assets/content-library-Dxcgk5RY.js            4.17 kB │ gzip:   1.71 kB
+dist/assets/EvaluationDetailPage-BcCLWQDr.js       6.35 kB │ gzip:   1.97 kB
+dist/assets/LoginPage-H-p1V_gc.js                  6.75 kB │ gzip:   2.54 kB
+dist/assets/AnswerLibraryPage-BI-4ienT.js          7.12 kB │ gzip:   2.66 kB
+dist/assets/SettingsModelsPage-BbE4mCzC.js         7.20 kB │ gzip:   2.71 kB
+dist/assets/SemanticModelsPage-CykgkQa1.js         7.95 kB │ gzip:   2.99 kB
+dist/assets/DatasourcesPage-B1crd9fB.js            8.29 kB │ gzip:   3.11 kB
+dist/assets/DashboardDetailPage-C6VtWH4T.js        8.50 kB │ gzip:   3.19 kB
+dist/assets/SecurityAuditPage-DykfDoUV.js          9.31 kB │ gzip:   2.92 kB
+dist/assets/DashboardListPage-DPMzy-yn.js          9.77 kB │ gzip:   2.86 kB
+dist/assets/DataWorkspacePage-Bhndw2BX.js         10.17 kB │ gzip:   3.67 kB
+dist/assets/DatasourceDetailPage-B2Acjd3N.js      10.36 kB │ gzip:   3.84 kB
+dist/assets/useQuery-CF6xqaKe.js                  10.37 kB │ gzip:   3.65 kB
+dist/assets/SemanticEditorPage-Bbntbqwh.js        14.34 kB │ gzip:   5.21 kB
+dist/assets/EvaluationOverviewPage-d5If9z9i.js    17.49 kB │ gzip:   5.40 kB
+dist/assets/AskPage-BP2VGkdX.js                   51.06 kB │ gzip:  16.92 kB
+dist/assets/index-B0vSGA8R.js                    275.99 kB │ gzip:  89.88 kB
+dist/assets/EChart-nI2zHsu0.js                   555.48 kB │ gzip: 190.36 kB
+
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+✓ built in 11.21s

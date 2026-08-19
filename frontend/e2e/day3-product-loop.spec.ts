@@ -129,37 +129,47 @@ test('Day3 Narrative 与推荐追问只引用当前结果', async ({ request }) 
 
 test('Day3-E2E06 正确结果展示 KPI、Chart 与 Insight', async ({ page }) => {
   const errors = runtimeErrors(page);
+  await page.goto(`/ask/results?q=${encodeURIComponent('统计全部订单收入')}`);
+  await expect(page.getByTestId('query-success')).toBeVisible({ timeout: 30_000 });
+  const scalarSelectors = ['.assistant-response-head', '.answer-conclusion', '.kpi-card', '.chart-card', '.table-card', '.answer-followups'];
+  const scalarTops = await Promise.all(scalarSelectors.map((selector) => page.locator(selector).boundingBox().then((box) => box?.y ?? -1)));
+  expect(scalarTops).toEqual([...scalarTops].sort((left, right) => left - right));
+
   await page.goto(`/ask/results?q=${encodeURIComponent('按地区统计订单收入')}`);
   await expect(page.getByTestId('query-success')).toBeVisible({ timeout: 30_000 });
-  const selectors = ['.analysis-answer-header', '.analysis-kpi-grid', '.analysis-chart-card', '.analysis-insight', '.query-inline-table', '.followup-suggestions'];
-  const tops = await Promise.all(selectors.map((selector) => page.locator(selector).boundingBox().then((box) => box?.y ?? -1)));
-  expect(tops).toEqual([...tops].sort((left, right) => left - right));
-  await expect(page.getByRole('img', { name: '真实查询结果图表' })).toBeVisible();
+  const regionalSelectors = ['.assistant-response-head', '.answer-conclusion', '.chart-card', '.answer-insights', '.table-card', '.answer-followups'];
+  const regionalTops = await Promise.all(regionalSelectors.map((selector) => page.locator(selector).boundingBox().then((box) => box?.y ?? -1)));
+  expect(regionalTops).toEqual([...regionalTops].sort((left, right) => left - right));
+  const chart = page.locator('.chart-card .data-echart');
+  await expect(chart).toBeVisible();
+  expect((await chart.boundingBox())?.height ?? 0).toBeGreaterThanOrEqual(240);
+  await expect(chart.locator('canvas, svg')).toBeVisible();
   expect(errors).toEqual([]);
 });
 
 test('Day3-E2E07 查询明细与依据展示完整证据链', async ({ page }) => {
   await page.goto(`/ask/results?q=${encodeURIComponent('统计全部订单收入')}`);
   await expect(page.getByTestId('query-success')).toBeVisible({ timeout: 30_000 });
-  await page.locator('.query-evidence-inline').getByText('查询依据').click();
-  await expect(page.locator('.query-evidence-inline')).toContainText('Semantic Model Version');
-  await expect(page.locator('.query-evidence-inline')).toContainText('Result Signature');
   await page.getByRole('button', { name: '查看 SQL 与执行明细' }).click();
   const dialog = page.getByRole('dialog', { name: 'SQL 与执行明细' });
-  await expect(dialog).toContainText('Metric / Dimension');
-  await expect(dialog).toContainText('Result Oracle');
+  await expect(dialog).toContainText('数据与口径');
+  await expect(dialog).toContainText('语义模型');
+  await expect(dialog).toContainText('指标');
   await expect(dialog).toContainText('SUM');
+  await expect(dialog).toContainText('只读查询安全校验通过');
+  await expect(dialog).toContainText('指标、维度、过滤与结果值已校验');
+  await expect(dialog).toContainText('语义口径版本已绑定');
 });
 
 test('Day3-E2E08 推荐追问进入新一轮真实查询', async ({ page }) => {
   await page.goto(`/ask/results?q=${encodeURIComponent('统计全部订单收入')}`);
   await expect(page.getByTestId('query-success')).toBeVisible({ timeout: 30_000 });
-  const suggestion = page.locator('.followup-suggestions button').first();
+  const suggestion = page.locator('.answer-followups button').first();
   const question = await suggestion.textContent();
   const answerCount = await page.locator('.chat-assistant-message').count();
   await suggestion.click();
   await expect(page.locator('.chat-assistant-message')).toHaveCount(answerCount + 1, { timeout: 30_000 });
-  await expect(page.locator('.answer-query').last()).toContainText(question ?? '');
+  await expect(page.locator('.chat-user-bubble').last()).toContainText(question ?? '');
 });
 
 test('Day3-E2E09 正确答案经反馈后保存为 VERIFIED Answer', async ({ request }) => {
@@ -258,7 +268,8 @@ test('Day3-E2E15 零行查询进入真实空状态', async ({ page, request }) =
   expect(result.status).toBe('SUCCEEDED');
   expect(result.execution.row_count).toBe(0);
   await page.goto(`/ask/results?q=${encodeURIComponent(question)}`);
-  await expect(page.getByTestId('query-empty')).toContainText('暂无匹配数据');
+  await expect(page.getByTestId('query-empty')).toContainText('没有匹配记录');
+  await expect(page.getByTestId('query-empty')).toContainText('并不代表指标为 0');
 });
 
 test('Day3 核心闭环页面三视口无裁切和运行时错误', async ({ page }) => {
