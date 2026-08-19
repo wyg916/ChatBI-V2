@@ -47,7 +47,7 @@ describe('Data Workspace', () => {
     renderPage();
 
     expect(await screen.findByRole('heading', { name: '数据工作台' })).toBeVisible();
-    expect(await screen.findByText('finance.orders')).toBeVisible();
+    expect(await screen.findByRole('heading', { name: 'finance.orders' })).toBeVisible();
     await user.click(screen.getByRole('button', { name: '懒加载样例值' }));
     expect(await screen.findByText(/MASKED/)).toBeVisible();
 
