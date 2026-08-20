@@ -4,7 +4,7 @@ import { createMemoryRouter, RouterProvider } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Attachment, ChatInput, ChatResponse, Conversation, ConversationDetail, QueryResponse } from '../types/api';
 
-const chatMocks = vi.hoisted(() => ({ conversations: vi.fn(), createConversation: vi.fn(), conversation: vi.fn(), attachments: vi.fn(), stream: vi.fn(), deleteConversation: vi.fn(), deleteAttachment: vi.fn(), upload: vi.fn() }));
+const chatMocks = vi.hoisted(() => ({ conversations: vi.fn(), createConversation: vi.fn(), conversation: vi.fn(), attachments: vi.fn(), stream: vi.fn(), cancelStream: vi.fn(), deleteConversation: vi.fn(), deleteAttachment: vi.fn(), upload: vi.fn() }));
 const queryMocks = vi.hoisted(() => ({ feedback: vi.fn(), save: vi.fn(), get: vi.fn(), ask: vi.fn() }));
 vi.mock('../api/chat', () => ({ chatApi: chatMocks }));
 vi.mock('../api/queries', () => ({ queryApi: queryMocks }));
@@ -57,6 +57,7 @@ describe('问数据真实多轮界面', () => {
   beforeEach(() => {
     localStorage.clear(); Object.values(chatMocks).forEach((mock) => mock.mockReset()); Object.values(queryMocks).forEach((mock) => mock.mockReset());
     chatMocks.conversations.mockResolvedValue([conversation]); chatMocks.conversation.mockResolvedValue(detail); chatMocks.attachments.mockResolvedValue([]); chatMocks.createConversation.mockResolvedValue(conversation);
+    chatMocks.cancelStream.mockResolvedValue({ cancelled: true });
     chatMocks.stream.mockImplementation(async (input: ChatInput) => response(input)); queryMocks.feedback.mockResolvedValue({ id: 'feedback', recorded: true }); queryMocks.save.mockResolvedValue({ id: 'answer' });
   });
 
@@ -269,13 +270,21 @@ describe('问数据真实多轮界面', () => {
   });
 
   it('流式生成期间可停止且取消不显示伪错误', async () => {
+    const cancellation = deferred<{ cancelled: boolean }>();
+    let streamSignal: AbortSignal | undefined;
+    chatMocks.cancelStream.mockReturnValueOnce(cancellation.promise);
     chatMocks.stream.mockImplementationOnce((_input: ChatInput, _progress: unknown, signal: AbortSignal) => new Promise((_resolve, reject) => {
+      streamSignal = signal;
       signal.addEventListener('abort', () => reject(new DOMException('Aborted', 'AbortError')), { once: true });
     }));
     const user = userEvent.setup(); renderAsk(); const input = await screen.findByRole('textbox', { name: '输入业务问题' });
     await user.type(input, '统计全部订单收入'); await user.click(screen.getByRole('button', { name: '提交问题' }));
     await user.click(await screen.findByRole('button', { name: '停止生成' }));
+    await waitFor(() => expect(chatMocks.cancelStream).toHaveBeenCalledWith(conversation.id, expect.any(String)));
+    expect(streamSignal?.aborted).toBe(false);
+    cancellation.resolve({ cancelled: true });
     await waitFor(() => expect(screen.queryByRole('button', { name: '停止生成' })).not.toBeInTheDocument());
+    expect(streamSignal?.aborted).toBe(true);
     expect(screen.queryByRole('heading', { name: '回答未完成' })).not.toBeInTheDocument();
   });
 

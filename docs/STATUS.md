@@ -7,7 +7,8 @@
 - `TAG=chatbi-v2-v1.2.0`
 - `FINAL_RELEASE_SHA=chatbi-v2-v1.2.0^{}`；annotated Tag 的 peeled SHA 是最终发布身份，推送后的 local/tracking/`ls-remote` 一致性记录在正式交付中。
 - `P0_BLOCKERS=NONE`；`P1_BLOCKERS=NONE`。
-- `main` 由 `094c81a` fast-forward 到正式集成 `5303bdb`，再只增加版本元数据、发布文档、SBOM 与冻结 Manifest；业务逻辑、业务口径和已通过的 ChatBI 能力未再修改。
+- `main` 由 `094c81a` fast-forward 到正式集成 `5303bdb`；随后增加版本元数据、发布文档、SBOM 与冻结 Manifest，并只修复正式 main-SHA 门禁发现的停止生成持久化竞态。业务口径与其他已通过的 ChatBI 能力未改变。
+- 最终 Backend 门禁为 225/225；停止生成采用经会话/用户授权、按 client message 精确定位的显式服务端取消，再终止 SSE，两个真实取消流程各连续 5/5 通过后才重跑完整 82 项发布门禁。
 - V1.2.0 冻结后不得直接向该 Release SHA 增加功能；后续功能必须从新的开发分支开始。
 - 非阻塞 P2 保留：ECharts 555.48 kB chunk warning、重新生成新增同文可审计 user turn、Docker Desktop 冷启动受本机缓存体量影响。
 

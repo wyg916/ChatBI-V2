@@ -16,11 +16,11 @@ from app.core.config import Settings
 from app.integration.model_gateway import ModelGateway, ModelReply
 from app.integration.contracts import AnalysisResponse
 from app.main import app
-from app.models import AppUser, ChatMessage, Workspace
+from app.models import AppUser, ChatMessage, Conversation, Workspace
 from app.schemas.chat import ChatRequest, ChatResponse
 from app.services.chat import ChatService
 from app.services.conversations import refresh_conversation_summary
-from app.streaming import REQUIRED_EVENTS, StreamCancelled
+from app.streaming import REQUIRED_EVENTS, StreamCancelled, stream_registry
 
 
 def _events(response_text: str) -> list[dict]:
@@ -257,6 +257,55 @@ def test_pre_cancelled_chat_does_not_persist_messages(client, db_session):
         )
     db_session.rollback()
     assert list(db_session.scalars(select(ChatMessage).where(ChatMessage.conversation_id == conversation["id"]))) == []
+
+
+def test_explicit_chat_cancel_is_conversation_scoped(client, db_session, monkeypatch):
+    conversation = client.post("/api/v1/conversations", json={"title": "Cancel"}).json()
+    factory = sessionmaker(bind=db_session.get_bind(), autoflush=False, expire_on_commit=False)
+    monkeypatch.setattr(chat_route, "SessionLocal", factory)
+    with chat_route.SessionLocal() as seed_db:
+        conversation_row = seed_db.get(Conversation, conversation["id"])
+        assert conversation_row is not None
+        user = ChatMessage(
+            conversation_id=conversation["id"],
+            workspace_id=conversation_row.workspace_id,
+            user_id=conversation_row.user_id,
+            client_message_id="client-explicit-cancel-001",
+            role="user",
+            content="cancel me",
+            status="COMPLETED",
+        )
+        seed_db.add(user)
+        seed_db.flush()
+        seed_db.add(ChatMessage(
+            conversation_id=conversation["id"],
+            workspace_id=conversation_row.workspace_id,
+            user_id=conversation_row.user_id,
+            parent_message_id=user.id,
+            role="assistant",
+            content="must be removed",
+            status="SUCCEEDED",
+        ))
+        seed_db.commit()
+    lifecycle = stream_registry.register(
+        "STREAM-explicit-route-cancel",
+        conversation_id=conversation["id"],
+        client_message_id="client-explicit-cancel-001",
+    )
+    try:
+        response = client.post("/api/v1/chat/stream/cancel", json={
+            "conversation_id": conversation["id"],
+            "client_message_id": "client-explicit-cancel-001",
+        })
+        assert response.status_code == 202
+        assert response.json() == {"cancelled": True}
+        assert lifecycle.cancel_event.is_set()
+        with chat_route.SessionLocal() as check_db:
+            assert list(check_db.scalars(select(ChatMessage).where(
+                ChatMessage.conversation_id == conversation["id"],
+            ))) == []
+    finally:
+        stream_registry.connection_closed("STREAM-explicit-route-cancel")
 
 
 def test_model_gateway_normalizes_provider_sse_chunks():

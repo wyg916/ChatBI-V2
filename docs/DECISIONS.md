@@ -200,6 +200,12 @@ Assistant 消息以 Text、KPI、Chart、Table、Citation、Evidence、Artifact 
 
 ## ADR-044：V1.2.0 以 fast-forward main、annotated Tag 与不可变冻结清单发布
 
-V1.2.0 只把已经通过正式集成门禁的 `codex/v2.1-final-integration` 安全 fast-forward 晋升到 `main`，随后仅允许版本元数据、Release Notes、Release/Rollback/Evidence Manifest、SBOM 与冻结状态文档进入最终发布提交。Tag 必须是 `chatbi-v2-v1.2.0` annotated Tag，且 peeled SHA 与 local `main`、tracking `main` 和 `ls-remote main` 完全一致；禁止 force push、批量推送 Tag、移动旧 Tag 或把 P2 优化混入冻结提交。
+V1.2.0 只把已经通过正式集成门禁的 `codex/v2.1-final-integration` 安全 fast-forward 晋升到 `main`，随后仅允许版本元数据、Release Notes、Release/Rollback/Evidence Manifest、SBOM、冻结状态文档，或正式 main-SHA 门禁证实的 P0/P1 根因修复进入最终发布提交；任何根因修复都必须重跑完整发布门禁。Tag 必须是 `chatbi-v2-v1.2.0` annotated Tag，且 peeled SHA 与 local `main`、tracking `main` 和 `ls-remote main` 完全一致；禁止 force push、批量推送 Tag、移动旧 Tag 或把 P2 优化混入冻结提交。
 
 包含 Release Manifest 的 Git commit 无法在自身内容中写入自身 SHA，因此仓库内以 `chatbi-v2-v1.2.0^{}` 作为可验证的发布 SHA 解析式，真实完整 SHA 由推送后 Git 三方核验与最终交付记录。V1.2.0 冻结后，任何功能开发必须从新分支开始；仅在 Source 分支全部提交已进入 `main` 和正式 Tag、且无独有提交时，才允许删除该轮 Source 任务分支。Integration 分支继续保留。
+
+## ADR-045：停止生成必须显式取消服务端运行并按 client message 清理
+
+仅依赖浏览器关闭 SSE 连接会存在传播窗口：短分析可能先提交成功消息，用户界面却已经显示取消。V1.2.0 的停止操作因此先调用受 `query.ask`、Conversation Workspace 与用户所有权约束的显式取消端点，以 `(conversation_id, client_message_id)` 精确设置运行取消事件，再终止浏览器 SSE reader。Backend 在运行 checkpoint 与显式取消端点两侧都只清理该 client message 的 user/assistant 消息，覆盖“尚未提交”和“已提交但终态尚未送达”两个竞态窗口；不得按会话批量删除，也不得把该能力扩展成通用任务平台。
+
+发布门禁同时保留两条真实浏览器验证：鼠标点击停止后不得持久化 SUCCEEDED assistant；键盘 Enter 停止后必须可继续验证拒绝与重试。同一复杂问句带每次运行唯一标识，避免语义运行时缓存把取消窗口缩短为不可测试状态，但不模拟 SSE、不强制点击、不跳过持久化断言。

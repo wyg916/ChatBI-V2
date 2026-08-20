@@ -253,6 +253,27 @@ def test_stream_lifecycle_prunes_connection_and_task_after_cancel():
     assert snapshot["trace_ids"] == []
 
 
+def test_stream_lifecycle_can_cancel_the_exact_conversation_run():
+    trace_id = "STREAM-explicit-cancel"
+    lifecycle = stream_registry.register(
+        trace_id,
+        conversation_id="conversation-1",
+        client_message_id="client-message-1",
+    )
+    try:
+        assert not stream_registry.cancel_matching(
+            conversation_id="conversation-2",
+            client_message_id="client-message-1",
+        )
+        assert stream_registry.cancel_matching(
+            conversation_id="conversation-1",
+            client_message_id="client-message-1",
+        )
+        assert lifecycle.cancel_event.is_set()
+    finally:
+        stream_registry.connection_closed(trace_id)
+
+
 def test_workload_diagnostics_track_agent_and_sandbox_without_leaks():
     before = stream_registry.snapshot()
     with stream_registry.workload("agent"):

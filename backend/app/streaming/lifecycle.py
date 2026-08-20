@@ -13,6 +13,8 @@ class StreamCancelled(RuntimeError):
 @dataclass
 class StreamLifecycle:
     trace_id: str
+    conversation_id: str | None = None
+    client_message_id: str | None = None
     cancel_event: Event = field(default_factory=Event)
     created_at: float = field(default_factory=monotonic)
     connection_open: bool = True
@@ -51,8 +53,18 @@ class StreamRegistry:
             with self._lock:
                 self._workloads[kind] = max(0, self._workloads[kind] - 1)
 
-    def register(self, trace_id: str) -> StreamLifecycle:
-        lifecycle = StreamLifecycle(trace_id=trace_id)
+    def register(
+        self,
+        trace_id: str,
+        *,
+        conversation_id: str | None = None,
+        client_message_id: str | None = None,
+    ) -> StreamLifecycle:
+        lifecycle = StreamLifecycle(
+            trace_id=trace_id,
+            conversation_id=conversation_id,
+            client_message_id=client_message_id,
+        )
         with self._lock:
             self._streams[trace_id] = lifecycle
         return lifecycle
@@ -82,6 +94,18 @@ class StreamRegistry:
         with self._lock:
             lifecycle = self._streams.get(trace_id)
             if not lifecycle:
+                return False
+            lifecycle.cancel()
+            return True
+
+    def cancel_matching(self, *, conversation_id: str, client_message_id: str) -> bool:
+        with self._lock:
+            lifecycle = next((
+                item for item in self._streams.values()
+                if item.conversation_id == conversation_id
+                and item.client_message_id == client_message_id
+            ), None)
+            if lifecycle is None:
                 return False
             lifecycle.cancel()
             return True

@@ -15,6 +15,7 @@ from app.db.session import SessionLocal, get_db
 from app.models import Attachment, ChatMessage, Conversation
 from app.schemas.chat import (
     ChatRequest,
+    ChatCancelRequest,
     ChatResponse,
     ConversationCreate,
     ConversationDetail,
@@ -33,6 +34,26 @@ router = APIRouter(tags=["authenticated chat"])
 # received `accepted` and continue to receive heartbeats from reusable response
 # stream workers, preventing business work from starving TTFE scheduling.
 _CHAT_STREAM_EXECUTOR = ThreadPoolExecutor(max_workers=6, thread_name_prefix="chatbi-stream")
+
+
+def _cleanup_cancelled_messages(conversation_id: str, client_message_id: str) -> None:
+    """Remove only the messages created by one explicitly cancelled run."""
+    with SessionLocal() as cleanup_db:
+        user_message = cleanup_db.scalar(select(ChatMessage).where(
+            ChatMessage.conversation_id == conversation_id,
+            ChatMessage.client_message_id == client_message_id,
+        ))
+        if user_message is None:
+            return
+        assistants = list(cleanup_db.scalars(select(ChatMessage).where(
+            ChatMessage.conversation_id == conversation_id,
+            ChatMessage.parent_message_id == user_message.id,
+            ChatMessage.role == "assistant",
+        )))
+        for assistant in assistants:
+            cleanup_db.delete(assistant)
+        cleanup_db.delete(user_message)
+        cleanup_db.commit()
 
 
 def _stream_principal(
@@ -116,7 +137,11 @@ def chat_stream(
         conversation_id=data.conversation_id,
         message_id=f"pending-{data.client_message_id}",
     )
-    lifecycle = stream_registry.register(run_id)
+    lifecycle = stream_registry.register(
+        run_id,
+        conversation_id=data.conversation_id,
+        client_message_id=data.client_message_id,
+    )
     events: Queue[tuple[str, dict] | None] = Queue()
 
     def progress(stage: str, detail: dict):
@@ -128,25 +153,6 @@ def chat_stream(
         lifecycle.checkpoint()
         if delta:
             events.put(("delta", {"delta": delta}))
-
-    def cleanup_cancelled_messages() -> None:
-        """Remove only this run's messages if an upstream commit preceded abort."""
-        with SessionLocal() as cleanup_db:
-            user_message = cleanup_db.scalar(select(ChatMessage).where(
-                ChatMessage.conversation_id == data.conversation_id,
-                ChatMessage.client_message_id == data.client_message_id,
-            ))
-            if user_message is None:
-                return
-            assistants = list(cleanup_db.scalars(select(ChatMessage).where(
-                ChatMessage.conversation_id == data.conversation_id,
-                ChatMessage.parent_message_id == user_message.id,
-                ChatMessage.role == "assistant",
-            )))
-            for assistant in assistants:
-                cleanup_db.delete(assistant)
-            cleanup_db.delete(user_message)
-            cleanup_db.commit()
 
     def worker():
         stream_registry.task_started(run_id)
@@ -160,7 +166,7 @@ def chat_stream(
                 lifecycle.checkpoint()
                 events.put(("result", result.model_dump(mode="json")))
         except StreamCancelled:
-            cleanup_cancelled_messages()
+            _cleanup_cancelled_messages(data.conversation_id, data.client_message_id)
             events.put(("cancelled", {"code": "RUN_CANCELLED", "message": "请求已取消。", "retryable": True}))
         except Exception as exc:
             code = str(exc.detail) if isinstance(exc, HTTPException) and isinstance(exc.detail, str) else f"CHAT_STREAM_{type(exc).__name__.upper()}"
@@ -302,6 +308,22 @@ def chat_stream(
         media_type="text/event-stream",
         headers={"Cache-Control": "no-store", "X-Accel-Buffering": "no", "X-Trace-ID": run_id},
     )
+
+
+@router.post("/chat/stream/cancel", status_code=status.HTTP_202_ACCEPTED)
+def cancel_chat_stream(
+    data: ChatCancelRequest,
+    db: Session = Depends(get_db),
+    principal: Principal = Depends(require_permission("query.ask")),
+) -> dict[str, bool]:
+    get_conversation(db, data.conversation_id, principal)
+    cancelled = stream_registry.cancel_matching(
+        conversation_id=data.conversation_id,
+        client_message_id=data.client_message_id,
+    )
+    if cancelled:
+        _cleanup_cancelled_messages(data.conversation_id, data.client_message_id)
+    return {"cancelled": cancelled}
 
 
 @router.get("/chat/stream/diagnostics")

@@ -5,12 +5,12 @@
   "release_sha_resolution": "git rev-parse chatbi-v2-v1.2.0^{}",
   "pre_release_main_sha": "094c81aaaba44ced62fec7f0b97cc73f217d5975",
   "integration_sha": "5303bdb687ffe4c3896292b333edb58ed4003d6c",
-  "generated_at": "2026-08-20T16:00:41+08:00",
+  "generated_at": "2026-08-20T17:10:50+08:00",
   "gate_summary": {
     "frontend_typecheck": "PASS",
     "frontend_build": "PASS (741 modules)",
     "frontend_tests": "PASS (50/50)",
-    "backend_tests": "PASS (223/223)",
+    "backend_tests": "PASS (225/225)",
     "playwright_release_gate": "PASS (82/82, workers=1)",
     "docker_stopped_state_start": "PASS",
     "browser_errors": "console=0,page=0,request=0,blocking_4xx_5xx=0",
@@ -54,13 +54,13 @@
     },
     {
       "path": "docs/releases/V1_2_0_RELEASE_NOTES.md",
-      "bytes": 2841,
-      "sha256": "177f6e9e84ff6acf91403cca656ed9c33410b9ff87dc536a349c9ef9bc2a8de1"
+      "bytes": 2856,
+      "sha256": "3199795eab255c51fb719ef052d20a2040bdbc95ea6357a878dacd72a7f0e715"
     },
     {
       "path": "docs/releases/V1_2_0_RELEASE_MANIFEST.md",
       "bytes": 2646,
-      "sha256": "798dc6dcd8fbaf8d8db026ea53eddf0e4747016f94940362f824710f902f96a6"
+      "sha256": "039a1f058152ac6038e17eabad984e59218e7b0e8e37f9bab816291f0fef8930"
     },
     {
       "path": "docs/releases/V1_2_0_ROLLBACK_MANIFEST.md",
@@ -69,8 +69,8 @@
     },
     {
       "path": "docs/releases/V1_2_0_FINAL_RELEASE_REPORT.md",
-      "bytes": 2269,
-      "sha256": "f9f723d4379b6183b91ee7395480d5467921b5130fd9c5a1c321e8b156bfba32"
+      "bytes": 2687,
+      "sha256": "dfc8be1f8f3404106240892c17e08a0fbb9fb3783a7627c4df546f72977f25cd"
     },
     {
       "path": "docs/sbom/V1_2_0.cdx.json",

@@ -15,7 +15,7 @@
 - Frontend typecheck: PASS.
 - Frontend Vitest: 13/13 files, 50/50 tests PASS.
 - Frontend production build: PASS, 741 modules; the 555.48 kB ECharts warning remains non-blocking P2.
-- Backend pytest: 223/223 PASS; Python compile check PASS.
+- Backend pytest: 225/225 PASS; Python compile check PASS.
 - Playwright serial release gate: 82/82 PASS, one worker.
 - Docker official stopped-state start: PASS; Backend, RAG Runtime and Frontend healthy.
 - Browser smoke: Console Error 0, Page Error 0, unexpected Request Failure 0, unexpected blocking 4xx/5xx 0.
@@ -24,6 +24,8 @@
 ## Product verification
 
 ChatGPT-style layout, purple brand, hidden evidence Drawer, single-render user turns, simplified Assistant shell, real Streaming, stop/cancel, ordering/persistence, complete Composer interactions and all five result semantics pass. NL2SQL, RAG, bounded Multi-Agent, File/Image QA, RBAC and Workspace Isolation remain available and verified.
+
+The main-SHA release gate exposed a race where browser disconnect alone could arrive after a fast analysis had committed. V1.2.0 therefore sends an authenticated, conversation-scoped explicit cancellation before aborting the SSE reader, and removes only the messages bound to that client message ID. The two real cancellation flows passed five consecutive repetitions each before the complete release gate was rerun.
 
 ## One-click startup
 

@@ -706,9 +706,17 @@ export function AskPage({ results = false }: { results?: boolean }) {
   }
 
   function stopGeneration() {
-    if (activeRunRef.current) activeRunRef.current.cancelled = true;
-    abortRef.current?.abort();
+    const activeRun = activeRunRef.current;
+    const controller = abortRef.current;
+    if (activeRun) activeRun.cancelled = true;
     setPendingTurn((current) => current ? { ...current, status: 'CANCELLED', stage: '' } : current);
+    if (!activeRun) {
+      controller?.abort();
+      return;
+    }
+    void chatApi.cancelStream(activeRun.conversationId, activeRun.id)
+      .catch(() => undefined)
+      .finally(() => controller?.abort());
   }
 
   const pendingForCurrent = pendingTurn && pendingTurn.conversationId === detail?.id ? pendingTurn : null;

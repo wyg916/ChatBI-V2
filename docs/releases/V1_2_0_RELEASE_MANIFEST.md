@@ -21,9 +21,9 @@ The tracked manifest cannot contain the hash of the commit that contains itself.
 | Gate | Required and frozen result |
 | --- | --- |
 | BUILD_RESULT | `PASS` — Frontend production build, 741 modules |
-| TEST_RESULT | `PASS` — Frontend 50/50 and Backend 223/223 |
+| TEST_RESULT | `PASS` — Frontend 50/50 and Backend 225/225 |
 | PLAYWRIGHT_RESULT | `PASS` — 82/82, one worker, retries disabled as a substitute for correctness |
-| BACKEND_RESULT | `PASS` — 223/223 plus Python compile check |
+| BACKEND_RESULT | `PASS` — 225/225 plus Python compile check |
 | FRONTEND_RESULT | `PASS` — typecheck, 13/13 files and 50/50 Vitest, production build |
 | DOCKER_RESULT | `PASS` — stopped-state official stack start and three services healthy |
 | BROWSER_RESULT | `PASS` — console/page/request/unexpected blocking 4xx/5xx all 0 |

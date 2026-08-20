@@ -139,6 +139,12 @@ class ChatRequest(BaseModel):
     semantic_model_id: str | None = None
 
 
+class ChatCancelRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    conversation_id: str
+    client_message_id: str = Field(min_length=8, max_length=128)
+
+
 class ChatResponse(BaseModel):
     conversation: ConversationRead
     user_message: MessageRead

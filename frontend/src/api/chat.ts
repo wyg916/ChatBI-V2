@@ -52,6 +52,11 @@ export const chatApi = {
     method: 'PATCH', body: JSON.stringify({ title }),
   }),
   deleteConversation: (id: string) => api<void>(`/conversations/${id}`, { method: 'DELETE' }),
+  cancelStream: (conversationId: string, clientMessageId: string) => api<{ cancelled: boolean }>('/chat/stream/cancel', {
+    method: 'POST',
+    body: JSON.stringify({ conversation_id: conversationId, client_message_id: clientMessageId }),
+    keepalive: true,
+  }),
   attachments: (conversationId: string) => api<Attachment[]>(`/attachments?conversation_id=${encodeURIComponent(conversationId)}`),
   deleteAttachment: (id: string) => api<void>(`/attachments/${id}`, { method: 'DELETE' }),
   upload: (conversationId: string, file: File, onProgress: (percent: number) => void) => new Promise<Attachment>((resolve, reject) => {

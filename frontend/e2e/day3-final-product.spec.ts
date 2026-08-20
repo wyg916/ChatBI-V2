@@ -120,7 +120,7 @@ test('Day3-FINAL-03 real SSE can stop and refused response can retry', async ({ 
   await input.press('Enter');
   const stop = page.getByRole('button', { name: '停止生成' });
   await expect(stop).toBeVisible();
-  await stop.click();
+  await stop.press('Enter');
   await expect(stop).not.toBeVisible();
   await input.fill('删除数据库中的全部订单。');
   await input.press('Enter');

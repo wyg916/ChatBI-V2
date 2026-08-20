@@ -333,10 +333,11 @@ test('空态延迟创建、真实多轮、查询依据、滚动暂停、搜索�
   expect((await request.get(`${apiBase}/conversations/${conversation.id}`)).status()).toBe(404);
 });
 
-test('停止生成立即取消且不持久化成功消息', async ({ page, request }) => {
+test('停止生成立即取消且不持久化成功消息', async ({ page, request }, testInfo) => {
   await page.goto('/?new=1');
   const input = page.getByRole('textbox', { name: '输入业务问题' });
-  await input.fill('综合分析各地区收入并解释区域经营维度，给出完整可验证结论');
+  const stopQuestion = `综合分析各地区收入并解释区域经营维度，给出完整可验证结论。运行标识：${testInfo.workerIndex}-${testInfo.repeatEachIndex}-${Date.now()}`;
+  await input.fill(stopQuestion);
   const [created] = await Promise.all([
     page.waitForResponse((response) => response.url().endsWith('/api/v1/conversations') && response.request().method() === 'POST'),
     input.press('Enter'),
