@@ -1,5 +1,13 @@
 # 项目状态
 
+## 2026-08-20
+
+- ChatGPT 风格问数据已正式合入 `codex/v2.1-final-integration`：Target pre-merge `094c81a` 与 Source `31530f3` 通过 merge commit `8676c07` 汇合；两侧互非祖先，采用 `MERGE_COMMIT`，无冲突，两个重叠文件自动合并且语义均保留。
+- 正式集成发布门禁为 Backend 223/223、Frontend 13 files / 50 tests、TypeScript、Vite 741 modules、Playwright 定向 52/52 与最终串行 82/82 全部 PASS；Console/Page/Request/unexpected blocking 4xx/5xx、横向溢出和 Composer 覆盖均为 0。
+- 全量首轮 81/82 发现测试把 pending Assistant 当成事务提交证据；门禁现轮询 Conversation API 的第 21 条真实 user row，隔离 1/1 与完整 82/82 复跑通过，未降低断言或增加固定 sleep。
+- Docker Compose 从完全停止状态两轮启动均 PASS；第二轮复用镜像 33.794 秒，三项服务 healthy。五张正式截图、脱敏文本日志与 manifest 位于 `artifacts/chat-ui-optimization-20260819/final-integration/`；原始 HTML/trace 与临时 auth state 因可能包含 Cookie 未提交。
+- 最终推送只允许创建/更新 `codex/v2.1-final-integration`；`main`、Source branch 和全部既有 Tag 保持不变，不创建 Release Tag。
+
 ## 2026-08-19
 
 - ChatGPT 风格“问数据”一日优化已完成候选收口：保留紫色品牌与六个一级模块，新增懒创建会话、会话搜索/分组/重命名/删除、单列消息区、默认关闭的查询依据抽屉、无覆盖 Composer、真实 canonical SSE、结构化 Message Parts，以及 VALUE/ZERO/NO_ROWS/NULL_VALUE/FAILED 五态；未增加语音、麦克风、通用 Agent 或前端直连数据库。

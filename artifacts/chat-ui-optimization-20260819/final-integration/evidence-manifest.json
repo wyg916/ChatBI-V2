@@ -1,0 +1,46 @@
+{
+  "schema_version": "1.0",
+  "task": "CHATBI_V2_CHATGPT_STYLE_CHAT_UI_FINAL_INTEGRATION_CLOSURE",
+  "generated_date": "2026-08-20",
+  "source_sha": "31530f30972b0dc773112e2b1fabf61834ba7310",
+  "target_pre_merge_sha": "094c81aaaba44ced62fec7f0b97cc73f217d5975",
+  "merge_commit": "8676c07cc3144026fbbd282f54d318ae3cc2f546",
+  "test_fix_commits": [
+    "15291e6e23464893fc88bd6b4b94f28f0be53d80",
+    "758de13aa53ad69cf2231b39b81c6c13258b32de"
+  ],
+  "final_sha_resolution": "Resolve refs/heads/codex/v2.1-final-integration after push; verify git rev-parse HEAD equals tracking and ls-remote. The containing commit cannot self-reference its own SHA.",
+  "results": {
+    "backend": "223/223 PASS",
+    "frontend": "13 files / 50 tests PASS; typecheck PASS; build PASS",
+    "playwright_directed": "52/52 PASS",
+    "playwright_serial": "82/82 PASS",
+    "docker_stopped_state_starts": "2/2 PASS",
+    "console_errors": 0,
+    "page_errors": 0,
+    "request_failures": 0,
+    "unexpected_blocking_4xx_5xx": 0,
+    "horizontal_overflow": 0,
+    "composer_overlap": 0
+  },
+  "excluded_sensitive_artifacts": [
+    "Playwright HTML and trace archives",
+    "frontend/test-results",
+    "frontend/playwright-report",
+    "frontend/e2e/.auth/admin.json"
+  ],
+  "files": [
+    {"path":"chat-ui-1920x1080.png","bytes":151697,"sha256":"15851a10324a2da7d1a8db9bfdb71049120bbff37c44d1da85a38ad82d44b533"},
+    {"path":"chat-ui-1440x900.png","bytes":132050,"sha256":"25a19535c55cd507b17fa2c23858d21572c7d5299b5fa385a33094f67c210b6d"},
+    {"path":"chat-ui-1366x768.png","bytes":121864,"sha256":"8bb2eaa8c1fbe56985f429bc0e339d0b4ca44768920f0380bb7747cbfd378a81"},
+    {"path":"chat-ui-result-1440x900.png","bytes":134747,"sha256":"e6bb48712d652b09b1e477f1a106770425e4b589658c40830ca3bf453dd4d791"},
+    {"path":"chat-ui-drawer-1440x900.png","bytes":160077,"sha256":"0f35930d03831d921b01cd01515edad481f89ebc85dae18d8f8b374663cbe765"},
+    {"path":"reports/playwright-directed-52.txt","bytes":6721,"sha256":"58c0579df1f51753342acbe5656072264c87565613838e30733f7f04e4f8682d"},
+    {"path":"reports/playwright-full-82.txt","bytes":12163,"sha256":"0a6a296d07a9c2ac8c2b31ea64562f0f6a2b2dfb8a57e54baa5a3396d4ae17e4"},
+    {"path":"reports/playwright-day3-final02-rerun.txt","bytes":499,"sha256":"7bc9fdf38d56f35f14432f7420997cf67240e13cf00f71d82ffdbe626835cfff"},
+    {"path":"reports/playwright-full-82-final.txt","bytes":9829,"sha256":"db1d87ebb7f219f789a7cf9363d51d9c0bebca89c59f9e908d441bed0e813239"},
+    {"path":"reports/docker-stop-before-run2.txt","bytes":565,"sha256":"83496a4c27b43181d5faf38efddbe66f7e1703823508549372bf9a1af28713eb"},
+    {"path":"reports/docker-start-run2.txt","bytes":1057,"sha256":"ff3e5cf14a62fa8d1766c42e3da17eac23a23da8c395b298d518b7fc81692984"},
+    {"path":"reports/commands.json","bytes":4488,"sha256":"a9ffa7966917b56224e7b03676c732d138ea985ee294c8f0d135e60c4c99ef8a"}
+  ]
+}

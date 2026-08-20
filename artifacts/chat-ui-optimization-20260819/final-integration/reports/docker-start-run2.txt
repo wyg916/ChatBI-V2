@@ -1,0 +1,28 @@
+ Network chatbi-v2_default Creating
+ Network chatbi-v2_default Created
+ Container chatbi-v2-backend-1 Creating
+ Container chatbi-v2-backend-1 Created
+ Container chatbi-v2-rag-runtime-1 Creating
+ Container chatbi-v2-rag-runtime-1 Created
+ Container chatbi-v2-frontend-1 Creating
+ Container chatbi-v2-frontend-1 Created
+ Container chatbi-v2-backend-1 Starting
+ Container chatbi-v2-backend-1 Started
+ Container chatbi-v2-backend-1 Waiting
+ Container chatbi-v2-backend-1 Healthy
+ Container chatbi-v2-rag-runtime-1 Starting
+ Container chatbi-v2-rag-runtime-1 Started
+ Container chatbi-v2-rag-runtime-1 Waiting
+ Container chatbi-v2-rag-runtime-1 Healthy
+ Container chatbi-v2-frontend-1 Starting
+ Container chatbi-v2-frontend-1 Started
+
+
+frontend_http           : 200
+backend_http            : 200
+backend_version         : 1.1.0
+live_rag                : HEALTHY_AUTH_REQUIRED
+protected_api_auth      : 5_OF_5_RETURN_401
+local_metadata_postgres : READY
+local_demo_postgres     : PORT_REACHABLE_STARTUP_CHECK
+local_demo_mysql        : PORT_REACHABLE_STARTUP_CHECK

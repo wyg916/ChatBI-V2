@@ -1,8 +1,9 @@
 # ChatBI V2 对话界面一日优化变更摘要
 
-日期：2026-08-19
+日期：2026-08-20
 基线：`6cd05aaf7f558fee53fe83b1ccf82aeb98bf2a6f`
-任务分支：`codex/chat-ui-chatgpt-style-20260819`
+Source 分支：`codex/chat-ui-chatgpt-style-20260819`
+正式集成分支：`codex/v2.1-final-integration`
 
 ## 结果概览
 
@@ -46,3 +47,11 @@
 - Tests：`backend/tests/test_chat_answer_contract.py`、现有协议/附件回归、Frontend Vitest 与 Playwright 对话体验覆盖
 
 最终门禁数字、截图、浏览器错误统计和 Git 状态见 `TEST_REPORT.md`。
+
+## 正式集成差量
+
+- 远端 Target 在集成开始时不存在；从远端 `main` 的 `094c81a` 创建后，以 merge commit `8676c07` 非破坏性合并 Source `31530f3`。双方互非祖先，故未伪装为 fast-forward。
+- `docs/STATUS.md` 与 `frontend/e2e/day3-final-product.spec.ts` 自动合并，无冲突、无人工丢弃；目标侧有界等待与 Source 侧 Chat UI/SSE 契约均保留。
+- `15291e6` 只补发布级交互与错误监听测试；`758de13` 只修复长会话刷新门禁的持久化竞态。
+- 正式集成后覆盖从 50/80 提升为 52/82；最终定向 52/52、串行 82/82，产品代码与业务口径没有继续扩张。
+- 详细 merge identity、证据哈希与推送/回滚约束见 `FINAL_INTEGRATION_REPORT.md`。

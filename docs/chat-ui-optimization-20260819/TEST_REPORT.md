@@ -1,8 +1,9 @@
 # ChatBI V2 对话界面优化测试报告
 
-日期：2026-08-19
+日期：2026-08-20
 基线 SHA：`6cd05aaf7f558fee53fe83b1ccf82aeb98bf2a6f`
-任务分支：`codex/chat-ui-chatgpt-style-20260819`
+Source 分支：`codex/chat-ui-chatgpt-style-20260819`（`31530f30972b0dc773112e2b1fabf61834ba7310`）
+正式集成分支：`codex/v2.1-final-integration`
 
 ## 真实性声明
 
@@ -26,9 +27,9 @@
 | Frontend Vitest | 13 files / 50 tests PASS | Ask 16、stream 10，含会话/附件竞态 |
 | Frontend build | PASS | 741 modules；保留既有 EChart 555.48 kB warning |
 | NL2SQL/RAG/Agent/File/Workspace 六组 | 105 PASS | 独立复核从 `backend/` 正确工作目录运行 |
-| Chat UI 真实 Playwright 专项 | 11/11 PASS | 双重启后的当前代码与真实 Backend |
-| Playwright 定向门禁 | 50/50 PASS | 1 worker，3.9 分钟 |
-| Playwright 全量发布门禁 | 80/80 PASS | 1 worker，5.1 分钟 |
+| Chat UI 真实 Playwright 专项 | 13/13 PASS | 新增复制/重新生成/无语音和 ZERO/NULL 用户态覆盖 |
+| Playwright 定向门禁 | 52/52 PASS | 1 worker，4.7 分钟 |
+| Playwright 全量发布门禁 | 82/82 PASS | 1 worker，5.9 分钟；修复后完整重跑 |
 | Frontend lint | N/A | `package.json` 没有 lint script；TypeScript/build/unit/E2E 均单独执行 |
 
 ## 已执行的浏览器探测
@@ -37,6 +38,8 @@
 - 首轮 1-worker 串行：66 passed / 14 failed。它命中了修复前的 5175/8011 常驻进程，并发现旧 DOM 断言、auth-state 输出目录清理、Feedback 重复 key 等问题；不作为最终门禁。
 - 正式定向：同时重启独立 Frontend 5175 与 Backend 8011、探测当前源码后，`--workers=1` 运行 50 项，50/50 PASS（3.9 分钟）。
 - 最终发布门禁：同一当前工作树环境以 `--workers=1` 完整运行 80 项，80/80 PASS（5.1 分钟）。Console error、page error、unexpected request failure、unexpected blocking 4xx/5xx 均为 0；预期的匿名/越权/无效请求 401/403/415/422 不计为意外阻断。
+- 正式集成门禁：生产 Docker 栈上定向 52/52 PASS（4.7 分钟）。首轮全量 81/82 暴露 pending Assistant DOM 早于服务端事务提交的测试竞态；改为 API 持久化轮询后隔离 1/1 PASS，最终完整串行 82/82 PASS（5.9 分钟）。没有删除测试、跳过失败或降低 21 条消息断言。
+- 正式集成浏览器监听覆盖 console、pageerror、requestfailed 和非 allowlist HTTP `>=400` response；最终异常计数均为 0。
 
 ## 已验证的核心契约
 
@@ -44,6 +47,8 @@
 - 长回答至少两个真实 delta；拼接正文等于终态与持久化正文。
 - reader 在完成、取消和协议异常路径均 cancel/release。
 - `VALUE/ZERO/NO_ROWS/NULL_VALUE/FAILED` 五态分离，`ZERO` 不等于无数据。
+- `ZERO/NO_ROWS/NULL_VALUE` 用户态均不得展示“可信度 100%”或仅“—元”；失败不伪装空结果。
+- 成功回答复制到剪贴板、成功重新生成、原紫色 RGB 和无语音/麦克风入口由真实浏览器强断言覆盖。
 - 新会话懒创建、快速双击防重、创建期间导航失效、B→C 逆序响应隔离、空态首传附件采用同一会话。
 - 会话切换立即取消旧 Run，迟到 delta/terminal 不进入新会话。
 - Evidence Drawer 默认隐藏，Tab/Shift+Tab 焦点陷阱、背景 inert、Escape/关闭回焦。
@@ -52,18 +57,18 @@
 
 ## 停止态启动
 
-- Run 1：`scripts/stop.ps1` 后由 `scripts/start.ps1` 完整重建并启动，98.911 秒；Backend、RAG Runtime、Frontend 均 healthy。
-- Run 2：再次 `scripts/stop.ps1` 后由 `scripts/start.ps1 -SkipBuild` 启动同一当前代码镜像，26.506 秒；三项服务均 healthy。
+- 正式集成 Run 1：确认 `docker compose ps -a` 为空后，`scripts/start.ps1` 完整重建并启动；Backend、RAG Runtime、Frontend 均 healthy，命令退出码 0。
+- 正式集成 Run 2：再次停止并确认 Compose 为空后，`scripts/start.ps1 -SkipBuild` 在 33.794 秒内启动；三项服务均 healthy，命令退出码 0。
 - 两轮均验证 Frontend/Backend HTTP 200、受保护 API 5/5 返回 401、本机元数据 PostgreSQL READY，以及本机 PostgreSQL/MySQL 端口可达。Compose 服务只有 Backend、RAG Runtime、Frontend，数据库服务和数据库卷均为 0。
 
 ## 截图与报告路径
 
 - 优化前：`artifacts/chat-ui-optimization-20260819/baseline/`
 - 优化迭代：`artifacts/chat-ui-optimization-20260819/optimized/`
-- 最终三视口、结果态与抽屉态：`artifacts/chat-ui-optimization-20260819/final/`
-- 最终 Backend/Frontend/Playwright/Docker 原始日志：`artifacts/chat-ui-optimization-20260819/reports/`。
-- Playwright HTML 报告为本机忽略产物：`frontend/playwright-report/final-serial/index.html`；可提交文本报告为 `artifacts/chat-ui-optimization-20260819/reports/playwright-serial.txt`。
+- Source 最终三视口、结果态与抽屉态：`artifacts/chat-ui-optimization-20260819/final/`
+- 正式集成截图、脱敏文本日志和 SHA-256 manifest：`artifacts/chat-ui-optimization-20260819/final-integration/`。
+- Playwright HTML/trace 与临时 auth state 可能包含会话 Cookie，已安全删除且不提交；可审计结果保留为纯文本与 `commands.json`。
 
 ## 最终结论
 
-代码、浏览器和停止态启动门禁均 PASS。发布到远端前仍必须由主控完成 Secret/大文件/临时产物扫描、提交、push、tracking/`ls-remote` 一致性与 clean worktree 核验；这些 Git 结果不在提交前的文档中预先伪造。
+正式集成代码、浏览器、Secret scan 和两次停止态启动门禁均 PASS。最终 Git SHA、push、tracking/`ls-remote` 一致性、clean worktree 与 Tag 未变化由包含本报告的最终提交推送后核验，准确值见最终交付输出。

@@ -1,0 +1,135 @@
+
+> chatbi-v2-frontend@0.1.0 e2e
+> playwright test --workers=1 --reporter=list,html
+
+
+Running 82 tests using 1 worker
+
+(node:20108) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ok  1 e2e\chat-ui-optimization.spec.ts:71:1 › Chat UI 三视口布局、品牌、单主滚动和优化后截图 (9.5s)
+  ok  2 e2e\chat-ui-optimization.spec.ts:121:1 › 成功回答支持复制和重新生成且 Assistant 无巨大外层卡片 (5.2s)
+  ok  3 e2e\chat-ui-optimization.spec.ts:174:1 › ZERO 与 NULL_VALUE 用户态语义明确且不展示伪造可信度或空金额 (5.9s)
+  ok  4 e2e\chat-ui-optimization.spec.ts:201:1 › 真实 chat SSE 严格递增、多 delta、成对 phase、唯一终态并与持久化一致 (2.4s)
+  ok  5 e2e\chat-ui-optimization.spec.ts:240:3 › 真实回答保留 VALUE 结果语义 (547ms)
+  ok  6 e2e\chat-ui-optimization.spec.ts:240:3 › 真实回答保留 ZERO 结果语义 (450ms)
+  ok  7 e2e\chat-ui-optimization.spec.ts:240:3 › 真实回答保留 NO_ROWS 结果语义 (500ms)
+  ok  8 e2e\chat-ui-optimization.spec.ts:240:3 › 真实回答保留 NULL_VALUE 结果语义 (512ms)
+  ok  9 e2e\chat-ui-optimization.spec.ts:240:3 › 真实回答保留 FAILED 结果语义 (426ms)
+  ok 10 e2e\chat-ui-optimization.spec.ts:259:1 › 空态延迟创建、真实多轮、查询依据、滚动暂停、搜索、重命名和删除 (11.6s)
+  ok 11 e2e\chat-ui-optimization.spec.ts:336:1 › 停止生成立即取消且不持久化成功消息 (3.6s)
+  ok 12 e2e\chat-ui-optimization.spec.ts:360:1 › 真实拖拽、图片粘贴、上传进度、删除、失败与重试 (5.6s)
+  ok 13 e2e\chat-ui-optimization.spec.ts:409:1 › 匿名与跨用户会话、流式和附件访问失败关闭 (1.7s)
+  ok 14 e2e\data-workspace.spec.ts:14:1 › C Data Workspace provides a real guarded 10M user loop (14.5s)
+  ok 15 e2e\day1-core-flow.spec.ts:13:1 › 登录页表单进入默认问数据首页 (2.6s)
+  ok 16 e2e\day1-core-flow.spec.ts:26:1 › Day 1 数据源到语义模型核心流程 (3.4s)
+  ok 17 e2e\day1-core-flow.spec.ts:49:1 › 14 个路由可访问且目标视口无页面级横向裁切 (12.6s)
+  ok 18 e2e\day1-core-flow.spec.ts:77:1 › 语义模型列表与编辑器在目标视口无控制台、页面或阻断请求错误 (5.6s)
+  ok 19 e2e\day1-core-flow.spec.ts:104:1 › 内容中心、经营看板详情与评测总览由 API 驱动并适配三个目标视口 (32.4s)
+  ok 20 e2e\day2-query-flow.spec.ts:22:1 › Day2-1 登录后默认进入真实问数据首页 (2.5s)
+  ok 21 e2e\day2-query-flow.spec.ts:34:1 › Day2-2 简单聚合返回真实数据库结果与 Oracle 证据 (4.3s)
+  ok 22 e2e\day2-query-flow.spec.ts:50:1 › Day2-3 Join 查询展示地区维度与收入 (3.4s)
+  ok 23 e2e\day2-query-flow.spec.ts:66:1 › Day2-4 危险 SQL 被 AST Guard 拒绝且不访问数据库 (4.8s)
+  ok 24 e2e\day2-query-flow.spec.ts:84:1 › Day2-5 Result Oracle 能识别独立期望值不一致 (385ms)
+  ok 25 e2e\day2-query-flow.spec.ts:101:1 › Day2-6 用户反馈与标准答案保存落入 Backend API (6.1s)
+  ok 26 e2e\day2-visual.spec.ts:3:1 › Day2 问数据结果页三视口无裁切并保存 1440x900 证据 (10.2s)
+  ok 27 e2e\day3-final-product.spec.ts:27:1 › Day3-FINAL-01 incognito protects browser plus chat, attachment, SQL and evaluation APIs (1.0s)
+  x  28 e2e\day3-final-product.spec.ts:50:1 › Day3-FINAL-02 twenty-turn conversation keeps independent scroll, fixed composer and return-to-latest (37.2s)
+(node:6688) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ok 29 e2e\day3-final-product.spec.ts:101:1 › Day3-FINAL-03 real SSE can stop and refused response can retry (8.7s)
+  ok 30 e2e\day3-final-product.spec.ts:137:1 › Day3-FINAL-04 attachment attack inputs fail closed and path filenames are normalized (738ms)
+  ok 31 e2e\day3-final-product.spec.ts:167:1 › Day3-FINAL-05 SQL Workspace, evaluation and feedback expose request traces (731ms)
+  ok 32 e2e\day3-final-product.spec.ts:185:1 › Day3-FINAL-06 new conversation resets inherited business and evidence context (2.8s)
+  ok 33 e2e\day3-product-loop.spec.ts:34:1 › Day3-E2E01 登录进入问数据首页 (3.4s)
+  ok 34 e2e\day3-product-loop.spec.ts:44:1 › Day3-E2E02 PostgreSQL 数据源连接并读取隔离 Schema fixture (255ms)
+  ok 35 e2e\day3-product-loop.spec.ts:53:1 › Day4-E2E03 隔离语义模型完成 V1/V2 发布与 V1 回滚 (1.2s)
+  ok 36 e2e\day3-product-loop.spec.ts:94:1 › Day3-E2E04 自然语言问题生成受语义约束的 SQLPlan (549ms)
+  ok 37 e2e\day3-product-loop.spec.ts:102:1 › Day3-E2E05 SQL Guard、只读执行与 Result Oracle 全部通过 (257ms)
+  ok 38 e2e\day3-product-loop.spec.ts:110:1 › Day3 ChartSpec 由查询结构生成并绑定结果证据 (261ms)
+  ok 39 e2e\day3-product-loop.spec.ts:120:1 › Day3 Narrative 与推荐追问只引用当前结果 (931ms)
+  ok 40 e2e\day3-product-loop.spec.ts:130:1 › Day3-E2E06 正确结果展示 KPI、Chart 与 Insight (7.5s)
+  ok 41 e2e\day3-product-loop.spec.ts:150:1 › Day3-E2E07 查询明细与依据展示完整证据链 (5.1s)
+  ok 42 e2e\day3-product-loop.spec.ts:164:1 › Day3-E2E08 推荐追问进入新一轮真实查询 (4.4s)
+  ok 43 e2e\day3-product-loop.spec.ts:175:1 › Day3-E2E09 正确答案经反馈后保存为 VERIFIED Answer (1.1s)
+  ok 44 e2e\day3-product-loop.spec.ts:188:1 › Day3 已验证答案可复用且产生新 QueryRun (485ms)
+  ok 45 e2e\day3-product-loop.spec.ts:198:1 › Day3-E2E10 VERIFIED Answer 保存为 Dashboard Card (2.4s)
+  ok 46 e2e\day3-product-loop.spec.ts:216:1 › Day3-E2E11 Dashboard 查看来源并刷新真实数据 (2.9s)
+  ok 47 e2e\day3-product-loop.spec.ts:231:1 › Day4-E2E12 Evaluation Center 真正运行并持久化 Golden50 (24.5s)
+  ok 48 e2e\day3-product-loop.spec.ts:245:1 › Day3-E2E13 评测用例详情展示 Expected、Actual、SQL 与 ResultDiff (928ms)
+  ok 49 e2e\day3-product-loop.spec.ts:257:1 › Day3-E2E14 危险 SQL 被拒绝且执行载荷为空 (1.0s)
+  ok 50 e2e\day3-product-loop.spec.ts:265:1 › Day3-E2E15 零行查询进入真实空状态 (4.2s)
+  ok 51 e2e\day3-product-loop.spec.ts:278:1 › Day3 核心闭环页面三视口无裁切和运行时错误 (4.1s)
+  ok 52 e2e\day4-quality.spec.ts:14:1 › Day4-RBAC01 ANALYST 仅访问授权资源且拒绝事件进入审计 (2.8s)
+  ok 53 e2e\day4-quality.spec.ts:37:1 › Day4-UI14 Permission Denied 使用真实 Backend 403 状态 (1.4s)
+  ok 54 e2e\day5-rag-multiagent.spec.ts:42:1 › Day5-1 live RAG bridge and bounded agent capabilities are on (319ms)
+  ok 55 e2e\day5-rag-multiagent.spec.ts:54:3 › Day5-Complex-01 real trace is complete and verified (3.5s)
+  ok 56 e2e\day5-rag-multiagent.spec.ts:54:3 › Day5-Complex-02 real trace is complete and verified (2.9s)
+  ok 57 e2e\day5-rag-multiagent.spec.ts:54:3 › Day5-Complex-03 real trace is complete and verified (2.7s)
+  ok 58 e2e\day5-rag-multiagent.spec.ts:54:3 › Day5-Complex-04 real trace is complete and verified (666ms)
+  ok 59 e2e\day5-rag-multiagent.spec.ts:54:3 › Day5-Complex-05 real trace is complete and verified (731ms)
+  ok 60 e2e\day5-rag-multiagent.spec.ts:54:3 › Day5-Complex-06 real trace is complete and verified (2.3s)
+  ok 61 e2e\day5-rag-multiagent.spec.ts:54:3 › Day5-Complex-07 real trace is complete and verified (1.7s)
+  ok 62 e2e\day5-rag-multiagent.spec.ts:54:3 › Day5-Complex-08 real trace is complete and verified (1.6s)
+  ok 63 e2e\day5-rag-multiagent.spec.ts:54:3 › Day5-Complex-09 real trace is complete and verified (2.0s)
+  ok 64 e2e\day5-rag-multiagent.spec.ts:54:3 › Day5-Complex-10 real trace is complete and verified (1.7s)
+  ok 65 e2e\day5-rag-multiagent.spec.ts:54:3 › Day5-Complex-11 real trace is complete and verified (1.4s)
+  ok 66 e2e\day5-rag-multiagent.spec.ts:54:3 › Day5-Complex-12 real trace is complete and verified (1.0s)
+  ok 67 e2e\day5-rag-multiagent.spec.ts:54:3 › Day5-Complex-13 real trace is complete and verified (1.4s)
+  ok 68 e2e\day5-rag-multiagent.spec.ts:54:3 › Day5-Complex-14 real trace is complete and verified (578ms)
+  ok 69 e2e\day5-rag-multiagent.spec.ts:54:3 › Day5-Complex-15 real trace is complete and verified (705ms)
+  ok 70 e2e\day5-rag-multiagent.spec.ts:94:1 › Day5-12 knowledge and hybrid routes publish only verified evidence (773ms)
+  ok 71 e2e\day5-rag-multiagent.spec.ts:115:1 › Day5-13 SSE exposes canonical paired phases and no legacy or reasoning payload (739ms)
+  ok 72 e2e\day5-rag-multiagent.spec.ts:151:1 › Day5-14 missing session cannot access RAG or tools (48ms)
+  ok 73 e2e\day5-rag-multiagent.spec.ts:162:1 › Day5-15 RAG no-evidence path explicitly falls back to verified data (435ms)
+  ok 74 e2e\phase2-chat-auth-multimodal.spec.ts:20:1 › Phase2 unauthenticated browser, API and invalid session are blocked (735ms)
+  ok 75 e2e\phase2-chat-auth-multimodal.spec.ts:35:1 › Phase2 composer remains at the bottom and keyboard behavior uses the real chat runtime (15.5s)
+  ok 76 e2e\phase2-chat-auth-multimodal.spec.ts:88:1 › Phase2 CSV and image uploads complete real file and multimodal follow-ups (13.8s)
+  ok 77 e2e\phase2-chat-auth-multimodal.spec.ts:123:1 › Phase2 logout revokes only the current server session (1.7s)
+  ok 78 e2e\ui14-integration.spec.ts:71:3 › UI14 三视口集成 Gate 1440x900 (22.4s)
+  ok 79 e2e\ui14-integration.spec.ts:71:3 › UI14 三视口集成 Gate 1366x768 (21.4s)
+  ok 80 e2e\ui14-integration.spec.ts:71:3 › UI14 三视口集成 Gate 1920x1080 (25.3s)
+  ok 81 e2e\v21-eval-feedback.spec.ts:22:1 › V2.1-EVAL Evaluation 页面完成创建、执行、Dashboard、比较与 CI Gate (38.2s)
+  ok 82 e2e\v21-eval-feedback.spec.ts:53:1 › V2.1-FEEDBACK Feedback 页面完成错误修正、审核、Verified SQL 召回和 Oracle 回放 (3.6s)
+
+
+  1) e2e\day3-final-product.spec.ts:50:1 › Day3-FINAL-02 twenty-turn conversation keeps independent scroll, fixed composer and return-to-latest
+
+    Error: expect(locator).toHaveCount(expected) failed
+
+    Locator:  locator('.chat-user-bubble')
+    Expected: 21
+    Received: 20
+    Timeout:  30000ms
+
+    Call log:
+      - Expect "toHaveCount" with timeout 30000ms
+      - waiting for locator('.chat-user-bubble')
+        3 × locator resolved to 0 elements
+          - unexpected value "0"
+        59 × locator resolved to 20 elements
+           - unexpected value "20"
+
+
+      92 |     await expect.poll(() => messageArea.evaluate((node) => node.scrollHeight - node.scrollTop - node.clientHeight)).toBeLessThan(100);
+      93 |     await page.reload();
+    > 94 |     await expect(page.locator('.chat-user-bubble')).toHaveCount(21, { timeout: 30_000 });
+         |                                                     ^
+      95 |     expect(errors).toEqual([]);
+      96 |   } finally {
+      97 |     expect((await request.delete(`${apiBase}/conversations/${conversation.id}`)).status()).toBe(204);
+        at E:\ChatBI V2 项目\frontend\e2e\day3-final-product.spec.ts:94:53
+
+    Error Context: test-results\day3-final-product-Day3-FI-01428-mposer-and-return-to-latest\error-context.md
+
+    attachment #2: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results\day3-final-product-Day3-FI-01428-mposer-and-return-to-latest\trace.zip
+    Usage:
+
+        npx playwright show-trace test-results\day3-final-product-Day3-FI-01428-mposer-and-return-to-latest\trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  1 failed
+    e2e\day3-final-product.spec.ts:50:1 › Day3-FINAL-02 twenty-turn conversation keeps independent scroll, fixed composer and return-to-latest
+  81 passed (7.5m)

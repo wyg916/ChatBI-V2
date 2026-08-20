@@ -6,12 +6,13 @@
 
 本轮没有数据库迁移、Docker 数据库服务、Docker volume、第三方依赖或凭据变更，因此代码回滚不需要修改本机 PostgreSQL/MySQL 数据，也不得删除用户数据库。
 
-## 推荐方法
+## 推荐方法（正式集成分支）
 
-1. 在正式集成前，直接放弃任务分支即可；不要修改 `main`、正式集成分支或公开 Tag。
-2. 合入后若需回滚，针对本轮最终提交执行非破坏性的 `git revert <CHAT_UI_COMMIT_SHA>`，保留审计历史；禁止 force push。
-3. 重新构建 Backend/Frontend，停止后启动服务，并至少复验认证、问数据、会话列表、附件、DATA/RAG/Agent 路由和原有 Playwright 发布门禁。
-4. 核验受保护 API 仍为服务端会话鉴权，前端仍只经 Backend API 访问数据。
+1. 保留 `main`、Source branch 和全部公开 Tag；禁止 force push、reset 或删除数据库。
+2. 在 `codex/v2.1-final-integration` 按逆序 revert merge 之后的证据/测试修复提交（包括 `758de13`、`15291e6` 和最终证据提交），保留审计历史。
+3. 对 merge commit 使用主线父 1：`git revert -m 1 8676c07cc3144026fbbd282f54d318ae3cc2f546`。不得对该 merge commit 使用缺少 `-m 1` 的普通 revert。
+4. 重新构建 Backend/Frontend，停止后启动服务，并至少复验认证、问数据、会话列表、附件、DATA/RAG/Agent 路由和原有 Playwright 发布门禁。
+5. 核验受保护 API 仍为服务端会话鉴权，前端仍只经 Backend API 访问数据；核验本地、tracking 与 `ls-remote` 相等。
 
 ## 兼容回滚开关
 
@@ -29,3 +30,4 @@
 - Docker Compose 从停止状态启动成功，且仍不包含数据库服务或数据库 volume。
 - 本地分支、remote tracking 与 `ls-remote` 指向预期回滚提交。
 - 工作树 clean；没有遗留 stash、临时分支、未跟踪运行产物或公开 Tag 变更。
+- `main`、Source branch 与全部既有 annotated Tag object/peeled SHA 保持不变。

@@ -191,3 +191,9 @@ PandasAI 不作为运行依赖，也不导入其 community 或 `ee/**` 代码。
 Assistant 消息以 Text、KPI、Chart、Table、Citation、Evidence、Artifact 和 Follow-up 等 Message Parts 保存，并显式记录 `VALUE/ZERO/NO_ROWS/NULL_VALUE/FAILED`；数值 0 不得按空结果处理。SQL、数据口径、公开阶段和校验结论默认进入右侧证据抽屉，Agent 类名、工具名、Trace 与模型内部推理不得进入业务消息。新会话只在首条消息或附件上传时服务端创建，重命名/删除继续按 Workspace 和用户隔离。旧事件适配只允许留在客户端内部用于短期滚动兼容，不得作为真实流式发布证据。
 
 为控制流式终态的宽表放大，Table Part 只携带前 20 行可视预览，`row_count` 与结果签名保留真实总量，Result Oracle 使用的原始 execution 不截断。Feedback 术语必须经 Semantic Model 所属关系显式按当前 Workspace 过滤，并以规范化 `(term, mapped_object)` 业务键稳定去重；前端展示键不得掩盖跨 Workspace 混入或重复资源问题。
+
+## ADR-043：Chat UI 正式集成使用 merge commit 与脱敏浏览器证据
+
+正式集成开始时远端 Target 不存在，而远端 `main` 已在 Original Base 之后包含两个合法竞态加固提交，Source 同时包含三个 Chat UI 提交，双方互非祖先。因此从远端 `main` 创建 `codex/v2.1-final-integration`，再以双父 merge commit 汇合，不 rebase、不 force push、不伪装 fast-forward。自动合并的重叠文件必须同时保留目标侧有界持久化等待和 Source 侧 Chat-first/SSE 断言。
+
+浏览器发布证据提交 PNG、脱敏文本日志、非秘密命令元数据和 SHA-256 manifest；Playwright HTML、trace、storageState 与 auth cookie 只用于本地诊断，扫描后删除，不进入 Git。共享状态 E2E 继续遵守 ADR-022 串行门禁；pending Assistant DOM 不能作为事务提交证明，刷新持久化用例必须等待 Conversation API 的真实消息行。包含证据 manifest 的 Git commit 无法在自身内容中自引用最终 SHA，因此最终分支 SHA 以推送后 local/tracking/`ls-remote` 三方一致结果为准，并在交付输出中记录。
