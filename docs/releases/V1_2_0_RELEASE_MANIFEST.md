@@ -25,7 +25,7 @@ The tracked manifest cannot contain the hash of the commit that contains itself.
 | PLAYWRIGHT_RESULT | `PASS` — 82/82, one worker, retries disabled as a substitute for correctness |
 | BACKEND_RESULT | `PASS` — 225/225 plus Python compile check |
 | FRONTEND_RESULT | `PASS` — typecheck, 13/13 files and 50/50 Vitest, production build |
-| DOCKER_RESULT | `PASS` — stopped-state official stack start and three services healthy |
+| DOCKER_RESULT | `PASS` — two consecutive stopped-state official stack starts; three services healthy in both runs |
 | BROWSER_RESULT | `PASS` — console/page/request/unexpected blocking 4xx/5xx all 0 |
 | SECRET_SCAN | `PASS` — no high-confidence secret, Cookie, trace or auth payload in release tree |
 | WORKTREE | `clean`, stash `0`, main ahead/behind `0/0` after push |

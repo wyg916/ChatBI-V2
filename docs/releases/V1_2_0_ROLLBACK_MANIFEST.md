@@ -21,14 +21,17 @@ V1.2.0 Tag is immutable. Rollback must use a new reviewed commit/branch; never r
 Create a dedicated rollback branch from the current `main`, preserve evidence and backups, then revert in this exact non-destructive order:
 
 ```powershell
-git revert 'chatbi-v2-v1.2.0^{}'
+git revert 2b75c7e90d01f27ed5d880b00fe68761f3715b17
+git revert c0da6d758070b04303b263a7713998376e723201
+git revert 6bd3a96ab8207c4fa13fe8afad1414e1e0cb0d0f
+git revert 388666b6dc2e3d5bd9617c0dd0c195db2691900b
 git revert 5303bdb687ffe4c3896292b333edb58ed4003d6c
 git revert 758de13aa53ad69cf2231b39b81c6c13258b32de
 git revert 15291e6e23464893fc88bd6b4b94f28f0be53d80
 git revert -m 1 8676c07cc3144026fbbd282f54d318ae3cc2f546
 ```
 
-The first revert removes the V1.2.0 release metadata/SBOM/freeze commit. The following reverts remove final evidence/test hardening and the Chat UI merge while preserving the original `main` parent. Review the resulting diff before publishing; do not execute these commands on a dirty worktree.
+The order is the exact reverse of `main`'s first-parent release sequence after V1.1.0. It first removes the final transactional cancellation acknowledgement, the scoped cancellation implementation and its release-gate hardening, then removes the V1.2.0 metadata/SBOM/freeze commit, final evidence/test hardening and the Chat UI merge while preserving the original `main` parent. Review each generated revert before publishing; do not execute these commands on a dirty worktree.
 
 ## Data and service recovery
 
