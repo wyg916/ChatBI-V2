@@ -87,8 +87,14 @@ test('Day3-FINAL-02 twenty-turn conversation keeps independent scroll, fixed com
     await input.press('Enter');
     await expect(page.locator('.chat-user-bubble')).toHaveCount(21);
     // The user bubble is optimistic. Wait for the corresponding assistant
-    // message so the server transaction is committed before testing reload.
+    // message and the API-visible user row before testing reload. The pending
+    // assistant shell is mounted as soon as streaming starts, so its DOM count
+    // alone is not proof that the transaction has committed.
     await expect(page.locator('.chat-assistant-message')).toHaveCount(21, { timeout: 30_000 });
+    await expect.poll(async () => {
+      const latest = await payload(await request.get(`${apiBase}/conversations/${conversation.id}`));
+      return latest.messages.filter((message: { role: string }) => message.role === 'user').length;
+    }, { timeout: 30_000 }).toBe(21);
     await expect.poll(() => messageArea.evaluate((node) => node.scrollHeight - node.scrollTop - node.clientHeight)).toBeLessThan(100);
     await page.reload();
     await expect(page.locator('.chat-user-bubble')).toHaveCount(21, { timeout: 30_000 });
