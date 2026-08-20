@@ -21,7 +21,7 @@ from urllib.parse import quote
 
 ROOT = Path(__file__).resolve().parents[2]
 PROJECT_NAME = "ChatBI V2"
-PROJECT_VERSION = "1.1.0"
+PROJECT_VERSION = "1.2.0"
 PROJECT_LICENSE = "Apache-2.0"
 
 
@@ -246,8 +246,8 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--backend-container", default="chatbi-v2-backend-1")
     parser.add_argument("--frontend-lock", type=Path, default=ROOT / "frontend" / "package-lock.json")
-    parser.add_argument("--cyclonedx-output", type=Path, default=ROOT / "docs" / "sbom" / "V1_1_0.cdx.json")
-    parser.add_argument("--spdx-output", type=Path, default=ROOT / "docs" / "sbom" / "V1_1_0.spdx.json")
+    parser.add_argument("--cyclonedx-output", type=Path, default=ROOT / "docs" / "sbom" / "V1_2_0.cdx.json")
+    parser.add_argument("--spdx-output", type=Path, default=ROOT / "docs" / "sbom" / "V1_2_0.spdx.json")
     args = parser.parse_args()
 
     components = _backend_inventory(args.backend_container) + _frontend_inventory(args.frontend_lock)

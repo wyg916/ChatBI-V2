@@ -1,6 +1,6 @@
 # ChatBI V2
 
-ChatBI V2 是围绕“数据源 → Schema → 语义层 → 问数 → 可验证结果 → 图表与洞察 → 答案 → 看板 → 评测”构建的开源企业级 ChatBI 产品。V1.1.0 候选实现完整、可验证的产品闭环、受控 Live RAG 与受限 Multi-Agent；发布真实性以 Final Candidate SHA 下的原始证据为准，能力清单见 [`docs/v2_1/day3/V2_1_FINAL_CAPABILITY_AUDIT.md`](docs/v2_1/day3/V2_1_FINAL_CAPABILITY_AUDIT.md)。
+ChatBI V2 是围绕“数据源 → Schema → 语义层 → 问数 → 可验证结果 → 图表与洞察 → 答案 → 看板 → 评测”构建的开源企业级 ChatBI 产品。V1.2.0 在完整、可验证的产品闭环、受控 Live RAG 与受限 Multi-Agent 基础上，正式发布 ChatGPT 风格 Chat-first 对话界面、真实 Streaming、停止生成、查询依据抽屉、结构化 Answer Composer 与五态结果语义；发布真实性以 annotated Tag 的 peeled SHA 和发布 Manifest 为准。
 
 ## 一键启动
 
@@ -122,4 +122,4 @@ npm run build
 npm run e2e
 ```
 
-Golden 50 冻结清单位于 [`evaluation/golden/day4-golden-50.json`](evaluation/golden/day4-golden-50.json)。完整安装说明见 [`INSTALL.md`](INSTALL.md)，运行架构见 [`docs/ARCHITECTURE_RUNTIME.md`](docs/ARCHITECTURE_RUNTIME.md)，V1.1.0 发布说明见 [`docs/releases/V1_1_0_RELEASE_NOTES.md`](docs/releases/V1_1_0_RELEASE_NOTES.md)，许可证、SBOM 与第三方声明见 [`docs/OPEN_SOURCE_LICENSE_AUDIT.md`](docs/OPEN_SOURCE_LICENSE_AUDIT.md)、[`docs/sbom/`](docs/sbom/) 和 [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md)。
+Golden 50 冻结清单位于 [`evaluation/golden/day4-golden-50.json`](evaluation/golden/day4-golden-50.json)。完整安装说明见 [`INSTALL.md`](INSTALL.md)，运行架构见 [`docs/ARCHITECTURE_RUNTIME.md`](docs/ARCHITECTURE_RUNTIME.md)，V1.2.0 发布说明见 [`docs/releases/V1_2_0_RELEASE_NOTES.md`](docs/releases/V1_2_0_RELEASE_NOTES.md)，许可证、SBOM 与第三方声明见 [`docs/OPEN_SOURCE_LICENSE_AUDIT.md`](docs/OPEN_SOURCE_LICENSE_AUDIT.md)、[`docs/sbom/`](docs/sbom/) 和 [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md)。

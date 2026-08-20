@@ -197,3 +197,9 @@ Assistant 消息以 Text、KPI、Chart、Table、Citation、Evidence、Artifact 
 正式集成开始时远端 Target 不存在，而远端 `main` 已在 Original Base 之后包含两个合法竞态加固提交，Source 同时包含三个 Chat UI 提交，双方互非祖先。因此从远端 `main` 创建 `codex/v2.1-final-integration`，再以双父 merge commit 汇合，不 rebase、不 force push、不伪装 fast-forward。自动合并的重叠文件必须同时保留目标侧有界持久化等待和 Source 侧 Chat-first/SSE 断言。
 
 浏览器发布证据提交 PNG、脱敏文本日志、非秘密命令元数据和 SHA-256 manifest；Playwright HTML、trace、storageState 与 auth cookie 只用于本地诊断，扫描后删除，不进入 Git。共享状态 E2E 继续遵守 ADR-022 串行门禁；pending Assistant DOM 不能作为事务提交证明，刷新持久化用例必须等待 Conversation API 的真实消息行。包含证据 manifest 的 Git commit 无法在自身内容中自引用最终 SHA，因此最终分支 SHA 以推送后 local/tracking/`ls-remote` 三方一致结果为准，并在交付输出中记录。
+
+## ADR-044：V1.2.0 以 fast-forward main、annotated Tag 与不可变冻结清单发布
+
+V1.2.0 只把已经通过正式集成门禁的 `codex/v2.1-final-integration` 安全 fast-forward 晋升到 `main`，随后仅允许版本元数据、Release Notes、Release/Rollback/Evidence Manifest、SBOM 与冻结状态文档进入最终发布提交。Tag 必须是 `chatbi-v2-v1.2.0` annotated Tag，且 peeled SHA 与 local `main`、tracking `main` 和 `ls-remote main` 完全一致；禁止 force push、批量推送 Tag、移动旧 Tag 或把 P2 优化混入冻结提交。
+
+包含 Release Manifest 的 Git commit 无法在自身内容中写入自身 SHA，因此仓库内以 `chatbi-v2-v1.2.0^{}` 作为可验证的发布 SHA 解析式，真实完整 SHA 由推送后 Git 三方核验与最终交付记录。V1.2.0 冻结后，任何功能开发必须从新分支开始；仅在 Source 分支全部提交已进入 `main` 和正式 Tag、且无独有提交时，才允许删除该轮 Source 任务分支。Integration 分支继续保留。
