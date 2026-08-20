@@ -18,5 +18,10 @@ export function captureRuntimeErrors(page: Page, expectedHttpStatuses: number[] 
       blockingRequestErrors.push(`${request.url()}:${reason}`);
     }
   });
+  page.on('response', (response) => {
+    if (response.status() >= 400 && !expectedHttpStatuses.includes(response.status())) {
+      blockingRequestErrors.push(`${response.status()} ${response.url()}`);
+    }
+  });
   return { consoleErrors, pageErrors, blockingRequestErrors };
 }

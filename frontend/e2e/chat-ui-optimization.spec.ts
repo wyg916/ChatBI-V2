@@ -12,7 +12,9 @@ const viewports = [
   { width: 1366, height: 768 },
 ] as const;
 
-const screenshotRoot = path.resolve('..', 'artifacts', 'chat-ui-optimization-20260819', 'final');
+const screenshotRoot = process.env.CHATBI_SCREENSHOT_ROOT
+  ? path.resolve(process.env.CHATBI_SCREENSHOT_ROOT)
+  : path.resolve('..', 'artifacts', 'chat-ui-optimization-20260819', 'final-integration');
 
 function parseSse(text: string) {
   return text.split(/\r?\n\r?\n/).filter((block) => block.trim()).map((block) => {
@@ -81,7 +83,15 @@ test('Chat UI 三视口布局、品牌、单主滚动和优化后截图', async 
     await expect(page.getByRole('dialog', { name: 'SQL 与执行明细' })).toHaveCount(0);
     await expect(page.locator('.sidebar')).toHaveCSS('width', '236px');
     await expect(page.locator('.hero-mark')).toHaveCSS('color', 'rgb(255, 255, 255)');
-    expect(await page.locator('.hero-mark').evaluate((node) => getComputedStyle(node).backgroundImage)).toContain('linear-gradient');
+    const heroBackground = await page.locator('.hero-mark').evaluate((node) => getComputedStyle(node).backgroundImage);
+    expect(heroBackground).toContain('linear-gradient');
+    expect(heroBackground).toContain('rgb(108, 93, 255)');
+    expect(heroBackground).toContain('rgb(81, 68, 238)');
+    const composerToolbar = page.locator('.composer-toolbar');
+    await expect(composerToolbar.getByRole('button')).toHaveCount(2);
+    await expect(composerToolbar.getByRole('button', { name: '添加文件或图片' })).toBeVisible();
+    await expect(composerToolbar.getByRole('button', { name: '提交问题' })).toBeVisible();
+    await expect(page.getByRole('button', { name: /麦克风|语音|录音/ })).toHaveCount(0);
     expect(await page.locator('.chat-message-area').evaluate((node) => getComputedStyle(node).overflowY)).toBe('auto');
     expect(await page.locator('.chat-panel').evaluate((node) => getComputedStyle(node).overflow)).toBe('hidden');
     expect(await page.locator('.conversation-list').evaluate((node) => getComputedStyle(node).overflowY)).toBe('auto');
@@ -106,6 +116,86 @@ test('Chat UI 三视口布局、品牌、单主滚动和优化后截图', async 
   expect(errors.pageErrors).toEqual([]);
   expect(errors.blockingRequestErrors).toEqual([]);
   expect(blockingResponses).toEqual([]);
+});
+
+test('成功回答支持复制和重新生成且 Assistant 无巨大外层卡片', async ({ page, request }) => {
+  await page.context().grantPermissions(['clipboard-read', 'clipboard-write']);
+  await page.goto('/?new=1');
+  const question = '统计全部订单收入';
+  const input = page.getByRole('textbox', { name: '输入业务问题' });
+  await input.fill(question);
+  const [created] = await Promise.all([
+    page.waitForResponse((response) => response.url().endsWith('/api/v1/conversations') && response.request().method() === 'POST'),
+    input.press('Enter'),
+  ]);
+  const conversation = await created.json() as JsonRecord;
+  try {
+    await expect(page.getByTestId('result-state-VALUE')).toBeVisible({ timeout: 60_000 });
+    const firstAnswer = page.locator('.chat-assistant-message').last();
+    const shellStyle = await firstAnswer.evaluate((node) => {
+      const shell = getComputedStyle(node);
+      const response = getComputedStyle(node.querySelector('.assistant-response')!);
+      return {
+        shellBackground: shell.backgroundColor,
+        shellBorder: shell.borderTopWidth,
+        shellShadow: shell.boxShadow,
+        responseBackground: response.backgroundColor,
+        responseBorder: response.borderTopWidth,
+        responseShadow: response.boxShadow,
+      };
+    });
+    expect(shellStyle).toEqual({
+      shellBackground: 'rgba(0, 0, 0, 0)',
+      shellBorder: '0px',
+      shellShadow: 'none',
+      responseBackground: 'rgba(0, 0, 0, 0)',
+      responseBorder: '0px',
+      responseShadow: 'none',
+    });
+
+    await firstAnswer.getByRole('button', { name: '复制回答' }).click();
+    await expect(firstAnswer.getByRole('status')).toHaveText('已复制');
+    expect((await page.evaluate(() => navigator.clipboard.readText())).trim().length).toBeGreaterThan(0);
+
+    const answerCount = await page.locator('.chat-assistant-message').count();
+    const userCount = await page.locator('.chat-user-bubble').count();
+    const regenerated = page.waitForResponse((response) => response.url().endsWith('/api/v1/chat/stream') && response.request().method() === 'POST');
+    await firstAnswer.getByRole('button', { name: '重新生成', exact: true }).click();
+    expect((await regenerated).status()).toBe(200);
+    await expect(page.locator('.chat-assistant-message')).toHaveCount(answerCount + 1, { timeout: 60_000 });
+    await expect(page.locator('.chat-user-bubble')).toHaveCount(userCount + 1);
+    await expect(page.getByTestId('result-state-VALUE').last()).toBeVisible();
+    await expect(page.locator('.chat-user-bubble').last()).toContainText(question);
+  } finally {
+    await deleteConversation(request, conversation.id);
+  }
+});
+
+test('ZERO 与 NULL_VALUE 用户态语义明确且不展示伪造可信度或空金额', async ({ page, request }) => {
+  for (const scenario of [
+    { semantic: 'ZERO', question: 'SELECT COUNT(*) AS revenue FROM demo_business.orders WHERE 1 = 0', notice: '当前条件下结果为 0' },
+    { semantic: 'NULL_VALUE', question: 'SELECT CAST(NULL AS NUMERIC) AS revenue', notice: '查询到记录，但指标字段为空' },
+  ] as const) {
+    await page.goto('/?new=1');
+    const input = page.getByRole('textbox', { name: '输入业务问题' });
+    await input.fill(scenario.question);
+    const [created] = await Promise.all([
+      page.waitForResponse((response) => response.url().endsWith('/api/v1/conversations') && response.request().method() === 'POST'),
+      input.press('Enter'),
+    ]);
+    const conversation = await created.json() as JsonRecord;
+    try {
+      const answer = page.getByTestId(`result-state-${scenario.semantic}`).last();
+      await expect(answer).toBeVisible({ timeout: 60_000 });
+      await expect(answer).toContainText(scenario.notice);
+      await expect(answer).not.toContainText(/可信度\s*100\s*%/);
+      await expect(answer).not.toContainText(/—\s*元/);
+      if (scenario.semantic === 'ZERO') await expect(answer.getByTestId('query-success')).toBeVisible();
+      else await expect(answer.getByTestId('query-success')).toHaveCount(0);
+    } finally {
+      await deleteConversation(request, conversation.id);
+    }
+  }
 });
 
 test('真实 chat SSE 严格递增、多 delta、成对 phase、唯一终态并与持久化一致', async ({ request }) => {

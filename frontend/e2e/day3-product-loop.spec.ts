@@ -268,8 +268,11 @@ test('Day3-E2E15 零行查询进入真实空状态', async ({ page, request }) =
   expect(result.status).toBe('SUCCEEDED');
   expect(result.execution.row_count).toBe(0);
   await page.goto(`/ask/results?q=${encodeURIComponent(question)}`);
-  await expect(page.getByTestId('query-empty')).toContainText('没有匹配记录');
-  await expect(page.getByTestId('query-empty')).toContainText('并不代表指标为 0');
+  const emptyState = page.getByTestId('query-empty');
+  await expect(emptyState).toContainText('没有匹配记录', { timeout: 30_000 });
+  await expect(emptyState).toContainText('并不代表指标为 0');
+  await expect(emptyState).not.toContainText(/可信度\s*100\s*%/);
+  await expect(emptyState).not.toContainText(/—\s*元/);
 });
 
 test('Day3 核心闭环页面三视口无裁切和运行时错误', async ({ page }) => {
