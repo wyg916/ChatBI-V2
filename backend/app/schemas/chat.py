@@ -1,15 +1,99 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Any
+from enum import StrEnum
+from typing import Any, Literal
 
 from chatbi_agent_contracts import QuestionRoute
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 class ConversationCreate(BaseModel):
     model_config = ConfigDict(extra="forbid")
     title: str = Field(default="新会话", min_length=1, max_length=255)
+
+
+class ConversationRename(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    title: str = Field(min_length=1, max_length=255)
+
+    @field_validator("title")
+    @classmethod
+    def clean_title(cls, value: str) -> str:
+        cleaned = " ".join(value.split())[:255]
+        if not cleaned:
+            raise ValueError("title must contain visible characters")
+        return cleaned
+
+
+class ResultSemantic(StrEnum):
+    VALUE = "VALUE"
+    ZERO = "ZERO"
+    NO_ROWS = "NO_ROWS"
+    NULL_VALUE = "NULL_VALUE"
+    FAILED = "FAILED"
+
+
+class TextPart(BaseModel):
+    type: Literal["text"] = "text"
+    text: str
+    role: str | None = None
+
+
+class KpiItem(BaseModel):
+    label: str
+    value: Any
+    unit: str = ""
+
+
+class KpiPart(BaseModel):
+    type: Literal["kpi"] = "kpi"
+    items: list[KpiItem]
+
+
+class ChartPart(BaseModel):
+    type: Literal["chart"] = "chart"
+    chart_spec: dict[str, Any]
+    result_signature: str
+
+
+class TablePart(BaseModel):
+    type: Literal["table"] = "table"
+    columns: list[str]
+    rows: list[dict[str, Any]]
+    row_count: int
+    result_signature: str
+
+
+class CitationItem(BaseModel):
+    title: str
+    version: str
+    locator: str
+    resource_id: str
+
+
+class CitationsPart(BaseModel):
+    type: Literal["citations"] = "citations"
+    items: list[CitationItem]
+
+
+class EvidencePart(BaseModel):
+    type: Literal["evidence"] = "evidence"
+    sql: str | None = None
+    guard: dict[str, Any]
+    oracle: dict[str, Any]
+    semantic: dict[str, Any]
+    phases: list[dict[str, Any]]
+
+
+class ErrorPart(BaseModel):
+    type: Literal["error"] = "error"
+    code: str
+    message: str
+    retryable: bool
+
+
+MessagePart = TextPart | KpiPart | ChartPart | TablePart | CitationsPart | EvidencePart | ErrorPart
 
 
 class ConversationRead(BaseModel):
@@ -59,6 +143,8 @@ class ChatResponse(BaseModel):
     conversation: ConversationRead
     user_message: MessageRead
     assistant_message: MessageRead
+    message_parts: list[MessagePart] = Field(default_factory=list)
+    result_semantic: ResultSemantic = ResultSemantic.VALUE
 
 
 class AttachmentRead(BaseModel):

@@ -2,21 +2,29 @@ from __future__ import annotations
 
 from concurrent.futures import ThreadPoolExecutor
 from queue import Empty, Queue
+from time import perf_counter
 from uuid import uuid4
 
-from fastapi import APIRouter, Depends, Request, Response, status
+from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from fastapi.responses import StreamingResponse
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.access import Principal, get_conversation_principal, require_permission
 from app.db.session import SessionLocal, get_db
-from app.models import Attachment, Conversation
-from app.schemas.chat import ChatRequest, ChatResponse, ConversationCreate, ConversationDetail, ConversationRead
+from app.models import Attachment, ChatMessage, Conversation
+from app.schemas.chat import (
+    ChatRequest,
+    ChatResponse,
+    ConversationCreate,
+    ConversationDetail,
+    ConversationRead,
+    ConversationRename,
+)
 from app.services.chat import ChatService
 from app.services.attachments import attachment_path
 from app.services.conversations import get_conversation, list_messages
-from app.streaming import StreamCancelled, StreamEventFactory, event_for_stage, format_sse, stream_registry
+from app.streaming import PHASE_LABELS, StreamCancelled, StreamEventFactory, format_sse, phase_for_stage, stream_registry
 
 
 router = APIRouter(tags=["authenticated chat"])
@@ -60,6 +68,20 @@ def conversation_detail(conversation_id: str, db: Session = Depends(get_db), pri
     return ConversationDetail.model_validate(item).model_copy(update={"messages": list_messages(db, item.id)})
 
 
+@router.patch("/conversations/{conversation_id}", response_model=ConversationRead)
+def rename_conversation(
+    conversation_id: str,
+    data: ConversationRename,
+    db: Session = Depends(get_db),
+    principal: Principal = Depends(require_permission("query.ask")),
+):
+    item = get_conversation(db, conversation_id, principal)
+    item.title = data.title
+    db.commit()
+    db.refresh(item)
+    return item
+
+
 @router.delete("/conversations/{conversation_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_conversation(conversation_id: str, db: Session = Depends(get_db), principal: Principal = Depends(require_permission("query.ask"))):
     item = get_conversation(db, conversation_id, principal)
@@ -88,38 +110,105 @@ def chat_stream(
     # entire StreamingResponse. Release its transaction/connection before the
     # stream begins; the worker owns a separate bounded SessionLocal lifecycle.
     db.close()
-    trace_id = f"STREAM-{uuid4()}"
-    factory = StreamEventFactory(trace_id=trace_id)
-    lifecycle = stream_registry.register(trace_id)
+    run_id = f"STREAM-{uuid4()}"
+    factory = StreamEventFactory(
+        run_id=run_id,
+        conversation_id=data.conversation_id,
+        message_id=f"pending-{data.client_message_id}",
+    )
+    lifecycle = stream_registry.register(run_id)
     events: Queue[tuple[str, dict] | None] = Queue()
 
     def progress(stage: str, detail: dict):
         lifecycle.checkpoint()
-        public = {key: detail[key] for key in ("route", "status", "elapsed_ms", "role", "tool") if key in detail}
-        events.put(("progress", {"stage": stage, **public}))
+        public = {key: detail[key] for key in ("route", "status", "elapsed_ms") if key in detail}
+        events.put(("stage", {"stage": stage, **public}))
+
+    def answer_delta(delta: str) -> None:
+        lifecycle.checkpoint()
+        if delta:
+            events.put(("delta", {"delta": delta}))
+
+    def cleanup_cancelled_messages() -> None:
+        """Remove only this run's messages if an upstream commit preceded abort."""
+        with SessionLocal() as cleanup_db:
+            user_message = cleanup_db.scalar(select(ChatMessage).where(
+                ChatMessage.conversation_id == data.conversation_id,
+                ChatMessage.client_message_id == data.client_message_id,
+            ))
+            if user_message is None:
+                return
+            assistants = list(cleanup_db.scalars(select(ChatMessage).where(
+                ChatMessage.conversation_id == data.conversation_id,
+                ChatMessage.parent_message_id == user_message.id,
+                ChatMessage.role == "assistant",
+            )))
+            for assistant in assistants:
+                cleanup_db.delete(assistant)
+            cleanup_db.delete(user_message)
+            cleanup_db.commit()
 
     def worker():
-        stream_registry.task_started(trace_id)
+        stream_registry.task_started(run_id)
         try:
             with SessionLocal() as worker_db:
                 result = ChatService().execute(
                     worker_db, data, principal, progress=progress,
                     cancellation_event=lifecycle.cancel_event,
+                    answer_delta=answer_delta,
                 )
                 lifecycle.checkpoint()
                 events.put(("result", result.model_dump(mode="json")))
         except StreamCancelled:
-            events.put(("cancelled", {"code": "STREAM_CANCELLED"}))
+            cleanup_cancelled_messages()
+            events.put(("cancelled", {"code": "RUN_CANCELLED", "message": "请求已取消。", "retryable": True}))
         except Exception as exc:
-            events.put(("error", {"code": f"CHAT_STREAM_{type(exc).__name__.upper()}"}))
+            code = str(exc.detail) if isinstance(exc, HTTPException) and isinstance(exc.detail, str) else f"CHAT_STREAM_{type(exc).__name__.upper()}"
+            events.put(("error", {"code": code, "message": "请求执行失败，请稍后重试。", "retryable": True}))
         finally:
-            stream_registry.task_finished(trace_id)
+            stream_registry.task_finished(run_id)
             events.put(None)
 
     def stream():
+        active_phase: str | None = None
+        phase_started = perf_counter()
+        terminal_sent = False
+
+        def transition(next_phase: str | None):
+            nonlocal active_phase, phase_started
+            if next_phase == active_phase:
+                return []
+            phase_events = []
+            if active_phase is not None:
+                phase_events.append(factory.create(
+                    "phase.completed",
+                    phase=active_phase,
+                    label=PHASE_LABELS[active_phase],
+                    duration_ms=round((perf_counter() - phase_started) * 1000),
+                    metadata={},
+                ))
+            active_phase = next_phase
+            if active_phase is not None:
+                phase_started = perf_counter()
+                phase_events.append(factory.create(
+                    "phase.started",
+                    phase=active_phase,
+                    label=PHASE_LABELS[active_phase],
+                    metadata={},
+                ))
+            return phase_events
+
+        def render_many(payloads):
+            for payload in payloads:
+                yield format_sse(payload["event_type"], payload)
+
         try:
-            accepted = factory.create("accepted", data={"conversation_id": data.conversation_id})
-            yield format_sse("accepted", accepted)
+            started = factory.create(
+                "run.started",
+                status="RUNNING",
+                route=data.route.value if data.route else "AUTO",
+            )
+            yield format_sse("run.started", started)
             # The public acknowledgement is the first yielded byte. Starting
             # database/model work only on the next generator iteration keeps
             # TTFE bounded even when the worker pool is under contention.
@@ -131,50 +220,87 @@ def chat_stream(
                 try:
                     item = events.get(timeout=0.5)
                 except Empty:
-                    yield format_sse("heartbeat", factory.create("heartbeat"))
                     continue
                 if item is None:
                     break
                 event, payload = item
-                if event == "progress":
-                    stage = str(payload.get("stage", ""))
-                    if stage.upper() == "COMPLETED":
-                        envelope = factory.create("completed", capability="chatbi", data=payload)
-                        yield format_sse("progress", {**envelope, "stage": stage})
-                        continue
-                    protocol_event = event_for_stage(stage)
-                    if protocol_event:
-                        capability = str(payload.get("tool") or payload.get("role") or payload.get("route") or "chatbi")
-                        envelope = factory.create(protocol_event, capability=capability, data=payload)
-                        yield format_sse(protocol_event, envelope)
-                        yield format_sse("progress", {**envelope, "stage": stage})
+                if event == "stage":
+                    phase = phase_for_stage(str(payload.get("stage", "")))
+                    if phase:
+                        yield from render_many(transition(phase))
+                    continue
+                if event == "delta":
+                    yield from render_many(transition("composing_answer"))
+                    envelope = factory.create("answer.delta", delta=payload["delta"])
+                    yield format_sse("answer.delta", envelope)
                     continue
                 if event == "result":
+                    yield from render_many(transition(None))
                     assistant = payload.get("assistant_message") or {}
-                    content = str(assistant.get("content") or "")
-                    if content:
-                        yield format_sse("answer_delta", factory.create("answer_delta", data={"text": content}))
-                    response_payload = assistant.get("response_payload") or {}
-                    if "chart" in str(response_payload).lower():
-                        yield format_sse("chart_ready", factory.create("chart_ready"))
-                    yield format_sse("completed", factory.create(
-                        "completed",
-                        data={"stage": "COMPLETED", "status": assistant.get("status")},
-                    ))
-                    yield format_sse("result", payload)
-                    continue
+                    assistant_status = str(assistant.get("status") or "FAILED")
+                    if assistant_status in {"SUCCEEDED", "PARTIAL"}:
+                        message_parts = payload.get("message_parts") or []
+                        for part in message_parts:
+                            part_type = str(part.get("type") or "")
+                            if part_type in {"kpi", "chart", "table", "evidence"}:
+                                artifact = factory.create(
+                                    "artifact.ready",
+                                    artifact_type=part_type,
+                                    artifact=part,
+                                )
+                                yield format_sse("artifact.ready", artifact)
+                        citations_part = next((part for part in message_parts if part.get("type") == "citations"), None)
+                        if citations_part:
+                            citations = factory.create("citations.ready", citations=citations_part.get("items") or [])
+                            yield format_sse("citations.ready", citations)
+                        terminal = factory.create(
+                            "run.completed",
+                            status=assistant_status,
+                            result_semantic=payload.get("result_semantic") or "VALUE",
+                            message_parts=message_parts,
+                            response=payload,
+                        )
+                        yield format_sse("run.completed", terminal)
+                    else:
+                        response_payload = assistant.get("response_payload") or {}
+                        error_part = next((part for part in response_payload.get("message_parts") or [] if part.get("type") == "error"), {})
+                        terminal = factory.create(
+                            "run.failed",
+                            code=error_part.get("code") or assistant.get("error_code") or "CHAT_RUN_FAILED",
+                            message=error_part.get("message") or "请求执行失败，请稍后重试。",
+                            retryable=bool(error_part.get("retryable", True)),
+                        )
+                        yield format_sse("run.failed", terminal)
+                    terminal_sent = True
+                    break
                 if event == "cancelled":
-                    yield format_sse("cancelled", factory.create("cancelled", data=payload))
-                    continue
+                    yield from render_many(transition(None))
+                    terminal = factory.create("run.cancelled", **payload)
+                    yield format_sse("run.cancelled", terminal)
+                    terminal_sent = True
+                    break
                 if event == "error":
-                    yield format_sse("error", factory.create("error", data=payload))
+                    yield from render_many(transition(None))
+                    terminal = factory.create("run.failed", **payload)
+                    yield format_sse("run.failed", terminal)
+                    terminal_sent = True
+                    break
+            if not terminal_sent:
+                yield from render_many(transition(None))
+                terminal = factory.create(
+                    "run.cancelled" if lifecycle.cancel_event.is_set() else "run.failed",
+                    code="RUN_CANCELLED" if lifecycle.cancel_event.is_set() else "STREAM_ENDED_WITHOUT_RESULT",
+                    message="请求已取消。" if lifecycle.cancel_event.is_set() else "流式请求未返回结果。",
+                    retryable=True,
+                )
+                yield format_sse(terminal["event_type"], terminal)
         finally:
-            stream_registry.connection_closed(trace_id)
+            stream_registry.connection_closed(run_id)
 
     return StreamingResponse(
         stream(),
         media_type="text/event-stream",
-        headers={"Cache-Control": "no-store", "X-Accel-Buffering": "no", "X-Trace-ID": trace_id},
+        headers={"Cache-Control": "no-store", "X-Accel-Buffering": "no", "X-Trace-ID": run_id},
     )
 
 

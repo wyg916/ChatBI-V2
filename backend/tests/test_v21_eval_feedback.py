@@ -6,6 +6,7 @@ from sqlalchemy import select
 
 from app.evaluation.ibm_adapter import IbmText2SqlEvaluationAdapter
 from app.models import (
+    BusinessTerm,
     DataSource,
     DataSourceColumn,
     DataSourceSchema,
@@ -205,6 +206,95 @@ def test_evaluation_and_feedback_endpoints_hide_foreign_workspace_records(client
         f"/api/v1/evaluation/feedback/{foreign_answer.id}/replay",
         json={"question": "foreign question"},
     ).status_code == 404
+
+
+def test_feedback_dashboard_terms_are_workspace_scoped_and_stably_deduplicated(client, db_session):
+    _, current_model = _catalog(db_session)
+    current_workspace = db_session.get(Workspace, current_model.workspace_id)
+    db_session.add_all([
+        BusinessTerm(
+            semantic_model_id=current_model.id,
+            term="地区",
+            synonyms=["区域"],
+            definition="同一映射的重复副本 A",
+            mapped_object="dimension.region",
+        ),
+        BusinessTerm(
+            semantic_model_id=current_model.id,
+            term="地区",
+            synonyms=["地域"],
+            definition="同一映射的重复副本 B",
+            mapped_object="dimension.region",
+        ),
+        BusinessTerm(
+            semantic_model_id=current_model.id,
+            term="地区",
+            synonyms=["结算区域"],
+            definition="同一术语的另一项有效映射",
+            mapped_object="dimension.billing_region",
+        ),
+    ])
+
+    foreign_workspace = Workspace(name="Foreign terminology workspace")
+    db_session.add(foreign_workspace)
+    db_session.flush()
+    foreign_datasource = DataSource(
+        workspace_id=foreign_workspace.id,
+        name="Foreign terminology source",
+        type="postgresql",
+        host="foreign.invalid",
+        port=5432,
+        database="foreign",
+        username="readonly",
+        password_encrypted="test-only-encrypted-placeholder",
+        status="SYNCED",
+    )
+    db_session.add(foreign_datasource)
+    db_session.flush()
+    foreign_model = SemanticModel(
+        workspace_id=foreign_workspace.id,
+        datasource_id=foreign_datasource.id,
+        name="Foreign terminology model",
+        status="PUBLISHED",
+        version=1,
+    )
+    db_session.add(foreign_model)
+    db_session.flush()
+    db_session.add_all([
+        BusinessTerm(
+            semantic_model_id=foreign_model.id,
+            term="机密术语",
+            synonyms=["foreign-only"],
+            definition="不得出现在当前工作区",
+            mapped_object="metric.foreign_secret",
+        ),
+        BusinessTerm(
+            semantic_model_id=foreign_model.id,
+            term="地区",
+            synonyms=["foreign-region"],
+            definition="另一工作区的同名术语",
+            mapped_object="dimension.region",
+        ),
+    ])
+    db_session.commit()
+
+    first = client.get("/api/v1/evaluation/feedback/dashboard")
+    second = client.get("/api/v1/evaluation/feedback/dashboard")
+    assert first.status_code == second.status_code == 200
+    terms = first.json()["terminology"]
+    assert terms == second.json()["terminology"]
+    assert all(item["semantic_model_id"] != foreign_model.id for item in terms)
+    assert all(item["term"] != "机密术语" for item in terms)
+    assert all(item["id"] and item["semantic_model_id"] and item["business_key"] for item in terms)
+    business_keys = [item["business_key"] for item in terms]
+    assert len(business_keys) == len(set(business_keys))
+    region_terms = [item for item in terms if item["term"] == "地区"]
+    assert {item["mapped_object"] for item in region_terms} == {
+        "dimension.billing_region",
+        "dimension.region",
+    }
+    assert sum(item["mapped_object"] == "dimension.region" for item in region_terms) == 1
+    assert current_workspace.id == current_model.workspace_id
 
 
 def test_sqlbot_feedback_verified_sql_recall_and_replay(client, db_session, monkeypatch):

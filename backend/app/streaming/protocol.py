@@ -3,104 +3,105 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
-from time import perf_counter
 from typing import Any
 
 
 REQUIRED_EVENTS = (
-    "accepted",
-    "catalog_retrieving",
-    "schema_linked",
-    "semantic_parsing",
-    "semantic_compiling",
-    "sql_validating",
-    "sql_running",
-    "result_validating",
-    "knowledge_retrieving",
-    "agent_running",
-    "python_running",
-    "answer_delta",
-    "chart_ready",
-    "completed",
-    "error",
-    "cancelled",
-    "heartbeat",
+    "run.started",
+    "phase.started",
+    "phase.completed",
+    "answer.delta",
+    "artifact.ready",
+    "citations.ready",
+    "run.completed",
+    "run.failed",
+    "run.cancelled",
 )
 
+TERMINAL_EVENTS = frozenset({"run.completed", "run.failed", "run.cancelled"})
 
-STAGE_EVENTS = {
-    "UNDERSTANDING": "catalog_retrieving",
-    "CATALOG_RETRIEVING": "catalog_retrieving",
-    "SCHEMA_LINKED": "schema_linked",
-    "SEMANTIC_PARSING": "semantic_parsing",
-    "SEMANTIC_COMPILING": "semantic_compiling",
-    "SQL_VALIDATING": "sql_validating",
-    "QUERYING_DATA": "sql_running",
-    "SQL_RUNNING": "sql_running",
-    "RESULT_VALIDATING": "result_validating",
-    "RETRIEVING_KNOWLEDGE": "knowledge_retrieving",
-    "AGENT_RUNNING": "agent_running",
-    "VERIFYING": "result_validating",
-    "GENERATING_INSIGHT": "answer_delta",
-    "PYTHON_RUNNING": "python_running",
-    "CHART_READY": "chart_ready",
-    "COMPLETED": "completed",
+PHASE_LABELS = {
+    "understanding": "正在理解问题……",
+    "semantic_mapping": "正在识别指标和维度……",
+    "querying_data": "正在查询数据……",
+    "retrieving_knowledge": "正在检索业务规则……",
+    "verifying": "正在校验结果……",
+    "composing_answer": "正在整理回答……",
+}
+
+STAGE_PHASES = {
+    "UNDERSTANDING": "understanding",
+    "CATALOG_RETRIEVING": "understanding",
+    "SCHEMA_LINKED": "semantic_mapping",
+    "SEMANTIC_PARSING": "semantic_mapping",
+    "SEMANTIC_COMPILING": "semantic_mapping",
+    "SQL_VALIDATING": "semantic_mapping",
+    "QUERYING_DATA": "querying_data",
+    "SQL_RUNNING": "querying_data",
+    "PYTHON_RUNNING": "querying_data",
+    "RETRIEVING_KNOWLEDGE": "retrieving_knowledge",
+    "AGENT_RUNNING": "understanding",
+    "VERIFYING": "verifying",
+    "RESULT_VALIDATING": "verifying",
+    "GENERATING_INSIGHT": "composing_answer",
+    "CHART_READY": "composing_answer",
 }
 
 
-EVENT_MESSAGES = {
-    "accepted": "已接收请求",
-    "catalog_retrieving": "正在检索业务目录",
-    "schema_linked": "已识别候选表与字段",
-    "semantic_parsing": "正在解析指标、维度、时间与过滤条件",
-    "semantic_compiling": "正在编译语义查询",
-    "sql_validating": "正在执行只读 SQL 与权限校验",
-    "sql_running": "正在执行只读查询",
-    "result_validating": "正在校验结果值与业务口径",
-    "knowledge_retrieving": "正在检索授权知识依据",
-    "agent_running": "正在执行受控分析步骤",
-    "python_running": "正在受控沙箱中分析文件",
-    "answer_delta": "正在生成可验证回答",
-    "chart_ready": "图表已准备",
-    "completed": "请求已完成",
-    "error": "请求执行失败",
-    "cancelled": "请求已取消",
-    "heartbeat": "请求仍在处理中",
-}
+def phase_for_stage(stage: str) -> str | None:
+    """Map private runtime progress to one of the six public business phases."""
+    return STAGE_PHASES.get(stage.upper())
 
 
 def event_for_stage(stage: str) -> str | None:
-    return STAGE_EVENTS.get(stage.upper())
+    """Compatibility name retained for callers; values are now public phases."""
+    return phase_for_stage(stage)
 
 
 @dataclass
 class StreamEventFactory:
-    trace_id: str
-    started: float = field(default_factory=perf_counter)
+    run_id: str
+    conversation_id: str
+    message_id: str
     sequence: int = 0
+    _started: bool = field(default=False, init=False)
+    _terminal: str | None = field(default=None, init=False)
 
-    def create(
-        self,
-        event: str,
-        *,
-        capability: str = "chatbi",
-        message: str | None = None,
-        data: dict[str, Any] | None = None,
-    ) -> dict[str, Any]:
-        if event not in REQUIRED_EVENTS:
-            raise ValueError(f"Unsupported stream event: {event}")
+    def create(self, event_type: str, **payload: Any) -> dict[str, Any]:
+        if event_type not in REQUIRED_EVENTS:
+            raise ValueError(f"Unsupported stream event: {event_type}")
+        if self._terminal is not None:
+            raise RuntimeError(f"Cannot emit {event_type} after terminal event {self._terminal}")
+        if not self._started and event_type != "run.started":
+            raise RuntimeError("run.started must be the first stream event")
+        if self._started and event_type == "run.started":
+            raise RuntimeError("run.started may only be emitted once")
+        if event_type == "answer.delta" and not str(payload.get("delta") or ""):
+            raise ValueError("answer.delta requires a non-empty delta")
+        if event_type in {"phase.started", "phase.completed"}:
+            phase = str(payload.get("phase") or "")
+            if phase not in PHASE_LABELS:
+                raise ValueError(f"Unsupported public phase: {phase}")
+            payload.setdefault("label", PHASE_LABELS[phase])
+
         self.sequence += 1
-        return {
-            "trace_id": self.trace_id,
-            "sequence": self.sequence,
-            "timestamp": datetime.now(timezone.utc).isoformat(),
-            "elapsed_ms": round((perf_counter() - self.started) * 1000),
-            "event": event,
-            "capability": capability,
-            "message": message or EVENT_MESSAGES[event],
-            "data": data or {},
+        event = {
+            "seq": self.sequence,
+            "run_id": self.run_id,
+            "conversation_id": self.conversation_id,
+            "message_id": self.message_id,
+            "timestamp": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
+            "event_type": event_type,
+            **payload,
         }
+        if event_type == "run.started":
+            self._started = True
+        if event_type in TERMINAL_EVENTS:
+            self._terminal = event_type
+        return event
 
 
 def format_sse(event: str, payload: dict[str, Any]) -> str:
+    if payload.get("event_type") != event:
+        raise ValueError("SSE event name must equal payload.event_type")
     return f"event: {event}\ndata: {json.dumps(payload, ensure_ascii=False)}\n\n"

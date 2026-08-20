@@ -3,14 +3,18 @@ import { expect, test, type Page } from '@playwright/test';
 import { adminCredentials, apiBase } from './auth';
 
 async function startFreshConversation(page: Page) {
-  const [response] = await Promise.all([
-    page.waitForResponse((response) => response.url().endsWith('/api/v1/conversations') && response.request().method() === 'POST'),
-    page.getByRole('button', { name: '＋ 新会话' }).click(),
-  ]);
-  const conversation = await response.json() as { id: string };
-  await page.waitForFunction((id) => localStorage.getItem('chatbi_conversation_id') === id, conversation.id);
-  await expect(page.locator(`.conversation-list .active[data-conversation-id="${conversation.id}"]`)).toBeVisible();
+  let createRequests = 0;
+  const observeCreate = (request: { url(): string; method(): string }) => {
+    if (request.url().endsWith('/api/v1/conversations') && request.method() === 'POST') createRequests += 1;
+  };
+  page.on('request', observeCreate);
+  await page.getByRole('button', { name: '＋ 新会话' }).click();
+  await page.waitForTimeout(250);
+  expect(createRequests, '点击新会话只应进入本地空态').toBe(0);
+  expect(await page.evaluate(() => localStorage.getItem('chatbi_conversation_id'))).toBeNull();
+  await expect(page.locator('.conversation-item.local.active')).toContainText('发送消息后保存');
   await expect(page.getByRole('textbox', { name: '输入业务问题' })).toBeVisible();
+  page.off('request', observeCreate);
 }
 
 test('Phase2 unauthenticated browser, API and invalid session are blocked', async ({ browser }) => {
@@ -43,11 +47,13 @@ test('Phase2 composer remains at the bottom and keyboard behavior uses the real 
     const panel = page.locator('.chat-panel');
     const messages = page.locator('.chat-message-area');
     const composer = page.locator('.chat-composer');
+    const composerZone = page.locator('.chat-composer-zone');
     await expect(composer).toBeVisible();
     expect(await messages.evaluate((node) => getComputedStyle(node).overflowY)).toBe('auto');
-    const [panelBox, composerBox] = await Promise.all([panel.boundingBox(), composer.boundingBox()]);
-    expect(panelBox && composerBox).toBeTruthy();
-    expect(Math.abs((panelBox!.y + panelBox!.height) - (composerBox!.y + composerBox!.height))).toBeLessThanOrEqual(20);
+    const [panelBox, messagesBox, zoneBox] = await Promise.all([panel.boundingBox(), messages.boundingBox(), composerZone.boundingBox()]);
+    expect(panelBox && messagesBox && zoneBox).toBeTruthy();
+    expect(Math.abs((panelBox!.y + panelBox!.height) - (zoneBox!.y + zoneBox!.height))).toBeLessThanOrEqual(2);
+    expect((messagesBox!.y + messagesBox!.height) - zoneBox!.y).toBeLessThanOrEqual(2);
   }
 
   const input = page.getByRole('textbox', { name: '输入业务问题' });
@@ -57,7 +63,11 @@ test('Phase2 composer remains at the bottom and keyboard behavior uses the real 
   await expect(input).toHaveValue('第一行\n第二行');
   await input.fill('统计全部订单收入');
   await expect(page.getByRole('button', { name: '提交问题' })).toBeEnabled();
-  await input.press('Enter');
+  const [created] = await Promise.all([
+    page.waitForResponse((response) => response.url().endsWith('/api/v1/conversations') && response.request().method() === 'POST'),
+    input.press('Enter'),
+  ]);
+  expect(created.status()).toBe(201);
   await expect(page.locator('.chat-user-bubble').last()).toContainText('统计全部订单收入');
   await expect(page.getByTestId('query-success')).toBeVisible({ timeout: 30_000 });
   await expect(page.locator('.chat-composer')).toBeVisible();
@@ -80,7 +90,11 @@ test('Phase2 CSV and image uploads complete real file and multimodal follow-ups'
   await startFreshConversation(page);
   const fileInput = page.locator('input[type="file"]');
   const csv = path.resolve('..', 'evaluation', 'fixtures', 'phase2-regional-revenue.csv');
-  await fileInput.setInputFiles(csv);
+  const [created] = await Promise.all([
+    page.waitForResponse((response) => response.url().endsWith('/api/v1/conversations') && response.request().method() === 'POST'),
+    fileInput.setInputFiles(csv),
+  ]);
+  expect(created.status()).toBe(201);
   await expect(page.getByRole('button', { name: '删除附件 phase2-regional-revenue.csv' })).toBeVisible();
   const input = page.getByRole('textbox', { name: '输入业务问题' });
   await input.fill('请计算华东收入合计，只给出数字。');
@@ -92,7 +106,8 @@ test('Phase2 CSV and image uploads complete real file and multimodal follow-ups'
   await expect(page.getByRole('link', { name: '下载 JSON Artifact' })).toBeVisible();
   await expect(page.getByRole('button', { name: '提交问题' })).toBeEnabled();
   await page.getByRole('button', { name: '删除附件 phase2-regional-revenue.csv' }).click();
-  await expect(page.getByText('phase2-regional-revenue.csv')).toHaveCount(0);
+  await expect(page.getByRole('button', { name: '删除附件 phase2-regional-revenue.csv' })).toHaveCount(0);
+  await expect(page.locator('.attachment-strip')).toHaveCount(0);
 
   const image = path.resolve('..', 'docs', 'ui', '03_问数据_分析结果.png');
   await fileInput.setInputFiles(image);

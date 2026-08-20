@@ -1,0 +1,4 @@
+NAME                      IMAGE                COMMAND                  SERVICE       CREATED          STATUS                    PORTS
+chatbi-v2-backend-1       chatbi-v2-backend    "sh -c 'alembic upgr…"   backend       59 seconds ago   Up 46 seconds (healthy)   0.0.0.0:8000->8000/tcp, [::]:8000->8000/tcp
+chatbi-v2-frontend-1      chatbi-v2-frontend   "/docker-entrypoint.…"   frontend      50 seconds ago   Up 28 seconds (healthy)   0.0.0.0:5173->80/tcp, [::]:5173->80/tcp
+chatbi-v2-rag-runtime-1   chatbi-v2-backend    "uvicorn app.rag_run…"   rag-runtime   55 seconds ago   Up 35 seconds (healthy)   0.0.0.0:8001->8001/tcp, [::]:8001->8001/tcp

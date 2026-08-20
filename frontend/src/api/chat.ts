@@ -1,17 +1,56 @@
 import { API_BASE, ApiError, api } from './client';
-import type { Attachment, ChatInput, ChatResponse, Conversation, ConversationDetail } from '../types/api';
+import { streamChat } from '../chat/stream';
+import type {
+  Attachment,
+  ChatInput,
+  ChatResponse,
+  ChatStreamEvent,
+  ChatStreamHandlers,
+  Conversation,
+  ConversationDetail,
+} from '../types/api';
 
-function parseError(response: Response) {
-  return response.json().catch(() => ({})).then((body) => {
-    if (response.status === 401) window.dispatchEvent(new Event('chatbi:unauthorized'));
-    throw new ApiError(response.status, body.detail ?? `请求失败 (${response.status})`);
-  });
+type LegacyProgressHandler = (stage: string) => void;
+
+function legacyStage(event: ChatStreamEvent): string | undefined {
+  if (event.event_type === 'run.started') return 'UNDERSTANDING';
+  if (event.event_type === 'run.completed') return 'COMPLETED';
+  if (event.event_type !== 'phase.started' && event.event_type !== 'phase.completed') return undefined;
+  if (event.phase === 'retrieving_knowledge') return 'RETRIEVING_KNOWLEDGE';
+  if (event.phase === 'verifying') return 'VERIFYING';
+  if (event.phase === 'composing_answer') return 'GENERATING_INSIGHT';
+  if (event.phase === 'semantic_mapping' || event.phase === 'querying_data') return 'QUERYING_DATA';
+  return 'UNDERSTANDING';
+}
+
+function normalizeHandlers(handlers: ChatStreamHandlers | LegacyProgressHandler): ChatStreamHandlers {
+  if (typeof handlers !== 'function') return handlers;
+  return {
+    onEvent: (event) => {
+      const stage = legacyStage(event);
+      if (stage) handlers(stage);
+    },
+  };
+}
+
+function parseUploadBody(responseText: string): Record<string, unknown> {
+  try {
+    const value = JSON.parse(responseText || '{}') as unknown;
+    return typeof value === 'object' && value !== null && !Array.isArray(value)
+      ? value as Record<string, unknown>
+      : {};
+  } catch {
+    return {};
+  }
 }
 
 export const chatApi = {
   conversations: () => api<Conversation[]>('/conversations'),
   createConversation: (title = '新会话') => api<Conversation>('/conversations', { method: 'POST', body: JSON.stringify({ title }) }),
   conversation: (id: string) => api<ConversationDetail>(`/conversations/${id}`),
+  renameConversation: (id: string, title: string) => api<Conversation>(`/conversations/${id}`, {
+    method: 'PATCH', body: JSON.stringify({ title }),
+  }),
   deleteConversation: (id: string) => api<void>(`/conversations/${id}`, { method: 'DELETE' }),
   attachments: (conversationId: string) => api<Attachment[]>(`/attachments?conversation_id=${encodeURIComponent(conversationId)}`),
   deleteAttachment: (id: string) => api<void>(`/attachments/${id}`, { method: 'DELETE' }),
@@ -21,37 +60,25 @@ export const chatApi = {
     request.open('POST', `${API_BASE}/attachments`); request.withCredentials = true;
     request.upload.onprogress = (event) => { if (event.lengthComputable) onProgress(Math.round(event.loaded / event.total * 100)); };
     request.onload = () => {
-      const body = JSON.parse(request.responseText || '{}');
-      if (request.status >= 200 && request.status < 300) resolve(body as Attachment);
-      else reject(new ApiError(request.status, body.detail ?? `上传失败 (${request.status})`));
+      const body = parseUploadBody(request.responseText);
+      if (request.status >= 200 && request.status < 300) resolve(body as unknown as Attachment);
+      else {
+        if (request.status === 401 && typeof window !== 'undefined') window.dispatchEvent(new Event('chatbi:unauthorized'));
+        const message = typeof body.detail === 'string'
+          ? body.detail
+          : typeof body.message === 'string'
+            ? body.message
+            : `上传失败 (${request.status})`;
+        reject(new ApiError(request.status, message));
+      }
     };
     request.onerror = () => reject(new Error('上传网络错误'));
+    request.onabort = () => reject(new DOMException('上传已取消', 'AbortError'));
     request.send(form);
   }),
-  stream: async (input: ChatInput, onProgress: (stage: string) => void, signal: AbortSignal): Promise<ChatResponse> => {
-    const response = await fetch(`${API_BASE}/chat/stream`, {
-      method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(input), signal,
-    });
-    if (!response.ok) return parseError(response);
-    if (!response.body) throw new Error('浏览器不支持流式响应');
-    const reader = response.body.getReader(); const decoder = new TextDecoder(); let buffer = ''; let result: ChatResponse | undefined;
-    while (true) {
-      const { done, value } = await reader.read();
-      buffer += decoder.decode(value ?? new Uint8Array(), { stream: !done });
-      const blocks = buffer.split('\n\n'); buffer = blocks.pop() ?? '';
-      for (const block of blocks) {
-        const event = block.split('\n').find((line) => line.startsWith('event:'))?.slice(6).trim();
-        const raw = block.split('\n').find((line) => line.startsWith('data:'))?.slice(5).trim();
-        if (!event || !raw) continue;
-        const payload = JSON.parse(raw);
-        if (event === 'progress') onProgress(payload.stage);
-        else if (['accepted', 'catalog_retrieving', 'schema_linked', 'semantic_parsing', 'semantic_compiling', 'sql_validating', 'sql_running', 'result_validating', 'knowledge_retrieving', 'agent_running', 'python_running', 'answer_delta', 'chart_ready', 'heartbeat'].includes(event)) onProgress(payload.event ?? event);
-        if (event === 'error') throw new Error(payload.code ?? 'CHAT_STREAM_FAILED');
-        if (event === 'result') result = payload as ChatResponse;
-      }
-      if (done) break;
-    }
-    if (!result) throw new Error('流式回答未返回最终结果');
-    return result;
-  },
+  stream: (
+    input: ChatInput,
+    handlers: ChatStreamHandlers | LegacyProgressHandler,
+    signal: AbortSignal,
+  ): Promise<ChatResponse> => streamChat(input, normalizeHandlers(handlers), signal),
 };

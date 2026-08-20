@@ -35,10 +35,15 @@ test('Day2-2 简单聚合返回真实数据库结果与 Oracle 证据', async ({
   const errors = captureRuntimeErrors(page);
   await page.goto(`/ask/results?q=${encodeURIComponent('统计全部订单收入')}`);
   await expect(page.getByTestId('query-success')).toBeVisible({ timeout: 30_000 });
-  await expect(page.getByText('真实查询')).toBeVisible();
-  await expect(page.getByText('结果通过校验')).toBeVisible();
+  await expect(page.locator('.assistant-response-head')).toContainText('查询执行已校验');
+  await expect(page.locator('.answer-conclusion')).toContainText('核心结论');
+  await expect(page.getByRole('dialog', { name: 'SQL 与执行明细' })).toHaveCount(0);
   await page.getByRole('button', { name: '查看 SQL 与执行明细' }).click();
-  await expect(page.getByRole('dialog', { name: 'SQL 与执行明细' })).toContainText('SUM');
+  const dialog = page.getByRole('dialog', { name: 'SQL 与执行明细' });
+  await expect(dialog).toContainText('SUM');
+  await expect(dialog).toContainText('只读查询安全校验通过');
+  await expect(dialog).toContainText('指标、维度、过滤与结果值已校验');
+  await expect(dialog).toContainText('语义口径版本已绑定');
   expect(errors).toEqual([]);
 });
 
@@ -46,11 +51,15 @@ test('Day2-3 Join 查询展示地区维度与收入', async ({ page }) => {
   const errors = captureRuntimeErrors(page);
   await page.goto(`/ask/results?q=${encodeURIComponent('按地区统计订单收入')}`);
   await expect(page.getByTestId('query-success')).toBeVisible({ timeout: 30_000 });
-  await expect(page.locator('.evidence-card')).toContainText('revenue');
-  await expect(page.locator('.evidence-card')).toContainText('region');
-  await expect(page.getByRole('img', { name: '真实查询结果图表' })).toBeVisible();
+  const chart = page.locator('.chart-card .data-echart');
+  await expect(chart).toBeVisible();
+  expect((await chart.boundingBox())?.height ?? 0).toBeGreaterThanOrEqual(240);
+  await expect(chart.locator('canvas, svg')).toBeVisible();
   await page.getByRole('button', { name: '查看 SQL 与执行明细' }).click();
-  await expect(page.getByRole('dialog', { name: 'SQL 与执行明细' })).toContainText('JOIN');
+  const dialog = page.getByRole('dialog', { name: 'SQL 与执行明细' });
+  await expect(dialog).toContainText('revenue');
+  await expect(dialog).toContainText('region');
+  await expect(dialog).toContainText('JOIN');
   expect(errors).toEqual([]);
 });
 
@@ -61,10 +70,14 @@ test('Day2-4 危险 SQL 被 AST Guard 拒绝且不访问数据库', async ({ pag
   expect(apiResult.status).toBe('SECURITY_REJECTED');
   expect(apiResult.execution).toEqual({});
   await page.goto(`/ask/results?q=${encodeURIComponent(question)}`);
-  await expect(page.getByTestId('governed-answer')).toBeVisible({ timeout: 30_000 });
-  await expect(page.getByTestId('governed-answer')).toContainText('REFUSED');
-  await expect(page.getByTestId('governed-answer')).toContainText('UNSUPPORTED');
+  const refused = page.getByTestId('result-state-FAILED');
+  await expect(refused).toBeVisible({ timeout: 30_000 });
+  await expect(refused).toContainText('回答未完成');
+  await expect(refused).toContainText('不在只读 ChatBI 分析范围内');
+  await expect(refused.getByRole('button', { name: '重新查询' })).toBeVisible();
   await expect(page.getByTestId('query-success')).toHaveCount(0);
+  await expect(page.locator('.chart-card, .table-card')).toHaveCount(0);
+  await expect(page.getByRole('button', { name: '保存为已验证答案' })).toHaveCount(0);
   expect(errors).toEqual([]);
 });
 

@@ -112,7 +112,7 @@ test('Day5-12 knowledge and hybrid routes publish only verified evidence', async
   }
 });
 
-test('Day5-13 SSE exposes finite stages and no reasoning payload', async ({ request }, testInfo) => {
+test('Day5-13 SSE exposes canonical paired phases and no legacy or reasoning payload', async ({ request }, testInfo) => {
   const ids = await runtimeIds(request);
   const response = await request.post(`${apiBase}/analysis/stream`, {
     data: {
@@ -125,8 +125,25 @@ test('Day5-13 SSE exposes finite stages and no reasoning payload', async ({ requ
   });
   expect(response.ok(), await response.text()).toBeTruthy();
   const text = await response.text();
-  const stages = [...text.matchAll(/"stage":\s*"([A-Z_]+)"/g)].map((item) => item[1]);
-  expect(stages).toEqual(expect.arrayContaining(['UNDERSTANDING', 'QUERYING_DATA', 'RETRIEVING_KNOWLEDGE', 'VERIFYING', 'GENERATING_INSIGHT', 'COMPLETED']));
+  const frames = text.split(/\r?\n\r?\n/).filter((block) => block.trim()).map((block) => {
+    const event = block.match(/^event:\s*(.+)$/m)?.[1]?.trim();
+    const data = block.match(/^data:\s*(.+)$/m)?.[1]?.trim();
+    expect(event, block).toBeTruthy();
+    expect(data, block).toBeTruthy();
+    const payload = JSON.parse(data!);
+    expect(payload.event_type).toBe(event);
+    return payload as Record<string, unknown>;
+  });
+  const eventTypes = frames.map((item) => item.event_type);
+  expect(eventTypes[0]).toBe('run.started');
+  expect(eventTypes.at(-1)).toBe('run.completed');
+  expect(eventTypes.filter((item) => ['run.completed', 'run.failed', 'run.cancelled'].includes(String(item)))).toHaveLength(1);
+  const startedPhases = frames.filter((item) => item.event_type === 'phase.started').map((item) => item.phase);
+  const completedPhases = frames.filter((item) => item.event_type === 'phase.completed').map((item) => item.phase);
+  expect(startedPhases).toEqual(completedPhases);
+  expect(startedPhases).toEqual(expect.arrayContaining(['understanding', 'querying_data', 'retrieving_knowledge', 'verifying', 'composing_answer']));
+  expect(frames.every((item) => !('stage' in item) && !('progress' in item) && !('result' in item))).toBe(true);
+  expect(frames.map((item) => Number(item.seq))).toEqual(frames.map((_, index) => index + 1));
   expect(text.toLowerCase()).not.toContain('chain_of_thought');
   expect(text.toLowerCase()).not.toContain('reasoning');
 });

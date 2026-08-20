@@ -2,6 +2,9 @@
 
 ## 2026-08-19
 
+- ChatGPT 风格“问数据”一日优化已完成候选收口：保留紫色品牌与六个一级模块，新增懒创建会话、会话搜索/分组/重命名/删除、单列消息区、默认关闭的查询依据抽屉、无覆盖 Composer、真实 canonical SSE、结构化 Message Parts，以及 VALUE/ZERO/NO_ROWS/NULL_VALUE/FAILED 五态；未增加语音、麦克风、通用 Agent 或前端直连数据库。
+- 本轮最终门禁为 Backend 223/223、Frontend 13 files / 50 tests、TypeScript、Vite 741 modules、Playwright 定向 50/50 与单 worker 串行 80/80 全部 PASS；三视口 console/page/request/blocking error、横向溢出和 Composer 覆盖均为 0。NL2SQL/RAG/Multi-Agent/File/Workspace 兼容回归 105 项、Chat UI 专项 11/11 与 Feedback 双 Workspace 5/5 通过。
+- Docker Compose 从停止状态启动两次均通过：完整重建 98.911 秒、复用已构建镜像 26.506 秒，Backend、RAG Runtime、Frontend 均 healthy；仍只使用本机 PostgreSQL/MySQL，Compose 数据库服务与数据库卷为 0。最终截图与原始日志位于 `artifacts/chat-ui-optimization-20260819/`。
 - v2.1 Day 3 Final Product 的提交前门禁已收口：18 项产品能力均为 PRODUCT_PASS；Open Question 100/100、Memory 30×5（150 turns）、Golden 50/50、Knowledge 20/20、Agent 15/15、File 10/10 均通过，硬编码/幻觉/跨会话与跨对话泄漏均为 0。
 - 全量回归为 Backend 209/209、Frontend 12 files / 33 tests、TypeScript、Vite 738 modules、Playwright 69/69；Alembic 唯一 head `20260818_0010` 的 upgrade→base→upgrade 与隔离 Schema 清理通过。两次发布冷启动分别 60.8 秒、55.6 秒，连续停止后启动 2/2 通过，三项服务均 healthy。
 - 最终候选前的 Open 100 冷缓存复验发现“去年每月订单量的最大值”曾错误回退为全时段净销售额并触发查询超时；语义运行时现将“去年”解析为确定自然年、在 10M 模型中将泛化订单量绑定 `valid_orders`，并把最大值下推为指标降序与 `LIMIT 1`。专项用例、Backend 209/209、Open 100/100 与 Playwright 69/69 复验通过；该修复后的提交才可作为最终候选。

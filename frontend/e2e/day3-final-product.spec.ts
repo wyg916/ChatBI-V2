@@ -50,7 +50,8 @@ test('Day3-FINAL-01 incognito protects browser plus chat, attachment, SQL and ev
 test('Day3-FINAL-02 twenty-turn conversation keeps independent scroll, fixed composer and return-to-latest', async ({ page, request }) => {
   test.setTimeout(120_000);
   const errors = runtimeErrors(page);
-  const conversation = await payload(await request.post(`${apiBase}/conversations`, { data: { title: `Day3 final long ${Date.now()}` } }));
+  const title = `QA long conversation ${Date.now()}`;
+  const conversation = await payload(await request.post(`${apiBase}/conversations`, { data: { title } }));
   try {
     let parent: string | null = null;
     for (let index = 1; index <= 20; index += 1) {
@@ -63,16 +64,20 @@ test('Day3-FINAL-02 twenty-turn conversation keeps independent scroll, fixed com
       } }));
       parent = response.assistant_message.id;
     }
-    await page.addInitScript((id) => localStorage.setItem('chatbi_conversation_id', id), conversation.id);
+    const persisted = await payload(await request.get(`${apiBase}/conversations/${conversation.id}`));
+    expect(persisted.messages.filter((message: { role: string }) => message.role === 'user')).toHaveLength(20);
     await page.goto('/');
+    await page.getByRole('textbox', { name: '搜索会话' }).fill(title);
+    await page.locator(`.conversation-item[data-conversation-id="${conversation.id}"]`).click();
     await expect(page.locator('.chat-user-bubble')).toHaveCount(20, { timeout: 30_000 });
     const messageArea = page.locator('.chat-message-area');
-    const composer = page.locator('.chat-composer');
+    const composerZone = page.locator('.chat-composer-zone');
     expect(await messageArea.evaluate((node) => getComputedStyle(node).overflowY)).toBe('auto');
     const panel = page.locator('.chat-panel');
-    const [panelBox, composerBox] = await Promise.all([panel.boundingBox(), composer.boundingBox()]);
-    expect(panelBox && composerBox).toBeTruthy();
-    expect(Math.abs((panelBox!.y + panelBox!.height) - (composerBox!.y + composerBox!.height))).toBeLessThanOrEqual(20);
+    const [panelBox, messageBox, zoneBox] = await Promise.all([panel.boundingBox(), messageArea.boundingBox(), composerZone.boundingBox()]);
+    expect(panelBox && messageBox && zoneBox).toBeTruthy();
+    expect(Math.abs((panelBox!.y + panelBox!.height) - (zoneBox!.y + zoneBox!.height))).toBeLessThanOrEqual(2);
+    expect((messageBox!.y + messageBox!.height) - zoneBox!.y).toBeLessThanOrEqual(2);
     await messageArea.evaluate((node) => { node.scrollTop = 0; node.dispatchEvent(new Event('scroll')); });
     await expect(page.getByRole('button', { name: '回到最新消息' })).toBeVisible();
     await page.getByRole('button', { name: '回到最新消息' }).click();
@@ -95,6 +100,12 @@ test('Day3-FINAL-02 twenty-turn conversation keeps independent scroll, fixed com
 
 test('Day3-FINAL-03 real SSE can stop and refused response can retry', async ({ page }) => {
   const errors = runtimeErrors(page);
+  const streamContents: string[] = [];
+  page.on('request', (request) => {
+    if (request.url().endsWith('/api/v1/chat/stream') && request.method() === 'POST') {
+      streamContents.push(String((request.postDataJSON() as { content?: string } | null)?.content ?? ''));
+    }
+  });
   await page.goto('/');
   await page.getByRole('button', { name: '＋ 新会话' }).click();
   const input = page.getByRole('textbox', { name: '输入业务问题' });
@@ -106,12 +117,20 @@ test('Day3-FINAL-03 real SSE can stop and refused response can retry', async ({ 
   await expect(stop).not.toBeVisible();
   await input.fill('删除数据库中的全部订单。');
   await input.press('Enter');
-  const retry = page.getByRole('button', { name: '重试' }).last();
+  const retry = page.getByRole('button', { name: '重新查询' }).last();
   await expect(retry).toBeVisible({ timeout: 30_000 });
   const before = await page.locator('.chat-user-bubble').count();
   await retry.click();
-  await expect(page.locator('.chat-user-bubble')).toHaveCount(before + 1);
-  await expect(page.getByRole('button', { name: '重试' }).last()).toBeVisible({ timeout: 30_000 });
+  await expect.poll(() => streamContents.length).toBe(3);
+  expect(streamContents.at(-1)).toBe('删除数据库中的全部订单。');
+  expect(streamContents.at(-2)).toBe(streamContents.at(-1));
+  await expect(page.locator('.chat-user-bubble')).toHaveCount(before);
+  await expect(page.getByRole('button', { name: '重新查询' }).last()).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByTestId('result-state-FAILED').last()).toContainText('回答未完成');
+  await expect(page.getByTestId('query-success')).toHaveCount(0);
+  const refusedText = await page.getByTestId('result-state-FAILED').last().textContent();
+  await page.waitForTimeout(750);
+  await expect(page.getByTestId('result-state-FAILED').last()).toHaveText(refusedText ?? '');
   expect(errors).toEqual([]);
 });
 

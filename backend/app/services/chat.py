@@ -21,6 +21,7 @@ from app.integration.question_router import QuestionRouter
 from app.integration.service import AnalysisService
 from app.models import Attachment, ChatMessage, Conversation
 from app.schemas.chat import ChatRequest, ChatResponse, ConversationRead, MessageRead
+from app.services.answer_composer import AnswerComposer
 from app.services.attachments import attachment_path, get_attachment
 from app.services.conversations import (
     extract_slots,
@@ -30,7 +31,8 @@ from app.services.conversations import (
     refresh_conversation_summary,
 )
 from app.services.file_analysis import analyze_structured
-from app.streaming.lifecycle import stream_registry
+from app.streaming import phase_for_stage
+from app.streaming.lifecycle import StreamCancelled, stream_registry
 
 
 def _message(item: ChatMessage) -> MessageRead:
@@ -82,6 +84,7 @@ class ChatService:
     def __init__(self, gateway: ModelGateway | None = None):
         self.gateway = gateway or ModelGateway()
         self.router = QuestionRouter(self.gateway)
+        self.composer = AnswerComposer()
 
     def execute(
         self,
@@ -90,8 +93,23 @@ class ChatService:
         principal: Principal,
         progress: Callable[[str, dict], None] | None = None,
         cancellation_event: Event | None = None,
+        answer_delta: Callable[[str], None] | None = None,
     ) -> ChatResponse:
         started = perf_counter()
+        public_phases: list[str] = []
+
+        def checkpoint() -> None:
+            if cancellation_event is not None and cancellation_event.is_set():
+                raise StreamCancelled("chat run cancelled")
+
+        def report(stage: str, detail: dict | None = None) -> None:
+            checkpoint()
+            phase = phase_for_stage(stage)
+            if phase and phase not in public_phases:
+                public_phases.append(phase)
+            if progress:
+                progress(stage, detail or {})
+
         conversation = get_conversation(db, request.conversation_id, principal)
         duplicate = db.scalar(select(ChatMessage).where(
             ChatMessage.conversation_id == conversation.id,
@@ -127,13 +145,12 @@ class ChatService:
             history_summary=conversation.summary,
             attachment_kinds={item.kind for item in attachments},
         )
-        if progress:
-            progress("UNDERSTANDING", {"route": route.value})
-            if route in {QuestionRoute.DATA_QUERY, QuestionRoute.HYBRID_ANALYSIS, QuestionRoute.COMPLEX_ANALYSIS}:
-                progress("SCHEMA_LINKED", {"route": route.value})
-                progress("SEMANTIC_PARSING", {"route": route.value})
-                progress("SEMANTIC_COMPILING", {"route": route.value})
-                progress("SQL_VALIDATING", {"route": route.value})
+        report("UNDERSTANDING", {"route": route.value})
+        if route in {QuestionRoute.DATA_QUERY, QuestionRoute.HYBRID_ANALYSIS, QuestionRoute.COMPLEX_ANALYSIS}:
+            report("SCHEMA_LINKED", {"route": route.value})
+            report("SEMANTIC_PARSING", {"route": route.value})
+            report("SEMANTIC_COMPILING", {"route": route.value})
+            report("SQL_VALIDATING", {"route": route.value})
 
         user_message = ChatMessage(
             conversation_id=conversation.id,
@@ -162,6 +179,7 @@ class ChatService:
         tool_calls: list[dict] = []
         sql_execution: dict = {}
         fallback_reason = None
+        answer_streamed = False
         try:
             if route in {
                 QuestionRoute.DATA_QUERY,
@@ -169,8 +187,7 @@ class ChatService:
                 QuestionRoute.HYBRID_ANALYSIS,
                 QuestionRoute.COMPLEX_ANALYSIS,
             }:
-                if progress:
-                    progress("QUERYING_DATA" if route == QuestionRoute.DATA_QUERY else "RETRIEVING_KNOWLEDGE", {})
+                report("QUERYING_DATA" if route == QuestionRoute.DATA_QUERY else "RETRIEVING_KNOWLEDGE", {})
                 workload = "agent" if route == QuestionRoute.COMPLEX_ANALYSIS else None
                 with stream_registry.workload(workload):
                     result = AnalysisService().execute(
@@ -183,7 +200,7 @@ class ChatService:
                             idempotency_key=request.client_message_id,
                         ),
                         principal,
-                        progress_callback=(lambda stage, detail: progress(stage.value, detail)) if progress else None,
+                        progress_callback=(lambda stage, detail: report(stage.value, detail)),
                         cancellation_event=cancellation_event,
                     )
                 response_payload = {"analysis": result.model_dump(mode="json")}
@@ -199,29 +216,34 @@ class ChatService:
                 retrieved_sources = knowledge.get("citations", []) if isinstance(knowledge, dict) else []
                 tool_calls = primary.get("steps", []) if isinstance(primary, dict) else []
                 fallback_reason = "CONTROLLED_RUNTIME_FALLBACK" if result.fallback_used else None
-                if progress:
-                    progress("RESULT_VALIDATING", {"route": route.value, "status": status})
+                report("RESULT_VALIDATING", {"route": route.value, "status": status})
                 if status not in {"SUCCEEDED", "PARTIAL"}:
                     error_code = str(primary.get("error_code") or status)
             elif route == QuestionRoute.GENERAL_CHAT:
-                reply = self.gateway.complete(
+                report("GENERATING_INSIGHT", {"route": route.value})
+                answer, model_provider, model_name, answer_streamed = self._model_answer(
                     system=(
                         "You are ChatBI Studio. Answer ordinary product or conversational questions concisely. "
                         "Never invent company data or internal policy. Direct business-data requests back to verified ChatBI analysis."
                     ),
                     user=content,
                     history=_history(prior_messages),
+                    answer_delta=answer_delta,
+                    cancellation_event=cancellation_event,
                 )
-                answer, model_provider, model_name = reply.content, reply.provider, reply.model
                 response_payload = {"answer": answer}
-                if progress:
-                    progress("GENERATING_INSIGHT", {"route": route.value})
             elif route == QuestionRoute.FILE_QUERY:
                 with stream_registry.workload("sandbox"):
-                    answer, model_provider, model_name, retrieved_sources, file_analysis = self._file_answer(content, attachments, prior_messages)
+                    answer, model_provider, model_name, retrieved_sources, file_analysis, answer_streamed = self._file_answer(
+                        content, attachments, prior_messages, answer_delta=answer_delta,
+                        cancellation_event=cancellation_event,
+                    )
                 response_payload = {"answer": answer, "citations": retrieved_sources, "file_analysis": file_analysis}
             elif route == QuestionRoute.MULTIMODAL_QUERY:
-                answer, model_provider, model_name = self._vision_answer(content, attachments, prior_messages)
+                answer, model_provider, model_name, answer_streamed = self._vision_answer(
+                    content, attachments, prior_messages, answer_delta=answer_delta,
+                    cancellation_event=cancellation_event,
+                )
                 response_payload = {"answer": answer}
             elif route == QuestionRoute.CLARIFICATION:
                 answer = "请补充要分析的指标、时间范围、区域或数据源。例如：今年华东区销售额是多少？"
@@ -236,6 +258,26 @@ class ChatService:
         except ModelUnavailable:
             status, error_code, answer = "FAILED", "MODEL_UNAVAILABLE", "当前没有可用的外部模型，无法生成真实模型回答。"
             response_payload = {"answer": answer}
+
+        report("GENERATING_INSIGHT", {"route": route.value})
+        composed = self.composer.compose(
+            answer=answer,
+            status=status,
+            response_payload=response_payload,
+            error_code=error_code,
+            phases=public_phases,
+        )
+        if status in {"SUCCEEDED", "PARTIAL"} and answer_delta and not answer_streamed:
+            for delta in composed.deltas():
+                checkpoint()
+                answer_delta(delta)
+        checkpoint()
+        answer = composed.content
+        response_payload = {
+            **response_payload,
+            "message_parts": composed.message_parts,
+            "result_semantic": composed.result_semantic.value,
+        }
 
         elapsed_ms = round((perf_counter() - started) * 1000)
         trace = {
@@ -297,15 +339,65 @@ class ChatService:
         db.refresh(conversation)
         if progress:
             progress("COMPLETED", {"status": status, "elapsed_ms": elapsed_ms})
-        return ChatResponse(conversation=_conversation(conversation), user_message=_message(user_message), assistant_message=_message(assistant))
+        return ChatResponse(
+            conversation=_conversation(conversation),
+            user_message=_message(user_message),
+            assistant_message=_message(assistant),
+            message_parts=composed.message_parts,
+            result_semantic=composed.result_semantic,
+        )
 
-    def _file_answer(self, question: str, attachments: list[Attachment], messages: list[ChatMessage]):
+    def _model_answer(
+        self,
+        *,
+        system: str,
+        user: str,
+        history: list[dict[str, str]] | None = None,
+        image_data_urls: list[str] | None = None,
+        vision: bool = False,
+        answer_delta: Callable[[str], None] | None = None,
+        cancellation_event: Event | None = None,
+    ) -> tuple[str, str, str, bool]:
+        stream = getattr(self.gateway, "stream", None)
+        if answer_delta is not None and callable(stream):
+            chunks: list[str] = []
+            provider = model = ""
+            for reply in stream(
+                system=system,
+                user=user,
+                history=history,
+                image_data_urls=image_data_urls,
+                vision=vision,
+            ):
+                if cancellation_event is not None and cancellation_event.is_set():
+                    raise StreamCancelled("chat run cancelled")
+                if reply.content:
+                    chunks.append(reply.content)
+                    provider, model = reply.provider, reply.model
+                    answer_delta(reply.content)
+            if not chunks:
+                raise VisionModelUnavailable("Vision model returned no content") if vision else ModelUnavailable("Model returned no content")
+            return "".join(chunks), provider, model, True
+        reply = self.gateway.complete(
+            system=system,
+            user=user,
+            history=history,
+            image_data_urls=image_data_urls,
+            vision=vision,
+        )
+        return reply.content, reply.provider, reply.model, False
+
+    def _file_answer(
+        self, question: str, attachments: list[Attachment], messages: list[ChatMessage], *,
+        answer_delta: Callable[[str], None] | None = None,
+        cancellation_event: Event | None = None,
+    ):
         if not attachments:
             raise HTTPException(status_code=422, detail="FILE_QUERY_REQUIRES_ATTACHMENT")
         sources = [{"attachment_id": item.id, "filename": item.filename, "kind": item.kind} for item in attachments]
         if attachments and all(item.kind == "STRUCTURED" for item in attachments):
             analysis = analyze_structured(question, attachments)
-            return analysis["answer"], "chatbi-safe-dataframe", "fixed-operation-v1", sources, analysis
+            return analysis["answer"], "chatbi-safe-dataframe", "fixed-operation-v1", sources, analysis, False
         context = []
         for item in attachments:
             payload = item.extracted_payload or {}
@@ -313,17 +405,23 @@ class ChatService:
                 context.append({"attachment_id": item.id, "filename": item.filename, **payload})
             elif item.kind == "DOCUMENT":
                 context.append({"attachment_id": item.id, "filename": item.filename, "text": str(payload.get("text", ""))[:60_000]})
-        reply = self.gateway.complete(
+        answer, provider, model, streamed = self._model_answer(
             system=(
                 "Answer only from the supplied temporary attachment evidence. For tabular files, calculate only from provided profile/preview and state limits. "
                 "For documents, cite claims as [attachment:<id>]. If evidence is absent, say so; never use general knowledge as company evidence."
             ),
             user=json.dumps({"question": question, "attachments": context}, ensure_ascii=False),
             history=_history(messages),
+            answer_delta=answer_delta,
+            cancellation_event=cancellation_event,
         )
-        return reply.content, reply.provider, reply.model, sources, None
+        return answer, provider, model, sources, None, streamed
 
-    def _vision_answer(self, question: str, attachments: list[Attachment], messages: list[ChatMessage]):
+    def _vision_answer(
+        self, question: str, attachments: list[Attachment], messages: list[ChatMessage], *,
+        answer_delta: Callable[[str], None] | None = None,
+        cancellation_event: Event | None = None,
+    ):
         images = [item for item in attachments if item.kind == "IMAGE"]
         if not images:
             raise HTTPException(status_code=422, detail="MULTIMODAL_QUERY_REQUIRES_IMAGE")
@@ -331,7 +429,7 @@ class ChatService:
             f"data:{item.mime_type};base64,{base64.b64encode(attachment_path(item).read_bytes()).decode('ascii')}"
             for item in images
         ]
-        reply = self.gateway.complete(
+        answer, provider, model, streamed = self._model_answer(
             system=(
                 "Analyze the supplied images for the user's ChatBI question. Describe only visible evidence. "
                 "Do not infer confidential business facts that are not visible."
@@ -340,5 +438,7 @@ class ChatService:
             history=_history(messages),
             image_data_urls=data_urls,
             vision=True,
+            answer_delta=answer_delta,
+            cancellation_event=cancellation_event,
         )
-        return reply.content, reply.provider, reply.model
+        return answer, provider, model, streamed
