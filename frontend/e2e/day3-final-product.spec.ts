@@ -104,7 +104,7 @@ test('Day3-FINAL-02 twenty-turn conversation keeps independent scroll, fixed com
   }
 });
 
-test('Day3-FINAL-03 real SSE can stop and refused response can retry', async ({ page }) => {
+test('Day3-FINAL-03 real SSE can stop and refused response can retry', async ({ page }, testInfo) => {
   const errors = runtimeErrors(page);
   const streamContents: string[] = [];
   page.on('request', (request) => {
@@ -115,7 +115,8 @@ test('Day3-FINAL-03 real SSE can stop and refused response can retry', async ({ 
   await page.goto('/');
   await page.getByRole('button', { name: '＋ 新会话' }).click();
   const input = page.getByRole('textbox', { name: '输入业务问题' });
-  await input.fill('请对2025年各区域销售额进行深度分析并给出可验证建议。');
+  const stopQuestion = `综合分析各地区收入并解释区域经营维度，给出完整可验证结论。运行标识：${testInfo.workerIndex}-${testInfo.repeatEachIndex}-${Date.now()}`;
+  await input.fill(stopQuestion);
   await input.press('Enter');
   const stop = page.getByRole('button', { name: '停止生成' });
   await expect(stop).toBeVisible();
