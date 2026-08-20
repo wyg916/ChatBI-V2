@@ -317,13 +317,18 @@ def cancel_chat_stream(
     principal: Principal = Depends(require_permission("query.ask")),
 ) -> dict[str, bool]:
     get_conversation(db, data.conversation_id, principal)
-    cancelled = stream_registry.cancel_matching(
+    lifecycle = stream_registry.cancel_matching(
         conversation_id=data.conversation_id,
         client_message_id=data.client_message_id,
     )
-    if cancelled:
+    if lifecycle is not None:
+        # The explicit acknowledgement is the transaction boundary observed by
+        # the browser.  A worker may already be committing when cancellation
+        # arrives, so wait for its bounded completion and clean once more after
+        # the commit window closes.  Cleanup remains scoped to this exact run.
+        lifecycle.task_done.wait()
         _cleanup_cancelled_messages(data.conversation_id, data.client_message_id)
-    return {"cancelled": cancelled}
+    return {"cancelled": lifecycle is not None}
 
 
 @router.get("/chat/stream/diagnostics")

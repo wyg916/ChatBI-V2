@@ -270,6 +270,10 @@ def test_stream_lifecycle_can_cancel_the_exact_conversation_run():
             client_message_id="client-message-1",
         )
         assert lifecycle.cancel_event.is_set()
+        assert not lifecycle.task_done.is_set()
+        stream_registry.task_started(trace_id)
+        stream_registry.task_finished(trace_id)
+        assert lifecycle.task_done.is_set()
     finally:
         stream_registry.connection_closed(trace_id)
 

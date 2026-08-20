@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import json
-from threading import Event
+from threading import Event, Thread
 
 import httpx
 import pytest
@@ -263,35 +263,43 @@ def test_explicit_chat_cancel_is_conversation_scoped(client, db_session, monkeyp
     conversation = client.post("/api/v1/conversations", json={"title": "Cancel"}).json()
     factory = sessionmaker(bind=db_session.get_bind(), autoflush=False, expire_on_commit=False)
     monkeypatch.setattr(chat_route, "SessionLocal", factory)
-    with chat_route.SessionLocal() as seed_db:
-        conversation_row = seed_db.get(Conversation, conversation["id"])
-        assert conversation_row is not None
-        user = ChatMessage(
-            conversation_id=conversation["id"],
-            workspace_id=conversation_row.workspace_id,
-            user_id=conversation_row.user_id,
-            client_message_id="client-explicit-cancel-001",
-            role="user",
-            content="cancel me",
-            status="COMPLETED",
-        )
-        seed_db.add(user)
-        seed_db.flush()
-        seed_db.add(ChatMessage(
-            conversation_id=conversation["id"],
-            workspace_id=conversation_row.workspace_id,
-            user_id=conversation_row.user_id,
-            parent_message_id=user.id,
-            role="assistant",
-            content="must be removed",
-            status="SUCCEEDED",
-        ))
-        seed_db.commit()
     lifecycle = stream_registry.register(
         "STREAM-explicit-route-cancel",
         conversation_id=conversation["id"],
         client_message_id="client-explicit-cancel-001",
     )
+    stream_registry.task_started("STREAM-explicit-route-cancel")
+
+    def commit_inside_the_cancel_window() -> None:
+        assert lifecycle.cancel_event.wait(timeout=1)
+        with chat_route.SessionLocal() as late_db:
+            conversation_row = late_db.get(Conversation, conversation["id"])
+            assert conversation_row is not None
+            user = ChatMessage(
+                conversation_id=conversation["id"],
+                workspace_id=conversation_row.workspace_id,
+                user_id=conversation_row.user_id,
+                client_message_id="client-explicit-cancel-001",
+                role="user",
+                content="cancel me",
+                status="COMPLETED",
+            )
+            late_db.add(user)
+            late_db.flush()
+            late_db.add(ChatMessage(
+                conversation_id=conversation["id"],
+                workspace_id=conversation_row.workspace_id,
+                user_id=conversation_row.user_id,
+                parent_message_id=user.id,
+                role="assistant",
+                content="must be removed",
+                status="SUCCEEDED",
+            ))
+            late_db.commit()
+        stream_registry.task_finished("STREAM-explicit-route-cancel")
+
+    thread = Thread(target=commit_inside_the_cancel_window)
+    thread.start()
     try:
         response = client.post("/api/v1/chat/stream/cancel", json={
             "conversation_id": conversation["id"],
@@ -300,11 +308,17 @@ def test_explicit_chat_cancel_is_conversation_scoped(client, db_session, monkeyp
         assert response.status_code == 202
         assert response.json() == {"cancelled": True}
         assert lifecycle.cancel_event.is_set()
+        assert lifecycle.task_done.is_set()
+        thread.join(timeout=1)
+        assert not thread.is_alive()
         with chat_route.SessionLocal() as check_db:
             assert list(check_db.scalars(select(ChatMessage).where(
                 ChatMessage.conversation_id == conversation["id"],
             ))) == []
     finally:
+        lifecycle.cancel()
+        thread.join(timeout=1)
+        stream_registry.task_finished("STREAM-explicit-route-cancel")
         stream_registry.connection_closed("STREAM-explicit-route-cancel")
 
 

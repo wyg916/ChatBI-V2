@@ -16,6 +16,7 @@ class StreamLifecycle:
     conversation_id: str | None = None
     client_message_id: str | None = None
     cancel_event: Event = field(default_factory=Event)
+    task_done: Event = field(default_factory=Event)
     created_at: float = field(default_factory=monotonic)
     connection_open: bool = True
     task_running: bool = False
@@ -80,6 +81,7 @@ class StreamRegistry:
             lifecycle = self._streams.get(trace_id)
             if lifecycle:
                 lifecycle.task_running = False
+                lifecycle.task_done.set()
                 self._prune(trace_id, lifecycle)
 
     def connection_closed(self, trace_id: str) -> None:
@@ -98,7 +100,7 @@ class StreamRegistry:
             lifecycle.cancel()
             return True
 
-    def cancel_matching(self, *, conversation_id: str, client_message_id: str) -> bool:
+    def cancel_matching(self, *, conversation_id: str, client_message_id: str) -> StreamLifecycle | None:
         with self._lock:
             lifecycle = next((
                 item for item in self._streams.values()
@@ -106,9 +108,9 @@ class StreamRegistry:
                 and item.client_message_id == client_message_id
             ), None)
             if lifecycle is None:
-                return False
+                return None
             lifecycle.cancel()
-            return True
+            return lifecycle
 
     def snapshot(self) -> dict[str, object]:
         with self._lock:

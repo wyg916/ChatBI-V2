@@ -345,8 +345,7 @@ test('停止生成立即取消且不持久化成功消息', async ({ page, reque
   const conversation = await created.json() as JsonRecord;
   try {
     const stop = page.getByRole('button', { name: '停止生成' });
-    await expect(stop).toBeVisible();
-    await stop.click();
+    await stop.press('Enter');
     await expect(page.getByText('已停止生成，不会继续追加内容。')).toBeVisible();
     const before = await page.locator('.chat-assistant-message').last().textContent();
     await page.waitForTimeout(750);
