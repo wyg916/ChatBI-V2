@@ -204,7 +204,13 @@ class QueryPipeline:
             semantic_model_version=model.version,
             question=request.question,
             status="PLANNING",
-            provider="wren-clean-room-runtime" if settings.semantic_runtime_mode == "wren" else self.router.capabilities()["provider"],
+            provider=(
+                "wrenai-upstream-runtime"
+                if settings.semantic_runtime_mode == "wren" and settings.semantic_upstream_reuse_mode == "selected_source"
+                else "wren-clean-room-runtime"
+                if settings.semantic_runtime_mode == "wren"
+                else self.router.capabilities()["provider"]
+            ),
         )
         db.add(run)
         db.flush()

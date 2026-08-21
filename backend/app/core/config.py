@@ -47,6 +47,7 @@ class Settings(BaseSettings):
     verification_query_enabled: bool = True
     context_token_budget: int = 6000
     semantic_runtime_mode: Literal["wren", "local"] = "wren"
+    semantic_upstream_reuse_mode: Literal["selected_source", "clean_room"] = "selected_source"
     rag_mode: Literal["off", "shadow", "canary", "on"] = "on"
     agent_mode: Literal["off", "shadow", "canary", "on"] = "on"
     agent_allowed_routes: str = "COMPLEX_ANALYSIS"

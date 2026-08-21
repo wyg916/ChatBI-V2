@@ -146,7 +146,10 @@ class DeterministicTestProvider(ModelProviderAdapter, Nl2SqlEngine):
             metrics = ["revenue", "revenue_mom"]
         elif _contains(question, ["同比", "年同比"]):
             metrics = ["revenue", "revenue_yoy"]
-        elif _contains(question, ["收入占比", "营收占比", "收入贡献度", "营收贡献度"]):
+        elif _contains(question, ["收入占比", "营收占比", "收入贡献度", "营收贡献度"]) or (
+            _contains(question, ["贡献度", "贡献率", "占比"])
+            and _contains(question, ["收入", "营收", "销售额"])
+        ):
             metrics = ["revenue_share"]
         elif _contains(question, ["利润率", "毛利率"]):
             metrics = ["profit_margin"]

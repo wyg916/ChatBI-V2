@@ -11,6 +11,7 @@ from app.query.sql_guard import SqlGuard
 from app.semantic_runtime import SemanticRuntime
 from app.semantic_runtime._upstream.openchatbi import catalog_store
 from app.semantic_runtime._upstream.wren import type_mapping, wren_dialect
+from test_query_pipeline import semantic_context
 from test_v21_semantic_runtime import CASES, benchmark_context
 
 
@@ -129,3 +130,29 @@ def test_local_mode_remains_full_runtime_rollback():
     assert trace.openchatbi_called is False
     assert trace.wren_called is False
     assert trace.upstream_runtime_call_count == {}
+
+
+def test_settings_switch_selects_clean_room_without_code_change():
+    runtime = SemanticRuntime(Settings(
+        _env_file=None,
+        semantic_runtime_mode="wren",
+        semantic_upstream_reuse_mode="clean_room",
+    ))
+
+    plan, trace = runtime.plan(question="2025年按地区统计收入", context=benchmark_context())
+
+    assert runtime.capabilities()["upstream_reuse_mode"] == "clean_room"
+    assert plan.provider == "wren-clean-room-runtime"
+    assert trace.upstream_runtime_call_count == {"openchatbi": 0, "wrenai": 0}
+
+
+def test_revenue_contribution_intent_allows_non_contiguous_business_wording():
+    runtime = SemanticRuntime(Settings(_env_file=None, semantic_runtime_mode="wren"))
+
+    plan, _ = runtime.plan(
+        question="每个区域对总收入的贡献度是多少",
+        context=semantic_context(),
+    )
+
+    assert plan.metrics == ["revenue_share"]
+    assert plan.dimensions == ["region"]

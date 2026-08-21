@@ -21,12 +21,12 @@ class SemanticRuntime:
         settings: Settings | None = None,
         router: Nl2SqlRouter | None = None,
         *,
-        upstream_reuse_mode: Literal["selected_source", "clean_room"] = "selected_source",
+        upstream_reuse_mode: Literal["selected_source", "clean_room"] | None = None,
     ) -> None:
         self.settings = settings or get_settings()
-        self.upstream_reuse_mode = upstream_reuse_mode
+        self.upstream_reuse_mode = upstream_reuse_mode or self.settings.semantic_upstream_reuse_mode
         self.local_router = router or Nl2SqlRouter(settings=self.settings)
-        upstream_reuse = upstream_reuse_mode == "selected_source"
+        upstream_reuse = self.upstream_reuse_mode == "selected_source"
         self.openchatbi = OpenChatBILinker(upstream_reuse=upstream_reuse)
         self.supersonic = SuperSonicSemanticPipeline()
         self.wren = WrenRuntimeAdapter(self.local_router, upstream_reuse=upstream_reuse)
