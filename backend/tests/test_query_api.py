@@ -70,7 +70,16 @@ def test_query_api_full_chain_feedback_and_save(client, db_session, monkeypatch)
             result_signature="a" * 64,
         )
 
+    def fake_explain(self, *, datasource, normalized_sql, timeout_ms):
+        return ExecutionResult(
+            status="SUCCEEDED", columns=["plan"], column_types=["json"],
+            rows=[{"plan": [{"Plan": {"Node Type": "Limit", "Total Cost": 10.0}}]}],
+            row_count=1, duration_ms=1, datasource_id=datasource.id, dialect=datasource.type,
+            normalized_sql=normalized_sql, result_signature="e" * 64,
+        )
+
     monkeypatch.setattr(QueryExecutor, "execute", fake_execute)
+    monkeypatch.setattr(QueryExecutor, "explain", fake_explain)
     response = client.post("/api/v1/ask", json={
         "question": "按地区统计订单收入",
         "datasource_id": datasource.id,

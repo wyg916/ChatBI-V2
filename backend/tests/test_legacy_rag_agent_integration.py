@@ -100,6 +100,16 @@ def fake_query_execution(monkeypatch):
         )
     monkeypatch.setattr(QueryExecutor, "execute", execute)
 
+    def explain(self, *, datasource, normalized_sql, timeout_ms):
+        return ExecutionResult(
+            status="SUCCEEDED", columns=["plan"], column_types=["json"],
+            rows=[{"plan": [{"Plan": {"Node Type": "Limit", "Total Cost": 10.0}}]}],
+            row_count=1, duration_ms=1, datasource_id=datasource.id, dialect=datasource.type,
+            normalized_sql=normalized_sql, result_signature="e" * 64,
+        )
+
+    monkeypatch.setattr(QueryExecutor, "explain", explain)
+
 
 def test_rag_contract_requires_all_security_context_and_allowed_tool():
     with pytest.raises(ValidationError):

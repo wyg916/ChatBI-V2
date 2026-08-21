@@ -152,3 +152,52 @@ class ResultOracle:
             expected_signature=expected_signature,
             mismatch_count=mismatch_count,
         )
+
+    def verify_presentation(
+        self,
+        *,
+        oracle: OracleResult,
+        query_id: str,
+        execution: ExecutionResult,
+        chart_spec: dict[str, Any],
+        narrative: dict[str, Any],
+    ) -> OracleResult:
+        """Bind chart and narrative to the verified result without model confidence."""
+        columns = set(execution.columns)
+        chart_fields = set(chart_spec.get("bound_columns") or [])
+        chart_ok = (
+            chart_spec.get("data_source_query_id") == query_id
+            and chart_spec.get("result_signature") == execution.result_signature
+            and chart_fields == columns
+            and int(chart_spec.get("bound_row_count", -1)) == execution.row_count
+        )
+        oracle.checks.append(OracleCheck(
+            name="chart_accuracy",
+            passed=chart_ok,
+            message="Chart is bound to the verified query result" if chart_ok else "Chart binding differs from the verified result",
+        ))
+
+        evidence_ok = True
+        for item in narrative.get("evidence") or []:
+            if not set(item.get("fields") or []).issubset(columns):
+                evidence_ok = False
+            if any(not isinstance(index, int) or index < 0 or index >= execution.row_count for index in item.get("row_indexes") or []):
+                evidence_ok = False
+        narrative_ok = (
+            narrative.get("source_query_id") == query_id
+            and narrative.get("result_signature") == execution.result_signature
+            and evidence_ok
+        )
+        oracle.checks.append(OracleCheck(
+            name="narrative_accuracy",
+            passed=narrative_ok,
+            message="Narrative evidence is bound to verified rows" if narrative_ok else "Narrative evidence is not bound to the verified result",
+        ))
+        if not chart_ok or not narrative_ok:
+            oracle.status = "MISMATCH"
+            oracle.mismatch_count += int(not chart_ok) + int(not narrative_ok)
+        oracle.confidence = round(
+            sum(1 for check in oracle.checks if check.passed) / len(oracle.checks),
+            4,
+        )
+        return oracle

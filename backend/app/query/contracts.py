@@ -134,6 +134,26 @@ class ExecutionResult(BaseModel):
     error_message: str | None = None
 
 
+class ExplainCostAssessment(BaseModel):
+    status: Literal["PASS", "BLOCKED", "ERROR"]
+    estimated_cost: float | None = None
+    maximum_cost: float
+    explain_duration_ms: int = 0
+    reason: str
+
+
+class VerificationQueryResult(BaseModel):
+    required: bool
+    executed: bool
+    passed: bool
+    kind: Literal["NOT_REQUIRED", "READ_ONLY_REPLAY"]
+    query_sha256: str | None = None
+    primary_signature: str | None = None
+    verification_signature: str | None = None
+    duration_ms: int = 0
+    error_code: str | None = None
+
+
 class ExpectedResult(BaseModel):
     columns: list[str] = Field(default_factory=list)
     rows: list[dict[str, Any]] = Field(default_factory=list)

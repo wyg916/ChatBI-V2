@@ -29,14 +29,17 @@ from app.query.contracts import (
     ExpectedResult,
     FeedbackRequest,
     GuardResult,
+    OracleCheck,
     OracleResult,
     QueryResponse,
     SaveAnswerRequest,
 )
 from app.query.executor import QueryExecutor
+from app.query.explain_cost import ExplainCostGuard
 from app.query.nl2sql import Nl2SqlRouter
 from app.query.oracle import ResultOracle
 from app.query.sql_guard import SqlGuard
+from app.query.verification import VerificationQueryRunner
 from app.semantic_runtime import SemanticRuntimeError, default_semantic_runtime
 from app.services.datasources import default_workspace
 
@@ -155,6 +158,8 @@ class QueryPipeline:
         self.semantic_runtime = default_semantic_runtime()
         self.guard = SqlGuard()
         self.executor = QueryExecutor()
+        self.explain_cost_guard = ExplainCostGuard()
+        self.verification_runner = VerificationQueryRunner(guard=self.guard, executor=self.executor)
         self.oracle = ResultOracle()
         self.chart_engine = ChartEngine()
         self.narrative_engine = NarrativeEngine()
@@ -292,6 +297,50 @@ class QueryPipeline:
                 return run
 
             run.normalized_sql = guard.normalized_sql
+            explain = self.executor.explain(
+                datasource=datasource,
+                normalized_sql=guard.normalized_sql or "",
+                timeout_ms=context.security_policy.timeout_ms,
+            )
+            cost_assessment = self.explain_cost_guard.assess(
+                explain,
+                maximum_cost=settings.query_max_estimated_cost,
+            )
+            run.guard_payload = {
+                **(run.guard_payload or {}),
+                "explain_cost": _json(cost_assessment),
+            }
+            run.context_payload = {
+                **(run.context_payload or {}),
+                "query_performance": {
+                    **((run.context_payload or {}).get("query_performance") or {}),
+                    "explain_ms": explain.duration_ms,
+                    "estimated_cost": cost_assessment.estimated_cost,
+                },
+            }
+            _audit(db, run, "EXPLAIN_COST_GUARD", cost_assessment.status, {
+                "estimated_cost": cost_assessment.estimated_cost,
+                "maximum_cost": cost_assessment.maximum_cost,
+                "duration_ms": cost_assessment.explain_duration_ms,
+                "reason": cost_assessment.reason,
+            })
+            if cost_assessment.status != "PASS":
+                run.status = "SECURITY_REJECTED"
+                run.error_code = (
+                    "QUERY_COST_LIMIT" if cost_assessment.status == "BLOCKED" else "QUERY_EXPLAIN_REQUIRED"
+                )
+                run.error_message = cost_assessment.reason
+                run.oracle_payload = _json(OracleResult(status="NOT_RUN", confidence=0))
+                db.commit()
+                db.refresh(run)
+                if principal is not None:
+                    record_audit(
+                        db, principal, action="QUERY_RUN", resource_type="QUERY_RUN", resource_id=run.id,
+                        status=run.status, details={"error_code": run.error_code},
+                    )
+                    db.commit()
+                return run
+
             executor_arguments = dict(
                 datasource=datasource,
                 normalized_sql=guard.normalized_sql or "",
@@ -316,6 +365,51 @@ class QueryPipeline:
             else:
                 oracle_started = perf_counter()
                 oracle = self.oracle.verify(plan=plan, guard=guard, execution=execution)
+                verification = self.verification_runner.run(
+                    plan=plan,
+                    datasource=datasource,
+                    normalized_sql=guard.normalized_sql or "",
+                    primary=execution,
+                    policy=context.security_policy,
+                    row_limit=guard.applied_limit or row_limit,
+                    timeout_ms=context.security_policy.timeout_ms,
+                    cancellation_event=cancellation_event,
+                ) if settings.verification_query_enabled else None
+                if verification is not None:
+                    run.context_payload = {
+                        **(run.context_payload or {}),
+                        "verification_query": _json(verification),
+                    }
+                    _audit(
+                        db,
+                        run,
+                        "VERIFICATION_QUERY",
+                        "PASS" if verification.passed else "FAIL",
+                        {
+                            "required": verification.required,
+                            "executed": verification.executed,
+                            "kind": verification.kind,
+                            "duration_ms": verification.duration_ms,
+                            "query_sha256": verification.query_sha256,
+                            "error_code": verification.error_code,
+                        },
+                    )
+                    if verification.required:
+                        oracle.checks.append(OracleCheck(
+                            name="verification_query",
+                            passed=verification.passed,
+                            message=(
+                                "Second guarded read-only query matched the primary result signature"
+                                if verification.passed else "Verification query did not match the primary result"
+                            ),
+                        ))
+                        if not verification.passed:
+                            oracle.status = "MISMATCH"
+                            oracle.mismatch_count += 1
+                        oracle.confidence = round(
+                            sum(1 for check in oracle.checks if check.passed) / len(oracle.checks),
+                            4,
+                        )
                 oracle_duration_ms = round((perf_counter() - oracle_started) * 1000, 3)
                 run.oracle_payload = _json(oracle)
                 run.context_payload = {
@@ -325,12 +419,20 @@ class QueryPipeline:
                         "oracle_ms": oracle_duration_ms,
                     },
                 }
+                self._build_presentation(run)
+                oracle = self.oracle.verify_presentation(
+                    oracle=oracle,
+                    query_id=run.id,
+                    execution=execution,
+                    chart_spec=run.chart_spec_payload or {},
+                    narrative=run.narrative_payload or {},
+                )
+                run.oracle_payload = _json(oracle)
                 run.status = "SUCCEEDED" if oracle.status == "PASSED" else "ORACLE_MISMATCH"
                 _audit(db, run, "RESULT_ORACLE", oracle.status, {
                     "confidence": oracle.confidence, "mismatch_count": oracle.mismatch_count,
                     "duration_ms": oracle_duration_ms,
                 })
-                self._build_presentation(run)
             db.commit()
             db.refresh(run)
             if principal is not None:
@@ -377,6 +479,15 @@ class QueryPipeline:
         run.oracle_payload = _json(oracle)
         run.status = "SUCCEEDED" if oracle.status == "PASSED" else "ORACLE_MISMATCH"
         self._build_presentation(run)
+        oracle = self.oracle.verify_presentation(
+            oracle=oracle,
+            query_id=run.id,
+            execution=execution,
+            chart_spec=run.chart_spec_payload or {},
+            narrative=run.narrative_payload or {},
+        )
+        run.oracle_payload = _json(oracle)
+        run.status = "SUCCEEDED" if oracle.status == "PASSED" else "ORACLE_MISMATCH"
         _audit(db, run, "RESULT_ORACLE_REVERIFY", oracle.status, {
             "confidence": oracle.confidence, "mismatch_count": oracle.mismatch_count,
         })

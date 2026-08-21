@@ -43,6 +43,8 @@ class Settings(BaseSettings):
     query_timeout_ms: int = 30000
     query_row_limit: int = 500
     query_concurrency: int = 4
+    query_max_estimated_cost: float = 1000000.0
+    verification_query_enabled: bool = True
     context_token_budget: int = 6000
     semantic_runtime_mode: Literal["wren", "local"] = "wren"
     rag_mode: Literal["off", "shadow", "canary", "on"] = "on"

@@ -314,7 +314,16 @@ def test_sqlbot_feedback_verified_sql_recall_and_replay(client, db_session, monk
             result_signature="b" * 64,
         )
 
+    def fake_explain(self, *, datasource, normalized_sql, timeout_ms):
+        return ExecutionResult(
+            status="SUCCEEDED", columns=["plan"], column_types=["json"],
+            rows=[{"plan": [{"Plan": {"Node Type": "Limit", "Total Cost": 10.0}}]}],
+            row_count=1, duration_ms=1, datasource_id=datasource.id, dialect=datasource.type,
+            normalized_sql=normalized_sql, result_signature="e" * 64,
+        )
+
     monkeypatch.setattr(QueryExecutor, "execute", fake_execute)
+    monkeypatch.setattr(QueryExecutor, "explain", fake_explain)
     asked = client.post("/api/v1/ask", json={
         "question": "按地区统计订单收入",
         "datasource_id": datasource.id,

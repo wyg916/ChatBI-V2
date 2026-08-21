@@ -49,8 +49,18 @@ def query_capabilities(_: Principal = Depends(require_permission("query.ask"))):
             "providers": model_gateway.health_snapshot(),
             "policy": model_gateway.policy.safe_summary(),
         },
-        "sql_guard": {"engine": "sqlglot", "ast_validation": True},
-        "result_oracle": {"version": "v1", "sql_string_equality": False},
+        "sql_guard": {
+            "engine": "sqlglot",
+            "ast_validation": True,
+            "explain_cost_guard": True,
+            "maximum_estimated_cost": settings.query_max_estimated_cost,
+        },
+        "result_oracle": {
+            "version": "v1.3",
+            "sql_string_equality": False,
+            "checks": ["metric", "dimension", "time", "filter", "join", "result_value", "chart", "narrative"],
+            "critical_verification_query": settings.verification_query_enabled,
+        },
         "controlled_rag": {
             "mode": settings.rag_mode,
             "configured": bool(settings.legacy_rag_base_url),
