@@ -9,6 +9,8 @@ on:
       - "backend/app/services/evaluation.py"
       - "backend/app/services/feedback_loop.py"
       - "backend/app/api/routes/evaluation.py"
+      - "backend/scripts/run_v13_ibm_official_eval.py"
+      - "backend/tests/test_v13_ibm_official_eval.py"
       - "backend/tests/test_v21_eval_feedback.py"
       - "evaluation/golden/**"
       - "frontend/src/pages/Evaluation*"
@@ -52,18 +54,41 @@ jobs:
     if: github.event_name == 'workflow_dispatch' && inputs.api_base != ''
     needs: deterministic-gate
     runs-on: ubuntu-latest
+    env:
+      CHATBI_BOOTSTRAP_ADMIN_PASSWORD: ${{ secrets.CHATBI_BOOTSTRAP_ADMIN_PASSWORD }}
+      IBM_UPSTREAM_COMMIT: 60dd4515236adb335f2053b7c069397d7d88fe0a
     steps:
       - uses: actions/checkout@v4
+      - name: Checkout pinned IBM Text-to-SQL selected source
+        uses: actions/checkout@v4
+        with:
+          repository: IBM/text2sql-eval-toolkit
+          ref: 60dd4515236adb335f2053b7c069397d7d88fe0a
+          path: vendor/ibm-text2sql-eval-toolkit
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
+      - uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+      - name: Build pinned IBM isolated environment
+        run: uv sync --frozen --no-dev --project vendor/ibm-text2sql-eval-toolkit
       - name: Golden 50, eight-dimension Oracle and feedback replay gate
         run: >-
           python backend/scripts/run_v21_release_gate.py
           --api-base "${{ inputs.api_base }}"
           --require-feedback
           --output docs/evidence/v2.1/eval-feedback-release-gate.json
+      - name: IBM official execution compare and error-analysis gate
+        run: >-
+          python backend/scripts/run_v13_ibm_official_eval.py
+          --checkout vendor/ibm-text2sql-eval-toolkit
+          --python vendor/ibm-text2sql-eval-toolkit/.venv/bin/python
+          --base-url "${{ inputs.api_base }}"
+          --output docs/evidence/v2.1/ibm-official-release-gate.json
       - uses: actions/upload-artifact@v4
         with:
           name: v21-eval-feedback-release-gate
-          path: docs/evidence/v2.1/eval-feedback-release-gate.json
+          path: |
+            docs/evidence/v2.1/eval-feedback-release-gate.json
+            docs/evidence/v2.1/ibm-official-release-gate.json

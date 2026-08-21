@@ -12,6 +12,7 @@ from app.evaluation.ibm_official.runner import (
     SELECTED_SOURCE_SHA256,
 )
 from app.evaluation.ibm_official.runtime_bridge import diagnostic_category
+from scripts import run_v13_ibm_official_eval as official_gate
 
 
 def test_official_runner_is_pinned_and_separate_from_clean_room_adapter() -> None:
@@ -37,6 +38,25 @@ def test_empty_result_policy_preserves_official_subset_metric() -> None:
     assert diagnostic_category(result) == "EMPTY_RESULT_POLICY_DIAGNOSTIC_NOT_APPLICABLE"
     assert result["execution_accuracy"] == 1
     assert result["subset_non_empty_execution_accuracy"] == 0
+
+
+def test_live_gate_authenticates_through_the_chatbi_api_cookie_boundary(monkeypatch) -> None:
+    calls = []
+    monkeypatch.setenv("CHATBI_BOOTSTRAP_ADMIN_PASSWORD", "unit-test-only")
+    monkeypatch.setattr(
+        official_gate,
+        "_api",
+        lambda base_url, method, path, body=None: calls.append((base_url, method, path, body)),
+    )
+
+    official_gate._authenticate("https://chatbi.invalid/api/v1", "admin@chatbi.local")
+
+    assert calls == [(
+        "https://chatbi.invalid/api/v1",
+        "POST",
+        "/auth/login",
+        {"email": "admin@chatbi.local", "password": "unit-test-only"},
+    )]
 
 
 def test_runtime_evidence_contract_from_real_run() -> None:

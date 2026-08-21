@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import http.cookiejar
 import hashlib
 import json
 import os
@@ -21,6 +22,7 @@ from app.evaluation.ibm_official import PinnedIbmOfficialEvaluator  # noqa: E402
 
 
 RUNTIME_MODEL_NAME = "新能源经营分析"
+OPENER = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(http.cookiejar.CookieJar()))
 
 
 def _api(base_url: str, method: str, path: str, body: dict[str, Any] | None = None) -> Any:
@@ -32,7 +34,7 @@ def _api(base_url: str, method: str, path: str, body: dict[str, Any] | None = No
         headers={"Content-Type": "application/json"},
     )
     try:
-        with urllib.request.urlopen(request, timeout=180) as response:
+        with OPENER.open(request, timeout=180) as response:
             return json.loads(response.read().decode("utf-8"))
     except urllib.error.HTTPError as exc:
         detail = exc.read().decode("utf-8", errors="replace")[-2000:]
@@ -44,6 +46,26 @@ def _manifest_hash(manifest: dict[str, Any]) -> str:
     value["manifest_sha256"] = None
     payload = json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+
+def _local_secret(key: str) -> str:
+    if value := os.environ.get(key):
+        return value
+    env_path = PROJECT_ROOT / ".env"
+    if not env_path.exists():
+        return ""
+    for raw_line in env_path.read_text(encoding="utf-8").splitlines():
+        name, separator, value = raw_line.partition("=")
+        if separator and name.strip() == key:
+            return value.strip().strip("\"'")
+    return ""
+
+
+def _authenticate(base_url: str, email: str) -> None:
+    password = _local_secret("CHATBI_BOOTSTRAP_ADMIN_PASSWORD")
+    if not password:
+        raise RuntimeError("Missing CHATBI_BOOTSTRAP_ADMIN_PASSWORD for authenticated IBM gate")
+    _api(base_url, "POST", "/auth/login", {"email": email, "password": password})
 
 
 def _load_inputs(manifest_path: Path, overlay_path: Path) -> tuple[dict[str, Any], dict[str, list[str]]]:
@@ -64,8 +86,8 @@ def _load_inputs(manifest_path: Path, overlay_path: Path) -> tuple[dict[str, Any
 
 
 def _select_runtime(base_url: str) -> tuple[str, str]:
-    sources = _api(base_url, "GET", "/api/v1/datasources")
-    models = _api(base_url, "GET", "/api/v1/semantic-models")
+    sources = _api(base_url, "GET", "/datasources")
+    models = _api(base_url, "GET", "/semantic-models")
     datasource = next(item for item in sources if item["type"] == "postgresql")
     model = next(
         item
@@ -89,7 +111,7 @@ def _collect_live_cases(
         response = _api(
             base_url,
             "POST",
-            "/api/v1/ask",
+            "/ask",
             {
                 "question": case["question"],
                 "datasource_id": datasource_id,
@@ -260,7 +282,8 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--checkout", type=Path, required=True)
     parser.add_argument("--python", dest="python_executable", type=Path)
-    parser.add_argument("--base-url", default="http://127.0.0.1:8000")
+    parser.add_argument("--base-url", default="http://127.0.0.1:8000/api/v1")
+    parser.add_argument("--email", default="admin@chatbi.local")
     parser.add_argument("--internal", action="store_true")
     parser.add_argument("--env-file", type=Path)
     parser.add_argument("--runtime-host-override")
@@ -288,6 +311,7 @@ def main() -> int:
             manifest, alternatives, args.runtime_host_override
         )
     else:
+        _authenticate(args.base_url, args.email)
         cases, execution_trace = _collect_live_cases(args.base_url, manifest, alternatives)
     evaluator = PinnedIbmOfficialEvaluator(args.checkout, python_executable=args.python_executable)
     official = evaluator.evaluate(cases)
