@@ -6,9 +6,9 @@
 - PostgreSQL 同库同 Schema/模型/权限 A/B 为 Golden 50 + 复杂改写 20：clean-room 与 selected-source 的执行、结果、语义、Join、澄清均为 70/70；selected-source OpenChatBI/Wren 调用为 588/140，Catalog Recall@5=1.0，A/B 总延迟 p95 为 535.033/397.603 ms，模型 Token/成本/重试均为 0。
 - SQL 执行新增 fail-closed EXPLAIN Cost Guard；关键指标/多 Join 新增第二次经 SQLGlot 与同一权限策略保护的只读一致性查询；Oracle 新增 Chart/Narrative 结果绑定。Verified SQL 审核和回放新增 SQL SHA-256、数据源、语义模型/version 与结果签名防篡改。
 - 回归结果：Backend 256/256、定向安全 110/110、Frontend Vitest 50/50、TypeScript、production build、Golden 50 与八维 Oracle、危险 SQL 56/56、三模型真实 Discovery/Auth/Chat/SQLPlan/Guard、确定性 E2E 12/12 均 PASS。E2E 首轮误继承开发机 `MODEL_PROVIDER=auto` 而得到 7/12，失败日志保留；显式恢复发布基线 `deterministic` 后完整重跑 12/12。10M 数据源同步为 79 表/1187 字段/111 关系；Docker Compose 从停止状态连续两次启动为 healthy，验收后停止栈、删除临时 metadata Schema 并确认不存在。
-- IBM package/wheel 模式仍因 Apache-2.0/MIT 分发元数据冲突而 BLOCKED，但 11 个具明确 Apache-2.0 SPDX/根许可证治理的 selected-source 文件已经闭合。官方 `evaluate_prediction` 真实调用 50 次、`get_failed_records` 执行 1 次，execution accuracy 50/50、multiple GT、error analysis 与 Release Gate 均 PASS；共享 CI 已固定 checkout/uv/runner 并 fail-closed 接线，仍需一次真实远端 workflow run 才可把 CI 状态从 `WIRED_PENDING_REMOTE_RUN` 升为 `ENFORCED`。
-- SQLBot 因 modified GPL 品牌条件、启动前强制导入的 `sqlbot-xpack 0.0.5.35` 无许可证字段/文件及未固定镜像而继续 BLOCKED；official runtime calls=0、xpack loaded=0。Phase 2 真实复用 3/目标 4，因此最终 Gate 保持 PARTIAL，不创建 Tag、不修改 main。
-- 远端 HTTPS 已恢复并以非 force 方式创建任务分支；最终 closure SHA 的 local/tracking/`ls-remote` 一致性在外部 Phase 2 Closure Evidence 中验收。SSH 严格 host-key 模式因本机缺少 GitHub ED25519 known-host 条目失败，未修改 known_hosts、私钥或 Git 配置。
+- IBM package/wheel 模式仍因 Apache-2.0/MIT 分发元数据冲突而 BLOCKED，但 11 个具明确 Apache-2.0 SPDX/根许可证治理的 selected-source 文件已经闭合。本地官方 `evaluate_prediction` 真实调用 50 次、`get_failed_records` 执行 1 次，execution accuracy 50/50、multiple GT、error analysis 与 Release Gate 均 PASS。Phase 2 Closure 将 CI 改为 GitHub-hosted 自包含模式：临时 PostgreSQL、迁移、固定演示 seed、一次性认证、localhost Backend、固定 IBM checkout、Golden 50 与校验和 artifact；不再依赖外部 `api_base`、生产数据、Provider Key 或长期仓库 Secret。远端 run 是否 `ENFORCED` 只以同一 Closure SHA 的外部 Evidence 为准。
+- SQLBot 因 modified GPL 品牌条件、无路径级宽松授权、启动前强制导入的 `sqlbot-xpack 0.0.5.35` 无许可证/公开源码闭包及官方镜像不可固定到目标提交而继续 BLOCKED；official runtime calls=0、xpack loaded=0。正式 Requirement Delta 与 V1.3.0 License Exception 保留 ChatBI clean-room feedback/replay 为 PASS，但不把它计为 SQLBot 上游复用；真实直接复用项目数固定为 3。
+- V1.3.0 Requirement Delta、SQLBot Exception、最终 Closure SHA 的回归、非强推交付、local/tracking/`ls-remote` 一致性及 IBM 远端 run 均由外部 Phase 2 Document-Compliant Closure Evidence 验收。本文不预先宣称远端 PASS；不创建 Tag、不修改 main，源工作区 WIP 保持隔离。
 
 ## V1.3.0 Phase 1 三模型统一控制平面（2026-08-21）
 

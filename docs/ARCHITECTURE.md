@@ -8,6 +8,8 @@
 
 OpenChatBI `catalog_store.py` and WrenAI `type_mapping.py`/`wren_dialect.py` are exact pinned upstream files behind a ChatBI-owned bridge. Hybrid ranking, SuperSonic-compatible SemanticQuery, final SQL generation, Router, Model Gateway, permissions, execution, Oracle, Trace and SSE remain ChatBI-owned. Runtime evidence persists adapter, official commit, source SHA and actual call count in `QueryRun.context_payload.semantic_runtime`. Cache keys include Workspace, permission, semantic/data/knowledge/input versions and A/B mode. `CHATBI_SEMANTIC_UPSTREAM_REUSE_MODE=clean_room` retains the previous A/B path; `CHATBI_SEMANTIC_RUNTIME_MODE=local` remains the full rollback.
 
+The controlled V1.3.0 mapping of the governing V1.2.0 Runtime Architecture, IBM GitHub-hosted self-contained Gate and SQLBot requirement exception is defined in [`docs/runtime/V1_3_RUNTIME_ARCHITECTURE_REQUIREMENT_DELTA.md`](runtime/V1_3_RUNTIME_ARCHITECTURE_REQUIREMENT_DELTA.md). The IBM job creates only an ephemeral PostgreSQL database and per-run principals, applies repository migrations and a fixed demo seed, starts the Backend on localhost, invokes the pinned selected-source evaluator, and uploads checksummed evidence. It has no production database, Provider-key, external `api_base` or long-lived repository-secret dependency.
+
 ## 1. 推荐技术栈
 
 - Web：React、TypeScript、Vite、ECharts。
@@ -15,7 +17,7 @@ OpenChatBI `catalog_store.py` and WrenAI `type_mapping.py`/`wren_dialect.py` are
 - Metadata DB：本机 PostgreSQL，数据库 `chatbi_v2`；应用使用项目专用账号，管理员账号只用于首次初始化。
 - SQL 解析与方言：SQLGlot 或等价 AST 解析器。
 - 模型：通过 `ModelProviderAdapter` 接入本地确定性语义运行时与命名的 OpenAI-compatible 服务；当前包含 Kimi `kimi-k2.6`、MiMo `mimo-v2.5`、DeepSeek `deepseek-v4-flash`，供应商差异封装在 Adapter 内。
-- 评测：ChatBI 在线 clean-room comparator + Business Result Oracle；离线/CI 可从外部固定 checkout 的隔离 Python 调用 IBM 官方 Apache-2.0 selected source。IBM package/wheel 路径仍因 Apache/MIT metadata 冲突阻断，官方工具不得获得数据库连接或进入在线问数路径。
+- 评测：ChatBI 在线 clean-room comparator + Business Result Oracle；离线/CI 可从外部固定 checkout 的隔离 Python 调用 IBM 官方 Apache-2.0 selected source。GitHub Runner 仅创建一次性 PostgreSQL/认证环境并向 IBM 传递已执行结果，不向 IBM 提供数据库连接。IBM package/wheel 路径仍因 Apache/MIT metadata 冲突阻断，官方工具不得进入在线问数路径。
 - 部署：Docker Compose 承载 Backend、独立 RAG Runtime 与 Frontend；开发数据库运行在本机，不创建 Docker 数据库容器或数据卷。CI 执行 Backend、Frontend、E2E、Golden Set。
 
 ## 2. 数据运行基线

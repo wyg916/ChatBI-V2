@@ -1,5 +1,11 @@
 # Architecture Decisions
 
+## ADR-049：V1.3.0 以自包含 IBM 远端 Gate 和受控 SQLBot 例外收口 Phase 2
+
+V1.2.0 Runtime Architecture 的架构、能力、测试、安全、性能、许可证、Evidence 与 Git 原则继续约束 V1.3.0；旧版本号、分支、Tag 和历史基线 SHA 仅作历史字段。正式映射由 `docs/runtime/V1_3_RUNTIME_ARCHITECTURE_REQUIREMENT_DELTA.md` 控制。IBM 远端 Gate 不再依赖外部 `api_base` 或长期仓库 Secret：GitHub-hosted Runner 创建临时 PostgreSQL 和一次性主体，应用迁移与固定 seed，只启动 localhost Backend，再从固定 checkout 的隔离 Python 调用 Apache-2.0 selected source。生产数据库、生产用户、Provider Key 和数据库连接均不提供给 IBM；任何初始化、Golden 50、官方 compare、error analysis、脱敏或 artifact 步骤失败都必须非零退出。
+
+SQLBot 固定提交的根 modified-GPLv3/附加品牌条件没有路径级宽松授权；官方启动又必经许可证/公开源码未闭合的 XPack，且没有可固定到目标提交的公开完整运行时。因此 V1.3.0 接受 `docs/opensource/V1_3_SQLBOT_LICENSE_EXCEPTION.md`：直接源码、官方服务和 XPack 运行继续阻断，真实调用与加载均为 0；项目自有 feedback/Verified SQL replay 保持 PASS，但不得改写为 SQLBot 集成或计入上游复用。Phase 2 的真实复用数固定为 3，本例外只适用于 V1.3.0，并在上游许可证、XPack 来源、不可变 artifact、分发边界或项目授权变化时强制复审。这是工程合规决策，不是法律意见。
+
 ## ADR-048：IBM 只允许固定 checkout 的 Apache-2.0 selected-source 离线评测
 
 IBM `60dd451...` 的 package/wheel/sdist 继续因根 `LICENSE=Apache-2.0` 与发行 metadata `MIT` 冲突而阻断；这不自动扩展为所有源码路径均不可用。实际运行闭包只包含 11 个固定文件：执行文件均有 IBM Copyright 与 Apache-2.0 SPDX，唯一无 SPDX 的包初始化文件由根 Apache-2.0 许可证治理，依赖许可证也逐项闭合。ChatBI 因此只从外部精确 checkout 的隔离 Python 调用官方 `evaluate_prediction` 与 `get_failed_records`，每次执行前核对 commit 和逐文件 SHA-256，不安装/复制/分发冲突 package，也不给官方工具数据库连接或 Provider 密钥。

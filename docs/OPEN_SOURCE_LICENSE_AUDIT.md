@@ -14,6 +14,8 @@ This addendum supersedes the V1.1 statements that no reviewed upstream source is
 
 The OpenChatBI/Wren destination blobs match the official locked Git blobs. Their individual SHA-256 values, selected paths, license notice, dependency closure, runtime entry, disable switch and rollback are machine-readable in `docs/UPSTREAM_LOCK.json` and `backend/app/semantic_runtime/_upstream/provenance.json`. IBM runs outside the repository from a fixed checkout and validates all 11 selected hashes before execution. Direct upstream reuse count is exactly 3 projects, not the target 4. This remains an engineering compliance record, not legal advice.
 
+The V1.3.0 SQLBot direct-runtime target is superseded by the controlled [`SQLBot License and Runtime Requirement Exception`](opensource/V1_3_SQLBOT_LICENSE_EXCEPTION.md). The pinned tree has no path-specific grant that relaxes the modified root terms; official startup necessarily imports an unclosed XPack package, and no immutable commit-bound official runtime artifact is publicly reproducible. Therefore `SQLBOT_DIRECT_UPSTREAM_REUSE=BLOCKED_BY_UPSTREAM_LICENSE`, official calls and XPack loads remain zero, and the ChatBI-owned feedback/replay path is not counted as upstream reuse.
+
 - Audit date: 2026-08-19 (Asia/Shanghai)
 - Scope: released backend container, complete frontend lockfile, eight upstream design references, copied source/assets, notices, checksums, rollback boundaries, CycloneDX and SPDX output.
 - Result: **PASS for the audited release candidate**. Unknown dependency licenses: **0**. Copied restricted source/UI/logo/model/benchmark assets: **0**.

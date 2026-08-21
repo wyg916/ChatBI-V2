@@ -1,26 +1,26 @@
-name: V2.1 Eval Golden Feedback Gate
+name: V1.3 IBM Official Self-Contained Release Gate
 
 on:
   push:
-    branches: ["codex/v2.1-eval-golden-feedback"]
+    branches: ["codex/v1.3.0-data-semantic-upstream"]
   pull_request:
     paths:
+      - ".github/workflows/v21-eval-golden-feedback.yml"
       - "backend/app/evaluation/**"
       - "backend/app/services/evaluation.py"
-      - "backend/app/services/feedback_loop.py"
-      - "backend/app/api/routes/evaluation.py"
+      - "backend/scripts/run_v13_ibm_ci_bootstrap.py"
       - "backend/scripts/run_v13_ibm_official_eval.py"
+      - "backend/tests/test_v13_ibm_ci_bootstrap.py"
       - "backend/tests/test_v13_ibm_official_eval.py"
-      - "backend/tests/test_v21_eval_feedback.py"
       - "evaluation/golden/**"
-      - "frontend/src/pages/Evaluation*"
-      - "frontend/e2e/v21-eval-feedback.spec.ts"
   workflow_dispatch:
-    inputs:
-      api_base:
-        description: "Isolated ChatBI API base ending in /api/v1"
-        required: false
-        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: v13-ibm-official-${{ github.ref }}
+  cancel-in-progress: false
 
 jobs:
   deterministic-gate:
@@ -50,13 +50,38 @@ jobs:
           npm test
           npm run build
 
-  isolated-live-release-gate:
-    if: github.event_name == 'workflow_dispatch' && inputs.api_base != ''
+  ibm-official-self-contained:
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
     needs: deterministic-gate
     runs-on: ubuntu-latest
+    timeout-minutes: 45
+    services:
+      postgres:
+        image: postgres:16.9-alpine@sha256:7c688148e5e156d0e86df7ba8ae5a05a2386aaec1e2ad8e6d11bdf10504b1fb7
+        env:
+          POSTGRES_USER: chatbi_ci_admin
+          POSTGRES_PASSWORD: ci-${{ github.run_id }}-${{ github.run_attempt }}
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U chatbi_ci_admin -d postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
     env:
-      CHATBI_BOOTSTRAP_ADMIN_PASSWORD: ${{ secrets.CHATBI_BOOTSTRAP_ADMIN_PASSWORD }}
+      PYTHONPATH: >-
+        backend:packages/agent-contracts/src:packages/agent-orchestrator/src:packages/prompt-registry/src:packages/rag-adapter/src:packages/rag-contracts/src
+      CHATBI_CI_POSTGRES_ADMIN_PASSWORD: ci-${{ github.run_id }}-${{ github.run_attempt }}
+      CHATBI_MODEL_PROVIDER: deterministic
+      CHATBI_SEMANTIC_RUNTIME_MODE: wren
+      CHATBI_SEMANTIC_UPSTREAM_REUSE_MODE: selected_source
+      CHATBI_SEED_DEMO_SEMANTIC_MODEL: "true"
+      CHATBI_ENVIRONMENT: ci
+      TZ: Asia/Shanghai
+      PGTZ: Asia/Shanghai
       IBM_UPSTREAM_COMMIT: 60dd4515236adb335f2053b7c069397d7d88fe0a
+      IBM_EVIDENCE_DIR: docs/evidence/v1.3/ibm-official-ci
     steps:
       - uses: actions/checkout@v4
       - name: Checkout pinned IBM Text-to-SQL selected source
@@ -68,27 +93,127 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
       - uses: astral-sh/setup-uv@v6
         with:
           enable-cache: true
-      - name: Build pinned IBM isolated environment
-        run: uv sync --frozen --no-dev --project vendor/ibm-text2sql-eval-toolkit
-      - name: Golden 50, eight-dimension Oracle and feedback replay gate
+      - name: Install ChatBI runtime dependencies
+        run: pip install -r backend/requirements.txt
+      - name: Bootstrap isolated PostgreSQL and ephemeral principals
         run: >-
-          python backend/scripts/run_v21_release_gate.py
-          --api-base "${{ inputs.api_base }}"
-          --require-feedback
-          --output docs/evidence/v2.1/eval-feedback-release-gate.json
-      - name: IBM official execution compare and error-analysis gate
+          python backend/scripts/run_v13_ibm_ci_bootstrap.py
+          --admin-user chatbi_ci_admin
+          --admin-password-env CHATBI_CI_POSTGRES_ADMIN_PASSWORD
+          --github-env "$GITHUB_ENV"
+      - name: Apply metadata migrations
+        working-directory: backend
+        run: python -m alembic upgrade head
+      - name: Start isolated localhost Backend
+        run: |
+          mkdir -p "$IBM_EVIDENCE_DIR"
+          python -m uvicorn app.main:app --app-dir backend --host 127.0.0.1 --port 18080 \
+            > "$RUNNER_TEMP/chatbi-backend.log" 2>&1 &
+          echo "CHATBI_BACKEND_PID=$!" >> "$GITHUB_ENV"
+          for attempt in $(seq 1 60); do
+            if curl --fail --silent --show-error http://127.0.0.1:18080/health > /dev/null; then
+              echo "CHATBI_BACKEND_HEALTH=PASS"
+              exit 0
+            fi
+            sleep 1
+          done
+          tail -n 200 "$RUNNER_TEMP/chatbi-backend.log"
+          exit 1
+      - name: Build pinned IBM selected-source environment
+        run: >-
+          uv sync --frozen --no-dev --no-install-project
+          --project vendor/ibm-text2sql-eval-toolkit
+      - name: Authenticate and synchronize isolated PostgreSQL catalog
+        run: >-
+          python backend/scripts/run_v13_ibm_ci_bootstrap.py
+          --prepare-api http://127.0.0.1:18080/api/v1
+      - name: IBM official Golden 50, execution compare and error analysis
+        id: ibm_gate
         run: >-
           python backend/scripts/run_v13_ibm_official_eval.py
           --checkout vendor/ibm-text2sql-eval-toolkit
           --python vendor/ibm-text2sql-eval-toolkit/.venv/bin/python
-          --base-url "${{ inputs.api_base }}"
-          --output docs/evidence/v2.1/ibm-official-release-gate.json
-      - uses: actions/upload-artifact@v4
+          --base-url http://127.0.0.1:18080/api/v1
+          --output "$IBM_EVIDENCE_DIR/ibm-official-release-gate.json"
+      - name: Collect run metadata, logs and checksums
+        id: collect_evidence
+        if: always()
+        shell: bash
+        run: |
+          mkdir -p "$IBM_EVIDENCE_DIR"
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          evidence_dir = Path(os.environ["IBM_EVIDENCE_DIR"])
+          gate_path = evidence_dir / "ibm-official-release-gate.json"
+          gate = json.loads(gate_path.read_text(encoding="utf-8")) if gate_path.exists() else {}
+          gate_status = gate.get("status", "NOT_PRODUCED")
+          release_status = gate.get("release_gate", "NOT_PRODUCED")
+          receipt = {
+              "run_id": os.environ["GITHUB_RUN_ID"],
+              "run_attempt": os.environ["GITHUB_RUN_ATTEMPT"],
+              "run_url": (
+                  f'{os.environ["GITHUB_SERVER_URL"]}/{os.environ["GITHUB_REPOSITORY"]}'
+                  f'/actions/runs/{os.environ["GITHUB_RUN_ID"]}'
+              ),
+              "run_sha": os.environ["GITHUB_SHA"],
+              "workflow": os.environ["GITHUB_WORKFLOW"],
+              "job": os.environ["GITHUB_JOB"],
+              "runner_mode": "github-hosted-self-contained",
+              "database_mode": "ephemeral-postgresql-fixed-seed",
+              "api_base_mode": "localhost",
+              "auth_mode": "ephemeral-masked-ci-principal",
+              "production_secret_used": False,
+              "ci_release_gate": (
+                  "ENFORCED_PASS"
+                  if gate_status == "PASS" and release_status == "PASS"
+                  else ("ENFORCED_FAIL" if gate_path.exists() else "NOT_PRODUCED")
+              ),
+              "license_closure": gate.get("license_closure", "NOT_PRODUCED"),
+              "package_wheel_sdist": "NOT_USED",
+              "ibm_gate_status": gate_status,
+              "ibm_runtime_calls": (gate.get("official") or {}).get("runtime_calls", 0),
+              "error_analysis_executions": (gate.get("official") or {}).get(
+                  "error_analysis_executions",
+                  (gate.get("official") or {}).get("tool_executions", 0),
+              ),
+          }
+          (evidence_dir / "run-receipt.json").write_text(
+              json.dumps(receipt, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
+          )
+          PY
+          python backend/scripts/run_v13_ibm_ci_bootstrap.py \
+            --sanitize-artifacts "$IBM_EVIDENCE_DIR" \
+            --backend-log "$RUNNER_TEMP/chatbi-backend.log"
+          find "$IBM_EVIDENCE_DIR" -maxdepth 1 -type f ! -name SHA256SUMS.txt -print0 \
+            | sort -z \
+            | xargs -0 sha256sum \
+            > "$IBM_EVIDENCE_DIR/SHA256SUMS.txt"
+      - name: Upload IBM Gate evidence
+        id: ibm_artifact
+        if: always() && steps.collect_evidence.outcome == 'success'
+        uses: actions/upload-artifact@v4
         with:
-          name: v21-eval-feedback-release-gate
-          path: |
-            docs/evidence/v2.1/eval-feedback-release-gate.json
-            docs/evidence/v2.1/ibm-official-release-gate.json
+          name: v13-ibm-official-${{ github.sha }}
+          path: docs/evidence/v1.3/ibm-official-ci
+          if-no-files-found: error
+          retention-days: 30
+      - name: Publish artifact receipt
+        if: always()
+        run: |
+          echo "IBM_ARTIFACT_ID=${{ steps.ibm_artifact.outputs.artifact-id }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "IBM_ARTIFACT_URL=${{ steps.ibm_artifact.outputs.artifact-url }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "IBM_ARTIFACT_SHA256=${{ steps.ibm_artifact.outputs.artifact-digest }}" >> "$GITHUB_STEP_SUMMARY"
+      - name: Stop isolated Backend
+        if: always()
+        run: |
+          if [ -n "${CHATBI_BACKEND_PID:-}" ]; then
+            kill "$CHATBI_BACKEND_PID" 2>/dev/null || true
+          fi
