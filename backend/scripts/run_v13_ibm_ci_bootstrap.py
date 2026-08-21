@@ -251,7 +251,7 @@ def bootstrap_postgres(
     host: str,
     port: int,
     admin_user: str,
-    admin_password: str,
+    admin_password: str | None,
     admin_database: str,
     app_database: str,
     values: dict[str, str],
@@ -259,13 +259,14 @@ def bootstrap_postgres(
     fixed_date: date,
 ) -> tuple[int, int]:
     """Create the isolated database, roles and reproducible demo schema."""
-    connect_kwargs = {
+    connect_kwargs: dict[str, object] = {
         "host": host,
         "port": port,
         "user": admin_user,
-        "password": admin_password,
         "autocommit": True,
     }
+    if admin_password is not None:
+        connect_kwargs["password"] = admin_password
     with psycopg.connect(dbname=admin_database, **connect_kwargs) as admin:
         with admin.cursor() as cursor:
             _upsert_login_role(cursor, APP_ROLE, values["CHATBI_META_PASSWORD"])
@@ -345,6 +346,11 @@ def main() -> int:
     parser.add_argument(
         "--admin-password-env", default="CHATBI_CI_POSTGRES_ADMIN_PASSWORD"
     )
+    parser.add_argument(
+        "--allow-local-trust",
+        action="store_true",
+        help="Allow passwordless bootstrap only for an isolated loopback PostgreSQL service",
+    )
     parser.add_argument("--admin-database", default="postgres")
     parser.add_argument("--app-database", default=APP_DATABASE)
     parser.add_argument("--fixed-date", type=date.fromisoformat, default=FIXED_SEED_DATE)
@@ -372,11 +378,13 @@ def main() -> int:
         print("POSTGRES_CATALOG_SYNC=PASS")
         return 0
 
-    admin_password = os.getenv(args.admin_password_env, "")
-    if not admin_password:
+    admin_password = os.getenv(args.admin_password_env) or None
+    if admin_password is None and not args.allow_local_trust:
         raise RuntimeError(
             f"Missing ephemeral PostgreSQL admin password in {args.admin_password_env}"
         )
+    if args.allow_local_trust and args.host not in {"127.0.0.1", "localhost", "::1"}:
+        raise RuntimeError("Local trust bootstrap is restricted to a loopback PostgreSQL host")
     if args.github_env is None:
         raise RuntimeError("GITHUB_ENV path is required for ephemeral credential handoff")
 

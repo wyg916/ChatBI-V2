@@ -12,7 +12,7 @@ from pathlib import Path
 from typing import Any
 
 
-ORIGINAL_SHA256 = "d40bb690a4208240ecf347abe47e045cd74c8eb89b9162d5d53890ecf24bc282"
+ORIGINAL_SHA256 = "741da55b7dd41046a6f8411522a3cf92afb45ca1ac38b90b202b49c87f8eef0e"
 RUNTIME_MODEL_NAMES = {
     "postgresql": "新能源经营分析",
     "mysql": "新能源经营分析（MySQL兼容）",

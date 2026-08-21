@@ -162,31 +162,64 @@ class WrenRuntimeAdapter:
             "outstanding_amount": "ROUND(SUM(p.outstanding_amount)::numeric, 2) AS outstanding_amount",
         }
         dimension_sql = {
-            "region": ("r.region_group AS region", "r.region_group", "dim_region.region_group"),
-            "product": ("pr.product_name AS product", "pr.product_name", "dim_product.product_name"),
-            "category": ("pr.category AS category", "pr.category", "dim_product.category"),
-            "customer": ("c.customer_name AS customer", "c.customer_name", "dim_customer.customer_name"),
-            "customer_tier": ("c.customer_tier AS customer_tier", "c.customer_tier", "dim_customer.customer_tier"),
+            "region": (
+                "r.region_group AS region", "r.region_group", "dim_region.region_group",
+                "r.region_id", "dim_region.region_id",
+            ),
+            "product": (
+                "pr.product_name AS product", "pr.product_name", "dim_product.product_name",
+                "pr.product_id", "dim_product.product_id",
+            ),
+            "category": (
+                "pr.category AS category", "pr.category", "dim_product.category",
+                "pr.category", "dim_product.category",
+            ),
+            "customer": (
+                "c.customer_name AS customer", "c.customer_name", "dim_customer.customer_name",
+                "c.customer_id", "dim_customer.customer_id",
+            ),
+            "customer_tier": (
+                "c.customer_tier AS customer_tier", "c.customer_tier", "dim_customer.customer_tier",
+                "c.customer_tier", "dim_customer.customer_tier",
+            ),
             "month": (
                 f"DATE_TRUNC('month', {alias}.{'invoice_date' if payment_query else 'order_date'})::date AS month",
                 f"DATE_TRUNC('month', {alias}.{'invoice_date' if payment_query else 'order_date'})::date",
                 f"{fact}.{'invoice_date' if payment_query else 'order_date'}",
+                None,
+                None,
             ),
-            "status": ("f.order_status AS status", "f.order_status", "fact_sales.order_status"),
-            "aging_bucket": ("p.aging_bucket AS aging_bucket", "p.aging_bucket", "fact_payment.aging_bucket"),
-            "tenant": (f"{alias}.tenant_id AS tenant", f"{alias}.tenant_id", f"{fact}.tenant_id"),
+            "status": (
+                "f.order_status AS status", "f.order_status", "fact_sales.order_status",
+                "f.order_status", "fact_sales.order_status",
+            ),
+            "aging_bucket": (
+                "p.aging_bucket AS aging_bucket", "p.aging_bucket", "fact_payment.aging_bucket",
+                "p.aging_bucket", "fact_payment.aging_bucket",
+            ),
+            "tenant": (
+                f"{alias}.tenant_id AS tenant", f"{alias}.tenant_id", f"{fact}.tenant_id",
+                f"{alias}.tenant_id", f"{fact}.tenant_id",
+            ),
         }
         select_parts: list[str] = []
         group_by: list[str] = []
+        stable_order_by: list[str] = []
         selected_columns: list[str] = []
         for dimension in semantic_query.dimensions:
             if payment_query and dimension not in {"month", "aging_bucket", "tenant"}:
                 continue
             if dimension in dimension_sql:
-                expression, group, source = dimension_sql[dimension]
+                expression, group, source, stable_group, stable_source = dimension_sql[dimension]
                 select_parts.append(expression)
                 group_by.append(group)
                 selected_columns.append(source)
+                if stable_group is not None:
+                    if stable_group not in group_by:
+                        group_by.append(stable_group)
+                    stable_order_by.append(f"{stable_group} ASC")
+                if stable_source is not None and stable_source not in selected_columns:
+                    selected_columns.append(stable_source)
         for metric in metrics:
             expression = metric_sql.get(metric)
             if not expression:
@@ -268,9 +301,13 @@ class WrenRuntimeAdapter:
         )
         primary_metric = metrics[0]
         if extreme and group_by:
-            order_by = [f"{primary_metric} {'DESC' if extreme == 'MAX' else 'ASC'}"]
+            order_by = [f"{primary_metric} {'DESC' if extreme == 'MAX' else 'ASC'}", *stable_order_by]
         else:
-            order_by = ["month ASC"] if "month" in semantic_query.dimensions else ([f"{primary_metric} DESC"] if group_by else [])
+            order_by = (
+                ["month ASC", *stable_order_by]
+                if "month" in semantic_query.dimensions
+                else ([f"{primary_metric} DESC", *stable_order_by] if group_by else [])
+            )
         lines = ["SELECT", "  " + ",\n  ".join(select_parts), f"FROM {table(fact)} {alias}", *join_lines]
         if where_parts:
             lines.append("WHERE " + "\n  AND ".join(where_parts))

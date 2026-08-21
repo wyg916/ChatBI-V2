@@ -259,27 +259,54 @@ class DeterministicTestProvider(ModelProviderAdapter, Nl2SqlEngine):
             "profit_margin": "ROUND(SUM(o.revenue - o.cost) * 100.0 / NULLIF(SUM(o.revenue), 0), 4) AS profit_margin",
         }
         dimension_sql = {
-            "region": ("r.region_name AS region", "r.region_name", "regions.region_name"),
-            "product": ("p.product_name AS product", "p.product_name", "products.product_name"),
-            "category": ("p.category AS category", "p.category", "products.category"),
-            "customer": ("c.customer_name AS customer", "c.customer_name", "customers.customer_name"),
-            "customer_type": ("c.customer_type AS customer_type", "c.customer_type", "customers.customer_type"),
-            "status": ("o.status AS status", "o.status", "orders.status"),
+            "region": (
+                "r.region_name AS region", "r.region_name", "regions.region_name",
+                "r.region_id", "regions.region_id",
+            ),
+            "product": (
+                "p.product_name AS product", "p.product_name", "products.product_name",
+                "p.product_id", "products.product_id",
+            ),
+            "category": (
+                "p.category AS category", "p.category", "products.category",
+                "p.category", "products.category",
+            ),
+            "customer": (
+                "c.customer_name AS customer", "c.customer_name", "customers.customer_name",
+                "c.customer_id", "customers.customer_id",
+            ),
+            "customer_type": (
+                "c.customer_type AS customer_type", "c.customer_type", "customers.customer_type",
+                "c.customer_type", "customers.customer_type",
+            ),
+            "status": (
+                "o.status AS status", "o.status", "orders.status",
+                "o.status", "orders.status",
+            ),
             "month": (
                 "DATE_TRUNC('month', o.order_date) AS month" if dialect == "postgresql" else "DATE_FORMAT(o.order_date, '%Y-%m-01') AS month",
                 "DATE_TRUNC('month', o.order_date)" if dialect == "postgresql" else "DATE_FORMAT(o.order_date, '%Y-%m-01')",
                 "orders.order_date",
+                None,
+                None,
             ),
         }
         select_parts: list[str] = []
         group_parts: list[str] = []
+        stable_order_parts: list[str] = []
         selected_columns: list[str] = []
         for dimension in dimensions:
             if dimension in dimension_sql:
-                select_value, group_value, source = dimension_sql[dimension]
+                select_value, group_value, source, stable_group, stable_source = dimension_sql[dimension]
                 select_parts.append(select_value)
                 group_parts.append(group_value)
                 selected_columns.append(source)
+                if stable_group is not None:
+                    if stable_group not in group_parts:
+                        group_parts.append(stable_group)
+                    stable_order_parts.append(f"{stable_group} ASC")
+                if stable_source is not None and stable_source not in selected_columns:
+                    selected_columns.append(stable_source)
         for metric in metrics:
             select_parts.append(metric_sql.get(metric, metric_sql["revenue"]))
             if metric in {"order_count", "distinct_order_count"}:
@@ -335,9 +362,16 @@ class DeterministicTestProvider(ModelProviderAdapter, Nl2SqlEngine):
 
         descending = not _contains(question, ["最低", "最少", "升序"])
         metric_alias = metrics[0] if metrics else "revenue"
-        order_parts = [f"{metric_alias} {'DESC' if descending else 'ASC'}"] if dimensions else []
+        order_parts = (
+            [f"{metric_alias} {'DESC' if descending else 'ASC'}", *stable_order_parts]
+            if dimensions else []
+        )
         if "month" in dimensions:
-            order_parts = ["month ASC"] + ([f"{metric_alias} DESC"] if len(dimensions) > 1 else [])
+            order_parts = (
+                ["month ASC"]
+                + ([f"{metric_alias} DESC"] if len(dimensions) > 1 else [])
+                + stable_order_parts
+            )
 
         lines = ["SELECT", "  " + ",\n  ".join(select_parts), f"FROM {table('orders')} o"]
         lines.extend(join_lines)

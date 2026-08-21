@@ -60,7 +60,7 @@ jobs:
         image: postgres:16.9-alpine@sha256:7c688148e5e156d0e86df7ba8ae5a05a2386aaec1e2ad8e6d11bdf10504b1fb7
         env:
           POSTGRES_USER: chatbi_ci_admin
-          POSTGRES_PASSWORD: ci-${{ github.run_id }}-${{ github.run_attempt }}
+          POSTGRES_HOST_AUTH_METHOD: trust
           POSTGRES_DB: postgres
         ports:
           - 5432:5432
@@ -72,7 +72,6 @@ jobs:
     env:
       PYTHONPATH: >-
         backend:packages/agent-contracts/src:packages/agent-orchestrator/src:packages/prompt-registry/src:packages/rag-adapter/src:packages/rag-contracts/src
-      CHATBI_CI_POSTGRES_ADMIN_PASSWORD: ci-${{ github.run_id }}-${{ github.run_attempt }}
       CHATBI_MODEL_PROVIDER: deterministic
       CHATBI_SEMANTIC_RUNTIME_MODE: wren
       CHATBI_SEMANTIC_UPSTREAM_REUSE_MODE: selected_source
@@ -104,7 +103,7 @@ jobs:
         run: >-
           python backend/scripts/run_v13_ibm_ci_bootstrap.py
           --admin-user chatbi_ci_admin
-          --admin-password-env CHATBI_CI_POSTGRES_ADMIN_PASSWORD
+          --allow-local-trust
           --github-env "$GITHUB_ENV"
       - name: Apply metadata migrations
         working-directory: backend

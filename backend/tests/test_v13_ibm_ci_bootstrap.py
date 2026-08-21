@@ -125,6 +125,10 @@ def test_workflow_is_self_contained_and_has_no_repository_secret_dependency() ->
 
     assert 'branches: ["codex/v1.3.0-data-semantic-upstream"]' in workflow
     assert "image: postgres:16.9-alpine@sha256:" in workflow
+    assert "POSTGRES_HOST_AUTH_METHOD: trust" in workflow
+    assert "POSTGRES_PASSWORD:" not in workflow
+    assert "CHATBI_CI_POSTGRES_ADMIN_PASSWORD:" not in workflow
+    assert "--allow-local-trust" in workflow
     assert "run_v13_ibm_ci_bootstrap.py" in workflow
     assert "python -m alembic upgrade head" in workflow
     assert "--prepare-api http://127.0.0.1:18080/api/v1" in workflow
@@ -145,3 +149,24 @@ def test_workflow_is_self_contained_and_has_no_repository_secret_dependency() ->
     assert "inputs.api_base" not in workflow
     assert "secrets." not in workflow
     assert not re.search(r"Bearer\s+[A-Za-z0-9._-]+", workflow)
+
+
+def test_local_trust_bootstrap_is_loopback_only(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.delenv("CHATBI_CI_POSTGRES_ADMIN_PASSWORD", raising=False)
+    monkeypatch.setattr(
+        "sys.argv",
+        [
+            "run_v13_ibm_ci_bootstrap.py",
+            "--host",
+            "db.internal",
+            "--allow-local-trust",
+            "--github-env",
+            str(tmp_path / "github-env"),
+        ],
+    )
+
+    with pytest.raises(RuntimeError, match="restricted to a loopback"):
+        bootstrap.main()

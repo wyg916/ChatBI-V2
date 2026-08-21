@@ -138,6 +138,18 @@ def test_day1_semantic_runtime_produces_traceable_guarded_plan(question, metrics
         assert plan.generated_sql.endswith("LIMIT 1")
 
 
+def test_wren_grouped_entity_query_uses_primary_key_as_stable_tiebreaker() -> None:
+    runtime = SemanticRuntime(Settings(_env_file=None, semantic_runtime_mode="wren"))
+    plan, _ = runtime.plan(
+        question="租户 1 2025年按产品统计销售额前5",
+        context=benchmark_context(),
+    )
+
+    assert "GROUP BY pr.product_name, pr.product_id" in plan.generated_sql
+    assert "ORDER BY net_sales DESC, pr.product_id ASC" in plan.generated_sql
+    assert "dim_product.product_id" in plan.selected_columns
+
+
 def test_invalid_relation_is_blocked_with_structured_error():
     runtime = SemanticRuntime(Settings(_env_file=None, semantic_runtime_mode="wren"))
     with pytest.raises(SemanticRuntimeError) as error:

@@ -275,7 +275,7 @@ def _seed_demo_content(db: Session, workspace_id: str) -> None:
             error_distribution=[{"label": "无错误", "percent": 100, "color": "#16a36a"}],
             trend_points=[{"date": "08/17", "value": 100}],
             completed_at=now - timedelta(minutes=28), duration_seconds=0, sort_order=1,
-            manifest_sha256="d40bb690a4208240ecf347abe47e045cd74c8eb89b9162d5d53890ecf24bc282",
+            manifest_sha256="741da55b7dd41046a6f8411522a3cf92afb45ca1ac38b90b202b49c87f8eef0e",
             sql_execution_pass_count=20, result_value_pass_count=20, semantic_pass_count=20,
             dangerous_sql_total=38, dangerous_sql_block_count=38,
         ))

@@ -1,7 +1,7 @@
 {
   "name": "ChatBI V2.1 Multiple Ground Truth Overlay",
   "version": "2.1.0",
-  "source_manifest_sha256": "25580af42bc76ebddd3d49e6b9c16f8bfabba8ba485a835c453c29175ee2a64a",
+  "source_manifest_sha256": "67a1d43d53232644df86a8e46ee66fc51baaeeb724881679d53855dde49e0dc4",
   "description": "Execution-equivalent SQL ground truths. Runtime answers are still compared by executed values, never SQL text equality.",
   "cases": {
     "G01": [

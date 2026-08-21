@@ -1,10 +1,10 @@
 {
   "name": "ChatBI V2 Day 4 Golden 50",
-  "version": "4.0.0",
-  "source_manifest_sha256": "d40bb690a4208240ecf347abe47e045cd74c8eb89b9162d5d53890ecf24bc282",
+  "version": "4.1.0",
+  "source_manifest_sha256": "741da55b7dd41046a6f8411522a3cf92afb45ca1ac38b90b202b49c87f8eef0e",
   "frozen": true,
-  "frozen_at": "2026-08-17T12:26:21.872216+00:00",
-  "manifest_sha256": "25580af42bc76ebddd3d49e6b9c16f8bfabba8ba485a835c453c29175ee2a64a",
+  "frozen_at": "2026-08-21T16:30:00+00:00",
+  "manifest_sha256": "67a1d43d53232644df86a8e46ee66fc51baaeeb724881679d53855dde49e0dc4",
   "cases": [
     {
       "id": "G01",
@@ -430,7 +430,7 @@
         }
       ],
       "expected_time_range": null,
-      "expected_sql": "SELECT p.product_name AS product, COUNT(o.order_id) AS order_count FROM demo_business.orders o JOIN demo_business.products p ON p.product_id = o.product_id WHERE o.status = 'REFUNDED' GROUP BY p.product_name ORDER BY order_count DESC LIMIT 5",
+      "expected_sql": "SELECT p.product_name AS product, COUNT(o.order_id) AS order_count FROM demo_business.orders o JOIN demo_business.products p ON p.product_id = o.product_id WHERE o.status = 'REFUNDED' GROUP BY p.product_name, p.product_id ORDER BY order_count DESC, p.product_id ASC LIMIT 5",
       "expected_result": [
         {
           "product": "储能柜",
@@ -441,7 +441,7 @@
           "order_count": 12
         },
         {
-          "product": "运维服务包",
+          "product": "家用充电桩",
           "order_count": 11
         },
         {
@@ -449,7 +449,7 @@
           "order_count": 11
         },
         {
-          "product": "家用充电桩",
+          "product": "运维服务包",
           "order_count": 11
         }
       ],
@@ -471,7 +471,7 @@
       ],
       "expected_filters": [],
       "expected_time_range": null,
-      "expected_sql": "SELECT o.status AS status, SUM(o.revenue) AS revenue FROM demo_business.orders o GROUP BY o.status ORDER BY revenue DESC",
+      "expected_sql": "SELECT o.status AS status, SUM(o.revenue) AS revenue FROM demo_business.orders o GROUP BY o.status ORDER BY revenue DESC, o.status ASC",
       "expected_result": [
         {
           "status": "PAID",
@@ -501,7 +501,7 @@
       ],
       "expected_filters": [],
       "expected_time_range": null,
-      "expected_sql": "SELECT p.category AS category, SUM(o.cost) AS cost FROM demo_business.orders o JOIN demo_business.products p ON p.product_id = o.product_id GROUP BY p.category ORDER BY cost DESC LIMIT 4",
+      "expected_sql": "SELECT p.category AS category, SUM(o.cost) AS cost FROM demo_business.orders o JOIN demo_business.products p ON p.product_id = o.product_id GROUP BY p.category ORDER BY cost DESC, p.category ASC LIMIT 4",
       "expected_result": [
         {
           "category": "充电设备",
@@ -539,7 +539,7 @@
       ],
       "expected_filters": [],
       "expected_time_range": null,
-      "expected_sql": "SELECT r.region_name AS region, SUM(o.revenue) AS revenue FROM demo_business.orders o JOIN demo_business.regions r ON r.region_id = o.region_id GROUP BY r.region_name ORDER BY revenue DESC",
+      "expected_sql": "SELECT r.region_name AS region, SUM(o.revenue) AS revenue FROM demo_business.orders o JOIN demo_business.regions r ON r.region_id = o.region_id GROUP BY r.region_name, r.region_id ORDER BY revenue DESC, r.region_id ASC",
       "expected_result": [
         {
           "region": "西部",
@@ -581,10 +581,18 @@
       ],
       "expected_filters": [],
       "expected_time_range": null,
-      "expected_sql": "SELECT c.customer_name AS customer, COUNT(o.order_id) AS order_count FROM demo_business.orders o JOIN demo_business.customers c ON c.customer_id = o.customer_id GROUP BY c.customer_name ORDER BY order_count DESC LIMIT 5",
+      "expected_sql": "SELECT c.customer_name AS customer, COUNT(o.order_id) AS order_count FROM demo_business.orders o JOIN demo_business.customers c ON c.customer_id = o.customer_id GROUP BY c.customer_name, c.customer_id ORDER BY order_count DESC, c.customer_id ASC LIMIT 5",
       "expected_result": [
         {
-          "customer": "客户-007",
+          "customer": "客户-001",
+          "order_count": 19
+        },
+        {
+          "customer": "客户-002",
+          "order_count": 19
+        },
+        {
+          "customer": "客户-003",
           "order_count": 19
         },
         {
@@ -592,19 +600,11 @@
           "order_count": 19
         },
         {
-          "customer": "客户-008",
-          "order_count": 19
-        },
-        {
-          "customer": "客户-011",
-          "order_count": 19
-        },
-        {
-          "customer": "客户-010",
+          "customer": "客户-005",
           "order_count": 19
         }
       ],
-      "expected_signature": "b6ab716d8ebf38d2f14a449cbeca9c049e35211332f7c5f9b3fd0fd1ac6a9472",
+      "expected_signature": "ec3d2a3fedc325e4aad6bc2862b0ad5e9042161711a5b7081f5bee7c356765d2",
       "expected_outcome": "PASSED"
     },
     {
@@ -623,7 +623,7 @@
       ],
       "expected_filters": [],
       "expected_time_range": null,
-      "expected_sql": "SELECT p.product_name AS product, SUM(o.revenue) AS revenue FROM demo_business.orders o JOIN demo_business.products p ON p.product_id = o.product_id GROUP BY p.product_name ORDER BY revenue DESC LIMIT 5",
+      "expected_sql": "SELECT p.product_name AS product, SUM(o.revenue) AS revenue FROM demo_business.orders o JOIN demo_business.products p ON p.product_id = o.product_id GROUP BY p.product_name, p.product_id ORDER BY revenue DESC, p.product_id ASC LIMIT 5",
       "expected_result": [
         {
           "product": "能源管理终端",
@@ -665,7 +665,7 @@
       ],
       "expected_filters": [],
       "expected_time_range": null,
-      "expected_sql": "SELECT c.customer_type AS customer_type, AVG(o.revenue) AS avg_order_value FROM demo_business.orders o JOIN demo_business.customers c ON c.customer_id = o.customer_id GROUP BY c.customer_type ORDER BY avg_order_value DESC",
+      "expected_sql": "SELECT c.customer_type AS customer_type, AVG(o.revenue) AS avg_order_value FROM demo_business.orders o JOIN demo_business.customers c ON c.customer_id = o.customer_id GROUP BY c.customer_type ORDER BY avg_order_value DESC, c.customer_type ASC",
       "expected_result": [
         {
           "customer_type": "渠道",
@@ -699,7 +699,7 @@
       ],
       "expected_filters": [],
       "expected_time_range": null,
-      "expected_sql": "SELECT r.region_name AS region, SUM(o.revenue - o.cost) AS profit FROM demo_business.orders o JOIN demo_business.regions r ON r.region_id = o.region_id GROUP BY r.region_name ORDER BY profit DESC",
+      "expected_sql": "SELECT r.region_name AS region, SUM(o.revenue - o.cost) AS profit FROM demo_business.orders o JOIN demo_business.regions r ON r.region_id = o.region_id GROUP BY r.region_name, r.region_id ORDER BY profit DESC, r.region_id ASC",
       "expected_result": [
         {
           "region": "西部",
@@ -750,7 +750,7 @@
         "start": "2026-01-01",
         "end_exclusive": "2027-01-01"
       },
-      "expected_sql": "SELECT r.region_name AS region, DATE_TRUNC('month', o.order_date) AS month, SUM(o.revenue) AS revenue FROM demo_business.orders o JOIN demo_business.regions r ON r.region_id = o.region_id WHERE o.status = 'PAID' AND o.order_date >= DATE '2026-01-01' AND o.order_date < DATE '2027-01-01' GROUP BY r.region_name, DATE_TRUNC('month', o.order_date) ORDER BY month ASC, revenue DESC",
+      "expected_sql": "SELECT r.region_name AS region, DATE_TRUNC('month', o.order_date) AS month, SUM(o.revenue) AS revenue FROM demo_business.orders o JOIN demo_business.regions r ON r.region_id = o.region_id WHERE o.status = 'PAID' AND o.order_date >= DATE '2026-01-01' AND o.order_date < DATE '2027-01-01' GROUP BY r.region_name, r.region_id, DATE_TRUNC('month', o.order_date) ORDER BY month ASC, revenue DESC, r.region_id ASC",
       "expected_result": [
         {
           "region": "西部",
@@ -980,7 +980,7 @@
         "start": "2026-01-01",
         "end_exclusive": "2027-01-01"
       },
-      "expected_sql": "SELECT p.product_name AS product, SUM(o.revenue) AS revenue FROM demo_business.orders o JOIN demo_business.products p ON p.product_id = o.product_id WHERE o.status = 'REFUNDED' AND o.order_date >= DATE '2026-01-01' AND o.order_date < DATE '2027-01-01' GROUP BY p.product_name ORDER BY revenue DESC LIMIT 5",
+      "expected_sql": "SELECT p.product_name AS product, SUM(o.revenue) AS revenue FROM demo_business.orders o JOIN demo_business.products p ON p.product_id = o.product_id WHERE o.status = 'REFUNDED' AND o.order_date >= DATE '2026-01-01' AND o.order_date < DATE '2027-01-01' GROUP BY p.product_name, p.product_id ORDER BY revenue DESC, p.product_id ASC LIMIT 5",
       "expected_result": [
         {
           "product": "家用充电桩",
@@ -1030,7 +1030,7 @@
         "start": "2026-01-01",
         "end_exclusive": "2027-01-01"
       },
-      "expected_sql": "SELECT p.category AS category, SUM(o.revenue - o.cost) AS profit FROM demo_business.orders o JOIN demo_business.products p ON p.product_id = o.product_id WHERE o.status = 'PAID' AND o.order_date >= DATE '2026-01-01' AND o.order_date < DATE '2027-01-01' GROUP BY p.category ORDER BY profit DESC LIMIT 4",
+      "expected_sql": "SELECT p.category AS category, SUM(o.revenue - o.cost) AS profit FROM demo_business.orders o JOIN demo_business.products p ON p.product_id = o.product_id WHERE o.status = 'PAID' AND o.order_date >= DATE '2026-01-01' AND o.order_date < DATE '2027-01-01' GROUP BY p.category ORDER BY profit DESC, p.category ASC LIMIT 4",
       "expected_result": [
         {
           "category": "充电设备",
@@ -1218,7 +1218,7 @@
       ],
       "expected_filters": [],
       "expected_time_range": null,
-      "expected_sql": "SELECT r.region_name AS region, SUM(o.cost) AS cost FROM demo_business.orders o JOIN demo_business.regions r ON r.region_id = o.region_id GROUP BY r.region_name ORDER BY cost DESC",
+      "expected_sql": "SELECT r.region_name AS region, SUM(o.cost) AS cost FROM demo_business.orders o JOIN demo_business.regions r ON r.region_id = o.region_id GROUP BY r.region_name, r.region_id ORDER BY cost DESC, r.region_id ASC",
       "expected_result": [
         {
           "region": "西部",
@@ -1260,7 +1260,7 @@
       ],
       "expected_filters": [],
       "expected_time_range": null,
-      "expected_sql": "SELECT p.product_name AS product, SUM(o.revenue - o.cost) AS profit FROM demo_business.orders o JOIN demo_business.products p ON p.product_id = o.product_id GROUP BY p.product_name ORDER BY profit DESC LIMIT 3",
+      "expected_sql": "SELECT p.product_name AS product, SUM(o.revenue - o.cost) AS profit FROM demo_business.orders o JOIN demo_business.products p ON p.product_id = o.product_id GROUP BY p.product_name, p.product_id ORDER BY profit DESC, p.product_id ASC LIMIT 3",
       "expected_result": [
         {
           "product": "能源管理终端",
@@ -1294,7 +1294,7 @@
       ],
       "expected_filters": [],
       "expected_time_range": null,
-      "expected_sql": "SELECT p.category AS category, SUM(o.revenue) AS revenue FROM demo_business.orders o JOIN demo_business.products p ON p.product_id = o.product_id GROUP BY p.category ORDER BY revenue DESC",
+      "expected_sql": "SELECT p.category AS category, SUM(o.revenue) AS revenue FROM demo_business.orders o JOIN demo_business.products p ON p.product_id = o.product_id GROUP BY p.category ORDER BY revenue DESC, p.category ASC",
       "expected_result": [
         {
           "category": "充电设备",
@@ -1332,7 +1332,7 @@
       ],
       "expected_filters": [],
       "expected_time_range": null,
-      "expected_sql": "SELECT c.customer_name AS customer, SUM(o.revenue) AS revenue FROM demo_business.orders o JOIN demo_business.customers c ON c.customer_id = o.customer_id GROUP BY c.customer_name ORDER BY revenue DESC LIMIT 5",
+      "expected_sql": "SELECT c.customer_name AS customer, SUM(o.revenue) AS revenue FROM demo_business.orders o JOIN demo_business.customers c ON c.customer_id = o.customer_id GROUP BY c.customer_name, c.customer_id ORDER BY revenue DESC, c.customer_id ASC LIMIT 5",
       "expected_result": [
         {
           "customer": "客户-009",
@@ -1347,11 +1347,11 @@
           "revenue": 33187.5
         },
         {
-          "customer": "客户-059",
+          "customer": "客户-006",
           "revenue": 32475.0
         },
         {
-          "customer": "客户-006",
+          "customer": "客户-059",
           "revenue": 32475.0
         }
       ],
@@ -1374,7 +1374,7 @@
       ],
       "expected_filters": [],
       "expected_time_range": null,
-      "expected_sql": "SELECT c.customer_type AS customer_type, COUNT(o.order_id) AS order_count FROM demo_business.orders o JOIN demo_business.customers c ON c.customer_id = o.customer_id GROUP BY c.customer_type ORDER BY order_count DESC",
+      "expected_sql": "SELECT c.customer_type AS customer_type, COUNT(o.order_id) AS order_count FROM demo_business.orders o JOIN demo_business.customers c ON c.customer_id = o.customer_id GROUP BY c.customer_type ORDER BY order_count DESC, c.customer_type ASC",
       "expected_result": [
         {
           "customer_type": "个人",
@@ -1468,7 +1468,7 @@
         "start": "2026-01-01",
         "end_exclusive": "2027-01-01"
       },
-      "expected_sql": "SELECT r.region_name AS region, DATE_TRUNC('month', o.order_date) AS month, SUM(o.cost) AS cost FROM demo_business.orders o JOIN demo_business.regions r ON r.region_id = o.region_id WHERE o.order_date >= DATE '2026-01-01' AND o.order_date < DATE '2027-01-01' GROUP BY r.region_name, DATE_TRUNC('month', o.order_date) ORDER BY month ASC, cost DESC",
+      "expected_sql": "SELECT r.region_name AS region, DATE_TRUNC('month', o.order_date) AS month, SUM(o.cost) AS cost FROM demo_business.orders o JOIN demo_business.regions r ON r.region_id = o.region_id WHERE o.order_date >= DATE '2026-01-01' AND o.order_date < DATE '2027-01-01' GROUP BY r.region_name, r.region_id, DATE_TRUNC('month', o.order_date) ORDER BY month ASC, cost DESC, r.region_id ASC",
       "expected_result": [
         {
           "region": "西部",
@@ -1695,7 +1695,7 @@
         }
       ],
       "expected_time_range": null,
-      "expected_sql": "SELECT r.region_name AS region, SUM(o.cost) AS cost FROM demo_business.orders o JOIN demo_business.regions r ON r.region_id = o.region_id WHERE o.status = 'PAID' GROUP BY r.region_name ORDER BY cost DESC",
+      "expected_sql": "SELECT r.region_name AS region, SUM(o.cost) AS cost FROM demo_business.orders o JOIN demo_business.regions r ON r.region_id = o.region_id WHERE o.status = 'PAID' GROUP BY r.region_name, r.region_id ORDER BY cost DESC, r.region_id ASC",
       "expected_result": [
         {
           "region": "西部",
@@ -1742,7 +1742,7 @@
         }
       ],
       "expected_time_range": null,
-      "expected_sql": "SELECT p.category AS category, COUNT(o.order_id) AS order_count FROM demo_business.orders o JOIN demo_business.products p ON p.product_id = o.product_id WHERE o.status = 'REFUNDED' GROUP BY p.category ORDER BY order_count DESC",
+      "expected_sql": "SELECT p.category AS category, COUNT(o.order_id) AS order_count FROM demo_business.orders o JOIN demo_business.products p ON p.product_id = o.product_id WHERE o.status = 'REFUNDED' GROUP BY p.category ORDER BY order_count DESC, p.category ASC",
       "expected_result": [
         {
           "category": "充电设备",
@@ -1785,7 +1785,7 @@
         }
       ],
       "expected_time_range": null,
-      "expected_sql": "SELECT r.region_name AS region, SUM(o.revenue) AS revenue FROM demo_business.orders o JOIN demo_business.regions r ON r.region_id = o.region_id WHERE r.region_name = '华东' GROUP BY r.region_name ORDER BY revenue DESC",
+      "expected_sql": "SELECT r.region_name AS region, SUM(o.revenue) AS revenue FROM demo_business.orders o JOIN demo_business.regions r ON r.region_id = o.region_id WHERE r.region_name = '华东' GROUP BY r.region_name, r.region_id ORDER BY revenue DESC, r.region_id ASC",
       "expected_result": [
         {
           "region": "华东",
@@ -1820,7 +1820,7 @@
         }
       ],
       "expected_time_range": null,
-      "expected_sql": "SELECT r.region_name AS region, SUM(o.revenue - o.cost) AS profit FROM demo_business.orders o JOIN demo_business.regions r ON r.region_id = o.region_id WHERE o.status = 'PAID' AND r.region_name = '华南' GROUP BY r.region_name ORDER BY profit DESC",
+      "expected_sql": "SELECT r.region_name AS region, SUM(o.revenue - o.cost) AS profit FROM demo_business.orders o JOIN demo_business.regions r ON r.region_id = o.region_id WHERE o.status = 'PAID' AND r.region_name = '华南' GROUP BY r.region_name, r.region_id ORDER BY profit DESC, r.region_id ASC",
       "expected_result": [
         {
           "region": "华南",
@@ -1851,7 +1851,7 @@
         }
       ],
       "expected_time_range": null,
-      "expected_sql": "SELECT p.category AS category, SUM(o.revenue) AS revenue FROM demo_business.orders o JOIN demo_business.products p ON p.product_id = o.product_id WHERE p.category = '充电设备' GROUP BY p.category ORDER BY revenue DESC",
+      "expected_sql": "SELECT p.category AS category, SUM(o.revenue) AS revenue FROM demo_business.orders o JOIN demo_business.products p ON p.product_id = o.product_id WHERE p.category = '充电设备' GROUP BY p.category ORDER BY revenue DESC, p.category ASC",
       "expected_result": [
         {
           "category": "充电设备",
@@ -1886,7 +1886,7 @@
         }
       ],
       "expected_time_range": null,
-      "expected_sql": "SELECT p.category AS category, SUM(o.cost) AS cost FROM demo_business.orders o JOIN demo_business.products p ON p.product_id = o.product_id WHERE o.status = 'REFUNDED' AND p.category = '储能设备' GROUP BY p.category ORDER BY cost DESC",
+      "expected_sql": "SELECT p.category AS category, SUM(o.cost) AS cost FROM demo_business.orders o JOIN demo_business.products p ON p.product_id = o.product_id WHERE o.status = 'REFUNDED' AND p.category = '储能设备' GROUP BY p.category ORDER BY cost DESC, p.category ASC",
       "expected_result": [
         {
           "category": "储能设备",
@@ -1914,7 +1914,7 @@
       ],
       "expected_filters": [],
       "expected_time_range": null,
-      "expected_sql": "SELECT r.region_name AS region, p.category AS category, SUM(o.revenue) AS revenue FROM demo_business.orders o JOIN demo_business.regions r ON r.region_id = o.region_id JOIN demo_business.products p ON p.product_id = o.product_id GROUP BY r.region_name, p.category ORDER BY revenue DESC",
+      "expected_sql": "SELECT r.region_name AS region, p.category AS category, SUM(o.revenue) AS revenue FROM demo_business.orders o JOIN demo_business.regions r ON r.region_id = o.region_id JOIN demo_business.products p ON p.product_id = o.product_id GROUP BY r.region_name, r.region_id, p.category ORDER BY revenue DESC, r.region_id ASC, p.category ASC",
       "expected_result": [
         {
           "region": "西部",
@@ -1962,14 +1962,9 @@
       ],
       "expected_filters": [],
       "expected_time_range": null,
-      "expected_sql": "SELECT p.product_name AS product, o.status AS status, COUNT(o.order_id) AS order_count FROM demo_business.orders o JOIN demo_business.products p ON p.product_id = o.product_id GROUP BY p.product_name, o.status ORDER BY order_count DESC",
+      "expected_sql": "SELECT p.product_name AS product, o.status AS status, COUNT(o.order_id) AS order_count FROM demo_business.orders o JOIN demo_business.products p ON p.product_id = o.product_id GROUP BY p.product_name, p.product_id, o.status ORDER BY order_count DESC, p.product_id ASC, o.status ASC",
       "expected_result": [
         {
-          "product": "运维服务包",
-          "status": "PAID",
-          "order_count": 208
-        },
-        {
           "product": "家用充电桩",
           "status": "PAID",
           "order_count": 208
@@ -1980,9 +1975,9 @@
           "order_count": 208
         },
         {
-          "product": "能源管理终端",
+          "product": "运维服务包",
           "status": "PAID",
-          "order_count": 207
+          "order_count": 208
         },
         {
           "product": "储能柜",
@@ -1991,11 +1986,16 @@
         },
         {
           "product": "能源管理终端",
+          "status": "PAID",
+          "order_count": 207
+        },
+        {
+          "product": "储能柜",
           "status": "REFUNDED",
           "order_count": 12
         },
         {
-          "product": "储能柜",
+          "product": "能源管理终端",
           "status": "REFUNDED",
           "order_count": 12
         },
@@ -2005,12 +2005,12 @@
           "order_count": 11
         },
         {
-          "product": "运维服务包",
+          "product": "商用充电桩",
           "status": "REFUNDED",
           "order_count": 11
         },
         {
-          "product": "商用充电桩",
+          "product": "运维服务包",
           "status": "REFUNDED",
           "order_count": 11
         }
@@ -2035,7 +2035,7 @@
       ],
       "expected_filters": [],
       "expected_time_range": null,
-      "expected_sql": "SELECT c.customer_type AS customer_type, o.status AS status, SUM(o.revenue) AS revenue FROM demo_business.orders o JOIN demo_business.customers c ON c.customer_id = o.customer_id GROUP BY c.customer_type, o.status ORDER BY revenue DESC",
+      "expected_sql": "SELECT c.customer_type AS customer_type, o.status AS status, SUM(o.revenue) AS revenue FROM demo_business.orders o JOIN demo_business.customers c ON c.customer_id = o.customer_id GROUP BY c.customer_type, o.status ORDER BY revenue DESC, c.customer_type ASC, o.status ASC",
       "expected_result": [
         {
           "customer_type": "渠道",
@@ -2113,7 +2113,7 @@
       ],
       "expected_filters": [],
       "expected_time_range": null,
-      "expected_sql": "SELECT r.region_name AS region, ROUND(SUM(o.revenue) * 100.0 / NULLIF(SUM(SUM(o.revenue)) OVER (), 0), 4) AS revenue_share FROM demo_business.orders o JOIN demo_business.regions r ON r.region_id = o.region_id GROUP BY r.region_name ORDER BY revenue_share DESC",
+      "expected_sql": "SELECT r.region_name AS region, ROUND(SUM(o.revenue) * 100.0 / NULLIF(SUM(SUM(o.revenue)) OVER (), 0), 4) AS revenue_share FROM demo_business.orders o JOIN demo_business.regions r ON r.region_id = o.region_id GROUP BY r.region_name, r.region_id ORDER BY revenue_share DESC, r.region_id ASC",
       "expected_result": [
         {
           "region": "西部",
@@ -2155,7 +2155,7 @@
       ],
       "expected_filters": [],
       "expected_time_range": null,
-      "expected_sql": "SELECT p.category AS category, ROUND(SUM(o.revenue - o.cost) * 100.0 / NULLIF(SUM(o.revenue), 0), 4) AS profit_margin FROM demo_business.orders o JOIN demo_business.products p ON p.product_id = o.product_id GROUP BY p.category ORDER BY profit_margin DESC",
+      "expected_sql": "SELECT p.category AS category, ROUND(SUM(o.revenue - o.cost) * 100.0 / NULLIF(SUM(o.revenue), 0), 4) AS profit_margin FROM demo_business.orders o JOIN demo_business.products p ON p.product_id = o.product_id GROUP BY p.category ORDER BY profit_margin DESC, p.category ASC",
       "expected_result": [
         {
           "category": "服务",
@@ -2367,8 +2367,12 @@
       ],
       "expected_filters": [],
       "expected_time_range": null,
-      "expected_sql": "SELECT c.customer_name AS customer, COUNT(DISTINCT o.order_id) AS distinct_order_count FROM demo_business.orders o JOIN demo_business.customers c ON c.customer_id = o.customer_id GROUP BY c.customer_name ORDER BY distinct_order_count DESC LIMIT 5",
+      "expected_sql": "SELECT c.customer_name AS customer, COUNT(DISTINCT o.order_id) AS distinct_order_count FROM demo_business.orders o JOIN demo_business.customers c ON c.customer_id = o.customer_id GROUP BY c.customer_name, c.customer_id ORDER BY distinct_order_count DESC, c.customer_id ASC LIMIT 5",
       "expected_result": [
+        {
+          "customer": "客户-001",
+          "distinct_order_count": 19
+        },
         {
           "customer": "客户-002",
           "distinct_order_count": 19
@@ -2383,10 +2387,6 @@
         },
         {
           "customer": "客户-005",
-          "distinct_order_count": 19
-        },
-        {
-          "customer": "客户-001",
           "distinct_order_count": 19
         }
       ],
@@ -2413,7 +2413,7 @@
         "start": "2026-01-01",
         "end_exclusive": "2026-04-01"
       },
-      "expected_sql": "SELECT r.region_name AS region, SUM(o.revenue) AS revenue, SUM(o.cost) AS cost FROM demo_business.orders o JOIN demo_business.regions r ON r.region_id = o.region_id WHERE o.order_date >= DATE '2026-01-01' AND o.order_date < DATE '2026-04-01' GROUP BY r.region_name ORDER BY revenue DESC",
+      "expected_sql": "SELECT r.region_name AS region, SUM(o.revenue) AS revenue, SUM(o.cost) AS cost FROM demo_business.orders o JOIN demo_business.regions r ON r.region_id = o.region_id WHERE o.order_date >= DATE '2026-01-01' AND o.order_date < DATE '2026-04-01' GROUP BY r.region_name, r.region_id ORDER BY revenue DESC, r.region_id ASC",
       "expected_result": [
         {
           "region": "西部",
@@ -2463,7 +2463,7 @@
         "start": "2026-02-01",
         "end_exclusive": "2026-03-01"
       },
-      "expected_sql": "SELECT p.product_name AS product, ROUND(SUM(o.revenue - o.cost) * 100.0 / NULLIF(SUM(o.revenue), 0), 4) AS profit_margin FROM demo_business.orders o JOIN demo_business.products p ON p.product_id = o.product_id WHERE o.order_date >= DATE '2026-02-01' AND o.order_date < DATE '2026-03-01' GROUP BY p.product_name ORDER BY profit_margin DESC",
+      "expected_sql": "SELECT p.product_name AS product, ROUND(SUM(o.revenue - o.cost) * 100.0 / NULLIF(SUM(o.revenue), 0), 4) AS profit_margin FROM demo_business.orders o JOIN demo_business.products p ON p.product_id = o.product_id WHERE o.order_date >= DATE '2026-02-01' AND o.order_date < DATE '2026-03-01' GROUP BY p.product_name, p.product_id ORDER BY profit_margin DESC, p.product_id ASC",
       "expected_result": [
         {
           "product": "家用充电桩",
@@ -2508,7 +2508,7 @@
         "start": "2024-01-01",
         "end_exclusive": "2025-01-01"
       },
-      "expected_sql": "SELECT r.region_name AS region, SUM(o.revenue) AS revenue FROM demo_business.orders o JOIN demo_business.regions r ON r.region_id = o.region_id WHERE o.order_date >= DATE '2024-01-01' AND o.order_date < DATE '2025-01-01' GROUP BY r.region_name ORDER BY revenue DESC",
+      "expected_sql": "SELECT r.region_name AS region, SUM(o.revenue) AS revenue FROM demo_business.orders o JOIN demo_business.regions r ON r.region_id = o.region_id WHERE o.order_date >= DATE '2024-01-01' AND o.order_date < DATE '2025-01-01' GROUP BY r.region_name, r.region_id ORDER BY revenue DESC, r.region_id ASC",
       "expected_result": [],
       "expected_signature": "803fc8dea91fa9dd4200b64dd6e17f317574fe219c8b1d06a6156ee3e4138d62",
       "expected_outcome": "PASSED"

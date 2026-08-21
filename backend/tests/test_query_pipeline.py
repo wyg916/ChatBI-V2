@@ -138,6 +138,58 @@ def test_day4_planner_supports_growth_ratio_null_and_date_boundaries(dialect):
 
 
 @pytest.mark.parametrize(
+    ("question", "expected_group", "expected_order"),
+    [
+        pytest.param(
+            "按产品统计已退款订单量前5名",
+            "GROUP BY p.product_name, p.product_id",
+            "ORDER BY order_count DESC, p.product_id ASC",
+            id="refunded-product-top5",
+        ),
+        pytest.param(
+            "按客户统计订单量前5名",
+            "GROUP BY c.customer_name, c.customer_id",
+            "ORDER BY order_count DESC, c.customer_id ASC",
+            id="customer-count-top5-boundary-tie",
+        ),
+        pytest.param(
+            "按客户统计订单收入前5名",
+            "GROUP BY c.customer_name, c.customer_id",
+            "ORDER BY revenue DESC, c.customer_id ASC",
+            id="customer-revenue-top5",
+        ),
+        pytest.param(
+            "按产品按状态统计订单量",
+            "GROUP BY p.product_name, p.product_id, o.status",
+            "ORDER BY order_count DESC, p.product_id ASC, o.status ASC",
+            id="product-status-count",
+        ),
+    ],
+)
+def test_grouped_business_queries_use_total_order_contract(
+    question: str,
+    expected_group: str,
+    expected_order: str,
+) -> None:
+    plan = DeterministicTestProvider().plan(question=question, context=semantic_context())
+
+    assert expected_group in plan.generated_sql
+    assert expected_order in plan.generated_sql
+    guarded = SqlGuard().validate(plan.generated_sql, dialect="postgresql", policy=policy())
+    assert guarded.allowed is True, guarded.issues
+
+
+def test_entity_primary_keys_precede_value_dimensions_in_stable_order() -> None:
+    plan = DeterministicTestProvider().plan(
+        question="按产品按状态统计订单量",
+        context=semantic_context(),
+    )
+
+    assert plan.group_by == ["p.product_name", "p.product_id", "o.status"]
+    assert plan.order_by == ["order_count DESC", "p.product_id ASC", "o.status ASC"]
+    assert {"products.product_id", "orders.status"}.issubset(plan.selected_columns)
+
+@pytest.mark.parametrize(
     ("provider_id", "secret_field", "expected_url", "auth_header", "max_tokens_field"),
     [
         ("kimi", "kimi_api_key", "https://api.moonshot.cn/v1/chat/completions", "authorization", "max_completion_tokens"),
