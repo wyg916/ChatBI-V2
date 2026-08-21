@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from functools import lru_cache
 from time import perf_counter
+from typing import Literal
 
 from app.core.config import Settings, get_settings
 from app.query.contracts import QueryContext, SQLPlan
@@ -15,18 +16,28 @@ from app.semantic_runtime.wren import WrenRuntimeAdapter
 class SemanticRuntime:
     """Default DATA_QUERY semantic chain with an explicit local rollback mode."""
 
-    def __init__(self, settings: Settings | None = None, router: Nl2SqlRouter | None = None) -> None:
+    def __init__(
+        self,
+        settings: Settings | None = None,
+        router: Nl2SqlRouter | None = None,
+        *,
+        upstream_reuse_mode: Literal["selected_source", "clean_room"] = "selected_source",
+    ) -> None:
         self.settings = settings or get_settings()
+        self.upstream_reuse_mode = upstream_reuse_mode
         self.local_router = router or Nl2SqlRouter(settings=self.settings)
-        self.openchatbi = OpenChatBILinker()
+        upstream_reuse = upstream_reuse_mode == "selected_source"
+        self.openchatbi = OpenChatBILinker(upstream_reuse=upstream_reuse)
         self.supersonic = SuperSonicSemanticPipeline()
-        self.wren = WrenRuntimeAdapter(self.local_router)
+        self.wren = WrenRuntimeAdapter(self.local_router, upstream_reuse=upstream_reuse)
 
     def capabilities(self) -> dict:
         return {
             "mode": self.settings.semantic_runtime_mode,
+            "upstream_reuse_mode": self.upstream_reuse_mode,
             "default_chain": ["openchatbi", "supersonic", "wren", "sqlglot", "query_executor", "result_oracle"],
             "rollback": "CHATBI_SEMANTIC_RUNTIME_MODE=local",
+            "ab_switch": "SemanticRuntime(upstream_reuse_mode='selected_source'|'clean_room')",
             "runtime_available": True,
         }
 
@@ -53,6 +64,7 @@ class SemanticRuntime:
                 mode="wren", openchatbi_called=True, supersonic_called=True, wren_called=False,
                 call_chain=["OpenChatBI", "SuperSonic:BLOCKED"], stage_latency_ms=latency,
                 schema_linking=linking,
+                upstream_runtime_call_count={"openchatbi": linking.upstream_call_count, "wrenai": 0},
             )
             raise
         latency["supersonic"] = round((perf_counter() - started) * 1000, 3)
@@ -68,6 +80,10 @@ class SemanticRuntime:
             call_chain=["OpenChatBI", "SuperSonic", "WrenAI", "SQLGlot", "QueryExecutor", "ResultOracle"],
             stage_latency_ms=latency, schema_linking=linking, semantic_query=semantic_query,
             wren_mdl=mdl, wren_dry_plan=dry_plan,
+            upstream_runtime_call_count={
+                "openchatbi": linking.upstream_call_count,
+                "wrenai": mdl.upstream_call_count + dry_plan.upstream_call_count,
+            },
         )
         return plan, trace
 

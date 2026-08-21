@@ -16,7 +16,10 @@ class CatalogCandidate(BaseModel):
 
 
 class OpenChatBIState(BaseModel):
-    adapter: Literal["openchatbi-clean-room"] = "openchatbi-clean-room"
+    adapter: Literal["openchatbi-selected-source", "openchatbi-clean-room"] = "openchatbi-clean-room"
+    upstream_source_commit: str | None = None
+    upstream_source_sha256: str | None = None
+    upstream_call_count: int = Field(default=0, ge=0)
     workflow: Literal["catalog_retrieval", "schema_linking"] = "schema_linking"
     workspace_id: str
     cache_scope: str
@@ -47,6 +50,10 @@ class SemanticQuery(BaseModel):
 
 
 class WrenMDL(BaseModel):
+    adapter: Literal["wrenai-selected-source", "wren-clean-room"] = "wren-clean-room"
+    upstream_source_commit: str | None = None
+    upstream_source_sha256: list[str] = Field(default_factory=list)
+    upstream_call_count: int = Field(default=0, ge=0)
     catalog: str = "chatbi"
     schema_name: str
     semantic_model_id: str
@@ -59,6 +66,11 @@ class WrenMDL(BaseModel):
 
 
 class WrenDryPlan(BaseModel):
+    adapter: Literal["wrenai-selected-source", "wren-clean-room"] = "wren-clean-room"
+    upstream_source_commit: str | None = None
+    upstream_call_count: int = Field(default=0, ge=0)
+    semantic_sql: str | None = None
+    upstream_ast: str | None = None
     status: Literal["READY", "CLARIFICATION_REQUIRED", "ERROR"]
     semantic_model_version: int
     nodes: list[dict[str, Any]]
@@ -79,6 +91,7 @@ class SemanticRuntimeTrace(BaseModel):
     semantic_query: SemanticQuery | None = None
     wren_mdl: WrenMDL | None = None
     wren_dry_plan: WrenDryPlan | None = None
+    upstream_runtime_call_count: dict[str, int] = Field(default_factory=dict)
 
 
 class SemanticRuntimeError(RuntimeError):

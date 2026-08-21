@@ -9,6 +9,11 @@ from time import perf_counter
 
 from app.query.contracts import QueryContext
 from app.semantic_runtime.contracts import CatalogCandidate, OpenChatBIState
+from app.semantic_runtime.upstream_bridge import (
+    OPENCHATBI_COMMIT,
+    OPENCHATBI_SOURCE_SHA256,
+    project_openchatbi_catalog,
+)
 
 
 _BUSINESS_TOKENS = (
@@ -59,15 +64,12 @@ def _cosine(left: Counter[str], right: Counter[str]) -> float:
 
 
 class OpenChatBILinker:
-    """Workspace-scoped hybrid catalog retrieval inspired by OpenChatBI's public contracts.
+    """Workspace-scoped retrieval with switchable selected-source reuse."""
 
-    This is a ChatBI-owned clean-room adapter. It uses no OpenChatBI internal code.
-    """
-
-    name = "openchatbi-clean-room"
-
-    def __init__(self) -> None:
-        self._cache: dict[tuple[str, str, str, str, int, str, str, str], OpenChatBIState] = {}
+    def __init__(self, *, upstream_reuse: bool = True) -> None:
+        self.upstream_reuse = upstream_reuse
+        self.name = "openchatbi-selected-source" if upstream_reuse else "openchatbi-clean-room"
+        self._cache: dict[tuple[str, str, str, str, int, str, str, str, str], OpenChatBIState] = {}
         self._lock = Lock()
 
     def link(self, *, question: str, context: QueryContext) -> OpenChatBIState:
@@ -80,16 +82,27 @@ class OpenChatBILinker:
             context.knowledge_version,
             context.data_version,
             context.input_signature or sha256(question.strip().lower().encode("utf-8")).hexdigest(),
+            self.name,
         )
         with self._lock:
             cached = self._cache.get(cache_key)
             if cached:
-                return cached.model_copy(deep=True, update={"cache_hit": True, "elapsed_ms": 0.0})
+                return cached.model_copy(
+                    deep=True,
+                    update={"cache_hit": True, "elapsed_ms": 0.0, "upstream_call_count": 0},
+                )
 
         started = perf_counter()
+        upstream_table_names = set(context.security_policy.allowed_tables)
+        upstream_source_calls = 0
+        if self.upstream_reuse:
+            projection = project_openchatbi_catalog(context)
+            upstream_table_names = set(projection.table_names)
+            upstream_source_calls = projection.source_calls
         documents: list[dict[str, object]] = []
         for item in context.candidate_tables:
-            documents.append({"type": "table", "name": item.name, "qualified": item.qualified_name, "text": f"{item.name} {item.label} {' '.join(item.evidence)}"})
+            if item.name in upstream_table_names:
+                documents.append({"type": "table", "name": item.name, "qualified": item.qualified_name, "text": f"{item.name} {item.label} {' '.join(item.evidence)}"})
         for item in context.candidate_columns:
             documents.append({"type": "column", "name": item.name, "qualified": item.qualified_name, "text": f"{item.name} {item.label} {' '.join(item.evidence)}"})
         for item in context.metrics:
@@ -130,6 +143,8 @@ class OpenChatBILinker:
             exact = any(token and token.lower() in lowered for token in [str(document["name"]), *str(document["text"]).split()[:3]])
             score = min(1.0, 0.52 * bm25_score + 0.38 * vector_score + (0.10 if exact else 0.0))
             evidence = [f"bm25:{bm25_score:.4f}", f"vector:{vector_score:.4f}"]
+            if self.upstream_reuse and document["type"] == "table":
+                evidence.append("openchatbi:selected-source-catalog")
             if exact:
                 evidence.append("exact_alias")
             candidates.append(CatalogCandidate(
@@ -144,6 +159,10 @@ class OpenChatBILinker:
         vague = bool(re.fullmatch(r".{0,4}(销售|数据|情况|业绩).{0,4}", question.strip()))
         clarification_required = confidence < 0.25 or vague
         state = OpenChatBIState(
+            adapter=self.name,
+            upstream_source_commit=OPENCHATBI_COMMIT if self.upstream_reuse else None,
+            upstream_source_sha256=OPENCHATBI_SOURCE_SHA256 if self.upstream_reuse else None,
+            upstream_call_count=upstream_source_calls,
             workspace_id=context.workspace_id,
             cache_scope=(
                 f"workspace:{context.workspace_id}:role:{context.cache_role}:permission:{context.permission_hash}:"

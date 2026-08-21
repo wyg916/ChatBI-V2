@@ -1,0 +1,54 @@
+{
+  "schema_version": "chatbi-v1.3.0-selected-upstream-v1",
+  "mode": "REAL_UPSTREAM_REUSE",
+  "openchatbi": {
+    "repository": "https://github.com/zhongyu09/openchatbi",
+    "commit": "c8786cb180081dbdd18d841efa33b70d77b633e9",
+    "license": "MIT",
+    "selected_files": [
+      {
+        "upstream_path": "openchatbi/catalog/catalog_store.py",
+        "upstream_git_blob": "41b7bd60d49f0e780959849921ad2899ed837621",
+        "raw_sha256": "24686e93fb8fc9c21931b13f2e4076a19a033299939185744ac78d4eb5b4d494",
+        "destination": "backend/app/semantic_runtime/_upstream/openchatbi/catalog_store.py",
+        "destination_sha256": "24686e93fb8fc9c21931b13f2e4076a19a033299939185744ac78d4eb5b4d494",
+        "modifications": "none; Git canonical LF content is byte-identical (Windows worktree may materialize CRLF)",
+        "hash_basis": "canonical LF repository content"
+      }
+    ],
+    "runtime_calls": ["split_db_table_name"],
+    "import_closure": ["python stdlib", "SQLAlchemy 2.0.43 (already pinned by ChatBI)"]
+  },
+  "wrenai": {
+    "repository": "https://github.com/Canner/WrenAI",
+    "commit": "7830cc746c11602d5899d8fdec1e28de4ce11a87",
+    "tag": "wren-v0.13.3",
+    "license": "Apache-2.0 for core/**",
+    "selected_files": [
+      {
+        "upstream_path": "core/wren/src/wren/type_mapping.py",
+        "upstream_git_blob": "924a0ef24bb7c7afff1a2e3545ff2d15ad957053",
+        "raw_sha256": "fadc3a136f79c3721e46727c9d633d3976475b9290786c34c3684b14669dae53",
+        "destination": "backend/app/semantic_runtime/_upstream/wren/type_mapping.py",
+        "destination_sha256": "fadc3a136f79c3721e46727c9d633d3976475b9290786c34c3684b14669dae53",
+        "modifications": "none; Git canonical LF content is byte-identical (Windows worktree may materialize CRLF)",
+        "hash_basis": "canonical LF repository content"
+      },
+      {
+        "upstream_path": "core/wren/src/wren/mdl/wren_dialect.py",
+        "upstream_git_blob": "ceebe3c26a1884cc2f143c8d2878ee9aedc42732",
+        "raw_sha256": "96e0834c1d6a5ecdcc66580abe8d710f4431f835ba0e5f1d42534ca77f9b6f27",
+        "destination": "backend/app/semantic_runtime/_upstream/wren/wren_dialect.py",
+        "destination_sha256": "96e0834c1d6a5ecdcc66580abe8d710f4431f835ba0e5f1d42534ca77f9b6f27",
+        "modifications": "none; Git canonical LF content is byte-identical (Windows worktree may materialize CRLF)",
+        "hash_basis": "canonical LF repository content"
+      }
+    ],
+    "runtime_calls": ["parse_types", "Wren SQLGlot dialect parser"],
+    "import_closure": ["python stdlib", "sqlglot 30.17.0 (already pinned by ChatBI)"]
+  },
+  "chatbi_bridge_modifications": "ChatBI-owned bridge maps authorized QueryContext into selected upstream functions; no upstream LLM, connector or executor is called.",
+  "disable": "SemanticRuntime(upstream_reuse_mode='clean_room')",
+  "rollback": "CHATBI_SEMANTIC_RUNTIME_MODE=local bypasses the full semantic runtime; selected-source A/B rollback uses the constructor flag.",
+  "license_text": "NOTICE.md; repository root LICENSE contains Apache-2.0"
+}

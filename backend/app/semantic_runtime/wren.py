@@ -6,21 +6,29 @@ from datetime import date
 from app.query.contracts import QueryContext, QueryFilter, QueryTimeRange, SQLPlan
 from app.query.nl2sql import Nl2SqlRouter
 from app.semantic_runtime.contracts import SemanticQuery, SemanticRuntimeError, WrenDryPlan, WrenMDL
+from app.semantic_runtime.upstream_bridge import (
+    WRENAI_COMMIT,
+    WREN_DIALECT_SHA256,
+    WREN_TYPE_MAPPING_SHA256,
+    normalize_wren_dimension_types,
+    validate_wren_semantic_sql,
+)
 
 
 class WrenRuntimeAdapter:
-    """Default semantic SQL runtime using ChatBI-owned Wren-compatible contracts.
+    """Semantic SQL runtime with explicit selected-source/clean-room A/B."""
 
-    The adapter is a clean-room implementation over the public MDL concepts. No
-    WrenAI source file or trademark asset is copied into ChatBI.
-    """
-
-    name = "wren-clean-room-runtime"
-
-    def __init__(self, fallback: Nl2SqlRouter | None = None) -> None:
+    def __init__(self, fallback: Nl2SqlRouter | None = None, *, upstream_reuse: bool = True) -> None:
         self.fallback = fallback or Nl2SqlRouter()
+        self.upstream_reuse = upstream_reuse
+        self.name = "wrenai-upstream-runtime" if upstream_reuse else "wren-clean-room-runtime"
 
     def compile_mdl(self, context: QueryContext) -> WrenMDL:
+        normalized_types = (
+            normalize_wren_dimension_types(context.dimensions, context.dialect)
+            if self.upstream_reuse
+            else {}
+        )
         models = [
             {
                 "name": item["name"],
@@ -38,7 +46,11 @@ class WrenRuntimeAdapter:
             for item in context.metrics
         ]
         dimensions = [
-            {"name": item["name"], "expression": item["source_column"], "type": item["type"]}
+            {
+                "name": item["name"],
+                "expression": item["source_column"],
+                "type": normalized_types.get(item["name"], item["type"]),
+            }
             for item in context.dimensions
         ]
         relationships = [
@@ -53,6 +65,12 @@ class WrenRuntimeAdapter:
         source_count = len(context.entities) + len(context.metrics) + len(context.dimensions) + len(context.relationships)
         mapped_count = len(models) + len(metrics) + len(dimensions) + len(relationships)
         return WrenMDL(
+            adapter="wrenai-selected-source" if self.upstream_reuse else "wren-clean-room",
+            upstream_source_commit=WRENAI_COMMIT if self.upstream_reuse else None,
+            upstream_source_sha256=(
+                [WREN_TYPE_MAPPING_SHA256, WREN_DIALECT_SHA256] if self.upstream_reuse else []
+            ),
+            upstream_call_count=1 if self.upstream_reuse else 0,
             schema_name=context.schema_name or "default",
             semantic_model_id=context.semantic_model_id,
             semantic_model_version=context.semantic_model_version,
@@ -72,16 +90,34 @@ class WrenRuntimeAdapter:
             selected_models.append("fact_sales" if "fact_sales" in model_names else next(iter(sorted(model_names)), "orders"))
         if "outstanding_amount" in semantic_query.metrics and "fact_payment" in model_names:
             selected_models = ["fact_payment"]
+        semantic_sql = None
+        upstream_ast = None
+        upstream_call_count = 0
+        if self.upstream_reuse:
+            projections = [*semantic_query.dimensions, *semantic_query.metrics] or ["*"]
+            semantic_sql = f"SELECT {', '.join(projections)} FROM {selected_models[0]}"
+            upstream_ast = validate_wren_semantic_sql(semantic_sql)
+            upstream_call_count = 1
         unknown_models = sorted(set(selected_models).difference(model_names))
         if unknown_models:
             error = {"code": "WREN_MODEL_NOT_FOUND", "stage": "dry_plan", "models": unknown_models, "retryable": False}
             return WrenDryPlan(
+                adapter="wrenai-selected-source" if self.upstream_reuse else "wren-clean-room",
+                upstream_source_commit=WRENAI_COMMIT if self.upstream_reuse else None,
+                upstream_call_count=upstream_call_count,
+                semantic_sql=semantic_sql,
+                upstream_ast=upstream_ast,
                 status="ERROR", semantic_model_version=mdl.semantic_model_version,
                 nodes=[], selected_models=selected_models, selected_metrics=semantic_query.metrics,
                 selected_dimensions=semantic_query.dimensions, structured_error=error,
             )
         status = "CLARIFICATION_REQUIRED" if semantic_query.clarification_required else "READY"
         return WrenDryPlan(
+            adapter="wrenai-selected-source" if self.upstream_reuse else "wren-clean-room",
+            upstream_source_commit=WRENAI_COMMIT if self.upstream_reuse else None,
+            upstream_call_count=upstream_call_count,
+            semantic_sql=semantic_sql,
+            upstream_ast=upstream_ast,
             status=status,
             semantic_model_version=mdl.semantic_model_version,
             selected_models=list(dict.fromkeys(selected_models)),
