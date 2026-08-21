@@ -325,6 +325,7 @@ def main() -> None:
 - A/B rollback: `CHATBI_SEMANTIC_UPSTREAM_REUSE_MODE=clean_room`.
 - Full semantic rollback: `CHATBI_SEMANTIC_RUNTIME_MODE=local`.
 - Stop boundary: Phase 2; no main update, no formal tag, no Phase 3 start.
+- Remote delivery: FAIL_NETWORK after three HTTPS attempts (`connection reset`, then two `github.com:443` connection timeouts). No remote branch/upstream synchronization is claimed; SSH was not substituted because this checkout has no verified SSH host configuration.
 """
     (root / "21_phase2_summary.md").write_text(summary, encoding="utf-8")
     write_sha256_manifest(root)
