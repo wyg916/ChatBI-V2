@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import re
 from datetime import datetime, timezone
 from difflib import SequenceMatcher
@@ -21,10 +22,57 @@ from app.schemas.evaluation import (
 
 
 FLOW_ID = "SQLBOT_FEEDBACK_V2_1"
+IMPLEMENTATION_ORIGIN = "chatbi-clean-room"
+SQLBOT_UPSTREAM_COMMIT = "2a86aa926c4a22400a4ab4506c3ec384f7855a9d"
+SQLBOT_RUNTIME_STATUS = "BLOCKED_MODIFIED_GPL_BRANDING_CONDITIONS"
+SQLBOT_RUNTIME_CALLS = 0
 
 
 def _now() -> str:
     return datetime.now(timezone.utc).isoformat()
+
+
+def _sql_sha256(sql: str) -> str:
+    return hashlib.sha256(sql.encode("utf-8")).hexdigest()
+
+
+def feedback_provenance() -> dict[str, Any]:
+    """Describe the clean-room boundary without claiming SQLBot reuse."""
+    return {
+        "implementation_origin": IMPLEMENTATION_ORIGIN,
+        "upstream_repository": "https://github.com/dataease/SQLBot",
+        "upstream_commit": SQLBOT_UPSTREAM_COMMIT,
+        "upstream_runtime_status": SQLBOT_RUNTIME_STATUS,
+        "upstream_runtime_calls": SQLBOT_RUNTIME_CALLS,
+    }
+
+
+def _verified_sql_attestation(answer: VerifiedAnswer, sql: str) -> dict[str, Any]:
+    return {
+        "verified_sql_sha256": _sql_sha256(sql),
+        "verified_datasource_id": answer.datasource_id,
+        "verified_semantic_model_id": answer.semantic_model_id,
+        "verified_semantic_model_version": answer.semantic_model_version,
+        "verified_result_signature": answer.result_signature,
+    }
+
+
+def _assert_verified_sql_integrity(answer: VerifiedAnswer) -> None:
+    feedback = answer.feedback or {}
+    if feedback.get("flow") != FLOW_ID:
+        raise ValueError("Verified SQL is not a ChatBI feedback correction")
+    sql = answer.sql_text or ""
+    expected = feedback.get("verified_sql_sha256")
+    if not expected or expected != _sql_sha256(sql):
+        raise ValueError("Verified SQL integrity attestation failed")
+    bindings = {
+        "verified_datasource_id": answer.datasource_id,
+        "verified_semantic_model_id": answer.semantic_model_id,
+        "verified_semantic_model_version": answer.semantic_model_version,
+        "verified_result_signature": answer.result_signature,
+    }
+    if any(feedback.get(name) != value for name, value in bindings.items()):
+        raise ValueError("Verified SQL resource attestation failed")
 
 
 def _tokens(value: str) -> set[str]:
@@ -220,11 +268,13 @@ def review_correction(
         answer.sql_text = str((answer.feedback or {}).get("corrected_sql") or "") or None
         if not answer.sql_text:
             raise ValueError("Correction has no SQL to promote")
+    attestation = _verified_sql_attestation(answer, answer.sql_text) if data.decision == "APPROVE" else {}
     answer.feedback = {
         **(answer.feedback or {}),
         "workflow_state": "VERIFIED_SQL" if data.decision == "APPROVE" else "REVIEW_REJECTED",
         "review_history": history,
         "verified_at": _now() if data.decision == "APPROVE" else None,
+        **attestation,
     }
     db.flush()
     db.add(AnswerVersion(answer_id=answer.id, version=next_version, snapshot=_snapshot(answer)))
@@ -283,12 +333,17 @@ def replay_verified_sql(
     answer = db.get(VerifiedAnswer, answer_id)
     if answer is None or answer.workspace_id != principal.workspace_id:
         raise LookupError("Verified SQL not found")
+    if answer.status != "VERIFIED" or answer.oracle_status != "PASSED" or not answer.sql_text:
+        raise ValueError("Candidate is not an approved Verified SQL")
+    _assert_verified_sql_integrity(answer)
+    if data.datasource_id and data.datasource_id != answer.datasource_id:
+        raise ValueError("Verified SQL datasource binding does not match replay request")
+    if data.semantic_model_id and data.semantic_model_id != answer.semantic_model_id:
+        raise ValueError("Verified SQL semantic-model binding does not match replay request")
     candidates = recall_candidates(db, data=data, workspace_id=principal.workspace_id)
     candidate = next((item for item in candidates if item["answer_id"] == answer.id), None)
     if candidate is None:
         raise ValueError("Verified SQL was not recalled for the similar question")
-    if answer.status != "VERIFIED" or answer.oracle_status != "PASSED" or not answer.sql_text:
-        raise ValueError("Candidate is not an approved Verified SQL")
 
     pipeline = QueryPipeline()
     replay = pipeline.execute(db, AskRequest(
@@ -392,6 +447,7 @@ def feedback_dashboard(db: Session, *, workspace_id: str) -> dict[str, Any]:
         } for answer in verified]
     total, passed = replay_totals(db, workspace_id=workspace_id)
     return {
+        "provenance": feedback_provenance(),
         "terminology": [{
             "id": item.id,
             "semantic_model_id": item.semantic_model_id,

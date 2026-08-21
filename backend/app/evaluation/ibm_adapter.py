@@ -40,6 +40,31 @@ class IbmText2SqlEvaluationAdapter:
 
     adapter_id = "ibm-text2sql-eval-compatible"
     upstream_commit = "60dd4515236adb335f2053b7c069397d7d88fe0a"
+    implementation_origin = "chatbi-clean-room"
+    upstream_runtime_status = "BLOCKED_LICENSE_METADATA_CONFLICT"
+    upstream_runtime_calls = 0
+
+    def provenance(self) -> dict[str, Any]:
+        """Return an auditable boundary between compatibility and reuse.
+
+        The locked IBM revision declares Apache-2.0 in its root LICENSE while
+        its distribution metadata declares MIT. Until upstream resolves that
+        conflict, ChatBI must not package or invoke the official runtime. This
+        adapter remains independently authored and must never be counted as an
+        upstream runtime call.
+        """
+        return {
+            "implementation_origin": self.implementation_origin,
+            "upstream_repository": "https://github.com/IBM/text2sql-eval-toolkit",
+            "upstream_commit": self.upstream_commit,
+            "upstream_runtime_status": self.upstream_runtime_status,
+            "upstream_runtime_calls": self.upstream_runtime_calls,
+            "license_evidence": {
+                "root_license": "Apache-2.0",
+                "distribution_metadata_license": "MIT",
+                "closure": "CONFLICT_UNRESOLVED",
+            },
+        }
 
     def compare_results(
         self,
@@ -139,6 +164,7 @@ class IbmText2SqlEvaluationAdapter:
         return {
             "adapter": self.adapter_id,
             "upstream_commit": self.upstream_commit,
+            "provenance": self.provenance(),
             "execution_based": True,
             "multiple_ground_truth": any(int(case.get("ground_truth_count") or 0) > 1 for case in cases),
             "total": total,
