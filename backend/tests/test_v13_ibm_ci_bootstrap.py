@@ -133,7 +133,10 @@ def test_workflow_is_self_contained_and_has_no_repository_secret_dependency() ->
     assert "PGTZ: Asia/Shanghai" in workflow
     assert "IBM/text2sql-eval-toolkit" in workflow
     assert "60dd4515236adb335f2053b7c069397d7d88fe0a" in workflow
-    assert "--no-install-project" in workflow
+    assert "uv export --frozen --no-dev --no-emit-project" in workflow
+    assert "uv pip sync" in workflow
+    assert "IBM_SELECTED_SOURCE_ENV=PASS" in workflow
+    assert "import ibm_watsonx_ai, numpy, pandas, requests, sqlglot, sqlparse, tqdm, yaml" in workflow
     assert "actions/upload-artifact@v4" in workflow
     assert "--sanitize-artifacts" in workflow
     assert "steps.collect_evidence.outcome == 'success'" in workflow

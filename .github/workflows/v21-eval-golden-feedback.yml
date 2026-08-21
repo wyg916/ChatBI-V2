@@ -125,9 +125,18 @@ jobs:
           tail -n 200 "$RUNNER_TEMP/chatbi-backend.log"
           exit 1
       - name: Build pinned IBM selected-source environment
-        run: >-
-          uv sync --frozen --no-dev --no-install-project
-          --project vendor/ibm-text2sql-eval-toolkit
+        run: |
+          uv venv --python 3.11 vendor/ibm-text2sql-eval-toolkit/.venv
+          uv export --frozen --no-dev --no-emit-project \
+            --project vendor/ibm-text2sql-eval-toolkit \
+            --output-file "$RUNNER_TEMP/ibm-selected-source-requirements.txt" \
+            --quiet
+          uv pip sync \
+            --python vendor/ibm-text2sql-eval-toolkit/.venv/bin/python \
+            "$RUNNER_TEMP/ibm-selected-source-requirements.txt" \
+            --quiet
+          vendor/ibm-text2sql-eval-toolkit/.venv/bin/python -c \
+            "import ibm_watsonx_ai, numpy, pandas, requests, sqlglot, sqlparse, tqdm, yaml; print('IBM_SELECTED_SOURCE_ENV=PASS')"
       - name: Authenticate and synchronize isolated PostgreSQL catalog
         run: >-
           python backend/scripts/run_v13_ibm_ci_bootstrap.py
