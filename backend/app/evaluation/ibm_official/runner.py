@@ -55,9 +55,9 @@ class PinnedIbmOfficialEvaluator:
             selected_source_sha256 or CANONICAL_SELECTED_SOURCE_SHA256
         )
         self.python_executable = (
-            python_executable.resolve()
+            python_executable.absolute()
             if python_executable
-            else (self.checkout / ".venv" / "Scripts" / "python.exe").resolve()
+            else (self.checkout / ".venv" / "Scripts" / "python.exe").absolute()
         )
 
     def verify_checkout(self) -> dict[str, Any]:

@@ -79,6 +79,36 @@ def test_official_runner_is_pinned_and_separate_from_clean_room_adapter() -> Non
     assert SELECTED_SOURCE_SHA256 is CANONICAL_SELECTED_SOURCE_SHA256
 
 
+def test_isolated_python_path_preserves_virtualenv_symlink_boundary(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    checkout = tmp_path / "checkout"
+    checkout.mkdir()
+    isolated_python = tmp_path / ".venv" / "bin" / "python"
+    isolated_python.parent.mkdir(parents=True)
+    isolated_python.write_text("test boundary only\n", encoding="utf-8")
+    system_python = tmp_path / "system-python"
+    system_python.write_text("must not be selected\n", encoding="utf-8")
+    original_resolve = Path.resolve
+
+    def resolve_like_a_linux_virtualenv_symlink(
+        path: Path, strict: bool = False
+    ) -> Path:
+        if path == isolated_python:
+            return system_python
+        return original_resolve(path, strict=strict)
+
+    monkeypatch.setattr(Path, "resolve", resolve_like_a_linux_virtualenv_symlink)
+
+    evaluator = PinnedIbmOfficialEvaluator(
+        checkout,
+        python_executable=isolated_python,
+    )
+
+    assert evaluator.python_executable == isolated_python.absolute()
+    assert evaluator.python_executable != system_python
+
+
 def test_canonical_git_blob_hash_is_independent_from_checkout_eol(tmp_path: Path) -> None:
     repo, source, relative, canonical_hash, blob_oid, evaluator = _canonical_repo(tmp_path)
 
