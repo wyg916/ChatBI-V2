@@ -56,4 +56,4 @@ V1.0.1 Final Release 的本次执行报告见 [`docs/status/DAY5_STATUS.md`](sta
 - DATA_QUERY 保持唯一 ChatBI Router、Model Gateway、SQLGlot→EXPLAIN→QueryExecutor→ResultOracle、Trace 与 SSE；上游不得直连 Provider 或数据库。
 - A/B 固定同一数据库、Schema、Golden、模型/Prompt、权限与 Workspace，必须完成 Golden 50 + 复杂 20 的真实结果值比较；执行成功率不低于 0.98、结果准确率不低于 0.95、Catalog Recall@5 不低于 0.95。
 - 关键指标/多 Join 的 Verification Query 执行率必须为 1.0；危险 SQL 执行、跨 Workspace recall/replay 和 Guard bypass 必须为 0。
-- IBM/SQLBot 若许可证闭包不成立，其 official runtime calls 必须为 0，Phase 2 Gate 必须保持 PARTIAL/BLOCKED；不得用 ChatBI clean-room 替代品宣称 PASS。
+- IBM/SQLBot 的每一种接入模式必须独立闭合许可证和依赖。未闭合的 package/service 模式 official runtime calls 必须为 0；具明确路径许可证、固定 commit/SHA、隔离依赖和真实函数调用证据的 selected-source 模式可单独计数。任何仍阻断的目标项都会使 Phase 2 保持 PARTIAL/BLOCKED；不得用 ChatBI clean-room 替代品宣称官方 PASS。

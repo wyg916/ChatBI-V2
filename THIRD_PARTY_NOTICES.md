@@ -2,17 +2,18 @@
 
 ## V1.3.0 Phase 2 selected upstream semantic sources
 
-V1.3.0 Phase 2 directly reuses exactly three Python source files from two official upstream projects. Their canonical-LF repository content is byte-identical to the locked Git blobs; ChatBI integration code is kept outside the vendored files.
+V1.3.0 Phase 2 directly reuses three official upstream projects. Three Python files from OpenChatBI/WrenAI are vendored byte-identically to locked Git blobs; IBM selected source is executed only from an external fixed checkout after commit and per-file SHA-256 verification, and is not copied or distributed by ChatBI.
 
 | Project | Official revision | Selected upstream path | License | Runtime use |
 | --- | --- | --- | --- | --- |
 | OpenChatBI | `c8786cb180081dbdd18d841efa33b70d77b633e9` | `openchatbi/catalog/catalog_store.py` | MIT | `split_db_table_name` projects authorized catalog tables before ChatBI hybrid ranking; 588 calls in the frozen 70-case A/B |
 | WrenAI | `7830cc746c11602d5899d8fdec1e28de4ce11a87` (`wren-v0.13.3`) | `core/wren/src/wren/type_mapping.py` | Apache-2.0 | `parse_types` maps ChatBI dimensions into MDL types |
 | WrenAI | same revision | `core/wren/src/wren/mdl/wren_dialect.py` | Apache-2.0 | the Wren SQLGlot dialect parses every selected-source dry semantic SQL; Wren selected-source calls total 140 in the frozen 70-case A/B |
+| IBM Text-to-SQL Evaluation Toolkit | `60dd4515236adb335f2053b7c069397d7d88fe0a` | 11 hash-locked files under `evaluation`, `metrics`, `analysis`, `inference`, plus `utils.py`/`logging.py` in an external checkout | Apache-2.0 selected-source path | official `evaluate_prediction` ran 50 times and `get_failed_records` once against executed Golden results; no IBM file is vendored or distributed |
 
 The exact upstream Git blobs, raw/destination SHA-256 values, import closure, modifications, disable switch and rollback are in `backend/app/semantic_runtime/_upstream/provenance.json`; copied license notices are in `backend/app/semantic_runtime/_upstream/NOTICE.md`. No upstream LLM client, Provider key, database connector, executor, UI, logo, documentation or trademark asset is included. `CHATBI_SEMANTIC_UPSTREAM_REUSE_MODE=clean_room` disables the three selected sources for A/B; `CHATBI_SEMANTIC_RUNTIME_MODE=local` bypasses the complete semantic runtime.
 
-SuperSonic remains an independently authored clean-room semantic contract. IBM Text-to-SQL Evaluation Toolkit and SQLBot remain **not reused**: IBM's locked source/wheel conflicts between Apache-2.0 and MIT metadata, while SQLBot has modified GPL branding conditions and a required xpack wheel with no license metadata/file. Their official runtime call counts are zero, and the existing ChatBI evaluation/feedback code explicitly reports `chatbi-clean-room`.
+SuperSonic remains an independently authored clean-room semantic contract. IBM's package/wheel path remains blocked by Apache-2.0/MIT metadata conflict, while the narrower Apache-2.0 selected-source path above is allowed and independently verified. SQLBot remains **not reused** because of modified GPL branding conditions and a required xpack wheel with no license metadata/file; its official runtime call count and xpack load count are zero. Existing online IBM-compatible evaluation and SQLBot-inspired feedback code continue to identify themselves as `chatbi-clean-room`.
 
 ## v2.1 Day 1 semantic design provenance
 
@@ -46,14 +47,14 @@ Other pre-existing runtime packages remain pinned in the relevant package manife
 
 These Day 2 paths add no third-party runtime dependency. Exact selected paths, license boundaries, checksums, forbidden paths and rollback decisions are recorded in `docs/UPSTREAM_LOCK.json` and the final `docs/OPEN_SOURCE_LICENSE_AUDIT.md`.
 
-## IBM Text-to-SQL Evaluation Toolkit design reference
+## IBM Text-to-SQL Evaluation Toolkit selected-source evaluation
 
 - Source repository: `https://github.com/IBM/text2sql-eval-toolkit`
 - Audited upstream revision: `60dd4515236adb335f2053b7c069397d7d88fe0a`
 - License: Apache-2.0
-- Project boundary: `backend/app/evaluation/ibm_adapter.py`
+- Project boundary: `backend/app/evaluation/ibm_official/`
 - Purpose: adapter-level execution result comparison, multiple accepted ground truths, error analysis and release-gate reporting.
-- Modification/source use: no IBM source file, package, benchmark result bundle, logo or asset is copied or imported. The ChatBI adapter is independently authored behind the project-owned `EvaluationAdapter` boundary and operates only on results already produced by the guarded ChatBI QueryPipeline.
+- Modification/source use: no IBM source file, package, benchmark result bundle, logo or asset is copied into ChatBI. The offline runner verifies the fixed checkout commit and 11 source hashes, then invokes official functions in that checkout's isolated environment. Package/wheel use remains blocked; the online adapter stays independently authored and only the offline/CI gate counts official calls.
 
 ## SQLBot product-flow reference
 

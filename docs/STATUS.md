@@ -2,12 +2,13 @@
 
 ## V1.3.0 Phase 2 数据主链与真实上游接入（2026-08-21）
 
-- OpenChatBI `c8786cb...` 的 `catalog_store.py` 与 WrenAI `7830cc7...` 的 `type_mapping.py`/`wren_dialect.py` 已按 canonical Git blob 字节等同 vendoring；固定路径、许可证、SHA-256、import closure、调用数、关闭和回滚均可审计。真实直接复用项目数为 2。
-- PostgreSQL 同库同 Schema/模型/权限 A/B 为 Golden 50 + 复杂改写 20：clean-room 与 selected-source 的执行、结果、语义、Join、澄清均为 70/70；selected-source OpenChatBI/Wren 调用为 588/140，Catalog Recall@5=1.0，A/B 总延迟 p95 为 562.597/570.854 ms，模型 Token/成本/重试均为 0。
+- OpenChatBI `c8786cb...` 的 `catalog_store.py` 与 WrenAI `7830cc7...` 的 `type_mapping.py`/`wren_dialect.py` 已按 canonical Git blob 字节等同 vendoring；IBM `60dd451...` 的 11 个 Apache-2.0 selected-source 文件由外部固定 checkout 的隔离 Python 执行且逐文件校验 SHA-256。真实直接复用项目数为 3；ChatBI 不复制或分发 IBM 源码、wheel 或 benchmark bundle。
+- PostgreSQL 同库同 Schema/模型/权限 A/B 为 Golden 50 + 复杂改写 20：clean-room 与 selected-source 的执行、结果、语义、Join、澄清均为 70/70；selected-source OpenChatBI/Wren 调用为 588/140，Catalog Recall@5=1.0，A/B 总延迟 p95 为 535.033/397.603 ms，模型 Token/成本/重试均为 0。
 - SQL 执行新增 fail-closed EXPLAIN Cost Guard；关键指标/多 Join 新增第二次经 SQLGlot 与同一权限策略保护的只读一致性查询；Oracle 新增 Chart/Narrative 结果绑定。Verified SQL 审核和回放新增 SQL SHA-256、数据源、语义模型/version 与结果签名防篡改。
-- 回归结果：Backend 251/251、定向安全 110/110、Frontend Vitest 50/50、TypeScript、production build、Golden 50 与八维 Oracle、危险 SQL 56/56 均 PASS；E2E 首轮因隔离元数据缺少 10M 数据源登记为 11/12，补录 79 表/1187 字段/111 关系后该用例真实通过，综合 12/12。初次连接既有 public 元数据时因该 Schema 已记录固定 Phase 1 基线之外的本机后续 Alembic revision 而启动失败；改用受保护的隔离元数据 Schema 后，Docker Compose 从停止状态连续两次启动为 healthy，验收后已停止栈并只删除该临时 Schema。
-- IBM official Toolkit 因同一锁定发行物 Apache-2.0/MIT 元数据冲突及 benchmark 闭包不完整而 BLOCKED；SQLBot 因 modified GPL 品牌条件和未闭合 xpack 二进制而 BLOCKED。两者 official runtime calls=0，自有替代实现明确为 `chatbi-clean-room`，因此 Phase 2 最终 Gate 保持 PARTIAL，不创建 Tag、不修改 main。
-- 远端交付：本地任务分支已提交完成，但 GitHub HTTPS 首次连接被重置、随后两次 `github.com:443` 连接超时；本 checkout 未配置已验证的 SSH host，未擅自切换协议。因此 `REMOTE_PUSH=FAIL_NETWORK`，不得声称远端同步完成。
+- 回归结果：Backend 256/256、定向安全 110/110、Frontend Vitest 50/50、TypeScript、production build、Golden 50 与八维 Oracle、危险 SQL 56/56、三模型真实 Discovery/Auth/Chat/SQLPlan/Guard、确定性 E2E 12/12 均 PASS。E2E 首轮误继承开发机 `MODEL_PROVIDER=auto` 而得到 7/12，失败日志保留；显式恢复发布基线 `deterministic` 后完整重跑 12/12。10M 数据源同步为 79 表/1187 字段/111 关系；Docker Compose 从停止状态连续两次启动为 healthy，验收后停止栈、删除临时 metadata Schema 并确认不存在。
+- IBM package/wheel 模式仍因 Apache-2.0/MIT 分发元数据冲突而 BLOCKED，但 11 个具明确 Apache-2.0 SPDX/根许可证治理的 selected-source 文件已经闭合。官方 `evaluate_prediction` 真实调用 50 次、`get_failed_records` 执行 1 次，execution accuracy 50/50、multiple GT、error analysis 与 Release Gate 均 PASS；共享 CI 已固定 checkout/uv/runner 并 fail-closed 接线，仍需一次真实远端 workflow run 才可把 CI 状态从 `WIRED_PENDING_REMOTE_RUN` 升为 `ENFORCED`。
+- SQLBot 因 modified GPL 品牌条件、启动前强制导入的 `sqlbot-xpack 0.0.5.35` 无许可证字段/文件及未固定镜像而继续 BLOCKED；official runtime calls=0、xpack loaded=0。Phase 2 真实复用 3/目标 4，因此最终 Gate 保持 PARTIAL，不创建 Tag、不修改 main。
+- 远端 HTTPS 已恢复并以非 force 方式创建任务分支；最终 closure SHA 的 local/tracking/`ls-remote` 一致性在外部 Phase 2 Closure Evidence 中验收。SSH 严格 host-key 模式因本机缺少 GitHub ED25519 known-host 条目失败，未修改 known_hosts、私钥或 Git 配置。
 
 ## V1.3.0 Phase 1 三模型统一控制平面（2026-08-21）
 

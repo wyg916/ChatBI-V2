@@ -1,5 +1,11 @@
 # Architecture Decisions
 
+## ADR-048：IBM 只允许固定 checkout 的 Apache-2.0 selected-source 离线评测
+
+IBM `60dd451...` 的 package/wheel/sdist 继续因根 `LICENSE=Apache-2.0` 与发行 metadata `MIT` 冲突而阻断；这不自动扩展为所有源码路径均不可用。实际运行闭包只包含 11 个固定文件：执行文件均有 IBM Copyright 与 Apache-2.0 SPDX，唯一无 SPDX 的包初始化文件由根 Apache-2.0 许可证治理，依赖许可证也逐项闭合。ChatBI 因此只从外部精确 checkout 的隔离 Python 调用官方 `evaluate_prediction` 与 `get_failed_records`，每次执行前核对 commit 和逐文件 SHA-256，不安装/复制/分发冲突 package，也不给官方工具数据库连接或 Provider 密钥。
+
+IBM 工具只评测 QueryPipeline 已执行并经 Oracle 校验的结果。Golden 50 的官方 execution accuracy 为 50/50；G50 双方一致空结果仍原样保留官方 `subset_non_empty_execution_accuracy=0`，仅分类为不适用诊断，不修改官方结果。现有在线 IBM-compatible adapter 保持 `chatbi-clean-room`，因此禁用离线任务即可回滚。共享 CI 已 fail-closed 接线，但在真实远端 workflow 成功前状态只能是 `WIRED_PENDING_REMOTE_RUN`。SQLBot 的强制 xpack 许可证闭包仍不成立，不能借服务边界绕过，Phase 2 因真实复用 3/目标 4 保持 PARTIAL。
+
 ## ADR-047：V1.3.0 Phase 2 只计可验真的最小上游源码复用，许可证冲突保持阻断
 
 OpenChatBI/WrenAI 整包依赖闭包分别会引入自己的 LLM、向量/数据库运行时或重型执行依赖，破坏 ChatBI 的单一 Router、Model Gateway 和 SQL 执行入口。Phase 2 因此只 vendoring 固定 commit 下三个字节等同的最小源文件：OpenChatBI CatalogStore 的名称投影函数，以及 WrenAI 类型映射和 SQLGlot Wren dialect。每次运行在统一 Trace 中记录 adapter、commit、source SHA 与调用数；`selected_source|clean_room` 进入缓存键并可用环境变量 A/B，完整回滚仍为 `local`。

@@ -18,6 +18,7 @@ import httpx
 from dotenv import dotenv_values
 from pydantic import ValidationError
 from sqlalchemy import select
+from sqlalchemy.orm.attributes import set_committed_value
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
@@ -61,6 +62,7 @@ from app.models import (  # noqa: E402
     AppUser,
     AuthSession,
     Conversation,
+    DataSource,
     KnowledgeAcl,
     KnowledgeChunk,
     KnowledgeDocument,
@@ -418,7 +420,10 @@ def rag_attacks(identity: dict[str, str]) -> dict:
     }
 
 
-def agent_attacks(identity: dict[str, str], datasource_id: str, semantic_model_id: str) -> dict:
+def agent_attacks(
+    identity: dict[str, str], datasource_id: str, semantic_model_id: str,
+    *, runtime_host_override: str | None = None,
+) -> dict:
     context = AgentExecutionContext(
         workspace_id=identity["admin_workspace_id"], user_id=identity["admin_id"], roles=frozenset({"ADMIN"}),
         allowed_datasources=frozenset({datasource_id}), allowed_semantic_models=frozenset({semantic_model_id}),
@@ -427,6 +432,14 @@ def agent_attacks(identity: dict[str, str], datasource_id: str, semantic_model_i
     )
     cases: list[dict] = []
     with SessionLocal() as db:
+        datasource = db.get(DataSource, datasource_id)
+        if datasource is None:
+            raise RuntimeError("agent security datasource was not found")
+        if runtime_host_override:
+            # Docker persists host.docker.internal while host-side audit runners
+            # must use loopback. Marking the value committed keeps this runtime
+            # adaptation out of the metadata database and the audit transaction.
+            set_committed_value(datasource, "host", runtime_host_override)
         principal = Principal(identity["admin_id"], identity["admin_workspace_id"], "admin@chatbi.local", "Admin", "ADMIN")
         executor = ChatBIToolExecutor(db, principal, rag_adapter=None)
         result = executor.execute(ToolCall(
@@ -456,6 +469,8 @@ def agent_attacks(identity: dict[str, str], datasource_id: str, semantic_model_i
                 and "DROP" not in guarded_sql
                 and (sql_bypass.output.get("oracle") or {}).get("status") == "PASSED"
             ),
+            "runtime_status": sql_bypass.status,
+            "runtime_error_code": sql_bypass.error_code,
         })
         oracle_bypass = executor.execute(ToolCall(
             tool_name=ToolName.VERIFY_RESULT.value, agent_role=AgentRole.VERIFICATION,
@@ -622,6 +637,7 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--base-url", default="http://127.0.0.1:8000")
     parser.add_argument("--env-file", type=Path, default=PROJECT_ROOT / ".env")
+    parser.add_argument("--runtime-host-override")
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
     env_file_values = dotenv_values(args.env_file)
@@ -672,7 +688,10 @@ def main() -> None:
                 primary, foreign, api, primary_conversation, identity["foreign_conversation_id"],
             )
             report["rag"] = rag_attacks(identity)
-            report["agent"] = agent_attacks(identity, postgres_id, semantic_model_id)
+            report["agent"] = agent_attacks(
+                identity, postgres_id, semantic_model_id,
+                runtime_host_override=args.runtime_host_override,
+            )
             report["sandbox"] = sandbox_attacks()
             primary.delete(f"{api}/conversations/{primary_conversation}")
         report["supply_chain"] = supply_chain_checks()

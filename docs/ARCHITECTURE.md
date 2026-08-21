@@ -15,7 +15,7 @@ OpenChatBI `catalog_store.py` and WrenAI `type_mapping.py`/`wren_dialect.py` are
 - Metadata DB：本机 PostgreSQL，数据库 `chatbi_v2`；应用使用项目专用账号，管理员账号只用于首次初始化。
 - SQL 解析与方言：SQLGlot 或等价 AST 解析器。
 - 模型：通过 `ModelProviderAdapter` 接入本地确定性语义运行时与命名的 OpenAI-compatible 服务；当前包含 Kimi `kimi-k2.6`、MiMo `mimo-v2.5`、DeepSeek `deepseek-v4-flash`，供应商差异封装在 Adapter 内。
-- 评测：ChatBI clean-room execution comparator + Business Result Oracle；IBM official Toolkit remains blocked until its Apache/MIT distribution metadata conflict and benchmark data closure are resolved.
+- 评测：ChatBI 在线 clean-room comparator + Business Result Oracle；离线/CI 可从外部固定 checkout 的隔离 Python 调用 IBM 官方 Apache-2.0 selected source。IBM package/wheel 路径仍因 Apache/MIT metadata 冲突阻断，官方工具不得获得数据库连接或进入在线问数路径。
 - 部署：Docker Compose 承载 Backend、独立 RAG Runtime 与 Frontend；开发数据库运行在本机，不创建 Docker 数据库容器或数据卷。CI 执行 Backend、Frontend、E2E、Golden Set。
 
 ## 2. 数据运行基线
