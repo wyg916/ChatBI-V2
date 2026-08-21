@@ -1,0 +1,9 @@
+{
+  "schema_version": "1.0",
+  "request_timeout_seconds": 45,
+  "retry_attempts": 2,
+  "circuit_failure_threshold": 3,
+  "circuit_cooldown_seconds": 30,
+  "retryable_statuses": [408, 425, 429, 500, 502, 503, 504],
+  "retry_after_max_seconds": 2.0
+}

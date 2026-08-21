@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import hashlib
+
 from sqlalchemy import select
 from threading import Event
 from time import perf_counter
@@ -7,6 +9,7 @@ from sqlalchemy.orm import Session
 
 from app.core.access import Principal, ensure_resource_access, record_audit
 from app.core.config import get_settings
+from app.model_gateway.contracts import BudgetMode, RequestContext
 from app.models import (
     AnswerVersion,
     DataSource,
@@ -174,7 +177,7 @@ class QueryPipeline:
 
     def execute(
         self, db: Session, request: AskRequest, principal: Principal | None = None,
-        *, cancellation_event: Event | None = None,
+        *, cancellation_event: Event | None = None, request_context: RequestContext | None = None,
     ) -> QueryRun:
         settings = get_settings()
         workspace = db.get(Workspace, principal.workspace_id) if principal and principal.workspace_id else default_workspace(db)
@@ -200,14 +203,33 @@ class QueryPipeline:
         )
         db.add(run)
         db.flush()
+        runtime_context = request_context or RequestContext(
+            request_id=run.id,
+            trace_id=f"TRACE-{run.id}",
+            user_id=(principal.user_id or principal.email) if principal is not None else "SYSTEM",
+            workspace_id=workspace.id,
+            datasource_id=datasource.id,
+            roles=frozenset({principal.role}) if principal is not None else frozenset({"SYSTEM"}),
+            permission_hash=hashlib.sha256(
+                f"{workspace.id}:{principal.user_id if principal else 'SYSTEM'}:{principal.role if principal else 'SYSTEM'}".encode("utf-8")
+            ).hexdigest(),
+            question=request.question,
+            budget_mode=BudgetMode(settings.model_budget_mode),
+        )
         _audit(db, run, "QUERY_RECEIVED", "PASS", {"question_length": len(request.question)})
         try:
             context = self.context_builder.build(
                 db, question=request.question, workspace=workspace, datasource=datasource,
                 semantic_model=model, row_limit=row_limit,
                 cache_role=principal.role if principal is not None else "SYSTEM",
+                request_context=runtime_context,
             )
-            run.context_payload = _json(context)
+            run.context_payload = {
+                **_json(context),
+                "request_context": runtime_context.model_dump(
+                    mode="json", exclude={"question"},
+                ),
+            }
             _audit(db, run, "CONTEXT_BUILT", "PASS", {
                 "link_count": len(context.linking_trace),
                 "estimated_tokens": context.estimated_tokens,
@@ -216,7 +238,11 @@ class QueryPipeline:
             plan, semantic_trace = self.semantic_runtime.plan(question=request.question, context=context)
             run.provider = plan.provider
             trace_payload = _json(semantic_trace)
-            run.context_payload = {**_json(context), "semantic_runtime": trace_payload}
+            run.context_payload = {
+                **_json(context),
+                "request_context": runtime_context.model_dump(mode="json", exclude={"question"}),
+                "semantic_runtime": trace_payload,
+            }
             run.plan_payload = {
                 **_json(plan),
                 "semantic_query": trace_payload.get("semantic_query"),

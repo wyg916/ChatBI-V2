@@ -5,7 +5,6 @@ from typing import Any
 from chatbi_agent_contracts import QuestionRoute
 from pydantic import BaseModel, ConfigDict, Field
 
-
 class AnalysisRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 

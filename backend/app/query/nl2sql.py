@@ -3,14 +3,21 @@ from __future__ import annotations
 import json
 import re
 from abc import ABC, abstractmethod
-from dataclasses import dataclass
 from datetime import date, timedelta
 from typing import Any
 
 import httpx
-from pydantic import SecretStr
 
 from app.core.config import Settings, get_settings
+from app.model_gateway.configuration import (
+    PROVIDER_DEFINITIONS,
+    ProviderDefinition,
+    ResolvedProvider,
+    configured_providers,
+    resolve_provider,
+)
+from app.model_gateway.contracts import BudgetMode, ModelCapability, ModelRequest, RequestContext
+from app.model_gateway.service import ModelGateway
 from app.query.contracts import QueryContext, QueryFilter, QueryTimeRange, SQLPlan
 
 
@@ -32,71 +39,9 @@ class Nl2SqlEngine(ABC):
         raise NotImplementedError
 
 
-@dataclass(frozen=True)
-class ProviderDefinition:
-    provider_id: str
-    display_name: str
-    base_url_field: str
-    api_key_field: str
-    model_name_field: str
-    credential_env: str
-    auth_header: str = "Authorization"
-    auth_prefix: str = "Bearer "
-    request_options: dict[str, Any] | None = None
-
-
-PROVIDER_DEFINITIONS = (
-    ProviderDefinition(
-        provider_id="kimi",
-        display_name="Moonshot Kimi",
-        base_url_field="kimi_base_url",
-        api_key_field="kimi_api_key",
-        model_name_field="kimi_model_name",
-        credential_env="CHATBI_KIMI_API_KEY",
-        request_options={"thinking": {"type": "disabled"}, "max_completion_tokens": 4096},
-    ),
-    ProviderDefinition(
-        provider_id="mimo",
-        display_name="Xiaomi MiMo",
-        base_url_field="mimo_base_url",
-        api_key_field="mimo_api_key",
-        model_name_field="mimo_model_name",
-        credential_env="CHATBI_MIMO_API_KEY",
-        auth_header="api-key",
-        auth_prefix="",
-        request_options={"thinking": {"type": "disabled"}, "max_completion_tokens": 4096},
-    ),
-    ProviderDefinition(
-        provider_id="deepseek",
-        display_name="DeepSeek",
-        base_url_field="deepseek_base_url",
-        api_key_field="deepseek_api_key",
-        model_name_field="deepseek_model_name",
-        credential_env="CHATBI_DEEPSEEK_API_KEY",
-        request_options={"thinking": {"type": "disabled"}, "max_tokens": 4096},
-    ),
-    ProviderDefinition(
-        provider_id="openai-compatible",
-        display_name="OpenAI Compatible",
-        base_url_field="model_base_url",
-        api_key_field="model_api_key",
-        model_name_field="model_name",
-        credential_env="CHATBI_MODEL_API_KEY",
-        request_options={"temperature": 0},
-    ),
-)
-
-
-def _secret_value(value: str | SecretStr) -> str:
-    return value.get_secret_value() if isinstance(value, SecretStr) else value
-
-
 def _provider_values(settings: Settings, definition: ProviderDefinition) -> tuple[str, str, str]:
-    return (
-        str(getattr(settings, definition.base_url_field)).rstrip("/"),
-        _secret_value(getattr(settings, definition.api_key_field)),
-        str(getattr(settings, definition.model_name_field)),
-    )
+    resolved = resolve_provider(settings, definition)
+    return resolved.base_url, resolved.api_key, resolved.model_name
 
 
 def _contains(question: str, values: list[str]) -> bool:
@@ -506,6 +451,7 @@ class OpenAICompatibleProvider(ModelProviderAdapter):
         display_name: str = "OpenAI Compatible",
         auth_header: str = "Authorization",
         auth_prefix: str = "Bearer ",
+        max_tokens_field: str = "max_tokens",
         request_options: dict[str, Any] | None = None,
         timeout_seconds: float = 30,
         transport: httpx.BaseTransport | None = None,
@@ -517,6 +463,7 @@ class OpenAICompatibleProvider(ModelProviderAdapter):
         self.model_name = model_name
         self.auth_header = auth_header
         self.auth_prefix = auth_prefix
+        self.max_tokens_field = max_tokens_field
         self.request_options = request_options or {}
         self.timeout_seconds = timeout_seconds
         self.transport = transport
@@ -537,11 +484,7 @@ class OpenAICompatibleProvider(ModelProviderAdapter):
     def generate(self, *, question: str, context: QueryContext) -> SQLPlan:
         if not self.capabilities()["configured"]:
             raise RuntimeError("OpenAI-compatible provider is not configured")
-        payload = {
-            "model": self.model_name,
-            "stream": False,
-            "response_format": {"type": "json_object"},
-            "messages": [
+        messages = (
                 {
                     "role": "system",
                     "content": (
@@ -552,18 +495,42 @@ class OpenAICompatibleProvider(ModelProviderAdapter):
                     ),
                 },
                 {"role": "user", "content": json.dumps({"question": question, "context": context.model_dump(mode="json")}, ensure_ascii=False)},
-            ],
-        }
-        payload.update(self.request_options)
-        with httpx.Client(timeout=self.timeout_seconds, transport=self.transport) as client:
-            response = client.post(
-                f"{self.base_url}/chat/completions",
-                headers={self.auth_header: f"{self.auth_prefix}{self.api_key}"},
-                json=payload,
-            )
-            response.raise_for_status()
-        content = response.json()["choices"][0]["message"]["content"]
-        plan = SQLPlan.model_validate_json(content)
+        )
+        provider = ResolvedProvider(
+            provider_id=self.name, display_name=self.display_name, base_url=self.base_url,
+            api_key=self.api_key, model_name=self.model_name, auth_header=self.auth_header,
+            auth_prefix=self.auth_prefix, max_tokens_field=self.max_tokens_field,
+            request_options=self.request_options,
+        )
+        gateway = ModelGateway(
+            Settings(_env_file=None, model_budget_mode="quality"),
+            transport=self.transport, provider_overrides={self.name: provider}, sleeper=lambda _: None,
+        )
+        response = gateway.execute(
+            ModelRequest(
+                capability=ModelCapability.NL2SQL,
+                messages=messages,
+                requested_alias=self.name,
+                json_mode=True,
+                complexity_score=60,
+                budget_mode=BudgetMode.QUALITY,
+                max_output_tokens=4096,
+            ),
+            RequestContext(
+                request_id=context.request_id,
+                trace_id=context.trace_id,
+                conversation_id=context.conversation_id,
+                user_id=context.user_id,
+                workspace_id=context.workspace_id,
+                datasource_id=context.datasource_id,
+                roles=frozenset({context.cache_role}),
+                permission_hash=context.permission_hash,
+                question=question,
+                context_hash=context.input_signature or "none",
+                budget_mode=BudgetMode.QUALITY,
+            ),
+        )
+        plan = SQLPlan.model_validate_json(response.content)
         # Provider output is untrusted. Runtime identity and release-critical
         # context must come from the server-owned request, never model JSON.
         return plan.model_copy(update={
@@ -573,6 +540,64 @@ class OpenAICompatibleProvider(ModelProviderAdapter):
             "semantic_model_id": context.semantic_model_id,
             "semantic_model_version": context.semantic_model_version,
             "limit": min(plan.limit, context.row_limit),
+            "model_trace": response.trace_payload(),
+        })
+
+
+class GatewayNl2SqlProvider(ModelProviderAdapter):
+    name = "model-gateway"
+
+    def __init__(self, settings: Settings):
+        self.settings = settings
+        self.gateway = ModelGateway(settings)
+
+    def capabilities(self) -> dict[str, Any]:
+        return {
+            "provider": self.name,
+            "runtime_available": bool(self.gateway.providers),
+            "configured": bool(self.gateway.providers),
+            "structured_output": True,
+            "external_model": True,
+            "protocol": "chatbi-model-gateway-v1",
+        }
+
+    def generate(self, *, question: str, context: QueryContext) -> SQLPlan:
+        messages = (
+            {
+                "role": "system",
+                "content": (
+                    "Return only one JSON object that validates against the supplied SQLPlan JSON Schema. "
+                    "Use only authorized context objects. generated_sql must be exactly one read-only SELECT "
+                    "or WITH ... SELECT statement. Never invent a table or column. "
+                    f"SQLPlan JSON Schema: {json.dumps(SQLPlan.model_json_schema(), ensure_ascii=False)}"
+                ),
+            },
+            {"role": "user", "content": json.dumps({"question": question, "context": context.model_dump(mode="json")}, ensure_ascii=False)},
+        )
+        response = self.gateway.execute(
+            ModelRequest(
+                capability=ModelCapability.NL2SQL, messages=messages, json_mode=True,
+                complexity_score=60, budget_mode=BudgetMode(self.settings.model_budget_mode),
+                thinking=True,
+                max_output_tokens=4096,
+            ),
+            RequestContext(
+                request_id=context.request_id, trace_id=context.trace_id,
+                conversation_id=context.conversation_id, user_id=context.user_id,
+                workspace_id=context.workspace_id, datasource_id=context.datasource_id,
+                roles=frozenset({context.cache_role}), permission_hash=context.permission_hash,
+                question=question, context_hash=context.input_signature or "none",
+                budget_mode=BudgetMode(self.settings.model_budget_mode),
+            ),
+        )
+        plan = SQLPlan.model_validate_json(response.content)
+        return plan.model_copy(update={
+            "question": question, "dialect": context.dialect,
+            "provider": response.resolved_provider,
+            "semantic_model_id": context.semantic_model_id,
+            "semantic_model_version": context.semantic_model_version,
+            "limit": min(plan.limit, context.row_limit),
+            "model_trace": response.trace_payload(),
         })
 
 
@@ -580,11 +605,7 @@ def build_model_provider(settings: Settings | None = None) -> ModelProviderAdapt
     settings = settings or get_settings()
     selected = settings.model_provider.strip().lower()
     if selected == "auto":
-        selected = next((
-            definition.provider_id
-            for definition in PROVIDER_DEFINITIONS
-            if all(_provider_values(settings, definition))
-        ), "deterministic")
+        return GatewayNl2SqlProvider(settings) if configured_providers(settings) else DeterministicTestProvider()
     for definition in PROVIDER_DEFINITIONS:
         if selected != definition.provider_id:
             continue
@@ -598,6 +619,7 @@ def build_model_provider(settings: Settings | None = None) -> ModelProviderAdapt
                 model_name=model_name,
                 auth_header=definition.auth_header,
                 auth_prefix=definition.auth_prefix,
+                max_tokens_field=definition.max_tokens_field,
                 request_options=definition.request_options,
             )
         break
@@ -608,13 +630,9 @@ def model_provider_catalog(settings: Settings | None = None) -> dict[str, Any]:
     settings = settings or get_settings()
     selected = settings.model_provider.strip().lower()
     if selected == "auto":
-        selected = next((
-            definition.provider_id
-            for definition in PROVIDER_DEFINITIONS
-            if all(_provider_values(settings, definition))
-        ), "deterministic")
+        selected = "model-gateway" if configured_providers(settings) else "deterministic"
     entries: list[dict[str, Any]] = []
-    selected_is_configured = selected == "deterministic"
+    selected_is_configured = selected in {"deterministic", "model-gateway"}
     for definition in PROVIDER_DEFINITIONS:
         base_url, api_key, model_name = _provider_values(settings, definition)
         configured = bool(base_url and api_key and model_name)
@@ -631,6 +649,19 @@ def model_provider_catalog(settings: Settings | None = None) -> dict[str, Any]:
             "protocol": "openai-chat-completions",
             "credential_env": definition.credential_env,
         })
+    if selected == "model-gateway":
+        entries.append({
+            "id": "model-gateway",
+            "display_name": "ChatBI V1.3 Control Plane",
+            "model_name": None,
+            "base_url": None,
+            "configured": True,
+            "active": True,
+            "external_model": False,
+            "structured_output": True,
+            "protocol": "chatbi-model-gateway-v1",
+            "credential_env": None,
+        })
     active_provider = selected if selected_is_configured else "deterministic"
     entries.append({
         "id": "deterministic",
@@ -644,7 +675,12 @@ def model_provider_catalog(settings: Settings | None = None) -> dict[str, Any]:
         "protocol": "local",
         "credential_env": None,
     })
-    return {"active_provider": active_provider, "secrets_exposed": False, "items": entries}
+    return {
+        "active_provider": active_provider,
+        "selection_strategy": "capability-complexity-cost" if active_provider == "model-gateway" else "fixed",
+        "secrets_exposed": False,
+        "items": entries,
+    }
 
 
 class Nl2SqlRouter(Nl2SqlEngine):

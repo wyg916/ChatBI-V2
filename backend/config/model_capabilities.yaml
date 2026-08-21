@@ -1,0 +1,25 @@
+{
+  "schema_version": "1.0",
+  "aliases": {
+    "mimo.default": {"provider": "mimo"},
+    "mimo.vision": {"provider": "mimo"},
+    "deepseek.default": {"provider": "deepseek"},
+    "deepseek.nl2sql": {"provider": "deepseek"},
+    "kimi.premium": {"provider": "kimi"},
+    "kimi.vision": {"provider": "kimi"}
+  },
+  "providers": {
+    "mimo": {
+      "capabilities": ["general", "classification", "nl2sql", "vision", "structured", "tool_call", "thinking", "stream"]
+    },
+    "deepseek": {
+      "capabilities": ["general", "classification", "nl2sql", "structured", "tool_call", "thinking", "stream"]
+    },
+    "kimi": {
+      "capabilities": ["general", "classification", "nl2sql", "vision", "structured", "tool_call", "thinking", "stream"]
+    },
+    "openai-compatible": {
+      "capabilities": ["general", "classification", "nl2sql", "structured", "tool_call", "stream"]
+    }
+  }
+}

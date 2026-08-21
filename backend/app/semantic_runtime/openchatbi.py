@@ -67,13 +67,14 @@ class OpenChatBILinker:
     name = "openchatbi-clean-room"
 
     def __init__(self) -> None:
-        self._cache: dict[tuple[str, str, str, int, str, str, str], OpenChatBIState] = {}
+        self._cache: dict[tuple[str, str, str, str, int, str, str, str], OpenChatBIState] = {}
         self._lock = Lock()
 
     def link(self, *, question: str, context: QueryContext) -> OpenChatBIState:
         cache_key = (
             context.workspace_id,
             context.cache_role,
+            context.permission_hash,
             context.semantic_model_id,
             context.semantic_model_version,
             context.knowledge_version,
@@ -145,7 +146,7 @@ class OpenChatBILinker:
         state = OpenChatBIState(
             workspace_id=context.workspace_id,
             cache_scope=(
-                f"workspace:{context.workspace_id}:role:{context.cache_role}:"
+                f"workspace:{context.workspace_id}:role:{context.cache_role}:permission:{context.permission_hash}:"
                 f"semantic:{context.semantic_model_id}:v{context.semantic_model_version}:"
                 f"knowledge:{context.knowledge_version}:data:{context.data_version}:"
                 f"input:{context.input_signature}"

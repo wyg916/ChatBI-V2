@@ -10,7 +10,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
     app_name: str = "ChatBI V2"
-    app_version: str = "1.2.0"
+    app_version: str = "1.3.0"
     environment: str = "development"
     database_url: str = "postgresql+psycopg://chatbi_app@127.0.0.1:5432/chatbi_v2"
     meta_password: SecretStr = SecretStr("")
@@ -27,7 +27,7 @@ class Settings(BaseSettings):
     demo_mysql_database: str = "chatbi_demo_business"
     demo_mysql_username: str = "chatbi_reader"
     demo_mysql_password: str = ""
-    model_provider: str = "deterministic"
+    model_provider: str = "auto"
     model_base_url: str = ""
     model_api_key: str = ""
     model_name: str = ""
@@ -81,6 +81,7 @@ class Settings(BaseSettings):
     general_model_provider: str = "auto"
     vision_model_provider: str = "auto"
     vision_model_name: str = ""
+    model_budget_mode: Literal["economy", "balanced", "quality"] = "balanced"
 
     @property
     def agent_route_allowlist(self) -> frozenset[str]:

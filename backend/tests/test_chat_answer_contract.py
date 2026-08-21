@@ -75,7 +75,9 @@ def test_chat_stream_is_canonical_lossless_persisted_and_has_one_terminal(client
     assert [item["seq"] for item in events] == list(range(1, len(events) + 1))
     assert len({item["run_id"] for item in events}) == 1
     assert {item["conversation_id"] for item in events} == {conversation["id"]}
-    assert {item["message_id"] for item in events} == {"pending-client-stream-contract-001"}
+    assert {item["message_id"] for item in events} == {"client-stream-contract-001"}
+    assert {item["request_id"] for item in events} == {"client-stream-contract-001"}
+    assert {item["trace_id"] for item in events} == {events[0]["run_id"]}
 
     started_phases = [item["phase"] for item in events if item["event_type"] == "phase.started"]
     completed_phases = [item["phase"] for item in events if item["event_type"] == "phase.completed"]
@@ -373,15 +375,16 @@ def test_analysis_stream_uses_same_canonical_contract(client, db_session, monkey
     query = _query_payload_for_analysis(42)
 
     class _AnalysisService:
-        def execute(self, _db, _data, _principal, *, progress_callback, cancellation_event):
+        def execute(self, _db, _data, _principal, *, progress_callback, cancellation_event, request_context):
             assert cancellation_event is not None
+            assert request_context.trace_id.startswith("TRACE-")
             progress_callback(ProgressStage.UNDERSTANDING, {})
             progress_callback(ProgressStage.QUERYING_DATA, {})
             progress_callback(ProgressStage.VERIFYING, {})
             return AnalysisResponse(
                 status="SUCCEEDED",
                 route=QuestionRoute.DATA_QUERY,
-                trace_id="TRACE-analysis-contract",
+                trace_id=request_context.trace_id,
                 primary=query,
                 feature_modes={"rag": "on", "agent": "on"},
                 security={"CROSS_WORKSPACE_LEAK": 0},

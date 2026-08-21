@@ -40,3 +40,12 @@ V1.0.1 Final Release 的本次执行报告见 [`docs/status/DAY5_STATUS.md`](sta
 - 工作树 clean；主仓库唯一；无重复 clone、长期 worktree 和未说明 stash。
 - 文档、迁移、测试、许可证和一键启动脚本齐全。
 - 前端只能通过 Backend API 访问数据库；任何前端直连数据库或暴露数据库凭据均为 FAIL。
+
+## V1.3.0 Phase 1 三模型统一控制平面
+
+- Backend 运行时代码中 Provider Chat Completions HTTP 调用平面必须恰好为 1，General、Intent、Vision、NL2SQL 不得各自直连 Provider。
+- MiMo、DeepSeek、Kimi 必须使用配置化 Alias/Model、能力矩阵和官方来源价格；不得把 Key、Authorization Header、Provider 错误正文或思考内容写入 Trace、Evidence、Git、Markdown/JSON 报告。
+- Balanced 普通请求默认 MiMo；NL2SQL 默认 DeepSeek；Kimi 仅在 Quality/Premium 资格或受控 Vision 回退下调用。预算超限、Provider 401/403/429/额度不足或无效 Key 必须真实失败或按策略回退，不得伪造 PASS。
+- “今天是几号/星期几”必须 `MODEL=NONE`；无关语境的“收入”不得进入 DATA_QUERY；跨会话响应、缓存和消息绑定错误必须为 0。
+- Chat、Analysis、Query 和 SSE 必须共用同一 `trace_id/request_id`，缓存键必须包含 Workspace、权限与上下文版本边界。
+- Phase 0.6 开发门禁使用 `CURRENT_DEV_KEYS_AUTHORIZED=YES`、`THREE_MODEL_SECRET_CONFIGURATION=PASS`、`SECRET_LEAK_IN_EVIDENCE=0`、`SECRET_LEAK_IN_GIT=0`。三组 Key 轮换只作为 V1.3.0 Final Release/生产/公开切流的强制 Gate。

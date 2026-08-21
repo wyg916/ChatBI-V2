@@ -1,5 +1,11 @@
 # Architecture Decisions
 
+## ADR-046：V1.3.0 采用单一三模型控制平面并把密钥轮换延期为生产发布门禁
+
+V1.3.0 将 General、Intent、Vision 和 NL2SQL 的 Provider 网络调用收敛到 `app/model_gateway/service.py`。业务调用方只构造项目自有 `RequestContext`、`RouterDecision`、`ModelRequest` 与 `ModelResponse`；旧 `integration/model_gateway.py` 仅保留兼容导入，NL2SQL Adapter 不再直接创建 HTTP Client。MiMo 作为 Balanced 普通路由默认，DeepSeek 作为 NL2SQL/Structured 默认，Kimi 只在 Quality 预算与 Premium 资格满足时升级，或作为受控 Vision 回退。价格、能力、路由和健康策略存放于可审计配置，真实 Provider usage 才能计入成本。
+
+当前三组开发 Key 经用户明确授权可继续用于 Phase 0.6、Phase 1～5 和开发测试；因此 `SECRET_ROTATION_CONFIRMED=YES` 不再是 Phase 0.6/Phase 1 条件。生产发布、正式部署或公开切流前仍必须重新验证 `PRODUCTION_SECRET_ROTATION_CONFIRMED=YES`，否则 `FINAL_RELEASE_ALLOWED=NO`。任何阶段都不得把 Key、Authorization Header、完整环境变量、Provider 错误正文或模型思考内容写入回复、Evidence、Git 或测试报告。
+
 ## ADR-001：Day 1 使用模块化单体
 
 前后端分别保持单体部署，后端按 API、Connector、Metadata、Semantic、DB 分层。当前主链路不引入分布式微服务。

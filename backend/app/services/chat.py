@@ -1,12 +1,15 @@
 from __future__ import annotations
 
 import base64
+import hashlib
 import json
 import re
 from datetime import datetime, timezone
 from time import perf_counter
 from threading import Event
 from typing import Callable
+from uuid import uuid4
+from zoneinfo import ZoneInfo
 
 from chatbi_agent_contracts import QuestionRoute
 from fastapi import HTTPException
@@ -16,8 +19,8 @@ from sqlalchemy.orm import Session
 from app.core.access import Principal, record_audit
 from app.core.config import get_settings
 from app.integration.contracts import AnalysisRequest
-from app.integration.model_gateway import ModelGateway, ModelUnavailable, VisionModelUnavailable
-from app.integration.question_router import QuestionRouter
+from app.model_gateway import BudgetMode, ModelGateway, ModelUnavailable, RequestContext, VisionModelUnavailable
+from app.integration.question_router import QuestionRouter, is_local_date_question
 from app.integration.service import AnalysisService
 from app.models import Attachment, ChatMessage, Conversation
 from app.schemas.chat import ChatRequest, ChatResponse, ConversationRead, MessageRead
@@ -94,6 +97,7 @@ class ChatService:
         progress: Callable[[str, dict], None] | None = None,
         cancellation_event: Event | None = None,
         answer_delta: Callable[[str], None] | None = None,
+        trace_id: str | None = None,
     ) -> ChatResponse:
         started = perf_counter()
         public_phases: list[str] = []
@@ -139,12 +143,34 @@ class ChatService:
             slots["datasource"] = request.datasource_id
         if request.semantic_model_id:
             slots["semantic_model"] = request.semantic_model_id
-        route = self.router.classify(
+        trace_id = trace_id or f"TRACE-{uuid4()}"
+        permission_hash = hashlib.sha256(
+            f"{principal.workspace_id}:{principal.user_id}:{principal.role}".encode("utf-8")
+        ).hexdigest()
+        request_context = RequestContext(
+            request_id=request.client_message_id,
+            trace_id=trace_id,
+            conversation_id=conversation.id,
+            user_id=principal.user_id or principal.email,
+            workspace_id=principal.workspace_id or conversation.workspace_id,
+            datasource_id=request.datasource_id,
+            roles=frozenset({principal.role}),
+            permission_hash=permission_hash,
+            question=resolved_question,
+            attachment_ids=tuple(item.id for item in attachments),
+            context_hash=hashlib.sha256(
+                f"{conversation.id}:{conversation.summary}:{slots}".encode("utf-8")
+            ).hexdigest(),
+            budget_mode=BudgetMode(get_settings().model_budget_mode),
+        )
+        router_decision = self.router.decide(
             resolved_question,
             request.route,
             history_summary=conversation.summary,
             attachment_kinds={item.kind for item in attachments},
+            context=request_context,
         )
+        route = router_decision.route
         report("UNDERSTANDING", {"route": route.value})
         if route in {QuestionRoute.DATA_QUERY, QuestionRoute.HYBRID_ANALYSIS, QuestionRoute.COMPLEX_ANALYSIS}:
             report("SCHEMA_LINKED", {"route": route.value})
@@ -162,7 +188,12 @@ class ChatService:
             content=content,
             route=route.value,
             attachment_ids=[item.id for item in attachments],
-            context_payload={"resolved_question": resolved_question, "slots": slots},
+            context_payload={
+                "resolved_question": resolved_question,
+                "slots": slots,
+                "request_context": request_context.model_dump(mode="json", exclude={"question"}),
+                "router_decision": router_decision.model_dump(mode="json"),
+            },
             status="COMPLETED",
         )
         db.add(user_message)
@@ -171,9 +202,9 @@ class ChatService:
         status = "SUCCEEDED"
         error_code = None
         response_payload: dict = {}
-        trace_id = f"CHAT-{user_message.id}"
         model_provider = None
         model_name = None
+        model_trace: dict = {}
         query_run_id = None
         retrieved_sources: list[dict] = []
         tool_calls: list[dict] = []
@@ -202,15 +233,17 @@ class ChatService:
                         principal,
                         progress_callback=(lambda stage, detail: report(stage.value, detail)),
                         cancellation_event=cancellation_event,
+                        request_context=request_context,
                     )
                 response_payload = {"analysis": result.model_dump(mode="json")}
-                trace_id = result.trace_id
                 status = result.status
                 primary = result.primary
                 answer = _comparative_answer(resolved_question, _analysis_answer(route, primary), primary)
                 data_payload = primary.get("data", primary) if isinstance(primary, dict) else {}
                 query_run_id = data_payload.get("id") if isinstance(data_payload, dict) else None
                 model_provider = data_payload.get("provider") if isinstance(data_payload, dict) else None
+                model_trace = ((data_payload.get("plan") or {}).get("model_trace") or {}) if isinstance(data_payload, dict) else {}
+                model_name = model_trace.get("resolved_model")
                 sql_execution = data_payload.get("execution", {}) if isinstance(data_payload, dict) else {}
                 knowledge = primary.get("knowledge", primary) if isinstance(primary, dict) else {}
                 retrieved_sources = knowledge.get("citations", []) if isinstance(knowledge, dict) else []
@@ -221,28 +254,40 @@ class ChatService:
                     error_code = str(primary.get("error_code") or status)
             elif route == QuestionRoute.GENERAL_CHAT:
                 report("GENERATING_INSIGHT", {"route": route.value})
-                answer, model_provider, model_name, answer_streamed = self._model_answer(
-                    system=(
-                        "You are ChatBI Studio. Answer ordinary product or conversational questions concisely. "
-                        "Never invent company data or internal policy. Direct business-data requests back to verified ChatBI analysis."
-                    ),
-                    user=content,
-                    history=_history(prior_messages),
-                    answer_delta=answer_delta,
-                    cancellation_event=cancellation_event,
-                )
+                if router_decision.reason == "DATE_TIME_L0" and is_local_date_question(resolved_question):
+                    local_now = datetime.now(ZoneInfo(request_context.timezone))
+                    weekdays = "一二三四五六日"
+                    answer = f"当前日期是{local_now:%Y年%m月%d日}，星期{weekdays[local_now.weekday()]}。"
+                    model_provider, model_name = "none", "none"
+                else:
+                    answer, model_provider, model_name, answer_streamed, model_trace = self._model_answer(
+                        system=(
+                            "You are ChatBI Studio. Answer ordinary product or conversational questions concisely. "
+                            "Never invent company data or internal policy. Direct business-data requests back to verified ChatBI analysis."
+                        ),
+                        user=content,
+                        history=_history(prior_messages),
+                        answer_delta=answer_delta,
+                        cancellation_event=cancellation_event,
+                        request_context=request_context,
+                        complexity_score=router_decision.complexity_score,
+                    )
                 response_payload = {"answer": answer}
             elif route == QuestionRoute.FILE_QUERY:
                 with stream_registry.workload("sandbox"):
-                    answer, model_provider, model_name, retrieved_sources, file_analysis, answer_streamed = self._file_answer(
+                    answer, model_provider, model_name, retrieved_sources, file_analysis, answer_streamed, model_trace = self._file_answer(
                         content, attachments, prior_messages, answer_delta=answer_delta,
                         cancellation_event=cancellation_event,
+                        request_context=request_context,
+                        complexity_score=router_decision.complexity_score,
                     )
                 response_payload = {"answer": answer, "citations": retrieved_sources, "file_analysis": file_analysis}
             elif route == QuestionRoute.MULTIMODAL_QUERY:
-                answer, model_provider, model_name, answer_streamed = self._vision_answer(
+                answer, model_provider, model_name, answer_streamed, model_trace = self._vision_answer(
                     content, attachments, prior_messages, answer_delta=answer_delta,
                     cancellation_event=cancellation_event,
+                    request_context=request_context,
+                    complexity_score=router_decision.complexity_score,
                 )
                 response_payload = {"answer": answer}
             elif route == QuestionRoute.CLARIFICATION:
@@ -281,6 +326,8 @@ class ChatService:
 
         elapsed_ms = round((perf_counter() - started) * 1000)
         trace = {
+            "trace_id": trace_id,
+            "request_id": request.client_message_id,
             "conversation_id": conversation.id,
             "message_id": user_message.id,
             "workspace_id": principal.workspace_id,
@@ -288,7 +335,10 @@ class ChatService:
             "route": route.value,
             "model_provider": model_provider,
             "model_name": model_name,
-            "prompt_version": "phase2-chat-v1",
+            "model_call": model_trace,
+            "router_decision": router_decision.model_dump(mode="json"),
+            "request_cache_key": request_context.cache_key("chat-response"),
+            "prompt_version": "v1.3-runtime-control-plane-v1",
             "semantic_model_version": (response_payload.get("analysis", {}).get("primary", {}) or {}).get("semantic_model_version"),
             "retrieved_sources": retrieved_sources,
             "tool_calls": tool_calls,
@@ -322,7 +372,12 @@ class ChatService:
             retrieved_sources=retrieved_sources,
             attachments=attachments,
         )
-        user_message.context_payload = {"resolved_question": resolved_question, "slots": slots}
+        user_message.context_payload = {
+            "resolved_question": resolved_question,
+            "slots": slots,
+            "request_context": request_context.model_dump(mode="json", exclude={"question"}),
+            "router_decision": router_decision.model_dump(mode="json"),
+        }
         refresh_conversation_summary(conversation, content, slots)
         record_audit(
             db,
@@ -357,7 +412,9 @@ class ChatService:
         vision: bool = False,
         answer_delta: Callable[[str], None] | None = None,
         cancellation_event: Event | None = None,
-    ) -> tuple[str, str, str, bool]:
+        request_context: RequestContext | None = None,
+        complexity_score: int = 25,
+    ) -> tuple[str, str, str, bool, dict]:
         stream = getattr(self.gateway, "stream", None)
         if answer_delta is not None and callable(stream):
             chunks: list[str] = []
@@ -368,6 +425,9 @@ class ChatService:
                 history=history,
                 image_data_urls=image_data_urls,
                 vision=vision,
+                context=request_context,
+                complexity_score=complexity_score,
+                cancellation_event=cancellation_event,
             ):
                 if cancellation_event is not None and cancellation_event.is_set():
                     raise StreamCancelled("chat run cancelled")
@@ -377,27 +437,34 @@ class ChatService:
                     answer_delta(reply.content)
             if not chunks:
                 raise VisionModelUnavailable("Vision model returned no content") if vision else ModelUnavailable("Model returned no content")
-            return "".join(chunks), provider, model, True
+            final_response = getattr(self.gateway, "last_response", None)
+            model_trace = final_response.trace_payload() if final_response is not None else {}
+            return "".join(chunks), provider, model, True, model_trace
         reply = self.gateway.complete(
             system=system,
             user=user,
             history=history,
             image_data_urls=image_data_urls,
             vision=vision,
+            context=request_context,
+            complexity_score=complexity_score,
+            cancellation_event=cancellation_event,
         )
-        return reply.content, reply.provider, reply.model, False
+        return reply.content, reply.provider, reply.model, False, (reply.trace or {})
 
     def _file_answer(
         self, question: str, attachments: list[Attachment], messages: list[ChatMessage], *,
         answer_delta: Callable[[str], None] | None = None,
         cancellation_event: Event | None = None,
+        request_context: RequestContext | None = None,
+        complexity_score: int = 25,
     ):
         if not attachments:
             raise HTTPException(status_code=422, detail="FILE_QUERY_REQUIRES_ATTACHMENT")
         sources = [{"attachment_id": item.id, "filename": item.filename, "kind": item.kind} for item in attachments]
         if attachments and all(item.kind == "STRUCTURED" for item in attachments):
             analysis = analyze_structured(question, attachments)
-            return analysis["answer"], "chatbi-safe-dataframe", "fixed-operation-v1", sources, analysis, False
+            return analysis["answer"], "chatbi-safe-dataframe", "fixed-operation-v1", sources, analysis, False, {}
         context = []
         for item in attachments:
             payload = item.extracted_payload or {}
@@ -405,7 +472,7 @@ class ChatService:
                 context.append({"attachment_id": item.id, "filename": item.filename, **payload})
             elif item.kind == "DOCUMENT":
                 context.append({"attachment_id": item.id, "filename": item.filename, "text": str(payload.get("text", ""))[:60_000]})
-        answer, provider, model, streamed = self._model_answer(
+        answer, provider, model, streamed, model_trace = self._model_answer(
             system=(
                 "Answer only from the supplied temporary attachment evidence. For tabular files, calculate only from provided profile/preview and state limits. "
                 "For documents, cite claims as [attachment:<id>]. If evidence is absent, say so; never use general knowledge as company evidence."
@@ -414,13 +481,17 @@ class ChatService:
             history=_history(messages),
             answer_delta=answer_delta,
             cancellation_event=cancellation_event,
+            request_context=request_context,
+            complexity_score=complexity_score,
         )
-        return answer, provider, model, sources, None, streamed
+        return answer, provider, model, sources, None, streamed, model_trace
 
     def _vision_answer(
         self, question: str, attachments: list[Attachment], messages: list[ChatMessage], *,
         answer_delta: Callable[[str], None] | None = None,
         cancellation_event: Event | None = None,
+        request_context: RequestContext | None = None,
+        complexity_score: int = 25,
     ):
         images = [item for item in attachments if item.kind == "IMAGE"]
         if not images:
@@ -429,7 +500,7 @@ class ChatService:
             f"data:{item.mime_type};base64,{base64.b64encode(attachment_path(item).read_bytes()).decode('ascii')}"
             for item in images
         ]
-        answer, provider, model, streamed = self._model_answer(
+        answer, provider, model, streamed, model_trace = self._model_answer(
             system=(
                 "Analyze the supplied images for the user's ChatBI question. Describe only visible evidence. "
                 "Do not infer confidential business facts that are not visible."
@@ -440,5 +511,7 @@ class ChatService:
             vision=True,
             answer_delta=answer_delta,
             cancellation_event=cancellation_event,
+            request_context=request_context,
+            complexity_score=complexity_score,
         )
-        return answer, provider, model, streamed
+        return answer, provider, model, streamed, model_trace

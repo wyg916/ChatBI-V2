@@ -1,0 +1,37 @@
+{
+  "schema_version": "1.0",
+  "currency": "CNY",
+  "unit": "per_million_tokens",
+  "effective_date": "2026-08-21",
+  "providers": {
+    "mimo": {
+      "model_family": "mimo-v2.5",
+      "cached_input": 0.02,
+      "uncached_input": 1.0,
+      "output": 2.0,
+      "source": "https://mimo.mi.com/docs/zh-CN/price/pay-as-you-go"
+    },
+    "deepseek": {
+      "model_family": "deepseek-v4-flash",
+      "cached_input": 0.02,
+      "uncached_input": 1.0,
+      "output": 2.0,
+      "source": "https://api-docs.deepseek.com/zh-cn/quick_start/pricing"
+    },
+    "kimi": {
+      "model_family": "kimi-k2.6",
+      "cached_input": 1.1,
+      "uncached_input": 6.5,
+      "output": 27.0,
+      "source": "https://platform.kimi.com/docs/pricing/chat-k26"
+    },
+    "openai-compatible": {
+      "model_family": "configured-at-runtime",
+      "priced": false,
+      "cached_input": 0.0,
+      "uncached_input": 0.0,
+      "output": 0.0,
+      "source": "operator-managed"
+    }
+  }
+}

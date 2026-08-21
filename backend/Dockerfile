@@ -17,6 +17,7 @@ RUN pip install --no-cache-dir \
 COPY backend/alembic.ini ./
 COPY backend/alembic ./alembic
 COPY backend/app ./app
+COPY backend/config ./config
 COPY backend/scripts ./scripts
 COPY evaluation/golden/day2-golden-20.json ./evaluation/golden/day2-golden-20.json
 COPY evaluation/golden/day4-golden-50.json ./evaluation/golden/day4-golden-50.json

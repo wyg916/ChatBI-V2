@@ -24,6 +24,7 @@ from app.integration.contracts import AnalysisRequest, AnalysisResponse
 from app.integration.feature_flags import decide
 from app.integration.question_router import QuestionRouter
 from app.integration.tool_executor import ChatBIToolExecutor
+from app.model_gateway import BudgetMode, RequestContext
 from app.models import (
     Citation as CitationRecord,
     DataSource,
@@ -50,6 +51,7 @@ class AnalysisService:
         self.router = router or QuestionRouter()
         self._rag_adapter = rag_adapter
         self.verifier = CitationVerifierV1()
+        self._runtime_context: RequestContext | None = None
 
     def execute(
         self,
@@ -59,10 +61,26 @@ class AnalysisService:
         *,
         progress_callback=None,
         cancellation_event: Event | None = None,
+        request_context: RequestContext | None = None,
     ) -> AnalysisResponse:
         settings = get_settings()
-        trace_id = f"TRACE-{uuid4()}"
-        route = self.router.classify(request.question, request.route)
+        trace_id = request_context.trace_id if request_context else f"TRACE-{uuid4()}"
+        self._runtime_context = request_context or RequestContext(
+            request_id=request.idempotency_key or f"REQ-{uuid4()}",
+            trace_id=trace_id,
+            user_id=principal.user_id or principal.email,
+            workspace_id=principal.workspace_id or "SYSTEM",
+            datasource_id=request.datasource_id,
+            roles=frozenset({principal.role}),
+            permission_hash=hashlib.sha256(
+                f"{principal.workspace_id}:{principal.user_id}:{principal.role}".encode("utf-8")
+            ).hexdigest(),
+            question=request.question,
+            budget_mode=BudgetMode(settings.model_budget_mode),
+        )
+        route = self.router.classify(
+            request.question, request.route, context=self._runtime_context,
+        )
         if route == QuestionRoute.DATA_QUERY:
             primary = self._data(db, request, principal, cancellation_event=cancellation_event)
             self._audit_route(db, principal, route, trace_id, "SUCCESS", False)
@@ -195,9 +213,8 @@ class AnalysisService:
             QuestionRoute.COMPLEX_ANALYSIS, trace_id, result.model_dump(mode="json"), settings=settings
         )
 
-    @staticmethod
     def _data(
-        db: Session, request: AnalysisRequest, principal: Principal, *, cancellation_event=None,
+        self, db: Session, request: AnalysisRequest, principal: Principal, *, cancellation_event=None,
     ) -> dict:
         run = QueryPipeline().execute(
             db,
@@ -209,6 +226,7 @@ class AnalysisService:
             ),
             principal=principal,
             cancellation_event=cancellation_event,
+            request_context=self._runtime_context,
         )
         return query_response(run).model_dump(mode="json")
 

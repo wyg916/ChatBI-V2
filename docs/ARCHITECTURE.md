@@ -56,7 +56,9 @@ All three compatibility adapters are ChatBI-owned clean-room implementations. Ru
 
 任何第三方组件只能位于适配器之后。
 
-外部模型密钥只允许由 Backend 环境变量提供。`GET /api/v1/model-providers` 只返回 Provider、模型、协议、配置状态与当前路由，不返回密钥；前端不得提供密钥回显或把凭据保存到浏览器。
+外部模型密钥只允许由 Backend 环境变量提供。V1.3.0 的 `app/model_gateway/` 是 Provider Chat Completions 的唯一网络边界；General、Intent、Vision 与 NL2SQL 都必须通过同一 `RequestContext → RouterDecision → ModelRequest → ModelGateway → ModelResponse` 契约。`GET /api/v1/query-capabilities` 只返回安全的 Provider 健康、路由/预算摘要和价格版本，不返回密钥；前端不得提供密钥回显或把凭据保存到浏览器。完整约束见 [`docs/runtime/MODEL_CONTROL_PLANE.md`](runtime/MODEL_CONTROL_PLANE.md)。
+
+MiMo 是 Balanced 普通请求的低成本默认 Provider，DeepSeek 是 NL2SQL/Structured 默认 Provider；Kimi 仅在 Quality 预算且复杂度或显式 Premium Trigger 满足时升级，Vision 可在 MiMo 失败后受控回退到 Kimi。所有价格均配置化并记录官方来源与生效日期，Provider 返回 usage 时才形成真实 Token/成本。重试、熔断、回退和取消均在 Gateway 内执行，模型思考字段不持久化。
 
 ## 5. Day 2 查询运行时
 

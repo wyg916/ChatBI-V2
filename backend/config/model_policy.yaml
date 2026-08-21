@@ -1,0 +1,38 @@
+{
+  "schema_version": "1.0",
+  "provider_order": {
+    "general": ["mimo", "deepseek", "kimi", "openai-compatible"],
+    "classification": ["mimo", "deepseek", "kimi", "openai-compatible"],
+    "nl2sql": ["deepseek", "mimo", "kimi", "openai-compatible"],
+    "vision": ["mimo", "kimi"],
+    "structured": ["deepseek", "mimo", "kimi", "openai-compatible"],
+    "tool_call": ["deepseek", "mimo", "kimi", "openai-compatible"]
+  },
+  "complexity_bands": {
+    "deterministic": [0, 24],
+    "standard": [25, 54],
+    "reasoning": [55, 79],
+    "premium_eligible": [80, 100]
+  },
+  "budget_modes": {
+    "economy": {"max_estimated_call_cny": 0.05, "max_output_tokens": 2048, "allow_premium": false},
+    "balanced": {"max_estimated_call_cny": 0.5, "max_output_tokens": 4096, "allow_premium": false},
+    "quality": {"max_estimated_call_cny": 5.0, "max_output_tokens": 8192, "allow_premium": true}
+  },
+  "premium_triggers": [
+    "multi_image",
+    "low_quality_document",
+    "cross_evidence",
+    "two_failed_sql_or_oracle_attempts",
+    "more_than_four_dependent_steps",
+    "three_or_more_tool_types",
+    "explicit_deep_analysis",
+    "high_risk_review"
+  ],
+  "limits": {
+    "max_model_escalations": 2,
+    "max_kimi_calls_per_request": 1,
+    "max_parallel_model_calls": 2,
+    "max_repairs": 2
+  }
+}

@@ -131,11 +131,12 @@ def chat_stream(
     # entire StreamingResponse. Release its transaction/connection before the
     # stream begins; the worker owns a separate bounded SessionLocal lifecycle.
     db.close()
-    run_id = f"STREAM-{uuid4()}"
+    run_id = f"TRACE-{uuid4()}"
     factory = StreamEventFactory(
         run_id=run_id,
         conversation_id=data.conversation_id,
-        message_id=f"pending-{data.client_message_id}",
+        message_id=data.client_message_id,
+        request_id=data.client_message_id,
     )
     lifecycle = stream_registry.register(
         run_id,
@@ -162,6 +163,7 @@ def chat_stream(
                     worker_db, data, principal, progress=progress,
                     cancellation_event=lifecycle.cancel_event,
                     answer_delta=answer_delta,
+                    trace_id=run_id,
                 )
                 lifecycle.checkpoint()
                 events.put(("result", result.model_dump(mode="json")))

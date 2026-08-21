@@ -28,6 +28,11 @@ class SecurityPolicy(BaseModel):
 
 
 class QueryContext(BaseModel):
+    request_id: str = "SYSTEM"
+    trace_id: str = "TRACE-SYSTEM"
+    user_id: str = "SYSTEM"
+    conversation_id: str | None = None
+    permission_hash: str = "system"
     workspace_id: str
     workspace_name: str
     datasource_id: str
@@ -93,6 +98,7 @@ class SQLPlan(BaseModel):
     confidence: float = Field(ge=0, le=1)
     warnings: list[str] = Field(default_factory=list)
     repair_count: int = Field(default=0, ge=0, le=2)
+    model_trace: dict[str, Any] = Field(default_factory=dict)
 
 
 class GuardIssue(BaseModel):

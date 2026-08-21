@@ -1,5 +1,13 @@
 # 项目状态
 
+## V1.3.0 Phase 1 三模型统一控制平面（2026-08-21）
+
+- Phase 0.6 已按用户最新授权通过：`CURRENT_DEV_KEYS_AUTHORIZED=YES`、`THREE_MODEL_SECRET_CONFIGURATION=PASS`、`SECRET_LEAK_IN_EVIDENCE=0`、`SECRET_LEAK_IN_GIT=0`。三模型 Key 轮换延期到 V1.3.0 Final Release/生产/公开切流前，不阻塞 Phase 1～5 开发测试。
+- Phase 1 在独立分支 `codex/v1.3.0-runtime-control-plane` 从 `chatbi-v2-v1.2.0^{}` 增量实现，不合入本地主工作区的 V1.2.0 后续候选提交，也未重跑 Phase 0/0.5。
+- Provider HTTP 调用已收敛到单一 ModelGateway；新增 Request/Router/Model 契约、MiMo/DeepSeek/Kimi Alias 与能力配置、真实 usage 成本、Economy/Balanced/Quality 预算、重试、熔断、回退、取消和安全健康摘要。
+- Chat/Analysis/Query/SSE 已统一 `trace_id/request_id`，语义缓存加入权限哈希；日期问题走服务端 L0 `MODEL=NONE`，创作语境中的“收入”不再误路由到 DATA_QUERY。
+- Phase 1 功能与本地发布门禁已通过：Backend 236/236、Frontend 50/50、Vite 741 modules、统一控制平面专项生产 E2E 3/3、Golden 50/50、迁移单 head 与 upgrade→base→upgrade、两次停止态 Docker 启动 2/2、三模型真实 Smoke 3/3、Secret Scan 0。最终提交 SHA 与远端同步状态由独立 Evidence 和交付输出记录；未创建 Release Tag，正式发布仍受三模型密钥轮换门禁约束。
+
 ## V1.2.0 正式发布冻结（2026-08-20）
 
 - `RELEASE_STATUS=FROZEN`

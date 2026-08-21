@@ -9,6 +9,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
+from app.model_gateway.contracts import RequestContext
 from app.models import (
     DataSource,
     DataSourceColumn,
@@ -69,6 +70,7 @@ class ContextBuilder:
         semantic_model: SemanticModel,
         row_limit: int,
         cache_role: str = "SYSTEM",
+        request_context: RequestContext | None = None,
     ) -> QueryContext:
         model = get_semantic_model(db, semantic_model.id)
         if model is None:
@@ -206,6 +208,11 @@ class ContextBuilder:
 
         settings = get_settings()
         return QueryContext(
+            request_id=request_context.request_id if request_context else "SYSTEM",
+            trace_id=request_context.trace_id if request_context else "TRACE-SYSTEM",
+            user_id=request_context.user_id if request_context else "SYSTEM",
+            conversation_id=request_context.conversation_id if request_context else None,
+            permission_hash=request_context.permission_hash if request_context else "system",
             workspace_id=workspace.id,
             workspace_name=workspace.name,
             datasource_id=datasource.id,

@@ -12,6 +12,7 @@ from app.query.contracts import (
     VerifyResultRequest,
 )
 from app.query.nl2sql import Nl2SqlRouter
+from app.model_gateway import ModelGateway
 from app.query.service import QueryPipeline, query_response, save_feedback, save_verified_answer
 from app.core.config import get_settings
 from app.schemas.content import AnswerRead
@@ -33,6 +34,7 @@ def _run_or_404(db: Session, query_id: str, principal: Principal) -> QueryRun:
 @router.get("/query-capabilities")
 def query_capabilities(_: Principal = Depends(require_permission("query.ask"))):
     settings = get_settings()
+    model_gateway = ModelGateway(settings)
     rag = LiveRagAdapter(
         base_url=settings.legacy_rag_base_url,
         shared_secret=settings.rag_shared_secret.get_secret_value(),
@@ -40,6 +42,13 @@ def query_capabilities(_: Principal = Depends(require_permission("query.ask"))):
     )
     return {
         "nl2sql": Nl2SqlRouter().capabilities(),
+        "model_control_plane": {
+            "version": "v1.3",
+            "single_provider_call_plane": True,
+            "secrets_exposed": False,
+            "providers": model_gateway.health_snapshot(),
+            "policy": model_gateway.policy.safe_summary(),
+        },
         "sql_guard": {"engine": "sqlglot", "ast_validation": True},
         "result_oracle": {"version": "v1", "sql_string_equality": False},
         "controlled_rag": {

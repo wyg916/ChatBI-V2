@@ -66,13 +66,14 @@ docs/         产品、架构、验收、UI 与状态文档
 → Golden Evaluation / Case Detail
 ```
 
-默认 `CHATBI_MODEL_PROVIDER=deterministic` 使用基于语义对象与通用分析意图的本地运行时，不使用“完整问题 → 固定 SQL”字典。可选 OpenAI-compatible Provider 仅通过环境变量配置：
+V1.3 默认 `CHATBI_MODEL_PROVIDER=auto`，由统一 ModelGateway 按能力、复杂度、成本与预算在 MiMo、DeepSeek、Kimi 间选择；普通 Balanced 请求默认 MiMo，NL2SQL 默认 DeepSeek，Kimi 只在 Quality/Premium 资格或受控视觉回退时使用。离线演示可显式设置 `CHATBI_MODEL_PROVIDER=deterministic`。完整契约见 [`docs/runtime/MODEL_CONTROL_PLANE.md`](docs/runtime/MODEL_CONTROL_PLANE.md)。
 
 ```text
-CHATBI_MODEL_PROVIDER=openai-compatible
-CHATBI_MODEL_BASE_URL=https://provider.example/v1
-CHATBI_MODEL_API_KEY=<LOCAL_SECRET_ONLY>
-CHATBI_MODEL_NAME=<MODEL_NAME>
+CHATBI_MODEL_PROVIDER=auto
+CHATBI_MODEL_BUDGET_MODE=balanced
+CHATBI_MIMO_API_KEY=<LOCAL_SECRET_ONLY>
+CHATBI_DEEPSEEK_API_KEY=<LOCAL_SECRET_ONLY>
+CHATBI_KIMI_API_KEY=<LOCAL_SECRET_ONLY>
 ```
 
 API Key 不得写入仓库。没有配置外部模型时，本地运行时仍可完成完整真实查询链路。

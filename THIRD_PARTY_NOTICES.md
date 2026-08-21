@@ -106,7 +106,8 @@ Day 3 introduced no copied third-party source, logo, brand asset, or restricted 
 ## External model API integrations
 
 - Services: Moonshot Kimi API, Xiaomi MiMo API, DeepSeek API.
-- Interface: OpenAI-compatible Chat Completions over HTTPS through the project-owned `ModelProviderAdapter`.
+- Interface: OpenAI-compatible Chat Completions over HTTPS through the project-owned V1.3 `ModelGateway` and provider adapters.
 - Source use: no provider SDK, source code, logo, model weight, or brand asset was copied into the repository.
+- V1.3 source reuse: no external open-source control-plane code was copied or imported; routing, cost, budget, circuit-breaker, fallback and trace logic are independently authored ChatBI code. The only runtime HTTP implementation is the existing pinned `httpx` dependency.
 - Credentials: server-side environment variables only; no credential is present in tracked files or browser responses.
 - Terms: operators remain responsible for each provider's current API terms, pricing, data handling policy, and key rotation.

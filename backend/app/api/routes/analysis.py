@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 from queue import Empty, Queue
 from threading import Thread
 from time import perf_counter
@@ -14,6 +15,8 @@ from app.core.access import Principal, require_permission
 from app.db.session import SessionLocal, get_db
 from app.integration.contracts import AnalysisRequest, AnalysisResponse
 from app.integration.service import AnalysisService
+from app.model_gateway import BudgetMode, RequestContext
+from app.core.config import get_settings
 from app.services.answer_composer import AnswerComposer
 from app.streaming import PHASE_LABELS, StreamCancelled, StreamEventFactory, format_sse, phase_for_stage, stream_registry
 
@@ -127,10 +130,27 @@ def analyze_stream(
     principal: Principal = Depends(require_permission("query.ask")),
 ) -> StreamingResponse:
     """Stream the same public business protocol as chat without internal reasoning."""
-    run_id = f"STREAM-{uuid4()}"
+    run_id = f"TRACE-{uuid4()}"
     conversation_id = f"analysis-{run_id}"
-    message_id = f"pending-{data.idempotency_key or uuid4()}"
-    factory = StreamEventFactory(run_id, conversation_id, message_id)
+    request_id = data.idempotency_key or f"REQ-{uuid4()}"
+    message_id = request_id
+    factory = StreamEventFactory(
+        run_id, conversation_id, message_id, request_id=request_id,
+    )
+    request_context = RequestContext(
+        request_id=request_id,
+        trace_id=run_id,
+        conversation_id=conversation_id,
+        user_id=principal.user_id or principal.email,
+        workspace_id=principal.workspace_id or "SYSTEM",
+        datasource_id=data.datasource_id,
+        roles=frozenset({principal.role}),
+        permission_hash=hashlib.sha256(
+            f"{principal.workspace_id}:{principal.user_id}:{principal.role}".encode("utf-8")
+        ).hexdigest(),
+        question=data.question,
+        budget_mode=BudgetMode(get_settings().model_budget_mode),
+    )
     lifecycle = stream_registry.register(run_id)
     events: Queue[tuple[str, dict] | None] = Queue()
 
@@ -149,6 +169,7 @@ def analyze_stream(
                     principal,
                     progress_callback=progress,
                     cancellation_event=lifecycle.cancel_event,
+                    request_context=request_context,
                 )
             lifecycle.checkpoint()
             events.put(("result", result.model_dump(mode="json")))

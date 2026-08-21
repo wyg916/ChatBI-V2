@@ -277,18 +277,18 @@ def test_model_gateway_auto_fails_over_without_fabricating_an_answer():
 
     def handler(request: httpx.Request):
         calls.append(str(request.url))
-        if "moonshot" in str(request.url):
+        if "xiaomimimo" in str(request.url):
             return httpx.Response(429, json={"error": "rate limited"})
         return httpx.Response(200, json={"choices": [{"message": {"content": "真实备用模型回答"}}]})
 
     gateway = ModelGateway(Settings(
         kimi_api_key="kimi-test", mimo_api_key="mimo-test", deepseek_api_key="",
-        general_model_provider="auto",
+        general_model_provider="auto", model_budget_mode="quality",
     ), transport=httpx.MockTransport(handler))
     reply = gateway.complete(system="system", user="hello")
     assert reply.content == "真实备用模型回答"
-    assert reply.provider == "mimo"
-    assert len(calls) == 2
+    assert reply.provider == "kimi"
+    assert len(calls) == 3
 
 
 def test_model_gateway_vision_retries_a_transient_primary_failure():
@@ -301,7 +301,7 @@ def test_model_gateway_vision_retries_a_transient_primary_failure():
         return httpx.Response(200, json={"choices": [{"message": {"content": "真实图片字段"}}]})
 
     gateway = ModelGateway(Settings(
-        kimi_api_key="kimi-test", mimo_api_key="", deepseek_api_key="",
+        kimi_api_key="", mimo_api_key="mimo-test", deepseek_api_key="",
         vision_model_provider="auto",
     ), transport=httpx.MockTransport(handler))
     reply = gateway.complete(
@@ -309,5 +309,5 @@ def test_model_gateway_vision_retries_a_transient_primary_failure():
         image_data_urls=["data:image/png;base64,iVBORw0KGgo="], vision=True,
     )
     assert reply.content == "真实图片字段"
-    assert reply.provider == "kimi"
+    assert reply.provider == "mimo"
     assert len(calls) == 2

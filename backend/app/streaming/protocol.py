@@ -63,6 +63,7 @@ class StreamEventFactory:
     run_id: str
     conversation_id: str
     message_id: str
+    request_id: str | None = None
     sequence: int = 0
     _started: bool = field(default=False, init=False)
     _terminal: str | None = field(default=None, init=False)
@@ -88,6 +89,8 @@ class StreamEventFactory:
         event = {
             "seq": self.sequence,
             "run_id": self.run_id,
+            "trace_id": self.run_id,
+            "request_id": self.request_id,
             "conversation_id": self.conversation_id,
             "message_id": self.message_id,
             "timestamp": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
