@@ -49,3 +49,11 @@ V1.0.1 Final Release 的本次执行报告见 [`docs/status/DAY5_STATUS.md`](sta
 - “今天是几号/星期几”必须 `MODEL=NONE`；无关语境的“收入”不得进入 DATA_QUERY；跨会话响应、缓存和消息绑定错误必须为 0。
 - Chat、Analysis、Query 和 SSE 必须共用同一 `trace_id/request_id`，缓存键必须包含 Workspace、权限与上下文版本边界。
 - Phase 0.6 开发门禁使用 `CURRENT_DEV_KEYS_AUTHORIZED=YES`、`THREE_MODEL_SECRET_CONFIGURATION=PASS`、`SECRET_LEAK_IN_EVIDENCE=0`、`SECRET_LEAK_IN_GIT=0`。三组 Key 轮换只作为 V1.3.0 Final Release/生产/公开切流的强制 Gate。
+
+## V1.3.0 Phase 2 数据主链与真实上游能力
+
+- OpenChatBI/WrenAI 只有在官方 commit、selected path、Git blob/SHA-256、路径许可证、import closure、真实 Trace 调用数、关闭开关和 rollback 全部可复验时才计为直接复用；clean-room/命名兼容不得计数。
+- DATA_QUERY 保持唯一 ChatBI Router、Model Gateway、SQLGlot→EXPLAIN→QueryExecutor→ResultOracle、Trace 与 SSE；上游不得直连 Provider 或数据库。
+- A/B 固定同一数据库、Schema、Golden、模型/Prompt、权限与 Workspace，必须完成 Golden 50 + 复杂 20 的真实结果值比较；执行成功率不低于 0.98、结果准确率不低于 0.95、Catalog Recall@5 不低于 0.95。
+- 关键指标/多 Join 的 Verification Query 执行率必须为 1.0；危险 SQL 执行、跨 Workspace recall/replay 和 Guard bypass 必须为 0。
+- IBM/SQLBot 若许可证闭包不成立，其 official runtime calls 必须为 0，Phase 2 Gate 必须保持 PARTIAL/BLOCKED；不得用 ChatBI clean-room 替代品宣称 PASS。

@@ -1,5 +1,13 @@
 # 项目状态
 
+## V1.3.0 Phase 2 数据主链与真实上游接入（2026-08-21）
+
+- OpenChatBI `c8786cb...` 的 `catalog_store.py` 与 WrenAI `7830cc7...` 的 `type_mapping.py`/`wren_dialect.py` 已按 canonical Git blob 字节等同 vendoring；固定路径、许可证、SHA-256、import closure、调用数、关闭和回滚均可审计。真实直接复用项目数为 2。
+- PostgreSQL 同库同 Schema/模型/权限 A/B 为 Golden 50 + 复杂改写 20：clean-room 与 selected-source 的执行、结果、语义、Join、澄清均为 70/70；selected-source OpenChatBI/Wren 调用为 588/140，Catalog Recall@5=1.0，A/B 总延迟 p95 为 562.597/570.854 ms，模型 Token/成本/重试均为 0。
+- SQL 执行新增 fail-closed EXPLAIN Cost Guard；关键指标/多 Join 新增第二次经 SQLGlot 与同一权限策略保护的只读一致性查询；Oracle 新增 Chart/Narrative 结果绑定。Verified SQL 审核和回放新增 SQL SHA-256、数据源、语义模型/version 与结果签名防篡改。
+- 回归结果：Backend 251/251、定向安全 110/110、Frontend Vitest 50/50、TypeScript、production build、Golden 50 与八维 Oracle、危险 SQL 56/56 均 PASS；E2E 首轮因隔离元数据缺少 10M 数据源登记为 11/12，补录 79 表/1187 字段/111 关系后该用例真实通过，综合 12/12。初次连接既有 public 元数据时因该 Schema 已记录固定 Phase 1 基线之外的本机后续 Alembic revision 而启动失败；改用受保护的隔离元数据 Schema 后，Docker Compose 从停止状态连续两次启动为 healthy，验收后已停止栈并只删除该临时 Schema。
+- IBM official Toolkit 因同一锁定发行物 Apache-2.0/MIT 元数据冲突及 benchmark 闭包不完整而 BLOCKED；SQLBot 因 modified GPL 品牌条件和未闭合 xpack 二进制而 BLOCKED。两者 official runtime calls=0，自有替代实现明确为 `chatbi-clean-room`，因此 Phase 2 最终 Gate 保持 PARTIAL，不创建 Tag、不修改 main。
+
 ## V1.3.0 Phase 1 三模型统一控制平面（2026-08-21）
 
 - Phase 0.6 已按用户最新授权通过：`CURRENT_DEV_KEYS_AUTHORIZED=YES`、`THREE_MODEL_SECRET_CONFIGURATION=PASS`、`SECRET_LEAK_IN_EVIDENCE=0`、`SECRET_LEAK_IN_GIT=0`。三模型 Key 轮换延期到 V1.3.0 Final Release/生产/公开切流前，不阻塞 Phase 1～5 开发测试。

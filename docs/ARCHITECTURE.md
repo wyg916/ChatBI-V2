@@ -1,12 +1,12 @@
 # ChatBI V2 技术架构
 
-## v2.1 Day 1 default semantic runtime
+## V1.3.0 Phase 2 default semantic runtime
 
 `DATA_QUERY` remains deterministic, read-only and Oracle-verified, but semantic preparation is now an explicit replaceable chain:
 
-`OpenChatBI-compatible hybrid catalog linking → SuperSonic-compatible SemanticQuery → Wren-compatible MDL + dry-plan + semantic SQL → SQLGlot AST Guard → QueryExecutor → ResultOracle`.
+`OpenChatBI selected source + ChatBI hybrid catalog linking → SuperSonic-compatible clean-room SemanticQuery → WrenAI selected source + ChatBI MDL/dry-plan bridge → SQLGlot AST Guard → EXPLAIN Cost Guard → QueryExecutor → ResultOracle → critical Verification Query`.
 
-All three compatibility adapters are ChatBI-owned clean-room implementations. Runtime evidence is persisted in `QueryRun.context_payload.semantic_runtime` and the plan stores SemanticQuery, dry-plan and the public call chain. Cache keys include Workspace, Semantic Model and version. The prior `LocalSemanticEngine/Nl2SqlRouter` path remains available only via `CHATBI_SEMANTIC_RUNTIME_MODE=local` for explicit rollback.
+OpenChatBI `catalog_store.py` and WrenAI `type_mapping.py`/`wren_dialect.py` are exact pinned upstream files behind a ChatBI-owned bridge. Hybrid ranking, SuperSonic-compatible SemanticQuery, final SQL generation, Router, Model Gateway, permissions, execution, Oracle, Trace and SSE remain ChatBI-owned. Runtime evidence persists adapter, official commit, source SHA and actual call count in `QueryRun.context_payload.semantic_runtime`. Cache keys include Workspace, permission, semantic/data/knowledge/input versions and A/B mode. `CHATBI_SEMANTIC_UPSTREAM_REUSE_MODE=clean_room` retains the previous A/B path; `CHATBI_SEMANTIC_RUNTIME_MODE=local` remains the full rollback.
 
 ## 1. 推荐技术栈
 
@@ -15,7 +15,7 @@ All three compatibility adapters are ChatBI-owned clean-room implementations. Ru
 - Metadata DB：本机 PostgreSQL，数据库 `chatbi_v2`；应用使用项目专用账号，管理员账号只用于首次初始化。
 - SQL 解析与方言：SQLGlot 或等价 AST 解析器。
 - 模型：通过 `ModelProviderAdapter` 接入本地确定性语义运行时与命名的 OpenAI-compatible 服务；当前包含 Kimi `kimi-k2.6`、MiMo `mimo-v2.5`、DeepSeek `deepseek-v4-flash`，供应商差异封装在 Adapter 内。
-- 评测：IBM Text-to-SQL Evaluation Toolkit + 自研 Business Result Oracle。
+- 评测：ChatBI clean-room execution comparator + Business Result Oracle；IBM official Toolkit remains blocked until its Apache/MIT distribution metadata conflict and benchmark data closure are resolved.
 - 部署：Docker Compose 承载 Backend、独立 RAG Runtime 与 Frontend；开发数据库运行在本机，不创建 Docker 数据库容器或数据卷。CI 执行 Backend、Frontend、E2E、Golden Set。
 
 ## 2. 数据运行基线

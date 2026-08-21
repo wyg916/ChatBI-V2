@@ -1,5 +1,13 @@
 # Architecture Decisions
 
+## ADR-047：V1.3.0 Phase 2 只计可验真的最小上游源码复用，许可证冲突保持阻断
+
+OpenChatBI/WrenAI 整包依赖闭包分别会引入自己的 LLM、向量/数据库运行时或重型执行依赖，破坏 ChatBI 的单一 Router、Model Gateway 和 SQL 执行入口。Phase 2 因此只 vendoring 固定 commit 下三个字节等同的最小源文件：OpenChatBI CatalogStore 的名称投影函数，以及 WrenAI 类型映射和 SQLGlot Wren dialect。每次运行在统一 Trace 中记录 adapter、commit、source SHA 与调用数；`selected_source|clean_room` 进入缓存键并可用环境变量 A/B，完整回滚仍为 `local`。
+
+SuperSonic 继续 clean-room。IBM 同一发行物的根 LICENSE 与 package/wheel metadata 分别为 Apache-2.0/MIT，SQLBot 同时存在 modified GPL 品牌条款和无许可证元数据的 xpack 二进制；两者不形成官方运行时调用，也不得把项目自有兼容代码计为真实复用。Phase 2 总 Gate 因此保持 PARTIAL，即使合法的 OpenChatBI/Wren 路径和 ChatBI 自有质量闭环通过。
+
+所有 SQL 继续进入 SQLGlot、Workspace/RBAC、EXPLAIN Cost Guard、只读 QueryExecutor 和 ResultOracle。关键指标及多 Join 查询额外执行第二条经同一 Guard 的只读一致性查询；它只能证明执行结果稳定，不冒充独立业务口径验证。Chart/Narrative 必须绑定 Query ID、列、行数、结果签名及证据字段。
+
 ## ADR-046：V1.3.0 采用单一三模型控制平面并把密钥轮换延期为生产发布门禁
 
 V1.3.0 将 General、Intent、Vision 和 NL2SQL 的 Provider 网络调用收敛到 `app/model_gateway/service.py`。业务调用方只构造项目自有 `RequestContext`、`RouterDecision`、`ModelRequest` 与 `ModelResponse`；旧 `integration/model_gateway.py` 仅保留兼容导入，NL2SQL Adapter 不再直接创建 HTTP Client。MiMo 作为 Balanced 普通路由默认，DeepSeek 作为 NL2SQL/Structured 默认，Kimi 只在 Quality 预算与 Premium 资格满足时升级，或作为受控 Vision 回退。价格、能力、路由和健康策略存放于可审计配置，真实 Provider usage 才能计入成本。

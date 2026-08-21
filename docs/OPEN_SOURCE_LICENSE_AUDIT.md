@@ -1,5 +1,19 @@
 # Open-source and supply-chain audit — V1.1.0
 
+## V1.3.0 Phase 2 addendum — 2026-08-21
+
+This addendum supersedes the V1.1 statements that no reviewed upstream source is present. Phase 2 intentionally vendors three exact, license-permitted Python files after a new path-level audit.
+
+| Project | Fixed revision and selected path | Closure | Runtime verdict |
+| --- | --- | --- | --- |
+| OpenChatBI | `c8786cb...`; `openchatbi/catalog/catalog_store.py` | Root MIT; selected file imports only stdlib and already-pinned SQLAlchemy | PASS, byte-identical pinned vendor module, runtime calls > 0 |
+| WrenAI | `7830cc7...`; `core/wren/src/wren/type_mapping.py`, `core/wren/src/wren/mdl/wren_dialect.py` | Selected `core/**` is Apache-2.0; imports only stdlib and already-pinned SQLGlot | PASS, two byte-identical pinned vendor modules, runtime calls > 0 |
+| SuperSonic | `af08d86...` | Root adds a commercial derivative-distribution restriction | CLEAN_ROOM only; upstream source calls = 0 |
+| IBM Text-to-SQL Evaluation Toolkit | `60dd451...`; official checkout and wheel build | BLOCKED: root LICENSE Apache-2.0, `pyproject.toml` and wheel METADATA MIT; benchmark data closure incomplete | official evaluation calls = 0; ChatBI adapter is clean-room |
+| SQLBot | `2a86aa9...`; official repository and exact xpack wheel inspected | BLOCKED: modified GPLv3 branding conditions plus required `sqlbot-xpack 0.0.5.35` with no license metadata/file | service/CLI/database calls = 0; ChatBI feedback is clean-room |
+
+The OpenChatBI/Wren destination blobs match the official locked Git blobs. Their individual SHA-256 values, selected paths, license notice, dependency closure, runtime entry, disable switch and rollback are machine-readable in `docs/UPSTREAM_LOCK.json` and `backend/app/semantic_runtime/_upstream/provenance.json`. Direct upstream reuse count is exactly 2 projects, not 5. This remains an engineering compliance record, not legal advice.
+
 - Audit date: 2026-08-19 (Asia/Shanghai)
 - Scope: released backend container, complete frontend lockfile, eight upstream design references, copied source/assets, notices, checksums, rollback boundaries, CycloneDX and SPDX output.
 - Result: **PASS for the audited release candidate**. Unknown dependency licenses: **0**. Copied restricted source/UI/logo/model/benchmark assets: **0**.

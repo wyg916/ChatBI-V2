@@ -42,6 +42,20 @@ def test_selected_sources_are_real_pinned_files_with_closed_imports():
     ]
 
 
+def test_selected_wren_source_normalizes_postgresql_field_types():
+    normalized = type_mapping.parse_types([
+        {"column": "id", "raw_type": "int8"},
+        {"column": "name", "raw_type": "character varying(255)"},
+        {"column": "business_date", "raw_type": "date"},
+        {"column": "amount", "raw_type": "numeric(12,2)"},
+        {"column": "attributes", "raw_type": "jsonb"},
+    ], dialect="postgres")
+
+    assert [item["type"] for item in normalized] == [
+        "BIGINT", "VARCHAR(255)", "DATE", "DECIMAL(12, 2)", "JSONB",
+    ]
+
+
 def test_selected_source_trace_recall_latency_mdl_dry_plan_and_ab_consistency():
     settings = Settings(_env_file=None, semantic_runtime_mode="wren")
     selected_runtime = SemanticRuntime(settings, upstream_reuse_mode="selected_source")

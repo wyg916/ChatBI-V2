@@ -1,5 +1,19 @@
 # Third-Party Notices
 
+## V1.3.0 Phase 2 selected upstream semantic sources
+
+V1.3.0 Phase 2 directly reuses exactly three Python source files from two official upstream projects. Their canonical-LF repository content is byte-identical to the locked Git blobs; ChatBI integration code is kept outside the vendored files.
+
+| Project | Official revision | Selected upstream path | License | Runtime use |
+| --- | --- | --- | --- | --- |
+| OpenChatBI | `c8786cb180081dbdd18d841efa33b70d77b633e9` | `openchatbi/catalog/catalog_store.py` | MIT | `split_db_table_name` projects authorized catalog tables before ChatBI hybrid ranking; 588 calls in the frozen 70-case A/B |
+| WrenAI | `7830cc746c11602d5899d8fdec1e28de4ce11a87` (`wren-v0.13.3`) | `core/wren/src/wren/type_mapping.py` | Apache-2.0 | `parse_types` maps ChatBI dimensions into MDL types |
+| WrenAI | same revision | `core/wren/src/wren/mdl/wren_dialect.py` | Apache-2.0 | the Wren SQLGlot dialect parses every selected-source dry semantic SQL; Wren selected-source calls total 140 in the frozen 70-case A/B |
+
+The exact upstream Git blobs, raw/destination SHA-256 values, import closure, modifications, disable switch and rollback are in `backend/app/semantic_runtime/_upstream/provenance.json`; copied license notices are in `backend/app/semantic_runtime/_upstream/NOTICE.md`. No upstream LLM client, Provider key, database connector, executor, UI, logo, documentation or trademark asset is included. `CHATBI_SEMANTIC_UPSTREAM_REUSE_MODE=clean_room` disables the three selected sources for A/B; `CHATBI_SEMANTIC_RUNTIME_MODE=local` bypasses the complete semantic runtime.
+
+SuperSonic remains an independently authored clean-room semantic contract. IBM Text-to-SQL Evaluation Toolkit and SQLBot remain **not reused**: IBM's locked source/wheel conflicts between Apache-2.0 and MIT metadata, while SQLBot has modified GPL branding conditions and a required xpack wheel with no license metadata/file. Their official runtime call counts are zero, and the existing ChatBI evaluation/feedback code explicitly reports `chatbi-clean-room`.
+
 ## v2.1 Day 1 semantic design provenance
 
 No source, UI, logo, trademark asset or binary from the following projects is copied or packaged. ChatBI uses project-owned clean-room adapters behind its own contracts; the references below document design provenance and the exact upstream state reviewed on 2026-08-18.
