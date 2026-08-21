@@ -4,6 +4,7 @@ import hashlib
 import json
 import subprocess
 import tempfile
+from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 
@@ -14,34 +15,45 @@ IBM_UPSTREAM_COMMIT = "60dd4515236adb335f2053b7c069397d7d88fe0a"
 # commit. The sole file without an SPDX header is evaluation/__init__.py; it is
 # an unmodified package initializer governed by the repository Apache-2.0
 # LICENSE. The package/wheel metadata path is deliberately not used.
-SELECTED_SOURCE_SHA256 = {
-    "src/text2sql_eval_toolkit/evaluation/__init__.py": "dc7f0dae49ba79434bb76256ddc0111bc3ed7a87de6f04a6bdf0504ea414f4b4",
-    "src/text2sql_eval_toolkit/evaluation/evaluation_tools.py": "ecf732cf2b13eb093132baaf512658dea871e1d5a9a15098b10f6abce29c44c9",
-    "src/text2sql_eval_toolkit/evaluation/llm_as_judge.py": "af04a5f3557f04f9e89b2833e8321ca252679cc13667362a1772e7458dbc9cb1",
-    "src/text2sql_eval_toolkit/metrics/__init__.py": "119babb7b375f0053f3079227ed536bfc17622dfb49be6e3c29cd46de90f4f57",
-    "src/text2sql_eval_toolkit/metrics/text2sql_utils.py": "f6caa4d84682ba67e435cc70837d684db03c7982d130f65ae5365f4a2363bbbe",
-    "src/text2sql_eval_toolkit/utils.py": "8691f1e6a4fb44c9f66eb2455e476e57722fbf02f27abd7bbbecbf8b56681bb2",
-    "src/text2sql_eval_toolkit/logging.py": "d1dacfc65224c4a83e1b6775ee288055ba0d719e8c12fe84c6c158f637d67201",
-    "src/text2sql_eval_toolkit/inference/__init__.py": "175c9670991429b449f2edd09103833eddd4a65a9a13c3153ea6151da96d0367",
-    "src/text2sql_eval_toolkit/inference/inference_tools.py": "e56a78755a85fd8f92583562f59f3c843e8c7a0e1edf1bf37b3ccdb2ddddb3f8",
-    "src/text2sql_eval_toolkit/analysis/__init__.py": "175c9670991429b449f2edd09103833eddd4a65a9a13c3153ea6151da96d0367",
-    "src/text2sql_eval_toolkit/analysis/error_analysis.py": "c2c60f5cfd64923f1e3f83929b11d6c25ab4b23d768189dc39a0b7bff9aa3727",
+CANONICAL_SELECTED_SOURCE_SHA256 = {
+    "src/text2sql_eval_toolkit/evaluation/__init__.py": "591df0dd1e437c07a35164294ccd23fd508562bc2564e2efafb737aec600cae3",
+    "src/text2sql_eval_toolkit/evaluation/evaluation_tools.py": "86afcae7775b450f7c913fdcce9386d6b52d3bcec27303da0fc3a69f12fa5684",
+    "src/text2sql_eval_toolkit/evaluation/llm_as_judge.py": "88204d754aa2ea2fc310641697803aabb3b2743ff5f8a4ade670235b5e9d4cfc",
+    "src/text2sql_eval_toolkit/metrics/__init__.py": "410996bda7c5a3ae16e31305c47d814af2ce3d9f9f2ffd7532bcf7ac6b3d9c78",
+    "src/text2sql_eval_toolkit/metrics/text2sql_utils.py": "211727bd42b7d34d5685dc3671161fcfb50f4579ce88c8bf9c8f394ff93b66e9",
+    "src/text2sql_eval_toolkit/utils.py": "baa5946fcdcc97a354ea851c9813f6fd2c4d5bd04118c24f44b37e8b55df51f8",
+    "src/text2sql_eval_toolkit/logging.py": "a578b9be523b06bb938b34963769d22e83a56603a8e1baf6085f09eb3b6ecd22",
+    "src/text2sql_eval_toolkit/inference/__init__.py": "6bdd279222aa0ea556f720557ab4548f4d1fcdafc59396b626161a54273ca9f1",
+    "src/text2sql_eval_toolkit/inference/inference_tools.py": "7a69915d4b36e142d004daef87b9843bfea587f0592ecc5f971fe3488cadb8b6",
+    "src/text2sql_eval_toolkit/analysis/__init__.py": "6bdd279222aa0ea556f720557ab4548f4d1fcdafc59396b626161a54273ca9f1",
+    "src/text2sql_eval_toolkit/analysis/error_analysis.py": "07c4254b15b74bd72706bc5fe9159441b6ebc6937ad9fa26e47393399e506c0f",
 }
 
+# Backward-compatible export for evidence and integrations written before the
+# canonical Git-blob contract was introduced.
+SELECTED_SOURCE_SHA256 = CANONICAL_SELECTED_SOURCE_SHA256
 
-def _sha256(path: Path) -> str:
-    digest = hashlib.sha256()
-    with path.open("rb") as handle:
-        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
-            digest.update(chunk)
-    return digest.hexdigest()
+
+def _sha256(content: bytes) -> str:
+    return hashlib.sha256(content).hexdigest()
 
 
 class PinnedIbmOfficialEvaluator:
     """Execute reviewed IBM source in its isolated, pinned checkout environment."""
 
-    def __init__(self, checkout: Path, *, python_executable: Path | None = None) -> None:
+    def __init__(
+        self,
+        checkout: Path,
+        *,
+        python_executable: Path | None = None,
+        upstream_commit: str = IBM_UPSTREAM_COMMIT,
+        selected_source_sha256: Mapping[str, str] | None = None,
+    ) -> None:
         self.checkout = checkout.resolve()
+        self.upstream_commit = upstream_commit
+        self.selected_source_sha256 = dict(
+            selected_source_sha256 or CANONICAL_SELECTED_SOURCE_SHA256
+        )
         self.python_executable = (
             python_executable.resolve()
             if python_executable
@@ -58,12 +70,58 @@ class PinnedIbmOfficialEvaluator:
             text=True,
             timeout=30,
         ).stdout.strip()
-        if head != IBM_UPSTREAM_COMMIT:
+        if head != self.upstream_commit:
             raise RuntimeError(f"IBM_UPSTREAM_COMMIT_MISMATCH:{head}")
+
+        missing = [
+            relative
+            for relative in self.selected_source_sha256
+            if not (self.checkout / relative).is_file()
+        ]
+        if missing:
+            raise RuntimeError("IBM_SELECTED_SOURCE_MISSING:" + ",".join(missing))
+
+        worktree = subprocess.run(
+            [
+                "git",
+                "-C",
+                str(self.checkout),
+                "diff",
+                "--quiet",
+                "HEAD",
+                "--",
+                *self.selected_source_sha256,
+            ],
+            check=False,
+            capture_output=True,
+            timeout=30,
+        )
+        if worktree.returncode == 1:
+            raise RuntimeError("IBM_SELECTED_SOURCE_WORKTREE_DIRTY")
+        if worktree.returncode != 0:
+            raise RuntimeError(
+                f"IBM_SELECTED_SOURCE_WORKTREE_STATUS_FAILED:{worktree.returncode}"
+            )
+
         mismatches: list[str] = []
-        for relative, expected in SELECTED_SOURCE_SHA256.items():
-            path = self.checkout / relative
-            actual = _sha256(path) if path.is_file() else "MISSING"
+        blob_oids: dict[str, str] = {}
+        for relative, expected in self.selected_source_sha256.items():
+            revision = f"{self.upstream_commit}:{relative}"
+            oid = subprocess.run(
+                ["git", "-C", str(self.checkout), "rev-parse", revision],
+                check=True,
+                capture_output=True,
+                text=True,
+                timeout=30,
+            ).stdout.strip()
+            canonical_bytes = subprocess.run(
+                ["git", "-C", str(self.checkout), "show", revision],
+                check=True,
+                capture_output=True,
+                timeout=30,
+            ).stdout
+            actual = _sha256(canonical_bytes)
+            blob_oids[relative] = oid
             if actual != expected:
                 mismatches.append(f"{relative}:{actual}")
         if mismatches:
@@ -72,8 +130,11 @@ class PinnedIbmOfficialEvaluator:
             raise RuntimeError("IBM_ISOLATED_PYTHON_NOT_FOUND")
         return {
             "upstream_commit": head,
-            "selected_source_count": len(SELECTED_SOURCE_SHA256),
-            "selected_source_sha256": dict(SELECTED_SOURCE_SHA256),
+            "canonical_hash_source": "git-blob",
+            "selected_worktree_clean": True,
+            "selected_source_count": len(self.selected_source_sha256),
+            "selected_source_sha256": dict(self.selected_source_sha256),
+            "selected_source_git_blob_oid": blob_oids,
         }
 
     def evaluate(self, cases: list[dict[str, Any]]) -> dict[str, Any]:
