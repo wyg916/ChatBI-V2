@@ -17,6 +17,7 @@ from .guard import PythonCodeGuard, SandboxPolicyViolation
 PROTOCOL_VERSION = 1
 MAX_HTTP_BODY_BYTES = 1024 * 1024
 MAX_HTTP_RESPONSE_BYTES = 512 * 1024
+CANCEL_CONFIRMATION_TIMEOUT_SECONDS = 10.0
 _JOB_ID = re.compile(r"^[0-9a-f]{32}$")
 
 
@@ -116,7 +117,13 @@ class SandboxControllerClient:
                     elif now >= effective_deadline:
                         cancel_reason = SandboxStatus.TIMEOUT
                     if cancel_reason is not None:
-                        cleanup_deadline = now + 5.0
+                        # Docker Desktop can report container deletion before
+                        # the controller thread has finished its final inspect
+                        # and result publication.  Keep this bounded, but give
+                        # the fixed controller enough time to return signed
+                        # destruction proof instead of producing a timing-only
+                        # cancel_unconfirmed failure.
+                        cleanup_deadline = now + CANCEL_CONFIRMATION_TIMEOUT_SECONDS
                 if cancel_reason is not None and not cancellation_sent:
                     self._transport("DELETE", f"/v1/jobs/{job_id}", None, 1.0)
                     cancellation_sent = True

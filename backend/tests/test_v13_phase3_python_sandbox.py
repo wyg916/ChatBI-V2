@@ -19,7 +19,10 @@ from app.sandbox import (
     SandboxResult,
     SandboxStatus,
 )
-from app.sandbox.controller_client import PROTOCOL_VERSION
+from app.sandbox.controller_client import (
+    CANCEL_CONFIRMATION_TIMEOUT_SECONDS,
+    PROTOCOL_VERSION,
+)
 from app.sandbox.controller_server import (
     ControllerRequestError,
     JobRegistry,
@@ -328,6 +331,10 @@ def test_controller_cancel_protocol_waits_for_destroyed_result():
     assert result.status is SandboxStatus.CANCELLED
     assert result.container_destroyed
     assert "DELETE" in calls
+
+
+def test_controller_cancel_confirmation_is_bounded_but_covers_docker_cleanup():
+    assert 10.0 <= CANCEL_CONFIRMATION_TIMEOUT_SECONDS <= SandboxLimits().timeout_seconds
 
 
 @pytest.mark.parametrize("field", ["image", "command", "mounts", "environment"])
