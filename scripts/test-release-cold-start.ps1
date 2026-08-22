@@ -1,6 +1,8 @@
 [CmdletBinding()]
 param(
-  [string]$EvidencePath = 'docs/evidence/day5/cold-start.json'
+  [string]$EvidencePath = 'docs/evidence/day5/cold-start.json',
+  [ValidateRange(120, 900)]
+  [int]$EvaluationTimeoutSeconds = 300
 )
 
 $ErrorActionPreference = 'Stop'
@@ -36,6 +38,7 @@ $result = [ordered]@{
   authentication = 'NOT_RUN'
   ask = 'NOT_RUN'
   evaluation = 'NOT_RUN'
+  evaluation_timeout_seconds = $EvaluationTimeoutSeconds
   model_provider_configuration = 'NOT_RUN'
   cleanup = 'NOT_RUN'
   stage = 'INITIALIZE'
@@ -138,7 +141,7 @@ try {
   $result.ask = 'SUCCEEDED_ORACLE_PASSED'
 
   $result.stage = 'EVALUATION'
-  $evaluation = Invoke-RestMethod -Method Post -Uri "$apiBase/evaluation/runs" -WebSession $webSession -TimeoutSec 120
+  $evaluation = Invoke-RestMethod -Method Post -Uri "$apiBase/evaluation/runs" -WebSession $webSession -TimeoutSec $EvaluationTimeoutSeconds
   if($evaluation.run.status -ne 'PASS' -or $evaluation.run.golden_set_count -ne 50) {
     throw 'Cold start Evaluation gate failed'
   }
