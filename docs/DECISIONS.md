@@ -4,7 +4,7 @@
 
 Phase 5 全可见控件门禁要求 Search、Filter、Sort 的用户条件进入 Backend API，并在当前 Workspace、用户和 RBAC 边界内形成真实数据库查询；浏览器对已经取回的全量产品数据做本地过滤不能作为该门禁的实现。为保持概览统计不被当前筛选污染，前端可以并行读取无条件汇总与有条件列表，但两者都只能来自 Backend API。没有本版本实现的控件必须移除或显式禁用并说明边界，不得保留可点击但无动作的外观。
 
-`Dashboard.card_count` 是兼容存储字段，不是客户端输入。新建与 JSON 导入不得提交该字段，Backend 对额外字段 fail closed；列表排序、汇总和详情统一按真实 `DashboardCard` 行重新派生数量，即使兼容字段漂移也不能向用户显示伪造计数。演示 Seed 只创建空看板，卡片和刷新计数从 0 开始；后续只由受授权的真实卡片创建、删除和刷新操作更新。
+`Dashboard.card_count` 和 `refresh_count_today` 是兼容存储字段，不是客户端输入。新建与 JSON 导入不得提交卡片数，Backend 对额外字段 fail closed；列表排序、汇总和详情统一按真实 `DashboardCard` 行重新派生卡片数量，并按当天成功 `REFRESH_CARD` 审计行派生刷新数量，即使兼容字段漂移也不能向用户显示伪造计数。演示 Seed 只创建空看板，卡片和刷新计数从 0 开始；后续只由受授权的真实卡片创建、删除和刷新操作产生。
 
 ## ADR-054：在冻结的 DB-GPT AWEL 边界覆盖未使用的易受攻击 aiohttp 版本
 

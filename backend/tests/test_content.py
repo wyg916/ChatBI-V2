@@ -1,4 +1,4 @@
-from app.models import Dashboard
+from app.models import AuditEvent, Dashboard
 from app.services.seed import seed_demo_semantic_model
 
 
@@ -67,12 +67,24 @@ def test_dashboard_library_summary_and_create_are_database_backed(client, db_ses
     assert created.status_code == 201
     stored = db_session.get(Dashboard, created.json()["id"])
     stored.card_count = 99
+    stored.refresh_count_today = 88
+    db_session.add(AuditEvent(
+        workspace_id=stored.workspace_id,
+        actor_email="admin@chatbi.local",
+        action="REFRESH_CARD",
+        resource_type="DASHBOARD",
+        resource_id=stored.id,
+        status="SUCCESS",
+        details={},
+    ))
     db_session.commit()
 
     listed = client.get("/api/v1/dashboards", params={"query": "订单质量"})
     assert listed.status_code == 200
     assert listed.json()["total"] == 1
     assert listed.json()["items"][0]["card_count"] == 0
+    assert listed.json()["items"][0]["refresh_count_today"] == 1
+    assert client.get("/api/v1/dashboards").json()["summary"]["refreshes_today"] == 1
 
     rejected_fake_count = client.post("/api/v1/dashboards", json={
         "name": "伪造卡片数看板",

@@ -1,9 +1,9 @@
-from datetime import timedelta
+from datetime import datetime, timedelta, timezone
 
 from sqlalchemy import case, func, or_, select
 from sqlalchemy.orm import Session
 
-from app.models import AnswerVersion, Dashboard, DashboardCard, DataSource, QueryRun, VerifiedAnswer
+from app.models import AnswerVersion, AuditEvent, Dashboard, DashboardCard, DataSource, QueryRun, VerifiedAnswer
 from app.services.datasources import build_connector
 
 
@@ -79,7 +79,6 @@ def dashboard_summary(db: Session, workspace_id: str | None = None) -> dict[str,
     statement = select(
         func.count(Dashboard.id),
         func.coalesce(func.sum(case((Dashboard.is_shared.is_(True), 1), else_=0)), 0),
-        func.coalesce(func.sum(Dashboard.refresh_count_today), 0),
     )
     if workspace_id:
         statement = statement.where(Dashboard.workspace_id == workspace_id)
@@ -87,22 +86,31 @@ def dashboard_summary(db: Session, workspace_id: str | None = None) -> dict[str,
     cards_statement = select(func.count(DashboardCard.id)).join(Dashboard, DashboardCard.dashboard_id == Dashboard.id)
     if workspace_id:
         cards_statement = cards_statement.where(Dashboard.workspace_id == workspace_id)
+    today_start = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
+    refreshes_statement = select(func.count(AuditEvent.id)).where(
+        AuditEvent.action == "REFRESH_CARD",
+        AuditEvent.resource_type == "DASHBOARD",
+        AuditEvent.status == "SUCCESS",
+        AuditEvent.created_at >= today_start,
+    )
+    if workspace_id:
+        refreshes_statement = refreshes_statement.where(AuditEvent.workspace_id == workspace_id)
     return {
         "total": row[0],
         "cards": db.scalar(cards_statement) or 0,
         "shared": row[1],
-        "refreshes_today": row[2],
+        "refreshes_today": db.scalar(refreshes_statement) or 0,
     }
 
 
-def _dashboard_payload(dashboard: Dashboard, card_count: int) -> dict:
+def _dashboard_payload(dashboard: Dashboard, card_count: int, refresh_count_today: int) -> dict:
     return {
         "id": dashboard.id,
         "name": dashboard.name,
         "description": dashboard.description,
         "card_count": card_count,
         "is_shared": dashboard.is_shared,
-        "refresh_count_today": dashboard.refresh_count_today,
+        "refresh_count_today": refresh_count_today,
         "status": dashboard.status,
         "trend_variant": dashboard.trend_variant,
         "updated_at": dashboard.updated_at,
@@ -119,7 +127,22 @@ def list_dashboards(
     workspace_id: str | None = None,
 ) -> tuple[list[dict], int]:
     actual_card_count = func.count(DashboardCard.id).label("actual_card_count")
-    statement = select(Dashboard, actual_card_count).outerjoin(
+    today_start = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
+    actual_refresh_count = (
+        select(func.count(AuditEvent.id))
+        .where(
+            AuditEvent.resource_id == Dashboard.id,
+            AuditEvent.workspace_id == Dashboard.workspace_id,
+            AuditEvent.action == "REFRESH_CARD",
+            AuditEvent.resource_type == "DASHBOARD",
+            AuditEvent.status == "SUCCESS",
+            AuditEvent.created_at >= today_start,
+        )
+        .correlate(Dashboard)
+        .scalar_subquery()
+        .label("actual_refresh_count")
+    )
+    statement = select(Dashboard, actual_card_count, actual_refresh_count).outerjoin(
         DashboardCard, DashboardCard.dashboard_id == Dashboard.id,
     ).group_by(Dashboard.id)
     total_statement = select(func.count(Dashboard.id))
@@ -139,7 +162,7 @@ def list_dashboards(
     rows = list(db.execute(
         statement.order_by(*ordering).offset((page - 1) * page_size).limit(page_size)
     ))
-    return [_dashboard_payload(dashboard, card_count) for dashboard, card_count in rows], total
+    return [_dashboard_payload(dashboard, card_count, refresh_count) for dashboard, card_count, refresh_count in rows], total
 
 
 def _number(value) -> float:
@@ -277,7 +300,18 @@ def dashboard_detail(db: Session, dashboard: Dashboard) -> dict:
             "updated_at": card.updated_at,
         })
     return {
-        "dashboard": _dashboard_payload(dashboard, len(cards)),
+        "dashboard": _dashboard_payload(
+            dashboard,
+            len(cards),
+            db.scalar(select(func.count(AuditEvent.id)).where(
+                AuditEvent.resource_id == dashboard.id,
+                AuditEvent.workspace_id == dashboard.workspace_id,
+                AuditEvent.action == "REFRESH_CARD",
+                AuditEvent.resource_type == "DASHBOARD",
+                AuditEvent.status == "SUCCESS",
+                AuditEvent.created_at >= datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0),
+            )) or 0,
+        ),
         "data_as_of": summary["max_date"].isoformat(),
         "range_start": (summary["max_date"] - timedelta(days=29)).isoformat(),
         "range_end": summary["max_date"].isoformat(),
