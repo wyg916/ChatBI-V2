@@ -4,25 +4,9 @@ import { Link } from 'react-router-dom';
 import { contentApi } from '../api/content';
 import { ErrorNotice, Loading, PageHeading } from '../components/UI';
 import { ContentImportDialog, NewDashboardDialog } from './ContentDialogs';
-import trendArea0 from '../assets/dashboard-trends/trend-01.svg';
-import trendLine0 from '../assets/dashboard-trends/trend-08.svg';
-import trendArea1 from '../assets/dashboard-trends/trend-02.svg';
-import trendLine1 from '../assets/dashboard-trends/trend-05.svg';
-import trendArea2 from '../assets/dashboard-trends/trend-06.svg';
-import trendLine2 from '../assets/dashboard-trends/trend-11.svg';
-import trendArea3 from '../assets/dashboard-trends/trend-03.svg';
-import trendLine3 from '../assets/dashboard-trends/trend-10.svg';
-import trendArea4 from '../assets/dashboard-trends/trend-07.svg';
-import trendLine4 from '../assets/dashboard-trends/trend-12.svg';
-import trendArea5 from '../assets/dashboard-trends/trend-09.svg';
-import trendLine5 from '../assets/dashboard-trends/trend-04.svg';
 import './content-library.css';
 
 const number = new Intl.NumberFormat('zh-CN');
-const trends = [
-  [trendArea0, trendLine0], [trendArea1, trendLine1], [trendArea2, trendLine2],
-  [trendArea3, trendLine3], [trendArea4, trendLine4], [trendArea5, trendLine5],
-];
 
 function relativeUpdate(value: string) {
   const minutes = Math.max(0, Math.floor((Date.now() - new Date(value).getTime()) / 60000));
@@ -69,9 +53,8 @@ export function DashboardListPage() {
     <ErrorNotice error={result.error} />
     {result.isLoading ? <Loading /> : <section className={`dashboard-grid dashboard-grid-${view}`}>
       {result.data?.items.map((dashboard) => {
-        const [area, line] = trends[Math.abs(dashboard.trend_variant) % trends.length];
         return <Link className="dashboard-card" data-testid="dashboard-card" to={`/dashboards/${dashboard.id}`} key={dashboard.id}>
-          <div className="dashboard-preview"><strong>{dashboard.name}</strong><span className="realtime-badge">实时</span><div className="dashboard-trend"><img src={area} alt="" /><img src={line} alt="" /></div></div>
+          <div className="dashboard-preview"><strong>{dashboard.name}</strong><span className="realtime-badge">Backend API</span><div className="dashboard-trend"><span>{number.format(dashboard.card_count)}</span><small>数据库卡片</small></div></div>
           <div className="dashboard-card-title"><h2>{dashboard.name}</h2><b>{dashboard.card_count} 张卡片</b></div>
           <div className="dashboard-card-meta"><p>{dashboard.description}</p><time dateTime={dashboard.updated_at}>{relativeUpdate(dashboard.updated_at)}</time></div>
         </Link>;

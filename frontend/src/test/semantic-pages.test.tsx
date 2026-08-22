@@ -58,7 +58,8 @@ describe('语义模型高保真界面', () => {
     expect(screen.getByText('1 个启用中')).toBeVisible();
     expect(screen.getByText('1 个草稿')).toBeVisible();
     expect(screen.getAllByTestId('semantic-model-card')).toHaveLength(2);
-    expect(screen.getByRole('heading', { name: '最近变更记录' })).toBeVisible();
+    expect(screen.getByRole('heading', { name: '模型更新时间' })).toBeVisible();
+    expect(screen.getAllByText('Backend API').length).toBeGreaterThan(0);
 
     await user.type(screen.getByRole('textbox', { name: '搜索语义模型' }), '客户');
     expect(screen.getAllByTestId('semantic-model-card')).toHaveLength(1);
@@ -74,6 +75,10 @@ describe('语义模型高保真界面', () => {
     expect(screen.getByRole('heading', { name: '模型编辑器' })).toBeVisible();
     expect(screen.getByRole('heading', { name: '实体配置' })).toBeVisible();
     expect(screen.getByRole('button', { name: /orders/ })).toBeVisible();
+    expect(screen.getByText(/数据库更新：/)).toBeVisible();
+    expect(screen.getByRole('button', { name: '查询缓存策略' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: '全量缓存策略' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: '部门' })).toBeDisabled();
     const nameInput = screen.getByLabelText('实体名称');
     await user.clear(nameInput);
     await user.type(nameInput, 'sales_orders');

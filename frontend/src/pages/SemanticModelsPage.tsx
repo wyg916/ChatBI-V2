@@ -163,8 +163,8 @@ export function SemanticModelsPage() {
 
       <section className="semantic-history" aria-labelledby="semantic-history-title">
         <header>
-          <div><h2 id="semantic-history-title">最近变更记录</h2><p>语义模型的变更、发布和同步历史记录</p></div>
-          <button className="button secondary" onClick={() => setShowAllHistory((value) => !value)}>{showAllHistory ? '收起版本记录' : '查看全部版本'}</button>
+          <div><h2 id="semantic-history-title">模型更新时间</h2><p>来自 Backend API 的当前模型记录，按数据库更新时间排序</p></div>
+          <button className="button secondary" onClick={() => setShowAllHistory((value) => !value)}>{showAllHistory ? '收起模型记录' : '查看全部模型'}</button>
         </header>
         <div className="semantic-history-scroll">
           <table>
@@ -172,10 +172,10 @@ export function SemanticModelsPage() {
             <tbody>
               {recentChanges.map((model) => (
                 <tr key={model.id}>
-                  <td>{model.status === 'PUBLISHED' ? '模型发布更新' : '结构变更更新'}</td>
+                  <td>当前模型状态</td>
                   <td>{formatVersion(model.version)}</td>
-                  <td>更新“{model.name}”语义定义</td>
-                  <td>系统同步</td>
+                  <td>“{model.name}”当前语义定义</td>
+                  <td>Backend API</td>
                   <td><span className={`semantic-status semantic-status-${model.status.toLowerCase()}`}>{statusLabels[model.status]}</span></td>
                   <td>{formatUpdatedAt(model.updated_at)}</td>
                 </tr>

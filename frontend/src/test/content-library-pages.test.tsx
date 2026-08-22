@@ -59,13 +59,15 @@ describe('答案库和看板列表高保真界面', () => {
     await waitFor(() => expect(create).toHaveBeenCalledWith(expect.objectContaining({ question: '近 12 个月订单量是多少？', model_name: '订单量' })));
   });
 
-  it('从 Backend API 渲染看板统计、趋势卡片并切换列表视图', async () => {
+  it('从 Backend API 渲染看板统计、数据库卡片计数并切换列表视图', async () => {
     const user = userEvent.setup();
     vi.spyOn(contentApi, 'dashboards').mockResolvedValue(dashboards);
     renderPage('/dashboards', <DashboardListPage />);
 
     expect(await screen.findByText('147')).toBeVisible();
     expect(screen.getAllByTestId('dashboard-card')).toHaveLength(2);
+    expect(screen.getAllByText('数据库卡片')).toHaveLength(2);
+    expect(document.querySelectorAll('.dashboard-trend img')).toHaveLength(0);
     expect(screen.getByText('经营总览看板', { selector: 'h2' })).toBeVisible();
     await user.click(screen.getByRole('button', { name: '列表视图' }));
     expect(screen.getByRole('button', { name: '列表视图' })).toHaveClass('active');

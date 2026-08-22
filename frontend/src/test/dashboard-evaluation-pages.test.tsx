@@ -47,6 +47,8 @@ test('经营看板详情渲染 API 指标、图表和洞察', async () => {
   expect(await screen.findByTestId('dashboard-detail')).toBeInTheDocument();
   expect(screen.getByText('经营总览看板')).toBeInTheDocument();
   expect(screen.getByText('华东收入领先。')).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: '编辑看板' })).toBeDisabled();
+  expect(screen.getByRole('button', { name: '＋ 从已验证答案添加卡片' })).toBeEnabled();
 });
 
 test('评测中心总览渲染数据库评测记录', async () => {

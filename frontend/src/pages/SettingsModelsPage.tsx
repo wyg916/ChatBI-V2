@@ -66,7 +66,10 @@ export function SettingsModelsPage() {
 
     <section className="settings-workspace">
       <nav className="settings-section-nav" aria-label="系统设置分区">
-        {sections.map((section) => <button key={section} type="button" className={activeSection === section ? 'active' : ''} onClick={() => selectSection(section)}>{section}</button>)}
+        {sections.map((section) => {
+          const available = section === '模型服务' || section === '用户与角色' || section === '审计日志';
+          return <button key={section} type="button" className={activeSection === section ? 'active' : ''} disabled={!available} title={available ? undefined : `${section}属于 P1，V1.3.0 不提供可持久化配置`} onClick={() => selectSection(section)}>{section}</button>;
+        })}
       </nav>
 
       {activeSection === '模型服务' ? <div className="settings-model-content">
@@ -103,9 +106,7 @@ export function SettingsModelsPage() {
             <footer><div><b>凭据隔离</b><span>密钥只从 Backend 进程环境读取，状态接口不返回密钥字段</span></div></footer>
           </article>
         </div>
-      </div> : <div className="settings-section-placeholder">
-        <span>UI</span><h2>{activeSection}</h2><p>该 P1 设置分区已预留在信息架构中，当前尚未接入可持久化的后端配置。</p><button className="button secondary" type="button" onClick={() => setActiveSection('模型服务')}>返回模型服务</button>
-      </div>}
+      </div> : null}
     </section>
   </div>;
 }

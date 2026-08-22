@@ -1,13 +1,14 @@
 import { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { chatApi } from '../api/chat';
-import type { SharedConversation } from '../types/api';
+import { EChartsRenderer } from '../charting/EChartsRenderer';
+import type { ChartSpec, QueryExecution, SharedConversation } from '../types/api';
 import './conversation-share.css';
 
 function asRecord(value: unknown): Record<string, unknown> {
   return value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : {};
 }
-function SharedPart({ part }: { part: Record<string, unknown> }) {
+function SharedPart({ part, execution }: { part: Record<string, unknown>; execution?: QueryExecution }) {
   const type = String(part.type ?? '');
   if (type === 'text') return <p className="shared-text">{String(part.text ?? '')}</p>;
   if (type === 'kpi') {
@@ -29,7 +30,12 @@ function SharedPart({ part }: { part: Record<string, unknown> }) {
       return <li key={index}><strong>{String(item.title ?? '来源')}</strong><span>{String(item.version ?? '')}</span><small>{String(item.locator ?? '')}</small></li>;
     })}</ul>;
   }
-  if (type === 'chart') return <div className="shared-chart-placeholder">图表已包含在共享回答中（只读）</div>;
+  if (type === 'chart') {
+    const spec = asRecord(part.chart_spec) as unknown as ChartSpec;
+    return execution?.rows?.length
+      ? <EChartsRenderer spec={spec} execution={execution} label={spec.title || '共享回答图表'} />
+      : <div className="shared-chart-placeholder">共享内容未包含图表所需的明细数据</div>;
+  }
   if (type === 'error') return <p className="shared-error">{String(part.message ?? '该回答未成功完成。')}</p>;
   return null;
 }
@@ -60,11 +66,22 @@ export function SharedConversationPage() {
         <h1>{conversation.title}</h1>
         {conversation.summary && <p className="shared-summary">{conversation.summary}</p>}
         <div className="shared-messages">
-          {conversation.messages.map((message) => <article key={message.id} className={`shared-message ${message.role}`}>
-            <small>{message.role === 'user' ? '提问' : 'ChatBI 回答'}</small>
-            <p>{message.content}</p>
-            {message.role === 'assistant' && message.message_parts.map((part, index) => <SharedPart key={`${message.id}-${index}`} part={part} />)}
-          </article>)}
+          {conversation.messages.map((message) => {
+            const tablePart = message.message_parts.find((part) => part.type === 'table');
+            const table = asRecord(tablePart);
+            const rows = Array.isArray(table.rows) ? table.rows.map(asRecord) : [];
+            const execution = tablePart ? {
+              columns: Array.isArray(table.columns) ? table.columns.map(String) : [],
+              rows,
+              row_count: Number(table.row_count ?? rows.length),
+              result_signature: String(table.result_signature ?? ''),
+            } satisfies QueryExecution : undefined;
+            return <article key={message.id} className={`shared-message ${message.role}`}>
+              <small>{message.role === 'user' ? '提问' : 'ChatBI 回答'}</small>
+              <p>{message.content}</p>
+              {message.role === 'assistant' && message.message_parts.map((part, index) => <SharedPart key={`${message.id}-${index}`} part={part} execution={execution} />)}
+            </article>;
+          })}
         </div>
       </section>
       <footer>该页面不可编辑、追问或下载私有附件。共享权限由创建者控制。</footer>

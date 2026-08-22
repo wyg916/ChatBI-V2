@@ -44,28 +44,28 @@ export function AppShell() {
         ? '评测中心 / 用例详情'
         : crumb;
   const contextLabel = isSemanticEditor
-      ? '数据已保存：刚刚'
+      ? '语义模型 · Backend API'
     : pathname === '/semantic-models'
-      ? '数据时效：近 24 小时'
+      ? '语义模型 · Backend API'
       : isEvaluationDetail
-        ? 'Golden Set · UI 演示'
+        ? 'Golden Set · Backend API'
       : isDatasourceDetail
-        ? '数据源：连接状态⌄'
+        ? '数据源 · Backend API'
         : pathname === '/datasources'
-          ? '数据引擎：本机分析引擎⌄'
+          ? '数据源 · Backend API'
           : isDashboardDetail
-            ? '数据时效：业务数据最新日'
+            ? '看板详情 · Backend API'
           : pathname === '/dashboards'
-            ? '全部看板实时可用'
+            ? '看板 · Backend API'
             : pathname === '/answers'
-              ? '数据环境：正式发布版⌄'
+              ? '答案库 · Backend API'
               : isEvaluation
-                ? '数据范围：近 30 天⌄'
+                ? '评测中心 · Backend API'
                 : pathname === '/settings/models'
-                  ? '系统配置 · UI 演示'
+                  ? '系统配置 · Backend API'
                   : pathname === '/settings/security'
-                    ? '权限策略 · UI 演示'
-                    : '数据环境：正式分析库⌄';
+                    ? '权限策略 · Backend API'
+                    : '问数据 · Backend API';
   return (
     <div className={isAskRoute ? 'app-shell ask-shell' : 'app-shell'}>
       <aside className="sidebar">
@@ -79,10 +79,10 @@ export function AppShell() {
         <NavLink to="/settings/models" className={isSettings ? 'nav-item active' : 'nav-item'}><span>设</span>系统设置</NavLink>
         <div className="side-spacer" />
         <div className="user-card"><NavLink to="/settings/security"><span>{user.display_name.slice(0, 1)}</span><div><strong>{user.display_name}</strong><small>{user.role} · 当前工作空间</small></div></NavLink><button type="button" aria-label="退出登录" onClick={() => void logout()}>退出</button></div>
-        <small className="version">v1.0.1 · 开源企业版</small>
+        <small className="version">v1.3.0 RC · 开源企业版</small>
       </aside>
       <div className="app-frame">
-        <header className="topbar"><div><small>{headerCrumb}</small><h2>{title}</h2></div><div className="header-actions"><button className="context-pill"><img src={onlineIcon} alt="" />{contextLabel}</button><button className="icon-button" aria-label={isDashboardDetail ? '返回看板列表' : '帮助'} onClick={isDashboardDetail ? () => history.back() : undefined}>{isDashboardDetail ? '←' : '?'}</button>{(isContentLibrary || isDashboardDetail || isEvaluation || isSettings) && <button className="icon-button" aria-label="更多操作">{isDashboardDetail || isEvaluation ? '↑' : '⋯'}</button>}</div></header>
+        <header className="topbar"><div><small>{headerCrumb}</small><h2>{title}</h2></div><div className="header-actions"><div className="context-pill" aria-label="当前页面上下文"><img src={onlineIcon} alt="" />{contextLabel}</div>{isDashboardDetail ? <button className="icon-button" type="button" aria-label="返回看板列表" onClick={() => history.back()}>←</button> : <button className="icon-button" type="button" aria-label="帮助" disabled title="当前版本未提供独立帮助中心">?</button>}{(isContentLibrary || isDashboardDetail || isEvaluation || isSettings) && <button className="icon-button" type="button" aria-label="更多操作" disabled title="当前页面没有额外操作">{isDashboardDetail || isEvaluation ? '↑' : '⋯'}</button>}</div></header>
         <main className={isAskRoute ? 'page ask-page-canvas' : isContentLibrary ? 'page content-library-canvas' : isDashboardDetail ? 'page dashboard-detail-canvas' : isEvaluation ? 'page evaluation-canvas' : isEvaluationDetail ? 'page evaluation-detail-canvas' : 'page'}><Outlet /></main>
       </div>
     </div>

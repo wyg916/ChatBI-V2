@@ -29,6 +29,9 @@ describe('LoginPage', () => {
     expect(screen.getByLabelText('密码')).toHaveAttribute('type', 'password');
     expect(screen.getByRole('checkbox', { name: '记住登录' })).toBeChecked();
     expect(screen.getByRole('button', { name: '登录 ChatBI Studio' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: '忘记密码?' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: '服务条款' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: '隐私政策' })).toBeDisabled();
   });
 
   it('supports changing the remember-login preference', async () => {

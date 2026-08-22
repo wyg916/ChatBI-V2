@@ -57,7 +57,7 @@ export function SecurityAuditPage() {
   return <div className="settings-surface-page security-audit-page" data-testid="security-audit-page">
     <header className="settings-page-heading">
       <div><h1>用户、角色与审计</h1><p>管理工作空间成员、角色权限和关键操作审计记录。</p></div>
-      <div className="settings-heading-actions"><button className="button secondary" type="button" disabled title="Day 4 暂不提供导出">导出审计</button><button className="button primary" type="button" disabled title="Day 4 仅实现最小 RBAC">＋ 邀请成员</button></div>
+      <div className="settings-heading-actions"><button className="button secondary" type="button" disabled title="V1.3.0 不提供审计导出">导出审计</button><button className="button primary" type="button" disabled title="V1.3.0 仅提供最小 RBAC，不开放成员邀请">＋ 邀请成员</button></div>
     </header>
 
     <section className="security-kpis" aria-label="用户与审计指标">
@@ -76,7 +76,7 @@ export function SecurityAuditPage() {
           {tab === '角色' && <table><thead><tr><th>角色</th><th>成员数</th><th>权限数量</th><th>状态</th><th>操作</th></tr></thead><tbody>{overview.roles.map((role) => <tr key={role.name}><td><b>{roleLabels[role.name]}</b></td><td>{role.user_count} 人</td><td>{role.permissions.length} 项</td><td><span className="security-state active">启用</span></td><td><button type="button" disabled>系统角色</button></td></tr>)}</tbody></table>}
           {tab === '权限策略' && <table><thead><tr><th>权限</th><th>适用角色</th><th>资源范围</th><th>状态</th><th>操作</th></tr></thead><tbody>{policyRows.map((item) => <tr key={`${item.role}-${item.permission}`}><td><b>{item.permission}</b></td><td>{roleLabels[item.role]}</td><td>{item.permission.split('.')[0]}</td><td><span className="security-state active">已生效</span></td><td><button type="button" disabled>只读</button></td></tr>)}</tbody></table>}
         </div>
-        <footer className="security-table-footer"><span>{tab === '用户' ? `共 ${overview.user_count} 位成员` : `${tab} · Backend API`}</span><div><button type="button" aria-label="上一页" disabled>‹</button><button type="button" className="active" aria-label="第 1 页">1</button><button type="button" aria-label="下一页" disabled>›</button></div></footer>
+        <footer className="security-table-footer"><span>{tab === '用户' ? `共 ${overview.user_count} 位成员` : `${tab} · Backend API`}</span><div><button type="button" aria-label="上一页" disabled>‹</button><button type="button" className="active" aria-label="第 1 页" aria-current="page" disabled title="当前只有一页">1</button><button type="button" aria-label="下一页" disabled>›</button></div></footer>
       </article>
 
       <aside className="security-side-column">

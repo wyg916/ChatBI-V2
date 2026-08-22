@@ -126,8 +126,6 @@ export function SemanticEditorPage() {
   const [historyOpen, setHistoryOpen] = useState(false);
   const [history, setHistory] = useState<SemanticVersion[]>([]);
   const [historyError, setHistoryError] = useState<unknown>();
-  const [cachePolicy, setCachePolicy] = useState({ query: true, full: true });
-  const [scope, setScope] = useState('全部');
 
   const items = useMemo(() => model.data ? itemsFor(model.data, active) : [], [active, model.data]);
   const filteredItems = useMemo(() => {
@@ -217,15 +215,10 @@ export function SemanticEditorPage() {
     setConfigDraft(draftFrom(item, active));
   };
 
-  const toggleCache = (key: 'query' | 'full') => {
-    setCachePolicy((current) => ({ ...current, [key]: !current[key] }));
-    setMessage('缓存策略已更新为当前界面草稿；模型 API 接入后方可持久化');
-  };
-
   return (
     <section className="semantic-editor-page" aria-label="语义模型编辑器">
       <header className="semantic-editor-heading">
-        <div className="semantic-editor-title"><h1>模型编辑器</h1><span>已保存 1 分钟前</span></div>
+        <div className="semantic-editor-title"><h1>模型编辑器</h1><span>{model.data.updated_at ? `数据库更新：${new Date(model.data.updated_at).toLocaleString('zh-CN', { hour12: false })}` : '数据库更新时间：—'}</span></div>
         <div className="semantic-heading-actions">
           <button className="button secondary" onClick={() => setPreviewOpen(true)}>预览数据</button>
           <button className="button secondary" data-testid="version-history" onClick={openHistory}>版本历史</button>
@@ -273,7 +266,7 @@ export function SemanticEditorPage() {
           {!filteredItems.length && <div className="semantic-graph-empty"><span>{config.shortLabel[0]}</span><h2>暂无{config.label}</h2><p>从左侧当前类型中添加资源，继续完善语义模型。</p><button className="button primary" onClick={() => setAdding(active)}>添加{config.label}</button></div>}
           {filteredItems.length > 4 && <span className="semantic-more-resources">另有 {filteredItems.length - 4} 项资源</span>}
           <section className="semantic-alignment" aria-labelledby="alignment-title">
-            <header><div><h2 id="alignment-title">命名语义对齐</h2><p>基于语义命名规范识别字段命名差异与潜在异常</p></div><span>对齐完成</span><button className="button primary" onClick={() => setMessage(`语义对齐完成：${alignedFields}/${totalFields} 个字段具备有效定义`)}>运行对齐</button></header>
+            <header><div><h2 id="alignment-title">命名语义对齐</h2><p>基于语义命名规范识别字段命名差异与潜在异常</p></div><span>{alignedFields}/{totalFields} 已定义</span><button className="button primary" onClick={() => setMessage(`语义对齐检查：${alignedFields}/${totalFields} 个字段具备有效定义`)}>运行对齐</button></header>
             <div><article><small>总字段数</small><strong>{totalFields}</strong></article><article><small>对齐字段</small><strong>{alignedFields}</strong></article><article><small>对齐率</small><strong>{alignmentRate}</strong></article></div>
           </section>
         </main>
@@ -284,11 +277,11 @@ export function SemanticEditorPage() {
             <label key={key}><span>{label}</span><input value={configDraft[key] ?? ''} onChange={(event) => setConfigDraft({ ...configDraft, [key]: event.target.value })} /></label>
           )) : <p className="semantic-config-empty">选择画布中的资源后编辑配置。</p>}
           <hr />
-          <div className="semantic-policy"><div><strong>启用查询缓存策略</strong><small>写入后 30 分钟内缓存</small></div><button aria-label="启用查询缓存策略" aria-pressed={cachePolicy.query} onClick={() => toggleCache('query')}>{cachePolicy.query ? <img src={toggleOn} alt="" /> : <span />}</button></div>
-          <div className="semantic-policy"><div><strong>启用全量缓存策略</strong><small>仅对查询加速生效</small></div><button aria-label="启用全量缓存策略" aria-pressed={cachePolicy.full} onClick={() => toggleCache('full')}>{cachePolicy.full ? <img src={toggleOn} alt="" /> : <span />}</button></div>
+          <div className="semantic-policy"><div><strong>查询缓存策略</strong><small>V1.3.0 不提供持久化配置</small></div><button aria-label="查询缓存策略" disabled title="当前版本不提供缓存策略配置"><img src={toggleOn} alt="" /></button></div>
+          <div className="semantic-policy"><div><strong>全量缓存策略</strong><small>V1.3.0 不提供持久化配置</small></div><button aria-label="全量缓存策略" disabled title="当前版本不提供缓存策略配置"><img src={toggleOn} alt="" /></button></div>
           <hr />
           <p className="semantic-panel-caption">可见范围</p>
-          <div className="semantic-scope">{['全部', '部门', '角色', '成员'].map((item) => <button className={scope === item ? 'active' : ''} onClick={() => setScope(item)} key={item}>{item}</button>)}</div>
+          <div className="semantic-scope">{['全部', '部门', '角色', '成员'].map((item) => <button className={item === '全部' ? 'active' : ''} disabled title="当前版本不提供可见范围持久化配置" key={item}>{item}</button>)}</div>
         </aside>
       </div>
 

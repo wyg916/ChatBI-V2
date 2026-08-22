@@ -90,7 +90,12 @@ export function LoginPage() {
             <div className="login-field">
               <span className="login-password-label">
                 <label htmlFor="login-password">密码</label>
-                <button className="login-text-button" type="button">忘记密码?</button>
+                <button
+                  className="login-text-button"
+                  type="button"
+                  disabled
+                  title="当前版本未提供密码自助重置，请联系工作空间管理员"
+                >忘记密码?</button>
               </span>
               <input
                 id="login-password"
@@ -115,7 +120,7 @@ export function LoginPage() {
           <button className="login-submit" type="submit" disabled={submitting}>{submitting ? '正在登录…' : '登录 ChatBI Studio'}</button>
 
           <p className="login-legal">
-            登录即表示你已同意 <button type="button">服务条款</button> 和 <button type="button">隐私政策</button>
+            登录即表示你已同意 <button type="button" disabled title="当前版本未提供独立服务条款页面">服务条款</button> 和 <button type="button" disabled title="当前版本未提供独立隐私政策页面">隐私政策</button>
           </p>
           <div className="login-divider" aria-hidden="true" />
           <p className="login-environment">本机开发环境&nbsp;&nbsp;·&nbsp;&nbsp;服务端安全会话</p>

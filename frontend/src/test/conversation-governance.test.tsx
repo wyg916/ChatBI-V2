@@ -92,7 +92,17 @@ describe('read-only shared conversation page', () => {
       updated_at: '2026-08-22T00:00:00Z', expires_at: '2026-08-29T00:00:00Z', read_only: true,
       messages: [{
         id: 'm1', role: 'assistant', content: '<img src=x onerror=alert(1)>安全文本', created_at: '2026-08-22T00:00:00Z',
-        message_parts: [{ type: 'table', columns: ['region'], rows: [{ region: '华东' }] }],
+        message_parts: [
+          {
+            type: 'chart', result_signature: 'sig-1', chart_spec: {
+              version: '1', chart_type: 'BAR', title: '区域收入', x_field: 'region', y_fields: ['revenue'],
+              series: [{ name: '收入', field: 'revenue', type: 'bar' }], aggregation: {}, unit: { revenue: '元' },
+              sort: [], limit: 10, legend: { show: true }, axis: {}, tooltip: {}, data_source_query_id: 'q1',
+              result_signature: 'sig-1', bound_columns: ['region', 'revenue'], bound_row_count: 1, null_policy: 'ZERO', warnings: [],
+            },
+          },
+          { type: 'table', columns: ['region', 'revenue'], rows: [{ region: '华东', revenue: 120 }], row_count: 1, result_signature: 'sig-1' },
+        ],
       }],
     };
     chatMocks.sharedConversation.mockResolvedValue(payload);
@@ -100,6 +110,7 @@ describe('read-only shared conversation page', () => {
     expect(await screen.findByRole('heading', { name: '经营结论' })).toBeVisible();
     expect(screen.getByText('<img src=x onerror=alert(1)>安全文本')).toBeVisible();
     expect(document.querySelector('img')).toBeNull();
+    expect(screen.getByRole('img', { name: '区域收入' })).toBeVisible();
     expect(screen.getByText('华东')).toBeVisible();
     expect(screen.queryByRole('button')).toBeNull();
     expect(chatMocks.sharedConversation).toHaveBeenCalledWith('token-value');

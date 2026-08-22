@@ -37,5 +37,8 @@ describe('UI route coverage', () => {
     expect(nav.querySelectorAll('a')).toHaveLength(6);
     ['问数据', '数据源', '语义模型', '答案库', '看板', '评测中心'].forEach((label) => expect(nav).toHaveTextContent(label));
     expect(nav).not.toHaveTextContent('系统设置');
+    expect(screen.getByRole('button', { name: '帮助' })).toBeDisabled();
+    expect(document.querySelector('.context-pill')?.tagName).toBe('DIV');
+    expect(screen.getByText('v1.3.0 RC · 开源企业版')).toBeVisible();
   });
 });

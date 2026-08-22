@@ -36,9 +36,9 @@ describe('系统设置高保真页面', () => {
     await user.click(screen.getAllByRole('button', { name: '配置方式 →' })[0]);
     expect(screen.getByRole('status')).toHaveTextContent('浏览器不会接收或显示 API Key');
 
-    await user.click(screen.getByRole('button', { name: '查询与安全' }));
-    expect(screen.getByRole('heading', { name: '查询与安全' })).toBeInTheDocument();
-    expect(screen.getByText(/尚未接入可持久化的后端配置/)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '查询与安全' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: '工作空间' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: '外观与品牌' })).toBeDisabled();
   });
 
   it('从 Backend API 展示 ADMIN/ANALYST、权限矩阵与审计事件', async () => {
