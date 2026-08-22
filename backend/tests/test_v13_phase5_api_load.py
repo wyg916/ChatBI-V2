@@ -7,6 +7,7 @@ from pathlib import Path
 
 import httpx
 import pytest
+import scripts.performance.run_v13_phase5_api_load as api_load_module
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -193,6 +194,34 @@ def test_backend_target_must_be_loopback(url: str) -> None:
 def test_backend_target_rejects_remote_non_http_or_embedded_credentials(url: str) -> None:
     with pytest.raises(ValueError):
         validate_backend_url(url)
+
+
+def test_authenticated_load_client_never_uses_environment_proxy(monkeypatch: pytest.MonkeyPatch) -> None:
+    observed: dict[str, object] = {}
+
+    class FakeClient:
+        def __init__(self, **kwargs: object) -> None:
+            observed.update(kwargs)
+
+        def post(self, *_args: object, **_kwargs: object) -> httpx.Response:
+            return httpx.Response(502)
+
+        def close(self) -> None:
+            return None
+
+    monkeypatch.setattr(api_load_module.httpx, "Client", FakeClient)
+    credential = api_load_module.Credential(email="load@example.invalid", password="synthetic-password")
+    with pytest.raises(RuntimeError, match="HTTP_502"):
+        api_load_module.prepare_user(
+            index=0,
+            credential=credential,
+            base_url="http://127.0.0.1:28080",
+            workspace_id="workspace",
+            csv_bytes=b"csv",
+            png_bytes=b"png",
+            timeout_seconds=10.0,
+        )
+    assert observed["trust_env"] is False
 
 
 def test_sse_observation_uses_real_stream_contract_with_fake_transport_only_in_quick_test() -> None:

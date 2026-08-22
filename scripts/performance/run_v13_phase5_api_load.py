@@ -787,6 +787,7 @@ def prepare_user(
         base_url=base_url,
         timeout=httpx.Timeout(timeout_seconds, connect=10.0),
         follow_redirects=False,
+        trust_env=False,
         headers={"User-Agent": "ChatBI-V13-Phase5-Real-Load/1.0"},
     )
     conversation_id: str | None = None
