@@ -1,6 +1,8 @@
 [CmdletBinding()]
 param(
   [string]$EvidencePath = 'docs/evidence/day5/cold-start.json',
+  [ValidateRange(30, 300)]
+  [int]$AskTimeoutSeconds = 120,
   [ValidateRange(120, 900)]
   [int]$EvaluationTimeoutSeconds = 300
 )
@@ -37,6 +39,7 @@ $result = [ordered]@{
   runtime_dependency = 'NOT_RUN'
   authentication = 'NOT_RUN'
   ask = 'NOT_RUN'
+  ask_timeout_seconds = $AskTimeoutSeconds
   evaluation = 'NOT_RUN'
   evaluation_timeout_seconds = $EvaluationTimeoutSeconds
   model_provider_configuration = 'NOT_RUN'
@@ -136,7 +139,7 @@ try {
   if(-not $model) { throw 'Published PostgreSQL semantic model was not seeded' }
   $askBody = @{ question = '统计订单数量'; datasource_id = $postgres.id; semantic_model_id = $model.id } | ConvertTo-Json
   $result.stage = 'ASK'
-  $ask = Invoke-RestMethod -Method Post -Uri "$apiBase/ask" -WebSession $webSession -ContentType 'application/json' -Body $askBody -TimeoutSec 30
+  $ask = Invoke-RestMethod -Method Post -Uri "$apiBase/ask" -WebSession $webSession -ContentType 'application/json' -Body $askBody -TimeoutSec $AskTimeoutSeconds
   if($ask.status -ne 'SUCCEEDED' -or $ask.oracle.status -ne 'PASSED') { throw 'Cold start Ask gate failed' }
   $result.ask = 'SUCCEEDED_ORACLE_PASSED'
 
