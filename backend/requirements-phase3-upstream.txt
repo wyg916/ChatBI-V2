@@ -1,0 +1,15 @@
+# Exact selected-source DB-GPT core/AWEL revision. Do not replace with dbgpt-app:
+# dbgpt-app pulls its own model, RAG, datasource, auth/conversation and tool surfaces.
+dbgpt @ https://github.com/eosphoros-ai/DB-GPT/archive/db580e952e544acf9f6c6c153da29dc67e9e40d7.zip#sha256=e225a2e222874adfb504e03f6a2d091729d8ecb2c874783fd4bcbc2c7c8ef31b&subdirectory=packages/dbgpt-core
+
+# AWEL serialization closure is deliberately exact instead of inheriting the
+# upstream simple_framework extra's unbounded cloudpickle dependency.
+cloudpickle==3.1.1
+
+# Host-side Docker API contract for the isolated Python worker.
+docker==7.1.0
+
+# Selected-runtime adapter is installed from this repository, after packages/
+# is copied into the backend build context.
+./packages/dbgpt-runtime-adapter
+./packages/pandasai-selected-runtime

@@ -1,0 +1,20 @@
+{
+  "schema_version": "chatbi-selected-source-v1",
+  "project": "PandasAI",
+  "repository": "https://github.com/Sinaptik-AI/pandas-ai",
+  "commit": "bbbb771d31062d81f6fa19bafb40620d5cbe48f4",
+  "selected_path": "pandasai/sandbox/sandbox.py",
+  "git_blob": "6f31f9dfd3dbd023c7f82a1533bb3c577efd19fd",
+  "sha256": "a6d4934cffc70d8a325071d8ab94b12ec0ded9043cdc01e9ba3a4d1f64d210c6",
+  "size_bytes": 2950,
+  "license": "MIT Expat",
+  "license_path": "LICENSE",
+  "license_git_blob": "46dd3ae6b187287712172a82f02a7cc19142c476",
+  "license_sha256": "8497ca052b7a4223ff1533108d81fbc11aff87fbf2567d20043965e47698a4fd",
+  "import_closure": ["ast"],
+  "import_closure_classification": {"ast": "Python standard library"},
+  "forbidden_paths": ["pandasai/ee/**"],
+  "modifications": "none",
+  "runtime_entry": "pandasai_selected_runtime.SelectedRuntimeSandbox.execute",
+  "execution_boundary": "ChatBI hardened sandbox executor Protocol"
+}

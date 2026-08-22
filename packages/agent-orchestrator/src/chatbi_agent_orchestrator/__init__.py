@@ -8,6 +8,10 @@ from chatbi_agent_orchestrator.runtime import (
     PlannerAgent,
     VerificationAgent,
 )
+from chatbi_agent_orchestrator.selected_runtime import (
+    DbgptOrchestrationResult,
+    DbgptSelectedRuntimeOrchestrator,
+)
 
 __all__ = [
     "BoundedAgentOrchestrator",
@@ -18,4 +22,6 @@ __all__ = [
     "OrchestrationError",
     "PlannerAgent",
     "VerificationAgent",
+    "DbgptOrchestrationResult",
+    "DbgptSelectedRuntimeOrchestrator",
 ]

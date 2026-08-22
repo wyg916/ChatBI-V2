@@ -1,0 +1,50 @@
+{
+  "schema_version": 1,
+  "selected_source": {
+    "repository": "https://github.com/eosphoros-ai/DB-GPT",
+    "revision": "db580e952e544acf9f6c6c153da29dc67e9e40d7",
+    "package_distribution": "dbgpt",
+    "package_version": "0.8.1",
+    "subdirectory": "packages/dbgpt-core",
+    "preferred_requirement": "dbgpt @ https://github.com/eosphoros-ai/DB-GPT/archive/db580e952e544acf9f6c6c153da29dc67e9e40d7.zip#sha256=e225a2e222874adfb504e03f6a2d091729d8ecb2c874783fd4bcbc2c7c8ef31b&subdirectory=packages/dbgpt-core",
+    "verified_archive_url": "https://github.com/eosphoros-ai/DB-GPT/archive/db580e952e544acf9f6c6c153da29dc67e9e40d7.zip",
+    "verified_archive_sha256": "e225a2e222874adfb504e03f6a2d091729d8ecb2c874783fd4bcbc2c7c8ef31b"
+  },
+  "license": {
+    "spdx": "MIT",
+    "upstream_file": "LICENSE",
+    "copyright": "Copyright (c) 2023 magic.chen"
+  },
+  "runtime_symbols": [
+    "dbgpt.core.awel.DAG",
+    "dbgpt.core.awel.MapOperator",
+    "dbgpt.core.awel.BaseOperator.call"
+  ],
+  "upstream_declared_runtime_dependencies": [
+    "aiohttp==3.8.4",
+    "apscheduler>=3.10,<4",
+    "cachetools",
+    "chardet==5.1.0",
+    "importlib-resources==5.12.0",
+    "pydantic>=2.6.0",
+    "snowflake-id",
+    "tomli>=2.2.1",
+    "typeguard",
+    "typing-inspect"
+  ],
+  "chatbi_selected_direct_dependencies": [
+    "cloudpickle==3.1.1",
+    "docker==7.1.0"
+  ],
+  "boundary": {
+    "allowed": "DAG and MapOperator call a single ChatBI callback",
+    "forbidden": [
+      "model keys",
+      "database credentials",
+      "database connectors",
+      "raw SQL",
+      "DB-GPT model or RAG services",
+      "DB-GPT auth or conversation services"
+    ]
+  }
+}

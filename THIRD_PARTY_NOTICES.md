@@ -15,6 +15,19 @@ The exact upstream Git blobs, raw/destination SHA-256 values, import closure, mo
 
 SuperSonic remains an independently authored clean-room semantic contract. IBM's package/wheel path remains blocked by Apache-2.0/MIT metadata conflict, while the narrower Apache-2.0 selected-source path above is allowed and independently verified. SQLBot remains **not reused** because of modified GPL branding conditions and a required xpack wheel with no license metadata/file; its official runtime call count and xpack load count are zero. Existing online IBM-compatible evaluation and SQLBot-inspired feedback code continue to identify themselves as `chatbi-clean-room`.
 
+## V1.3.0 Phase 3 selected Agent, File and scanning-PDF runtimes
+
+Phase 3 adds two deliberately narrow direct-runtime boundaries. DB-GPT is installed only from the exact `packages/dbgpt-core` revision and executes AWEL; its application, RAG, datasource, auth, conversation, model-key and skill surfaces are excluded. PandasAI contributes exactly one byte-identical MIT community file, `pandasai/sandbox/sandbox.py`; no root `pandasai` import and no `ee/**` path is packaged.
+
+| Project | Official revision / version | Selected path | License | Runtime boundary |
+| --- | --- | --- | --- | --- |
+| DB-GPT | `db580e952e544acf9f6c6c153da29dc67e9e40d7` / `0.8.1` | `packages/dbgpt-core`, specifically `DAG`, `MapOperator`, `BaseOperator.call` | MIT | AWEL receives only route, Trace ID and hard budgets, then calls the existing ChatBI five-role/six-tool orchestrator. It never receives SQL, datasource identifiers, model keys, connectors, RAG state or tool results. Exact archive SHA-256: `e225a2e222874adfb504e03f6a2d091729d8ecb2c874783fd4bcbc2c7c8ef31b`. |
+| PandasAI | `bbbb771d31062d81f6fa19bafb40620d5cbe48f4` | `pandasai/sandbox/sandbox.py`, Git blob `6f31f9dfd3dbd023c7f82a1533bb3c577efd19fd` | MIT Expat | The inherited upstream `Sandbox.execute` delegates to ChatBI's disposable hardened Docker worker. Selected file SHA-256: `a6d4934cffc70d8a325071d8ab94b12ec0ded9043cdc01e9ba3a4d1f64d210c6`. |
+| pypdfium2 | `5.13.0` | published Python package and bundled PDFium binary | BSD-3-Clause / Apache-2.0 plus dependency notices | Bounded scanned-PDF pages are rendered to clean PNG before the existing Vision preprocessing and Model Gateway. |
+| Docker SDK for Python | `7.1.0` | published Python package | Apache-2.0 | Host-side control API for creating and synchronously destroying the isolated worker; never installed inside or exposed to the worker. |
+
+The retained license and provenance records live in `packages/dbgpt-runtime-adapter/` and `packages/pandasai-selected-runtime/`. The worker runs non-root with no host mount, no database/model credential, no external network, a read-only root filesystem, dropped capabilities, no-new-privileges, bounded tmpfs, CPU/RAM/PID/time/file/output limits, and mandatory synchronous removal. Missing dependency, wrong provenance or unavailable Docker fails closed and produces zero verified runtime calls.
+
 ## v2.1 Day 1 semantic design provenance
 
 No source, UI, logo, trademark asset or binary from the following projects is copied or packaged. ChatBI uses project-owned clean-room adapters behind its own contracts; the references below document design provenance and the exact upstream state reviewed on 2026-08-18.
@@ -42,8 +55,8 @@ Other pre-existing runtime packages remain pinned in the relevant package manife
 ## v2.1 Day 2 clean-room product references
 
 - Chat2DB: reviewed at `5372213f267a087c232cb86cae4b200e00c3389f`; its current custom license is incompatible with the intended product embedding/distribution pattern. The Data Workspace is independently authored and copies or runs no Chat2DB source, UI, service, container, logo or brand asset.
-- DB-GPT: reviewed at `db580e952e544acf9f6c6c153da29dc67e9e40d7`; root MIT concepts are design provenance only. ChatBI's fixed five-role/six-tool orchestrator is project-authored and does not import DB-GPT or its embedded skill assets.
-- PandasAI: reviewed at `bbbb771d31062d81f6fa19bafb40620d5cbe48f4`; community paths are MIT while `ee/**` is excluded. ChatBI does not import or package PandasAI. Structured FILE_QUERY uses a project-authored fixed-operation interpreter that executes no generated Python and reuses the already declared pandas package.
+- DB-GPT historical Day 2 status: at that checkpoint its MIT concepts were design provenance only. This is superseded only for the exact Phase 3 `dbgpt-core/AWEL` boundary above; all embedded skill, app, RAG, auth and datasource surfaces remain excluded.
+- PandasAI historical Day 2 status: at that checkpoint it was not imported. This is superseded only for the exact Phase 3 community `pandasai/sandbox/sandbox.py` file above; `ee/**` remains excluded and deterministic file questions still execute no generated Python.
 
 These Day 2 paths add no third-party runtime dependency. Exact selected paths, license boundaries, checksums, forbidden paths and rollback decisions are recorded in `docs/UPSTREAM_LOCK.json` and the final `docs/OPEN_SOURCE_LICENSE_AUDIT.md`.
 

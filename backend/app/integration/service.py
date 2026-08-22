@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 from threading import Event
 from datetime import datetime, timezone
+from time import monotonic
 from uuid import uuid4
 
 from chatbi_agent_contracts import (
@@ -12,7 +13,7 @@ from chatbi_agent_contracts import (
     QuestionRoute,
     ToolName,
 )
-from chatbi_agent_orchestrator import BoundedAgentOrchestrator
+from chatbi_agent_orchestrator import DbgptSelectedRuntimeOrchestrator
 from chatbi_rag_adapter import CitationVerifierV1, LiveRagAdapter, RagAdapterError, UnavailableRagAdapter
 from chatbi_rag_contracts import RagExecutionContext, RagRequest, RagResult
 from sqlalchemy import select
@@ -25,6 +26,10 @@ from app.integration.feature_flags import decide
 from app.integration.question_router import QuestionRouter
 from app.integration.tool_executor import ChatBIToolExecutor
 from app.model_gateway import BudgetMode, RequestContext
+from app.rag_runtime.answer_guard import (
+    prompt_injection_evidence_used,
+    verify_grounded_answer,
+)
 from app.models import (
     Citation as CitationRecord,
     DataSource,
@@ -113,7 +118,10 @@ class AnalysisService:
         shadow = None
         if decision.execute:
             try:
-                result = self._rag(db, request, principal, trace_id, shadow=decision.shadow)
+                result = self._rag(
+                    db, request, principal, trace_id,
+                    shadow=decision.shadow, cancellation_event=cancellation_event,
+                )
                 if decision.publish and result.status == "SUCCEEDED":
                     primary = self._rag_primary(result)
                     self._audit_route(db, principal, QuestionRoute.KNOWLEDGE_QUERY, trace_id, "SUCCESS", False)
@@ -140,7 +148,10 @@ class AnalysisService:
         shadow = None
         if decision.execute:
             try:
-                rag = self._rag(db, request, principal, trace_id, shadow=decision.shadow)
+                rag = self._rag(
+                    db, request, principal, trace_id,
+                    shadow=decision.shadow, cancellation_event=cancellation_event,
+                )
                 if decision.publish and rag.status == "SUCCEEDED":
                     primary = {
                         "status": "SUCCEEDED",
@@ -178,18 +189,22 @@ class AnalysisService:
         tool_executor = ChatBIToolExecutor(
             db, principal, self._rag_adapter_instance(), cancellation_event=cancellation_event,
         )
-        result = BoundedAgentOrchestrator(
+        result = DbgptSelectedRuntimeOrchestrator(
             tool_executor, progress_callback=progress_callback
-        ).run(OrchestrationRequest(
-            question=request.question,
-            route=QuestionRoute.COMPLEX_ANALYSIS,
-            context=context,
-            datasource_id=request.datasource_id,
-            semantic_model_id=request.semantic_model_id,
-            include_knowledge=include_knowledge,
-            idempotency_key=idempotency_key,
-            prompt_versions=self._prompt_versions(db, context.workspace_id),
-        ))
+        ).run(
+            OrchestrationRequest(
+                question=request.question,
+                route=QuestionRoute.COMPLEX_ANALYSIS,
+                context=context,
+                datasource_id=request.datasource_id,
+                semantic_model_id=request.semantic_model_id,
+                include_knowledge=include_knowledge,
+                idempotency_key=idempotency_key,
+                prompt_versions=self._prompt_versions(db, context.workspace_id),
+            ),
+            cancellation_event=cancellation_event,
+            deadline_monotonic=monotonic() + min(settings.agent_timeout_ms, 30_000) / 1000,
+        )
         self._record_orchestration(db, principal, request, result, idempotency_key)
         if result.status not in {"SUCCEEDED", "PARTIAL"} and settings.agent_fallback_enabled:
             try:
@@ -230,13 +245,23 @@ class AnalysisService:
         )
         return query_response(run).model_dump(mode="json")
 
-    def _rag(self, db, request, principal, trace_id, *, shadow: bool) -> RagResult:
+    def _rag(
+        self, db, request, principal, trace_id, *, shadow: bool,
+        cancellation_event: Event | None = None,
+    ) -> RagResult:
         context = self._rag_context(db, principal, trace_id)
-        result = self._rag_adapter_instance().retrieve(RagRequest(
+        adapter = self._rag_adapter_instance()
+        rag_request = RagRequest(
             query=request.question,
             scenario_id="charging_ops",
             context=context,
-        ))
+        )
+        if isinstance(adapter, LiveRagAdapter):
+            result = adapter.retrieve(rag_request, cancellation_event=cancellation_event)
+        else:
+            if cancellation_event is not None and cancellation_event.is_set():
+                raise RagAdapterError("live RAG request cancelled")
+            result = adapter.retrieve(rag_request)
         verification = self.verifier.verify(request.question, result.citations)
         if result.status == "SUCCEEDED" and not verification.passed:
             result = result.model_copy(update={
@@ -329,12 +354,26 @@ class AnalysisService:
     @staticmethod
     def _rag_primary(result: RagResult) -> dict:
         top = result.citations[0]
+        if prompt_injection_evidence_used(result.citations):
+            raise RagAdapterError("PROMPT_INJECTION_EVIDENCE_USED")
+        summary_text = " ".join(top.text[:600].split())
+        summary = f"{summary_text} [citation:{top.citation_id}]"
+        guard = verify_grounded_answer(summary, result.citations)
+        if not guard.passed:
+            raise RagAdapterError(guard.reason or "ANSWER_GUARD_FAILED")
         return {
             "status": "SUCCEEDED",
-            "summary": top.text[:600],
+            "summary": summary,
             "citations": [item.model_dump(mode="json") for item in result.citations],
             "retrieval_mode": result.retrieval_mode,
             "answer_guard": "PASSED",
+            "answer_guard_evidence": {
+                "status": "PASSED",
+                "cited_ids": list(guard.cited_ids),
+                "factual_units": guard.factual_units,
+                "citation_accuracy": guard.citation_accuracy,
+                "prompt_injection_evidence_used": 0,
+            },
         }
 
     @staticmethod

@@ -293,6 +293,7 @@ class ModelGateway:
         complexity_score: int = 25,
         budget_mode: BudgetMode | None = None,
         requested_alias: str | None = None,
+        premium_triggers: frozenset[str] | None = None,
         cancellation_event: Event | None = None,
     ) -> ModelReply:
         messages: list[dict[str, Any]] = [{"role": "system", "content": system}, *(history or [])]
@@ -305,6 +306,9 @@ class ModelGateway:
         configured_request = self.settings.vision_model_provider if vision else self.settings.general_model_provider
         alias = requested_alias or (configured_request if configured_request.strip().lower() != "auto" else "auto")
         mode = budget_mode or BudgetMode(self.settings.model_budget_mode)
+        governed_triggers = set(premium_triggers or ())
+        if len(image_data_urls or ()) > 1:
+            governed_triggers.add("multi_image")
         request = ModelRequest(
             capability=ModelCapability.VISION if vision else capability,
             modality=ModelModality.VISION if vision else ModelModality.TEXT,
@@ -313,7 +317,7 @@ class ModelGateway:
             thinking=complexity_score >= 55,
             reasoning_effort="high" if complexity_score >= 80 else "medium",
             image_count=len(image_data_urls or ()),
-            premium_triggers=frozenset({"multi_image"}) if len(image_data_urls or ()) > 1 else frozenset(),
+            premium_triggers=frozenset(governed_triggers),
         )
         result = self.execute(request, context or self._default_context(user), cancellation_event=cancellation_event)
         return ModelReply(
@@ -334,6 +338,7 @@ class ModelGateway:
         complexity_score: int = 25,
         budget_mode: BudgetMode | None = None,
         requested_alias: str | None = None,
+        premium_triggers: frozenset[str] | None = None,
         cancellation_event: Event | None = None,
     ) -> Iterator[ModelReply]:
         del context
@@ -347,6 +352,9 @@ class ModelGateway:
             messages.append({"role": "user", "content": user})
         configured_request = self.settings.vision_model_provider if vision else self.settings.general_model_provider
         alias = requested_alias or (configured_request if configured_request.strip().lower() != "auto" else "auto")
+        governed_triggers = set(premium_triggers or ())
+        if len(image_data_urls or ()) > 1:
+            governed_triggers.add("multi_image")
         request = ModelRequest(
             capability=ModelCapability.VISION if vision else capability,
             modality=ModelModality.VISION if vision else ModelModality.TEXT,
@@ -356,7 +364,7 @@ class ModelGateway:
             thinking=complexity_score >= 55,
             reasoning_effort="high" if complexity_score >= 80 else "medium",
             image_count=len(image_data_urls or ()),
-            premium_triggers=frozenset({"multi_image"}) if len(image_data_urls or ()) > 1 else frozenset(),
+            premium_triggers=frozenset(governed_triggers),
         )
         failures: list[str] = []
         started = perf_counter()

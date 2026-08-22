@@ -123,7 +123,8 @@ def test_api_preparation_authenticates_and_syncs_only_postgres(
 def test_workflow_is_self_contained_and_has_no_repository_secret_dependency() -> None:
     workflow = WORKFLOW.read_text(encoding="utf-8")
 
-    assert 'branches: ["codex/v1.3.0-data-semantic-upstream"]' in workflow
+    assert '"codex/v1.3.0-data-semantic-upstream"' in workflow
+    assert '"codex/v1.3.0-rag-agent-file-multimodal"' in workflow
     assert "image: postgres:16.9-alpine@sha256:" in workflow
     assert "POSTGRES_HOST_AUTH_METHOD: trust" in workflow
     assert "POSTGRES_PASSWORD:" not in workflow

@@ -20,6 +20,8 @@ from sqlalchemy.orm import Session
 
 from app.core.access import Principal
 from app.core.config import get_settings
+from app.file_multimodal.contracts import AttachmentKind, ParsedAttachment
+from app.file_multimodal.parsers import parse_attachment
 from app.models import Attachment, Conversation
 from app.services.conversations import get_conversation
 
@@ -122,44 +124,75 @@ def _reject_prompt_injection(text: str) -> None:
         raise ValueError("PROMPT_INJECTION_DETECTED")
 
 
-def _extract(extension: str, data: bytes) -> tuple[str, dict]:
+def _parsed_payload(parsed: ParsedAttachment) -> dict:
+    """Persist a bounded index while retaining the raw file for full-file queries."""
     settings = get_settings()
-    source = io.BytesIO(data)
-    if extension == ".csv":
-        return "STRUCTURED", _dataframe_payload(pd.read_csv(source))
-    if extension in {".xls", ".xlsx"}:
-        frames = pd.read_excel(source, sheet_name=None)
-        if not frames:
-            raise ValueError("EMPTY_WORKBOOK")
-        sheets = {str(name): _dataframe_payload(frame) for name, frame in frames.items()}
+    payload: dict = {
+        "parser": "chatbi-file-multimodal-v1",
+        "file_sha256": parsed.file_sha256,
+        "result_signature": parsed.result_signature,
+        "requires_vision": parsed.requires_vision,
+        "page_count": parsed.page_count,
+    }
+    if parsed.tables:
+        sheets = {
+            table.name: {
+                "row_count": table.row_count,
+                "columns": list(table.columns),
+                # This is an index/preview only. Analysis reparses the immutable raw
+                # file and therefore never reports a preview as a full-file result.
+                "preview": [dict(row) for row in table.rows[:100]],
+            }
+            for table in parsed.tables
+        }
         first = next(iter(sheets.values()))
-        return "STRUCTURED", {
+        payload.update({
             **first,
             "row_count": sum(item["row_count"] for item in sheets.values()),
             "sheet_names": list(sheets),
             "sheets": sheets,
-        }
-    if extension == ".parquet":
-        return "STRUCTURED", _dataframe_payload(pd.read_parquet(source))
-    if extension == ".pdf":
-        text = "\n".join(page.extract_text() or "" for page in PdfReader(source).pages)
-        _reject_prompt_injection(text)
-        return "DOCUMENT", {"text": text[:settings.attachment_text_max_chars], "page_count": len(PdfReader(io.BytesIO(data)).pages)}
-    if extension == ".docx":
-        document = Document(source)
-        text = "\n".join(paragraph.text for paragraph in document.paragraphs)
-        _reject_prompt_injection(text)
-        return "DOCUMENT", {"text": text[:settings.attachment_text_max_chars], "paragraph_count": len(document.paragraphs)}
-    if extension in {".txt", ".md"}:
-        text = data.decode("utf-8-sig")
-        _reject_prompt_injection(text)
-        return "DOCUMENT", {"text": text[:settings.attachment_text_max_chars]}
-    if extension in IMAGES:
-        with Image.open(source) as image:
-            image.verify()
+        })
+    if parsed.text_evidence:
+        evidence = []
+        remaining = settings.attachment_text_max_chars
+        for item in parsed.text_evidence:
+            if remaining <= 0:
+                break
+            text = item.text[:remaining]
+            remaining -= len(text)
+            evidence.append({"text": text, "locator": item.locator.__dict__})
+        payload["evidence"] = evidence
+        payload["text"] = "\n".join(item["text"] for item in evidence)
+    return payload
+
+
+def _extract(
+    filename: str,
+    declared_mime: str | bytes,
+    data: bytes | None = None,
+) -> tuple[str, dict]:
+    """Parse an upload while retaining the historical ``_extract(ext, data)`` call."""
+    if data is None:
+        if not isinstance(declared_mime, bytes):
+            raise TypeError("legacy _extract requires file bytes as the second argument")
+        data = declared_mime
+        extension = filename.lower() if filename.lower() in ALLOWED else Path(filename).suffix.lower()
+        if extension not in MIME:
+            raise ValueError("UNSUPPORTED_FILE_TYPE")
+        declared_mime = sorted(MIME[extension])[0]
+        if filename.lower() == extension:
+            filename = f"upload{extension}"
+    parsed = parse_attachment(
+        filename,
+        declared_mime,
+        data,
+        max_rows=get_settings().attachment_max_rows,
+    )
+    payload = _parsed_payload(parsed)
+    if parsed.kind == AttachmentKind.IMAGE:
         with Image.open(io.BytesIO(data)) as image:
-            return "IMAGE", {"width": image.width, "height": image.height, "format": image.format}
-    raise ValueError("UNSUPPORTED_FILE_TYPE")
+            payload.update({"width": image.width, "height": image.height, "format": image.format})
+    return parsed.kind.value, payload
 
 
 def cleanup_expired(db: Session) -> int:
@@ -207,7 +240,7 @@ async def create_attachment(db: Session, principal: Principal, conversation_id: 
     path = storage_root() / storage_key
     path.write_bytes(data)
     try:
-        item.kind, item.extracted_payload = _extract(extension, data)
+        item.kind, item.extracted_payload = _extract(filename, declared, data)
         item.status = "READY"
     except Exception as exc:
         path.unlink(missing_ok=True)

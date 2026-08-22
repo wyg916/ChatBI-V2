@@ -6,7 +6,10 @@ build-backend = "setuptools.build_meta"
 name = "chatbi-agent-orchestrator"
 version = "0.1.0"
 requires-python = ">=3.11"
-dependencies = ["chatbi-agent-contracts==0.1.0"]
+dependencies = [
+    "chatbi-agent-contracts==0.1.0",
+    "chatbi-dbgpt-runtime-adapter==0.1.0",
+]
 
 [tool.setuptools.packages.find]
 where = ["src"]

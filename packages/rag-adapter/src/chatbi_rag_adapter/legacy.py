@@ -6,6 +6,7 @@ import json
 import re
 import time
 from collections.abc import Callable
+from threading import Event
 
 import httpx
 
@@ -49,7 +50,12 @@ class LiveRagAdapter:
         self.retry_count = max(0, min(retry_count, 2))
         self.client_factory = client_factory
 
-    def retrieve(self, request: RagRequest) -> RagResult:
+    def retrieve(
+        self,
+        request: RagRequest,
+        *,
+        cancellation_event: Event | None = None,
+    ) -> RagResult:
         headers = {
             "X-ChatBI-Workspace-Id": request.context.workspace_id,
             "X-ChatBI-User-Id": request.context.user_id,
@@ -90,22 +96,41 @@ class LiveRagAdapter:
         headers["Content-Type"] = "application/json"
         response = None
         last_error: Exception | None = None
-        for attempt in range(self.retry_count + 1):
+        total_timeout = request.context.timeout_ms / 1000
+        deadline = time.monotonic() + total_timeout
+        max_attempts = self.retry_count + 1 if cancellation_event is None else max(
+            self.retry_count + 1, int(total_timeout) + 1
+        )
+        for attempt in range(max_attempts):
+            if cancellation_event is not None and cancellation_event.is_set():
+                raise RagAdapterError("live RAG request cancelled")
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                raise RagAdapterError("live RAG request timed out")
             try:
                 with self.client_factory(
                     base_url=self.base_url,
-                    timeout=request.context.timeout_ms / 1000,
+                    # Bound the cancellation observation latency without
+                    # granting every retry a fresh full-request timeout.
+                    timeout=remaining if cancellation_event is None else min(1.0, remaining),
                     follow_redirects=False,
                     trust_env=False,
                 ) as client:
                     response = client.post(self.endpoint, content=body_bytes, headers=headers)
-                    if response.status_code >= 500 and attempt < self.retry_count:
+                    if response.status_code >= 500 and attempt + 1 < max_attempts:
                         continue
                     response.raise_for_status()
                     break
+            except httpx.TimeoutException as exc:
+                last_error = exc
+                if cancellation_event is not None and cancellation_event.is_set():
+                    raise RagAdapterError("live RAG request cancelled") from exc
+                if time.monotonic() < deadline and attempt + 1 < max_attempts:
+                    continue
+                raise RagAdapterError("live RAG request timed out") from exc
             except httpx.HTTPError as exc:
                 last_error = exc
-                if attempt >= self.retry_count:
+                if attempt + 1 >= max_attempts:
                     raise RagAdapterError(
                         f"live RAG request failed: {type(exc).__name__}"
                     ) from exc

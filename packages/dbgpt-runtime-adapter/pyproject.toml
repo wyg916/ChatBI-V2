@@ -1,0 +1,15 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "chatbi-dbgpt-runtime-adapter"
+version = "0.1.0"
+description = "Pinned DB-GPT AWEL runtime boundary for controlled ChatBI analysis"
+readme = "README.md"
+license = { file = "LICENSE" }
+requires-python = ">=3.11"
+dependencies = []
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/chatbi_dbgpt_runtime"]

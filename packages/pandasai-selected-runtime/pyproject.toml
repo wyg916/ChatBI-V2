@@ -1,0 +1,16 @@
+[build-system]
+requires = ["setuptools>=75"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "chatbi-pandasai-selected-runtime"
+version = "0.1.0"
+description = "Hash-locked PandasAI community Sandbox bridge for ChatBI"
+requires-python = ">=3.11"
+license = {text = "MIT"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+pandasai_selected_runtime = ["provenance.json", "LICENSE.pandasai", "_upstream/**/*.py"]

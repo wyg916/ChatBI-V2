@@ -1,5 +1,15 @@
 # Architecture Decisions
 
+## ADR-050：Phase 3 仅引入窄范围上游运行时，并保持单一安全与证据控制面
+
+DB-GPT 只允许固定提交 `db580e952e544acf9f6c6c153da29dc67e9e40d7` 的 `dbgpt-core/AWEL` 执行 `DAG`、`MapOperator` 与 `BaseOperator.call`；AWEL 输入不包含原始问题、SQL、数据源/模型标识、连接器、密钥、RAG 状态或工具结果。它只承载路由、Trace ID 和硬预算，并回调现有 ChatBI 固定五角色六工具编排。任何来源校验失败、运行时缺失或预算越界均 fail closed，不得回落后再记为真实 DB-GPT 调用。
+
+PandasAI 只允许固定提交 `bbbb771d31062d81f6fa19bafb40620d5cbe48f4`、Git blob `6f31f9dfd3dbd023c7f82a1533bb3c577efd19fd` 的 community `pandasai/sandbox/sandbox.py`。不得导入根包或任何 `ee/**`。简单文件问题使用项目自有全文件确定性操作；只有复杂关联通过继承的 `Sandbox.execute` 进入独立一次性 Docker worker。Worker 必须 non-root、无网络、无主机挂载、无生产密钥、只读根文件系统、drop capabilities、no-new-privileges，并限制 CPU、内存、PID、时间、输入文件和输出；取消、超时与异常均同步销毁容器。Backend Compose 不直接挂载 Docker socket，只能在私有 internal control network 上向独立 Sandbox Controller 发送固定版本、固定字段的请求；Controller 独占 Docker socket，按不可变 WorkerSpec 创建容器，拒绝客户端镜像、命令、挂载、环境变量、网络及 Docker 参数，最多并发两个任务。Controller 的 Docker daemon 权限仍是部署高权限边界，生产环境应进一步采用 rootless daemon/socket proxy 并保持该控制网络不可外部访问。
+
+Vision 先执行方向归一化、元数据清除、尺寸约束、必要分块、提示词注入识别与敏感字段脱敏，形成可签名 `VisualEvidence`。普通视觉默认 MiMo；Kimi 只由多图、低质量文档或大图分块等显式 premium trigger 选择，DeepSeek 不接收原始图片。扫描 PDF 经固定 pypdfium2 逐页渲染后复用同一 Vision 链。图片与数据库对照必须重新走 ChatBI Schema/Semantic/NL2SQL/SQL Guard/只读 Executor/Result Oracle，并保留 Query Run 与结果签名；视觉文本不得直接生成或执行数据库 SQL。
+
+正式 Trace 只记录实际执行的 `rag.retrieve`、`agent.step`、`file.parse`、`python.execute`、`model.invoke`、`sql.execute`、`oracle.verify`、`answer.compose` 和 `sse.stream`。同步入口不得记录 `sse.stream`，失败或回滚不得冒充已完成 span。Legacy RAG 在所有权和许可证无法闭合时维持 clean-room Adapter，直接源码复用状态为 `BLOCKED`，但不削弱 ACL、Citation 和 Answer Guard 的 P0 产品要求。
+
 ## ADR-049：V1.3.0 以自包含 IBM 远端 Gate 和受控 SQLBot 例外收口 Phase 2
 
 V1.2.0 Runtime Architecture 的架构、能力、测试、安全、性能、许可证、Evidence 与 Git 原则继续约束 V1.3.0；旧版本号、分支、Tag 和历史基线 SHA 仅作历史字段。正式映射由 `docs/runtime/V1_3_RUNTIME_ARCHITECTURE_REQUIREMENT_DELTA.md` 控制。IBM 远端 Gate 不再依赖外部 `api_base` 或长期仓库 Secret：GitHub-hosted Runner 创建临时 PostgreSQL 和一次性主体，应用迁移与固定 seed，只启动 localhost Backend，再从固定 checkout 的隔离 Python 调用 Apache-2.0 selected source。生产数据库、生产用户、Provider Key 和数据库连接均不提供给 IBM；任何初始化、Golden 50、官方 compare、error analysis、脱敏或 artifact 步骤失败都必须非零退出。

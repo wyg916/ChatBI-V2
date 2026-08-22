@@ -73,12 +73,44 @@ services:
       CHATBI_GENERAL_MODEL_PROVIDER: ${CHATBI_GENERAL_MODEL_PROVIDER:-auto}
       CHATBI_VISION_MODEL_PROVIDER: ${CHATBI_VISION_MODEL_PROVIDER:-auto}
       CHATBI_VISION_MODEL_NAME: ${CHATBI_VISION_MODEL_NAME:-}
+      CHATBI_SANDBOX_CONTROLLER_URL: http://sandbox-controller:8765
     extra_hosts:
       - "host.docker.internal:host-gateway"
     ports:
       - "${CHATBI_BACKEND_PORT:-8000}:8000"
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health', timeout=2)"]
+      interval: 4s
+      timeout: 4s
+      retries: 30
+    restart: unless-stopped
+    depends_on:
+      sandbox-controller:
+        condition: service_healthy
+    networks:
+      - default
+      - sandbox-control
+
+  sandbox-controller:
+    image: chatbi-sandbox-runtime:phase3
+    build:
+      context: .
+      dockerfile: sandbox_runtime/Dockerfile
+    user: "0:0"
+    command: ["python", "-m", "app.sandbox.controller_server"]
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,nodev,size=8m,mode=1777
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    networks:
+      - sandbox-control
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8765/healthz', timeout=2)"]
       interval: 4s
       timeout: 4s
       retries: 30
@@ -119,3 +151,7 @@ services:
       timeout: 4s
       retries: 30
     restart: unless-stopped
+
+networks:
+  sandbox-control:
+    internal: true

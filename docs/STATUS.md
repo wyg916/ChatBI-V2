@@ -1,5 +1,15 @@
 # 项目状态
 
+## V1.3.0 Phase 3 RAG / Agent / File / Multimodal 候选（2026-08-22）
+
+- Phase 3 从 Phase 2 精确基线 `c51c2f238bce0e26777c831fb9b44455b58d4c5c` 在隔离短期 worktree 开发；原共享工作区 WIP 不清理、不覆盖。本节记录候选实现，最终测试、提交、远端与同 SHA CI 结论只以外部 Evidence 和交付输出为准。
+- DB-GPT 固定 `db580e952e544acf9f6c6c153da29dc67e9e40d7`，仅 `dbgpt-core/AWEL` 的 `DAG`、`MapOperator`、`BaseOperator.call` 进入运行时；AWEL 只接收路由、Trace ID 与硬预算，再调用 ChatBI 固定五角色六工具编排。应用、RAG、数据源、认证、会话、模型凭据和 Skills 均不进入边界。
+- PandasAI 固定 `bbbb771d31062d81f6fa19bafb40620d5cbe48f4`，仅直接复用 MIT community `pandasai/sandbox/sandbox.py`。简单文件问题仍由全文件确定性操作执行；复杂关联才经该基类和独立 Sandbox Controller 进入一次性 Docker worker；Backend 无 Docker socket，Controller 仅接受固定协议并强制不可变安全配置，Docker/来源/协议不可用时 fail closed。
+- 文件链路支持 CSV/XLSX 全文件解析、公式/提示词注入检查和可定位证据；Vision 统一做方向归一化、去元数据、缩放/分块、敏感字段脱敏和 VisualEvidence 缓存。普通视觉默认 MiMo，仅明确多图、低质量文档或大图分块触发 Kimi；图片不发送给 DeepSeek。扫描 PDF 由固定 pypdfium2 渲染为 PNG 后进入同一受控 Vision 链。
+- 图片与数据库对照只接受单个可解析视觉数值，并重新进入现有 DATA_QUERY 的 Schema/Semantic/NL2SQL/SQL Guard/只读 Executor/Result Oracle；数据库证据必须保留 Query Run、Guard、Oracle 与结果签名。同步与 SSE Trace 分开记账，只有真实流式入口记录 `sse.stream`。
+- Legacy RAG 的直接源码复用因缺少可闭合的所有权/许可证证据继续 `BLOCKED`；受控 RAG 维持独立 clean-room Adapter、ACL、Citation 与 Answer Guard。此阻断不得被兼容代码或旧运行时调用数伪装为上游复用。
+- 最终提交前本地候选门禁：Backend 389 collected（383 passed、6 个显式外部运行时门禁 skipped）、Phase3 真实 DB-GPT/Controller/Worker 专项 111/111、Phase1/2 定向回归 47/47；同一精确 AWEL runtime 的 Golden Agent15 为 15/15 并累计 15 次 `BaseOperator.call`。File12 真实全文件/Controller/Sandbox runner 为 12/12，三模型真实多模态 runner 为 10/10，Frontend Vitest 13 files/50 tests、TypeScript、Vite 741 modules、Playwright 85/85 均通过。隔离 Compose 四服务从停止态连续两次 healthy，分别 109.657s 与 34.682s。上述结论仍须绑定最终 clean SHA，并由 GitHub-hosted Phase3 artifact 与同 SHA IBM self-contained CI 复验后才能作为远端发布门禁结论。
+
 ## V1.3.0 Phase 2 数据主链与真实上游接入（2026-08-21）
 
 - OpenChatBI `c8786cb...` 的 `catalog_store.py` 与 WrenAI `7830cc7...` 的 `type_mapping.py`/`wren_dialect.py` 已按 canonical Git blob 字节等同 vendoring；IBM `60dd451...` 的 11 个 Apache-2.0 selected-source 文件由外部固定 checkout 的隔离 Python 执行且逐文件校验 SHA-256。真实直接复用项目数为 3；ChatBI 不复制或分发 IBM 源码、wheel 或 benchmark bundle。

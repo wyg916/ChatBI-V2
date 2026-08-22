@@ -10,7 +10,7 @@ from chatbi_agent_contracts import (
     ToolName,
     ToolResult,
 )
-from chatbi_rag_adapter import CitationVerifierV1, RagAdapterError
+from chatbi_rag_adapter import CitationVerifierV1, LiveRagAdapter, RagAdapterError
 from chatbi_rag_contracts import Citation, RagExecutionContext, RagRequest
 from sqlalchemy.orm import Session
 
@@ -111,8 +111,7 @@ class ChatBIToolExecutor:
         if self.rag_adapter is None:
             return "FAILED", {}, "RAG_RUNTIME_UNAVAILABLE"
         try:
-            result = self.rag_adapter.retrieve(
-                RagRequest(
+            rag_request = RagRequest(
                     query=str(call.arguments.get("question") or ""),
                     scenario_id="charging_ops",
                     context=RagExecutionContext(
@@ -128,7 +127,14 @@ class ChatBIToolExecutor:
                         token_budget=context.token_budget,
                     ),
                 )
-            )
+            if isinstance(self.rag_adapter, LiveRagAdapter):
+                result = self.rag_adapter.retrieve(
+                    rag_request, cancellation_event=self.cancellation_event,
+                )
+            else:
+                if self.cancellation_event is not None and self.cancellation_event.is_set():
+                    raise RagAdapterError("live RAG request cancelled")
+                result = self.rag_adapter.retrieve(rag_request)
         except RagAdapterError:
             return "FAILED", {}, "RAG_RUNTIME_FAILED"
         if result.status != "SUCCEEDED":

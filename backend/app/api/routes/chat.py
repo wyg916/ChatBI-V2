@@ -11,6 +11,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.access import Principal, get_conversation_principal, require_permission
+from app.core.config import get_settings
 from app.db.session import SessionLocal, get_db
 from app.models import Attachment, ChatMessage, Conversation
 from app.schemas.chat import (
@@ -164,6 +165,7 @@ def chat_stream(
                     cancellation_event=lifecycle.cancel_event,
                     answer_delta=answer_delta,
                     trace_id=run_id,
+                    sse_streamed=True,
                 )
                 lifecycle.checkpoint()
                 events.put(("result", result.model_dump(mode="json")))
@@ -328,8 +330,10 @@ def cancel_chat_stream(
         # the browser.  A worker may already be committing when cancellation
         # arrives, so wait for its bounded completion and clean once more after
         # the commit window closes.  Cleanup remains scoped to this exact run.
-        lifecycle.task_done.wait()
-        _cleanup_cancelled_messages(data.conversation_id, data.client_message_id)
+        # Never let a non-cooperative provider make the acknowledgement hang.
+        # The worker performs the same scoped cleanup when it eventually exits.
+        if lifecycle.task_done.wait(timeout=max(1.0, get_settings().agent_timeout_ms / 1000 + 1.0)):
+            _cleanup_cancelled_messages(data.conversation_id, data.client_message_id)
     return {"cancelled": lifecycle is not None}
 
 

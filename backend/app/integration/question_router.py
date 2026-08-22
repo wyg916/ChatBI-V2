@@ -79,10 +79,10 @@ class QuestionRouter:
         kinds = attachment_kinds or set()
         if requested is not None:
             return self._decision(requested, question=normalized, reason="EXPLICIT_ROUTE", attachment_count=len(kinds))
-        if "IMAGE" in kinds:
+        if kinds & {"IMAGE", "SCANNED_PDF"}:
             return self._decision(
                 QuestionRoute.MULTIMODAL_QUERY, question=normalized,
-                reason="IMAGE_ATTACHMENT", attachment_count=len(kinds),
+                reason="VISION_ATTACHMENT", attachment_count=len(kinds),
             )
         if kinds:
             return self._decision(

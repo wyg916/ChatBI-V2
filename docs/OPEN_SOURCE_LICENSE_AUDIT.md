@@ -1,5 +1,14 @@
 # Open-source and supply-chain audit — V1.1.0
 
+## V1.3.0 Phase 3 addendum — 2026-08-22
+
+Phase 3 preserves every Phase 2 and SQLBot exception decision and raises direct upstream reuse from three to five projects through two narrow, independently attributable paths:
+
+- DB-GPT `packages/dbgpt-core` at `db580e952e544acf9f6c6c153da29dc67e9e40d7`, installed from exact Git provenance or the canonical archive whose SHA-256 is `e225a2e222874adfb504e03f6a2d091729d8ecb2c874783fd4bcbc2c7c8ef31b`. Only MIT-licensed AWEL `DAG`, `MapOperator` and `BaseOperator.call` execute. `dbgpt-app`, RAG, datasource/connectors, auth, conversation, credentials, embedded skills and assets remain excluded.
+- PandasAI community `pandasai/sandbox/sandbox.py` at `bbbb771d31062d81f6fa19bafb40620d5cbe48f4`, Git blob `6f31f9dfd3dbd023c7f82a1533bb3c577efd19fd`, byte SHA-256 `a6d4934cffc70d8a325071d8ab94b12ec0ded9043cdc01e9ba3a4d1f64d210c6`. The exact MIT file and license are retained; every `ee/**` path and the root import closure that loads EE remain excluded.
+
+The DB-GPT runtime never receives raw questions, SQL, keys, datasource/model identifiers, connectors, RAG state or tool outputs. The PandasAI base `Sandbox.execute` delegates to a ChatBI worker with no host mounts, secrets or external network. Both boundaries fail closed on missing/mismatched provenance. Detailed selected paths, checksums, retained licenses, runtime entry, fallback and rollback are machine-readable in `docs/UPSTREAM_LOCK.json`. This is an engineering compliance record, not legal advice.
+
 ## V1.3.0 Phase 2 addendum — 2026-08-21
 
 This addendum supersedes the V1.1 statements that no reviewed upstream source is present. Phase 2 intentionally vendors three exact, license-permitted Python files after a new path-level audit.
@@ -46,8 +55,8 @@ All revisions below were checked out from their official GitHub remotes in the e
 | [IBM Text-to-SQL Evaluation Toolkit](https://github.com/IBM/text2sql-eval-toolkit/tree/60dd4515236adb335f2053b7c069397d7d88fe0a) | `60dd4515236adb335f2053b7c069397d7d88fe0a` | Apache-2.0 | Project-authored result comparator; no toolkit source or benchmark bundle copied |
 | [SQLBot](https://github.com/dataease/SQLBot/tree/2a86aa926c4a22400a4ab4506c3ec384f7855a9d) | `2a86aa926c4a22400a4ab4506c3ec384f7855a9d` | Modified GPLv3 plus logo/copyright conditions | Reference-only; no source, UI, prompt text, brand, or asset copied |
 | [Chat2DB](https://github.com/OtterMind/Chat2DB/tree/5372213f267a087c232cb86cae4b200e00c3389f) | `5372213f267a087c232cb86cae4b200e00c3389f` | `LicenseRef-Chat2DB`; object distribution/external-product use restricted for 5.3.0+ | Reference-only; no dependency, service, container, source, UI, or asset used |
-| [DB-GPT](https://github.com/eosphoros-ai/DB-GPT/tree/db580e952e544acf9f6c6c153da29dc67e9e40d7) | `db580e952e544acf9f6c6c153da29dc67e9e40d7` | Root MIT for selected application paths; embedded skills require their own path review | Provenance only for a separately authored bounded orchestrator; embedded skills excluded |
-| [PandasAI](https://github.com/Sinaptik-AI/pandas-ai/tree/bbbb771d31062d81f6fa19bafb40620d5cbe48f4) | `bbbb771d31062d81f6fa19bafb40620d5cbe48f4` | Community paths MIT; all `ee/**` paths under enterprise terms | Not imported or packaged; file analysis is a project-owned fixed-operation interpreter |
+| [DB-GPT](https://github.com/eosphoros-ai/DB-GPT/tree/db580e952e544acf9f6c6c153da29dc67e9e40d7) | `db580e952e544acf9f6c6c153da29dc67e9e40d7` | Root MIT for `packages/dbgpt-core`; embedded skills and application surfaces excluded | V1.1/Day 2 provenance-only conclusion is superseded solely for the Phase 3 core/AWEL selected runtime above |
+| [PandasAI](https://github.com/Sinaptik-AI/pandas-ai/tree/bbbb771d31062d81f6fa19bafb40620d5cbe48f4) | `bbbb771d31062d81f6fa19bafb40620d5cbe48f4` | Selected community sandbox file MIT; all `ee/**` paths under enterprise terms | V1.1/Day 2 not-imported conclusion is superseded solely for the exact Phase 3 community sandbox file above |
 
 ## Source, asset, and secret checks
 
@@ -60,5 +69,5 @@ All revisions below were checked out from their official GitHub remotes in the e
 
 1. Preserve `docs/UPSTREAM_LOCK.json`, this audit, both SBOMs, and `THIRD_PARTY_NOTICES.md` in every V1.1.0 distribution.
 2. Keep Wren/OpenChatBI/SuperSonic behind `SemanticEngine`; keep IBM behind `EvaluationAdapter`; keep the RAG bridge behind `RagAdapter`.
-3. Default fallbacks must remain available: local semantic engine, ChatBI Result Oracle, bounded local catalog scoring, and project-owned file/agent runtimes.
+3. Default fallbacks must remain available: local semantic engine, ChatBI Result Oracle and deterministic full-file operations. A DB-GPT or Sandbox provenance/runtime failure must be labelled and fail closed; it must never be reported as a verified upstream call.
 4. If an audited license changes or an unknown license appears, block release and use the recorded per-capability rollback; do not silently substitute source.

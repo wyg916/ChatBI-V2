@@ -114,22 +114,33 @@ class RoutingPolicy:
     def provider_candidates(self, request: ModelRequest) -> list[str]:
         explicit = self.resolve_alias(request.requested_alias)
         if explicit:
+            if (
+                request.modality.value == "vision"
+                and explicit == "kimi"
+                and not request.premium_triggers
+            ):
+                return []
             return [explicit]
         capability = request.capability.value
         if request.modality.value == "vision":
             capability = "vision"
         candidates = list(self.policy["provider_order"].get(capability, ()))
         premium = self.policy["budget_modes"][request.budget_mode.value]["allow_premium"]
-        premium_eligible = request.complexity_score >= 80 or bool(request.premium_triggers)
-        if premium and premium_eligible and "kimi" in candidates:
-            candidates.remove("kimi")
-            candidates.insert(0, "kimi")
-        elif not premium and "kimi" in candidates:
-            candidates.remove("kimi")
-            # Vision has only two governed providers; retain Kimi as a safety
-            # fallback while keeping it out of ordinary balanced text routes.
-            if request.modality.value == "vision":
-                candidates.append("kimi")
+        if request.modality.value == "vision":
+            # MiMo is the sole ordinary image route. Kimi may be selected only
+            # after an observable Vision Escalation Trigger has been recorded.
+            if request.premium_triggers and "kimi" in candidates:
+                candidates.remove("kimi")
+                candidates.insert(0, "kimi")
+            elif "kimi" in candidates:
+                candidates.remove("kimi")
+        else:
+            premium_eligible = request.complexity_score >= 80 or bool(request.premium_triggers)
+            if premium and premium_eligible and "kimi" in candidates:
+                candidates.remove("kimi")
+                candidates.insert(0, "kimi")
+            elif not premium and "kimi" in candidates:
+                candidates.remove("kimi")
         return candidates
 
     def supports(self, provider: str, request: ModelRequest) -> bool:
