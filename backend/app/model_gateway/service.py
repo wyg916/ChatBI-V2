@@ -23,6 +23,7 @@ from app.model_gateway.contracts import (
     RequestContext,
 )
 from app.model_gateway.policy import RoutingPolicy
+from app.model_gateway.ledger import record_model_invocation
 
 
 class ModelUnavailable(RuntimeError):
@@ -210,18 +211,26 @@ class ModelGateway:
         *,
         cancellation_event: Event | None = None,
     ) -> ModelResponse:
-        del context  # Context is intentionally carried for identity/trace, never sent as provider metadata.
+        context = context or self._default_context()
         self.last_response = None
         self._cancelled(cancellation_event)
         failures: list[str] = []
         started = perf_counter()
         retries_total = 0
-        candidates = self._candidates(request)
+        try:
+            candidates = self._candidates(request)
+        except ModelUnavailable as exc:
+            record_model_invocation(
+                context, request, response=None, provider="none", status="FAILED",
+                latency_ms=round((perf_counter() - started) * 1000), error_code=type(exc).__name__,
+            )
+            raise
         attempts = max(1, int(self.health_config["retry_attempts"]))
         for fallback_count, provider in enumerate(candidates):
             provider_attempts = 1 if provider.provider_id == "kimi" else attempts
             for attempt in range(provider_attempts):
                 self._cancelled(cancellation_event)
+                attempt_started = perf_counter()
                 try:
                     timeout = request.timeout_seconds or float(self.health_config["request_timeout_seconds"])
                     with httpx.Client(timeout=timeout, transport=self.transport) as client:
@@ -262,11 +271,25 @@ class ModelGateway:
                     )
                     self._circuits.success(provider.provider_id)
                     self.last_response = result
+                    record_model_invocation(
+                        context, request, response=result, provider=result.resolved_provider,
+                        model=result.resolved_model, status="SUCCEEDED",
+                        latency_ms=round((perf_counter() - attempt_started) * 1000),
+                        circuit_state=self._circuits.snapshot(provider.provider_id)["state"],
+                    )
                     return result
                 except httpx.HTTPError as exc:
                     status = exc.response.status_code if isinstance(exc, httpx.HTTPStatusError) else "transport"
                     failures.append(f"{provider.provider_id}:{type(exc).__name__}:{status}:attempt{attempt + 1}")
                     self._circuits.failure(provider.provider_id)
+                    record_model_invocation(
+                        context, request, response=None, provider=provider.provider_id,
+                        model=provider.model_name, status="FAILED",
+                        latency_ms=round((perf_counter() - attempt_started) * 1000),
+                        fallback_count=fallback_count, retry_count=attempt,
+                        error_code=f"HTTP_{status}" if isinstance(status, int) else type(exc).__name__,
+                        circuit_state=self._circuits.snapshot(provider.provider_id)["state"],
+                    )
                     if attempt + 1 < provider_attempts and self._retryable(exc):
                         retries_total += 1
                         self.sleeper(self._retry_delay(exc, attempt))
@@ -275,7 +298,27 @@ class ModelGateway:
                 except (KeyError, TypeError, ValueError, json.JSONDecodeError) as exc:
                     failures.append(f"{provider.provider_id}:{type(exc).__name__}:attempt{attempt + 1}")
                     self._circuits.failure(provider.provider_id)
+                    record_model_invocation(
+                        context, request, response=None, provider=provider.provider_id,
+                        model=provider.model_name, status="FAILED",
+                        latency_ms=round((perf_counter() - attempt_started) * 1000),
+                        fallback_count=fallback_count, retry_count=attempt,
+                        error_code=type(exc).__name__,
+                        circuit_state=self._circuits.snapshot(provider.provider_id)["state"],
+                    )
                     break
+                except ModelUnavailable as exc:
+                    if cancellation_event is None or not cancellation_event.is_set():
+                        raise
+                    record_model_invocation(
+                        context, request, response=None, provider=provider.provider_id,
+                        model=provider.model_name, status="CANCELLED",
+                        latency_ms=round((perf_counter() - attempt_started) * 1000),
+                        fallback_count=fallback_count, retry_count=attempt,
+                        error_code="REQUEST_CANCELLED",
+                        circuit_state=self._circuits.snapshot(provider.provider_id)["state"],
+                    )
+                    raise
         error = VisionModelUnavailable if request.modality == ModelModality.VISION else ModelUnavailable
         raise error("All configured model providers failed: " + ", ".join(failures))
 
@@ -341,7 +384,7 @@ class ModelGateway:
         premium_triggers: frozenset[str] | None = None,
         cancellation_event: Event | None = None,
     ) -> Iterator[ModelReply]:
-        del context
+        context = context or self._default_context(user)
         self.last_response = None
         messages: list[dict[str, Any]] = [{"role": "system", "content": system}, *(history or [])]
         if image_data_urls:
@@ -370,10 +413,19 @@ class ModelGateway:
         started = perf_counter()
         retries_total = 0
         attempts = max(1, int(self.health_config["retry_attempts"]))
-        for fallback_count, provider in enumerate(self._candidates(request)):
+        try:
+            candidates = self._candidates(request)
+        except ModelUnavailable as exc:
+            record_model_invocation(
+                context, request, response=None, provider="none", status="FAILED",
+                latency_ms=round((perf_counter() - started) * 1000), error_code=type(exc).__name__,
+            )
+            raise
+        for fallback_count, provider in enumerate(candidates):
             provider_attempts = 1 if provider.provider_id == "kimi" else attempts
             for attempt in range(provider_attempts):
                 self._cancelled(cancellation_event)
+                attempt_started = perf_counter()
                 emitted = False
                 chunks: list[str] = []
                 usage = ModelUsage()
@@ -429,13 +481,35 @@ class ModelGateway:
                     )
                     self._circuits.success(provider.provider_id)
                     self.last_response = result
+                    record_model_invocation(
+                        context, request, response=result, provider=result.resolved_provider,
+                        model=result.resolved_model, status="SUCCEEDED",
+                        latency_ms=round((perf_counter() - attempt_started) * 1000),
+                        circuit_state=self._circuits.snapshot(provider.provider_id)["state"],
+                    )
                     return
                 except httpx.HTTPError as exc:
                     if emitted:
+                        record_model_invocation(
+                            context, request, response=None, provider=provider.provider_id,
+                            model=provider.model_name, status="FAILED",
+                            latency_ms=round((perf_counter() - started) * 1000),
+                            fallback_count=fallback_count, retry_count=retries_total,
+                            error_code="STREAM_HTTP_ERROR",
+                            circuit_state=self._circuits.snapshot(provider.provider_id)["state"],
+                        )
                         raise ModelUnavailable("Provider stream failed after content was emitted") from exc
                     status = exc.response.status_code if isinstance(exc, httpx.HTTPStatusError) else "transport"
                     failures.append(f"{provider.provider_id}:{type(exc).__name__}:{status}:attempt{attempt + 1}")
                     self._circuits.failure(provider.provider_id)
+                    record_model_invocation(
+                        context, request, response=None, provider=provider.provider_id,
+                        model=provider.model_name, status="FAILED",
+                        latency_ms=round((perf_counter() - attempt_started) * 1000),
+                        fallback_count=fallback_count, retry_count=attempt,
+                        error_code=f"HTTP_{status}" if isinstance(status, int) else type(exc).__name__,
+                        circuit_state=self._circuits.snapshot(provider.provider_id)["state"],
+                    )
                     if attempt + 1 < provider_attempts and self._retryable(exc):
                         retries_total += 1
                         self.sleeper(self._retry_delay(exc, attempt))
@@ -443,10 +517,38 @@ class ModelGateway:
                     break
                 except (KeyError, TypeError, ValueError, json.JSONDecodeError) as exc:
                     if emitted:
+                        record_model_invocation(
+                            context, request, response=None, provider=provider.provider_id,
+                            model=provider.model_name, status="FAILED",
+                            latency_ms=round((perf_counter() - started) * 1000),
+                            fallback_count=fallback_count, retry_count=retries_total,
+                            error_code="STREAM_INVALID_RESPONSE",
+                            circuit_state=self._circuits.snapshot(provider.provider_id)["state"],
+                        )
                         raise ModelUnavailable("Provider stream became invalid after content was emitted") from exc
                     failures.append(f"{provider.provider_id}:{type(exc).__name__}:attempt{attempt + 1}")
                     self._circuits.failure(provider.provider_id)
+                    record_model_invocation(
+                        context, request, response=None, provider=provider.provider_id,
+                        model=provider.model_name, status="FAILED",
+                        latency_ms=round((perf_counter() - attempt_started) * 1000),
+                        fallback_count=fallback_count, retry_count=attempt,
+                        error_code=type(exc).__name__,
+                        circuit_state=self._circuits.snapshot(provider.provider_id)["state"],
+                    )
                     break
+                except ModelUnavailable as exc:
+                    if cancellation_event is None or not cancellation_event.is_set():
+                        raise
+                    record_model_invocation(
+                        context, request, response=None, provider=provider.provider_id,
+                        model=provider.model_name, status="CANCELLED",
+                        latency_ms=round((perf_counter() - attempt_started) * 1000),
+                        fallback_count=fallback_count, retry_count=attempt,
+                        error_code="REQUEST_CANCELLED",
+                        circuit_state=self._circuits.snapshot(provider.provider_id)["state"],
+                    )
+                    raise
         error = VisionModelUnavailable if vision else ModelUnavailable
         raise error("All configured model provider streams failed: " + ", ".join(failures))
 

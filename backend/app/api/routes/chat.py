@@ -5,15 +5,16 @@ from queue import Empty, Queue
 from time import perf_counter
 from uuid import uuid4
 
-from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
 from fastapi.responses import StreamingResponse
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.core.access import Principal, get_conversation_principal, require_permission
+from app.core.access import Principal, get_conversation_principal, record_audit, require_permission
 from app.core.config import get_settings
 from app.db.session import SessionLocal, get_db
 from app.models import Attachment, ChatMessage, Conversation
+from app.model_gateway.ledger import bind_model_invocation_session
 from app.schemas.chat import (
     ChatRequest,
     ChatCancelRequest,
@@ -25,7 +26,7 @@ from app.schemas.chat import (
 )
 from app.services.chat import ChatService
 from app.services.attachments import attachment_path
-from app.services.conversations import get_conversation, list_messages
+from app.services.conversations import get_conversation, list_conversations, list_messages
 from app.streaming import PHASE_LABELS, StreamCancelled, StreamEventFactory, format_sse, phase_for_stage, stream_registry
 
 
@@ -68,26 +69,40 @@ def _stream_principal(
 
 
 @router.post("/conversations", response_model=ConversationRead, status_code=status.HTTP_201_CREATED)
-def create_conversation(data: ConversationCreate, db: Session = Depends(get_db), principal: Principal = Depends(require_permission("query.ask"))):
+def create_conversation(data: ConversationCreate, db: Session = Depends(get_db), principal: Principal = Depends(require_permission("conversation.manage"))):
     item = Conversation(workspace_id=principal.workspace_id, user_id=principal.user_id, title=data.title)
     db.add(item)
+    db.flush()
+    record_audit(db, principal, action="CONVERSATION_CREATE", resource_type="CONVERSATION", resource_id=item.id)
     db.commit()
     db.refresh(item)
     return item
 
 
 @router.get("/conversations", response_model=list[ConversationRead])
-def conversations(db: Session = Depends(get_db), principal: Principal = Depends(require_permission("query.ask"))):
-    return list(db.scalars(select(Conversation).where(
-        Conversation.workspace_id == principal.workspace_id,
-        Conversation.user_id == principal.user_id,
-    ).order_by(Conversation.updated_at.desc())))
+def conversations(
+    q: str = Query(default="", max_length=255),
+    state: str = Query(default="active", pattern="^(active|archived|all)$"),
+    project_id: str | None = Query(default=None, max_length=36),
+    db: Session = Depends(get_db),
+    principal: Principal = Depends(require_permission("query.ask")),
+):
+    items = list_conversations(db, principal, query=q, state=state, project_id=project_id)
+    record_audit(
+        db, principal, action="CONVERSATION_SEARCH" if q else "CONVERSATION_LIST",
+        resource_type="CONVERSATION", details={"state": state, "project_id": project_id, "query_length": len(q), "count": len(items)},
+    )
+    db.commit()
+    return items
 
 
 @router.get("/conversations/{conversation_id}", response_model=ConversationDetail)
 def conversation_detail(conversation_id: str, db: Session = Depends(get_db), principal: Principal = Depends(require_permission("query.ask"))):
     item = get_conversation(db, conversation_id, principal)
-    return ConversationDetail.model_validate(item).model_copy(update={"messages": list_messages(db, item.id)})
+    detail = ConversationDetail.model_validate(item).model_copy(update={"messages": list_messages(db, item.id)})
+    record_audit(db, principal, action="CONVERSATION_VIEW", resource_type="CONVERSATION", resource_id=item.id)
+    db.commit()
+    return detail
 
 
 @router.patch("/conversations/{conversation_id}", response_model=ConversationRead)
@@ -95,29 +110,40 @@ def rename_conversation(
     conversation_id: str,
     data: ConversationRename,
     db: Session = Depends(get_db),
-    principal: Principal = Depends(require_permission("query.ask")),
+    principal: Principal = Depends(require_permission("conversation.manage")),
 ):
     item = get_conversation(db, conversation_id, principal)
     item.title = data.title
+    record_audit(db, principal, action="CONVERSATION_RENAME", resource_type="CONVERSATION", resource_id=item.id)
     db.commit()
     db.refresh(item)
     return item
 
 
 @router.delete("/conversations/{conversation_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_conversation(conversation_id: str, db: Session = Depends(get_db), principal: Principal = Depends(require_permission("query.ask"))):
+def delete_conversation(conversation_id: str, db: Session = Depends(get_db), principal: Principal = Depends(require_permission("conversation.manage"))):
     item = get_conversation(db, conversation_id, principal)
     attachments = list(db.scalars(select(Attachment).where(Attachment.conversation_id == item.id)))
-    for attachment in attachments:
-        attachment_path(attachment).unlink(missing_ok=True)
+    paths = [attachment_path(attachment) for attachment in attachments]
+    record_audit(db, principal, action="CONVERSATION_DELETE", resource_type="CONVERSATION", resource_id=item.id)
     db.delete(item)
     db.commit()
+    for path in paths:
+        path.unlink(missing_ok=True)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @router.post("/chat", response_model=ChatResponse, status_code=status.HTTP_201_CREATED)
-def chat(data: ChatRequest, db: Session = Depends(get_db), principal: Principal = Depends(require_permission("query.ask"))):
-    return ChatService().execute(db, data, principal)
+def chat(
+    data: ChatRequest,
+    response: Response,
+    db: Session = Depends(get_db),
+    principal: Principal = Depends(require_permission("query.ask")),
+):
+    result = ChatService().execute(db, data, principal)
+    if result.answer_envelope is not None:
+        response.headers["X-Trace-ID"] = result.answer_envelope.trace_id
+    return result
 
 
 @router.post("/chat/stream")
@@ -160,13 +186,14 @@ def chat_stream(
         stream_registry.task_started(run_id)
         try:
             with SessionLocal() as worker_db:
-                result = ChatService().execute(
-                    worker_db, data, principal, progress=progress,
-                    cancellation_event=lifecycle.cancel_event,
-                    answer_delta=answer_delta,
-                    trace_id=run_id,
-                    sse_streamed=True,
-                )
+                with bind_model_invocation_session(worker_db):
+                    result = ChatService().execute(
+                        worker_db, data, principal, progress=progress,
+                        cancellation_event=lifecycle.cancel_event,
+                        answer_delta=answer_delta,
+                        trace_id=run_id,
+                        sse_streamed=True,
+                    )
                 lifecycle.checkpoint()
                 events.put(("result", result.model_dump(mode="json")))
         except StreamCancelled:

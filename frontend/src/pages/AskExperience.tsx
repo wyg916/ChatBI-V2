@@ -11,17 +11,22 @@ import {
 import { useLocation } from 'react-router-dom';
 import { chatApi } from '../api/chat';
 import { queryApi } from '../api/queries';
-import { EChartsRenderer } from '../charting/EChartsRenderer';
-import { EChart } from '../components/EChart';
+import { DynamicAnswerRenderer } from '../chat/DynamicAnswerRenderer';
+import {
+  mergeFinalResponseMessages,
+  mergeUniqueAnswerParts,
+  normalizeAnswerEnvelope,
+} from '../chat/answerEnvelope';
 import type {
   Attachment,
-  ChartSpec,
   ChatInput,
   ChatMessage,
   ChatResponse,
   Conversation,
   ConversationDetail,
-  Narrative,
+  ConversationListOptions,
+  ConversationListState,
+  Project,
   QueryResponse,
 } from '../types/api';
 import { ConversationSidebar, isVisibleConversation } from './chat-ui/ConversationSidebar';
@@ -247,122 +252,24 @@ function AnswerActions({ message, result, onRetry, onEvidence, evidenceButtonRef
   );
 }
 
-function QueryAnswer({ message, result, onAsk, onRetry }: { message: ChatMessage; result: QueryResponse; onAsk: (question: string) => void; onRetry: () => void }) {
-  const semantic = inferSemantic(message, result);
-  const [drawerOpen, setDrawerOpen] = useState(false);
-  const evidenceButtonRef = useRef<HTMLButtonElement>(null);
-  const rows = result.execution.rows ?? [];
-  const columns = result.execution.columns ?? [];
-  const chartSpec = 'chart_type' in result.chart_spec ? result.chart_spec as ChartSpec : null;
-  const narrative = 'conclusion' in result.narrative ? result.narrative as Narrative : null;
-  const kpis = result.kpis.length ? result.kpis : narrative?.key_metrics ?? [];
-  const citations = citationsFromMessage(message);
-  const conclusion = semantic === 'ZERO' ? '当前条件下结果为 0。' : narrative?.conclusion || message.content || result.summary;
-  const stateError = result.status === 'SECURITY_REJECTED'
-    ? `${result.error_code ?? 'SQL_GUARD_REJECTED'}：${result.error_message ?? '查询已被安全策略拒绝，未访问数据库。'}`
-    : result.status === 'ORACLE_MISMATCH'
-      ? `结果未通过一致性校验（${result.oracle.mismatch_count ?? 0} 项差异），不会作为已验证答案发布。`
-      : `${result.error_code ?? message.error_code ?? 'QUERY_FAILED'}：${result.error_message ?? '请稍后重试。'}`;
-  const success = semantic !== 'FAILED';
-
-  return (
-    <article className="assistant-response" data-testid={`result-state-${semantic}`}>
-      <header className="assistant-response-head"><span aria-hidden="true">BI</span><strong>ChatBI</strong>{success && result.guard.allowed && result.oracle.status === 'PASSED' && <small>查询执行已校验</small>}</header>
-      {success && semantic !== 'NO_ROWS' && semantic !== 'NULL_VALUE' && <section className="answer-conclusion"><h2 className="sr-only">分析结论</h2><h2>核心结论</h2><p>{conclusion}</p></section>}
-      <ResultStateNotice semantic={semantic} message={stateError} onRetry={onRetry} testId={result.status === 'SECURITY_REJECTED' ? 'query-security' : result.status === 'ORACLE_MISMATCH' ? 'query-mismatch' : undefined} />
-
-      {(semantic === 'VALUE' || semantic === 'ZERO') && (
-        <div data-testid="query-success">
-          {kpis.length > 0 && <section className="answer-card kpi-card"><h3>KPI</h3><div className="answer-kpi-grid">{kpis.slice(0, 4).map((kpi) => <article key={kpi.label}><span>{kpi.label}</span><strong>{formatValue(kpi.value)}{kpi.unit ?? ''}</strong><small>已验证指标</small></article>)}</div></section>}
-          {chartSpec && <section className="answer-card chart-card"><header><h3>{chartSpec.title}</h3><small>绑定本次查询结果</small></header><EChartsRenderer spec={chartSpec} execution={result.execution} label="真实查询结果图表" />{chartSpec.warnings.map((warning) => <p className="chart-warning" key={warning}>{warning}</p>)}</section>}
-          {narrative?.insights.length ? <section className="answer-insights"><h3>业务洞察</h3>{narrative.insights.map((insight) => <p key={insight}>{insight}</p>)}</section> : null}
-          {columns.length > 0 && rows.length > 0 && <section className="answer-card table-card"><header><h3>明细数据</h3><small>{result.execution.row_count ?? rows.length} 行</small></header><div className="answer-table-scroll"><table><thead><tr>{columns.map((column) => <th key={column}>{column}</th>)}</tr></thead><tbody>{rows.slice(0, 20).map((row, index) => <tr key={index}>{columns.map((column) => <td key={column}>{formatValue(row[column])}</td>)}</tr>)}</tbody></table></div></section>}
-          {citations.length > 0 && <section className="answer-card citations-card" data-testid="citation-evidence"><h3>业务依据</h3>{citations.map((citation) => <article key={citation.id}><strong>{citation.title}</strong><small>版本 {citation.version} · {citation.locator}</small></article>)}</section>}
-          {result.recommended_questions.length > 0 && <section className="answer-followups"><h3>推荐追问</h3><div>{result.recommended_questions.slice(0, 5).map((question) => <button type="button" key={question} onClick={() => onAsk(question)}>{question}</button>)}</div></section>}
-        </div>
-      )}
-      {semantic === 'NULL_VALUE' && columns.length > 0 && rows.length > 0 && <section className="answer-card table-card"><header><h3>明细数据</h3><small>{result.execution.row_count ?? rows.length} 行</small></header><div className="answer-table-scroll"><table><thead><tr>{columns.map((column) => <th key={column}>{column}</th>)}</tr></thead><tbody>{rows.slice(0, 20).map((row, index) => <tr key={index}>{columns.map((column) => <td key={column}>{formatValue(row[column])}</td>)}</tr>)}</tbody></table></div></section>}
-
-      <AnswerActions message={message} result={success ? result : null} onRetry={onRetry} onEvidence={() => setDrawerOpen(true)} evidenceButtonRef={evidenceButtonRef} />
-      {drawerOpen && <EvidenceDrawer data={evidenceData(message, result)} onClose={() => setDrawerOpen(false)} returnFocusRef={evidenceButtonRef} />}
-    </article>
-  );
-}
-
-function safeArtifactUrl(value: unknown) {
-  const url = String(value ?? '');
-  return url.startsWith('/api/') ? url : '';
-}
-
-function GeneralAnswer({ message, onAsk, onRetry }: { message: ChatMessage; onAsk: (question: string) => void; onRetry: () => void }) {
-  const semantic = inferSemantic(message, null);
-  const artifactSuccess = semantic === 'VALUE' || semantic === 'ZERO';
-  const parts = messageParts(message);
-  const citations = citationsFromMessage(message, parts);
-  const [drawerOpen, setDrawerOpen] = useState(false);
-  const evidenceButtonRef = useRef<HTMLButtonElement>(null);
-  const kpis = parts.filter((part) => part.type === 'kpi').flatMap((part) => Array.isArray(part.items) ? part.items.map(record) : []);
-  const insightTexts = parts.filter((part) => part.type === 'text' && part.role === 'insights').map((part) => String(part.text ?? '')).filter(Boolean);
-  const followups = parts
-    .filter((part) => part.type === 'text' && part.role === 'followups')
-    .flatMap((part) => String(part.text ?? '').split('\n').map((item) => item.trim()).filter(Boolean));
-  const table = record(parts.find((part) => part.type === 'table'));
-  const tableColumns = Array.isArray(table.columns) ? table.columns.map(String) : [];
-  const tableRows = Array.isArray(table.rows) ? table.rows.map(record) : [];
-  const chartPart = record(parts.find((part) => part.type === 'chart'));
-  const structuredChartSpec = record(chartPart.chart_spec);
-  const hasStructuredChart = typeof structuredChartSpec.chart_type === 'string'
-    && typeof structuredChartSpec.version === 'string'
-    && Array.isArray(structuredChartSpec.series)
-    && Array.isArray(structuredChartSpec.y_fields)
-    && tableColumns.length > 0
-    && tableRows.length > 0;
-  const fileAnalysis = record(record(message.response_payload).file_analysis);
-  const fileResult = record(fileAnalysis.result);
-  const fallbackColumns = Array.isArray(fileResult.columns) ? fileResult.columns.map(String) : [];
-  const fallbackRows = Array.isArray(fileResult.rows) ? fileResult.rows.map(record) : [];
-  const fileChart = record(fileAnalysis.chart);
-  const chartDefinition = Object.keys(fileChart).length ? fileChart : structuredChartSpec;
-  const chartRows = Array.isArray(chartDefinition.rows) ? chartDefinition.rows.map(record) : tableRows;
-  const xField = typeof chartDefinition.x === 'string' ? chartDefinition.x : typeof chartDefinition.x_field === 'string' ? chartDefinition.x_field : '';
-  const yFields = Array.isArray(chartDefinition.y_fields) ? chartDefinition.y_fields.map(String) : [];
-  const yField = typeof chartDefinition.y === 'string' ? chartDefinition.y : yFields[0] ?? '';
-  const chartOption = xField && yField ? {
-    tooltip: { trigger: 'axis' },
-    xAxis: { type: 'category', data: chartRows.map((row) => formatValue(row[xField])) },
-    yAxis: { type: 'value' },
-    series: [{ type: chartDefinition.chart_type === 'line' || chartDefinition.chart_type === 'LINE' ? 'line' : 'bar', data: chartRows.map((row) => Number(row[yField]) || 0) }],
-  } : null;
-  const artifacts = Array.isArray(fileAnalysis.artifacts) ? fileAnalysis.artifacts.map(record) : [];
-  const displayColumns = tableColumns.length ? tableColumns : fallbackColumns;
-  const displayRows = tableRows.length ? tableRows : fallbackRows;
-  const displayRowCount = Number(table.row_count ?? fileResult.row_count ?? displayRows.length);
-
-  return (
-    <article className="assistant-response" data-testid={`result-state-${semantic}`}>
-      <header className="assistant-response-head"><span aria-hidden="true">BI</span><strong>ChatBI</strong>{artifactSuccess && <small>回答已完成</small>}</header>
-      {artifactSuccess && <section className="answer-conclusion"><h2>核心结论</h2><p>{message.content}</p></section>}
-      <ResultStateNotice semantic={semantic} message={message.error_code ? `${message.error_code}：${message.content}` : message.content} onRetry={onRetry} />
-      {artifactSuccess && kpis.length > 0 && <section className="answer-card kpi-card"><h3>KPI</h3><div className="answer-kpi-grid">{kpis.slice(0, 4).map((kpi, index) => <article key={String(kpi.label ?? index)}><span>{String(kpi.label ?? '指标')}</span><strong>{formatValue(kpi.value)}{String(kpi.unit ?? '')}</strong></article>)}</div></section>}
-      {artifactSuccess && hasStructuredChart && <section className="answer-card chart-card"><header><h3>{String(structuredChartSpec.title ?? '分析图表')}</h3><small>绑定本次查询结果</small></header><EChartsRenderer spec={structuredChartSpec as unknown as ChartSpec} execution={{ columns: tableColumns, rows: tableRows, row_count: displayRowCount, result_signature: String(chartPart.result_signature ?? '') }} label="真实查询结果图表" /></section>}
-      {artifactSuccess && !hasStructuredChart && chartOption && <section className="answer-card chart-card"><h3>分析图表</h3><EChart option={chartOption} label="文件分析结果图表" className="file-analysis-chart" /></section>}
-      {artifactSuccess && insightTexts.length > 0 && <section className="answer-insights"><h3>业务洞察</h3>{insightTexts.map((insight) => <p key={insight}>{insight}</p>)}</section>}
-      {(artifactSuccess || semantic === 'NULL_VALUE') && displayColumns.length > 0 && displayRows.length > 0 && <section className="answer-card table-card" data-testid="file-analysis-evidence"><header><h3>明细数据</h3><small>{displayRowCount} 行</small></header><div className="answer-table-scroll"><table><thead><tr>{displayColumns.map((column) => <th key={column}>{column}</th>)}</tr></thead><tbody>{displayRows.slice(0, 20).map((row, index) => <tr key={index}>{displayColumns.map((column) => <td key={column}>{formatValue(row[column])}</td>)}</tr>)}</tbody></table></div>{artifacts.length > 0 && <footer className="artifact-links">{artifacts.flatMap((artifact, index) => {
-        const csv = safeArtifactUrl(artifact.csv_url);
-        const json = safeArtifactUrl(artifact.json_url);
-        return [csv && <a key={`csv-${index}`} href={csv}>下载 CSV Artifact</a>, json && <a key={`json-${index}`} href={json}>下载 JSON Artifact</a>].filter(Boolean);
-      })}</footer>}</section>}
-      {semantic !== 'FAILED' && semantic !== 'NO_ROWS' && citations.length > 0 && <section className="answer-card citations-card" data-testid="citation-evidence"><h3>业务依据</h3>{citations.map((citation) => <article key={citation.id}><strong>{citation.title}</strong><small>版本 {citation.version} · {citation.locator}</small></article>)}</section>}
-      {artifactSuccess && followups.length > 0 && <section className="answer-followups"><h3>推荐追问</h3><div>{followups.slice(0, 5).map((question) => <button type="button" key={question} onClick={() => onAsk(question)}>{question}</button>)}</div></section>}
-      <AnswerActions message={message} result={null} onRetry={onRetry} onEvidence={() => setDrawerOpen(true)} evidenceButtonRef={evidenceButtonRef} />
-      {drawerOpen && <EvidenceDrawer data={evidenceData(message, null, parts)} onClose={() => setDrawerOpen(false)} returnFocusRef={evidenceButtonRef} />}
-    </article>
-  );
-}
-
 function AssistantMessage({ message, onAsk, onRetry }: { message: ChatMessage; onAsk: (question: string) => void; onRetry: () => void }) {
   const result = queryFromMessage(message);
-  return result ? <QueryAnswer message={message} result={result} onAsk={onAsk} onRetry={onRetry} /> : <GeneralAnswer message={message} onAsk={onAsk} onRetry={onRetry} />;
+  const envelope = normalizeAnswerEnvelope(message);
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const evidenceButtonRef = useRef<HTMLButtonElement>(null);
+  return (
+    <>
+      <DynamicAnswerRenderer envelope={envelope} onAsk={onAsk} onRetry={onRetry} />
+      <AnswerActions
+        message={message}
+        result={envelope.result_semantic === 'FAILED' ? null : result}
+        onRetry={onRetry}
+        onEvidence={() => setDrawerOpen(true)}
+        evidenceButtonRef={evidenceButtonRef}
+      />
+      {drawerOpen && <EvidenceDrawer data={evidenceData(message, result, messageParts(message))} onClose={() => setDrawerOpen(false)} returnFocusRef={evidenceButtonRef} />}
+    </>
+  );
 }
 
 function PendingAssistant({ turn, onRetry }: { turn: PendingTurn; onRetry: () => void }) {
@@ -376,14 +283,12 @@ function PendingAssistant({ turn, onRetry }: { turn: PendingTurn; onRetry: () =>
   );
 }
 
-function mergeResponseMessages(current: ChatMessage[], response: ChatResponse) {
-  const ids = new Set([response.user_message.id, response.assistant_message.id]);
-  return [...current.filter((message) => !ids.has(message.id)), response.user_message, response.assistant_message];
-}
-
 export function AskPage({ results = false }: { results?: boolean }) {
   const location = useLocation();
   const [conversations, setConversations] = useState<Conversation[]>([]);
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [conversationState, setConversationState] = useState<ConversationListState>('active');
+  const [projectFilter, setProjectFilter] = useState('');
   const [detail, setDetail] = useState<ConversationDetail | null>(null);
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [uploading, setUploading] = useState<UploadState[]>([]);
@@ -399,6 +304,7 @@ export function AskPage({ results = false }: { results?: boolean }) {
   const activeRunRef = useRef<{ id: string; conversationId: string; cancelled: boolean } | null>(null);
   const interactionRef = useRef<{ generation: number; submissionId: string | null }>({ generation: 0, submissionId: null });
   const creationPromiseRef = useRef<{ generation: number; promise: Promise<ConversationDetail> } | null>(null);
+  const listFiltersRef = useRef<ConversationListOptions>({ state: 'active' });
   const inputRef = useRef<HTMLInputElement | null>(null);
   const messageAreaRef = useRef<HTMLDivElement | null>(null);
   const compositionRef = useRef(false);
@@ -430,14 +336,28 @@ export function AskPage({ results = false }: { results?: boolean }) {
     setIsAtBottom(true);
   }
 
-  async function refreshConversations() {
-    const items = await chatApi.conversations();
+  async function refreshConversations(overrides: ConversationListOptions = {}) {
+    listFiltersRef.current = { ...listFiltersRef.current, ...overrides };
+    const items = await chatApi.conversations(listFiltersRef.current);
     setConversations(items);
     return items;
   }
 
-  function startLocalConversation() {
+  async function refreshProjects() {
+    const items = await chatApi.projects();
+    setProjects(items);
+    return items;
+  }
+
+  function startLocalConversation(resetScope = true) {
     cancelActiveRunForNavigation();
+    if (resetScope) {
+      const scopeChanged = listFiltersRef.current.state !== 'active' || Boolean(listFiltersRef.current.project_id);
+      listFiltersRef.current = { state: 'active', q: listFiltersRef.current.q };
+      setConversationState('active');
+      setProjectFilter('');
+      if (scopeChanged) setConversations([]);
+    }
     localStorage.removeItem('chatbi_conversation_id');
     setDetail(null);
     setAttachments([]);
@@ -473,7 +393,7 @@ export function AskPage({ results = false }: { results?: boolean }) {
     let active = true;
     (async () => {
       try {
-        const items = await refreshConversations();
+        const [items] = await Promise.all([refreshConversations(), refreshProjects()]);
         if (!active) return;
         const params = new URLSearchParams(location.search);
         const requested = params.get('conversation_id');
@@ -570,16 +490,16 @@ export function AskPage({ results = false }: { results?: boolean }) {
             const label = PUBLIC_PHASES[String(event.phase ?? '')];
             if (label) setPendingTurn((current) => current?.runId === clientMessageId ? { ...current, stage: label, status: 'RUNNING' } : current);
           } else if (event.event_type === 'artifact.ready' && event.artifact_type && event.artifact) {
-            setPendingTurn((current) => current?.runId === clientMessageId ? { ...current, parts: [...current.parts, { type: event.artifact_type!, ...event.artifact }] } : current);
+            setPendingTurn((current) => current?.runId === clientMessageId ? { ...current, parts: mergeUniqueAnswerParts(current.parts, [{ type: event.artifact_type!, ...event.artifact! }]) } : current);
           } else if (event.event_type === 'citations.ready' && Array.isArray(event.citations)) {
-            setPendingTurn((current) => current?.runId === clientMessageId ? { ...current, parts: [...current.parts, { type: 'citations', items: event.citations }] } : current);
+            setPendingTurn((current) => current?.runId === clientMessageId ? { ...current, parts: mergeUniqueAnswerParts(current.parts, [{ type: 'citations', items: event.citations }]) } : current);
           } else if (event.event_type === 'run.failed') {
             setPendingTurn((current) => current?.runId === clientMessageId ? { ...current, status: 'FAILED', semantic: 'FAILED', error: event.message ?? event.code ?? '回答失败' } : current);
           } else if (event.event_type === 'run.cancelled') {
             if (activeRunRef.current) activeRunRef.current.cancelled = true;
             setPendingTurn((current) => current?.runId === clientMessageId ? { ...current, status: 'CANCELLED' } : current);
           } else if (event.event_type === 'run.completed') {
-            setPendingTurn((current) => current?.runId === clientMessageId ? { ...current, status: 'COMPLETED', semantic: event.result_semantic, parts: event.message_parts ?? current.parts } : current);
+            setPendingTurn((current) => current?.runId === clientMessageId ? { ...current, status: 'COMPLETED', semantic: event.result_semantic, parts: mergeUniqueAnswerParts(current.parts, event.message_parts ?? []) } : current);
           }
         },
       };
@@ -593,7 +513,7 @@ export function AskPage({ results = false }: { results?: boolean }) {
           attachment_ids: readyAttachmentIds,
         }, handlers, controller.signal);
         if (!isCurrentRun()) return;
-        setDetail((current) => current?.id === target.id ? { ...response.conversation, messages: mergeResponseMessages(current.messages, response) } : current);
+        setDetail((current) => current?.id === target.id ? { ...response.conversation, messages: mergeFinalResponseMessages(current.messages, response) } : current);
         setConversations((items) => [response.conversation, ...items.filter((item) => item.id !== response.conversation.id)]);
         setPendingTurn((current) => current?.runId === clientMessageId ? null : current);
       } catch (reason) {
@@ -700,9 +620,83 @@ export function AskPage({ results = false }: { results?: boolean }) {
     await chatApi.deleteConversation(id);
     const items = await refreshConversations();
     if (detail?.id !== id) return;
+    await reconcileConversationList(items);
+  }
+
+  async function reconcileConversationList(items: Conversation[]) {
+    if (detail && items.some((item) => item.id === detail.id)) return;
     const next = items.find(isVisibleConversation);
     if (next) await openConversation(next.id);
-    else startLocalConversation();
+    else startLocalConversation(false);
+  }
+
+  async function searchConversations(query: string) {
+    await refreshConversations({ q: query });
+  }
+
+  async function changeConversationState(state: ConversationListState) {
+    setConversationState(state);
+    const items = await refreshConversations({ state });
+    await reconcileConversationList(items);
+  }
+
+  async function changeProjectFilter(projectId: string) {
+    setProjectFilter(projectId);
+    const items = await refreshConversations({ project_id: projectId || undefined });
+    await reconcileConversationList(items);
+  }
+
+  async function pinConversation(id: string, pinned: boolean) {
+    const item = pinned ? await chatApi.pinConversation(id) : await chatApi.unpinConversation(id);
+    setConversations((items) => items.map((value) => value.id === id ? item : value));
+    setDetail((current) => current?.id === id ? { ...current, ...item } : current);
+    await refreshConversations();
+  }
+
+  async function archiveConversation(id: string, archived: boolean) {
+    if (detail?.id === id || activeRunRef.current?.conversationId === id) cancelActiveRunForNavigation();
+    if (archived) await chatApi.restoreConversation(id);
+    else await chatApi.archiveConversation(id);
+    const items = await refreshConversations();
+    await reconcileConversationList(items);
+  }
+
+  async function moveConversation(id: string, projectId: string | null) {
+    const item = projectId
+      ? await chatApi.moveConversationToProject(id, projectId)
+      : await chatApi.removeConversationFromProject(id);
+    setDetail((current) => current?.id === id ? { ...current, ...item } : current);
+    const items = await refreshConversations();
+    await reconcileConversationList(items);
+  }
+
+  async function createProject(name: string) {
+    await chatApi.createProject(name);
+    await refreshProjects();
+  }
+
+  async function archiveProject(id: string) {
+    await chatApi.archiveProject(id);
+    await refreshProjects();
+    if (projectFilter === id) {
+      setProjectFilter('');
+      const items = await refreshConversations({ project_id: undefined });
+      await reconcileConversationList(items);
+    }
+  }
+
+  async function batchArchiveConversations(ids: string[]) {
+    if (activeRunRef.current && ids.includes(activeRunRef.current.conversationId)) cancelActiveRunForNavigation();
+    await chatApi.batchArchiveConversations(ids);
+    const items = await refreshConversations();
+    await reconcileConversationList(items);
+  }
+
+  async function batchDeleteConversations(ids: string[]) {
+    if (activeRunRef.current && ids.includes(activeRunRef.current.conversationId)) cancelActiveRunForNavigation();
+    await chatApi.batchDeleteConversations(ids);
+    const items = await refreshConversations();
+    await reconcileConversationList(items);
   }
 
   function stopGeneration() {
@@ -728,15 +722,31 @@ export function AskPage({ results = false }: { results?: boolean }) {
     <section className={`chat-workspace${collapsed ? ' conversations-collapsed' : ''}`}>
       <ConversationSidebar
         conversations={conversations}
+        projects={projects}
         activeId={detail?.id}
         collapsed={collapsed}
         localEmpty={!detail}
         generatingConversationId={sending ? activeRunRef.current?.conversationId : undefined}
+        viewState={conversationState}
+        projectFilter={projectFilter}
         onCollapse={() => setCollapsed((value) => !value)}
         onNew={startLocalConversation}
         onOpen={openConversation}
+        onSearch={searchConversations}
+        onViewState={changeConversationState}
+        onProjectFilter={changeProjectFilter}
         onRename={renameConversation}
         onDelete={deleteConversation}
+        onPin={pinConversation}
+        onArchive={archiveConversation}
+        onMoveProject={moveConversation}
+        onCreateProject={createProject}
+        onArchiveProject={archiveProject}
+        onBatchArchive={batchArchiveConversations}
+        onBatchDelete={batchDeleteConversations}
+        onListShares={chatApi.shares}
+        onCreateShare={chatApi.createShare}
+        onRevokeShare={chatApi.revokeShare}
       />
 
       <div className="chat-panel">

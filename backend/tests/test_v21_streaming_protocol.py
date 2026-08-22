@@ -164,6 +164,20 @@ def test_answer_composer_chunks_are_lossless_and_parts_follow_business_order():
     ]
 
 
+def test_answer_composer_keeps_short_answers_incremental_and_lossless():
+    answer = "收入为 1。"
+    composed = AnswerComposer().compose(
+        answer=answer,
+        status="SUCCEEDED",
+        response_payload={"answer": answer},
+    )
+
+    deltas = list(composed.deltas())
+    assert len(deltas) == 2
+    assert all(deltas)
+    assert "".join(deltas) == answer
+
+
 def test_citations_require_real_controlled_identity_and_file_chart_is_not_misrepresented():
     file_payload = {
         "answer": "收入合计为 10。",

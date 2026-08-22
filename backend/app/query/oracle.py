@@ -26,6 +26,23 @@ def _canonical_rows(rows: list[dict[str, Any]], columns: list[str]) -> list[dict
     return sorted(rows, key=lambda row: tuple(str(row.get(column)) for column in columns))
 
 
+def _join_uses_selected_entities(item: dict[str, Any], selected_tables: set[str]) -> bool:
+    left = str(item.get("left") or "")
+    right = str(item.get("right") or "")
+    if left and right:
+        return left.split(".")[0] in selected_tables and right.split(".")[0] in selected_tables
+
+    left_entity = str(item.get("left_entity") or "")
+    right_entity = str(item.get("right_entity") or "")
+    join_keys = item.get("join_keys") or []
+    return (
+        left_entity in selected_tables
+        and right_entity in selected_tables
+        and bool(join_keys)
+        and all(isinstance(key, dict) and key.get("left") and key.get("right") for key in join_keys)
+    )
+
+
 class ResultOracle:
     """Independent result contract checks; never judges correctness from SQL string equality."""
 
@@ -69,11 +86,8 @@ class ResultOracle:
             name="filter_semantics", passed=filter_ok,
             message="Filters reference selected/authorized objects" if filter_ok else "A filter references an unselected object",
         ))
-        join_ok = all(
-            item.get("left", "").split(".")[0] in plan.selected_tables
-            and item.get("right", "").split(".")[0] in plan.selected_tables
-            for item in plan.joins
-        )
+        selected_tables = set(plan.selected_tables)
+        join_ok = all(_join_uses_selected_entities(item, selected_tables) for item in plan.joins)
         checks.append(OracleCheck(
             name="join_semantics", passed=join_ok,
             message="Join endpoints are selected semantic entities" if join_ok else "Join endpoint is outside the selected entities",

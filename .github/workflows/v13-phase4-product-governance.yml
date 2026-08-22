@@ -1,0 +1,86 @@
+name: V1.3 Phase4 Product Experience and Governance Gate
+
+on:
+  push:
+    branches:
+      - "codex/v1.3.0-product-experience-governance"
+  pull_request:
+    paths:
+      - ".github/workflows/v13-phase4-product-governance.yml"
+      - "backend/app/api/routes/conversation_governance.py"
+      - "backend/app/api/routes/governance.py"
+      - "backend/app/model_gateway/**"
+      - "backend/app/models/governance.py"
+      - "backend/app/schemas/answer_envelope.py"
+      - "backend/app/schemas/governance.py"
+      - "backend/app/services/answer_envelope.py"
+      - "backend/app/services/conversations.py"
+      - "backend/app/services/governance.py"
+      - "backend/tests/test_*phase4*"
+      - "frontend/src/**"
+      - "frontend/e2e/phase4-*"
+      - "frontend/package-lock.json"
+      - "frontend/vite.config.ts"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: v13-phase4-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  phase4-deterministic-gate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      PYTHONPATH: >-
+        backend:packages/agent-contracts/src:packages/agent-orchestrator/src:packages/prompt-registry/src:packages/rag-adapter/src:packages/rag-contracts/src:packages/dbgpt-runtime-adapter/src:packages/pandasai-selected-runtime/src
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+      - name: Install Backend dependencies
+        run: pip install -r backend/requirements.txt
+      - name: Phase4 Backend contracts, governance, migration and security
+        run: |
+          pytest \
+            backend/tests/test_v13_phase4_answer_envelope.py \
+            backend/tests/test_v13_phase4_conversation_governance.py \
+            backend/tests/test_phase4_governance.py \
+            backend/tests/test_phase4_feedback_governance.py \
+            backend/tests/test_phase4_model_invocation_ledger.py \
+            backend/tests/test_migrations.py \
+            -q --junitxml phase4-backend-junit.xml
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Frontend tests
+        working-directory: frontend
+        run: |
+          npm ci
+          npm audit --audit-level=high
+          npm test -- --reporter=default --reporter=junit --outputFile.junit=../phase4-frontend-junit.xml
+      - name: Frontend build and chunk gate
+        working-directory: frontend
+        shell: bash
+        run: |
+          set -o pipefail
+          npm run build 2>&1 | tee ../phase4-frontend-build.txt
+          ! grep -E "Some chunks are larger|Circular chunk" ../phase4-frontend-build.txt
+      - name: Upload Phase4 deterministic evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: v13-phase4-deterministic-${{ github.sha }}
+          path: |
+            phase4-backend-junit.xml
+            phase4-frontend-junit.xml
+            phase4-frontend-build.txt
+          if-no-files-found: error

@@ -10,18 +10,31 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.core.access import Principal
-from app.models import AnswerVersion, BusinessTerm, QueryFeedback, QueryRun, SemanticModel, VerifiedAnswer
+from app.models import (
+    AnswerVersion,
+    BusinessTerm,
+    EvaluationCaseResult,
+    EvaluationRun,
+    QueryFeedback,
+    QueryRun,
+    SemanticModel,
+    VerifiedAnswer,
+)
 from app.query.contracts import AskRequest, ExpectedResult
 from app.query.service import QueryPipeline
 from app.schemas.evaluation import (
     FeedbackCorrectionCreate,
+    FeedbackDecisionRequest,
     FeedbackRecallRequest,
     FeedbackReplayRequest,
+    FeedbackReviewStartRequest,
     FeedbackReviewRequest,
+    UserFeedbackCreate,
 )
 
 
 FLOW_ID = "SQLBOT_FEEDBACK_V2_1"
+PHASE4_FLOW_ID = "CHATBI_FEEDBACK_V1_3"
 IMPLEMENTATION_ORIGIN = "chatbi-clean-room"
 SQLBOT_UPSTREAM_COMMIT = "2a86aa926c4a22400a4ab4506c3ec384f7855a9d"
 SQLBOT_RUNTIME_STATUS = "BLOCKED_MODIFIED_GPL_BRANDING_CONDITIONS"
@@ -50,6 +63,7 @@ def feedback_provenance() -> dict[str, Any]:
 def _verified_sql_attestation(answer: VerifiedAnswer, sql: str) -> dict[str, Any]:
     return {
         "verified_sql_sha256": _sql_sha256(sql),
+        "verified_workspace_id": answer.workspace_id,
         "verified_datasource_id": answer.datasource_id,
         "verified_semantic_model_id": answer.semantic_model_id,
         "verified_semantic_model_version": answer.semantic_model_version,
@@ -59,7 +73,7 @@ def _verified_sql_attestation(answer: VerifiedAnswer, sql: str) -> dict[str, Any
 
 def _assert_verified_sql_integrity(answer: VerifiedAnswer) -> None:
     feedback = answer.feedback or {}
-    if feedback.get("flow") != FLOW_ID:
+    if feedback.get("flow") not in {FLOW_ID, PHASE4_FLOW_ID}:
         raise ValueError("Verified SQL is not a ChatBI feedback correction")
     sql = answer.sql_text or ""
     expected = feedback.get("verified_sql_sha256")
@@ -71,6 +85,8 @@ def _assert_verified_sql_integrity(answer: VerifiedAnswer) -> None:
         "verified_semantic_model_version": answer.semantic_model_version,
         "verified_result_signature": answer.result_signature,
     }
+    if feedback.get("flow") == PHASE4_FLOW_ID:
+        bindings["verified_workspace_id"] = answer.workspace_id
     if any(feedback.get(name) != value for name, value in bindings.items()):
         raise ValueError("Verified SQL resource attestation failed")
 
@@ -120,6 +136,9 @@ def _workflow(answer: VerifiedAnswer, version: int) -> dict[str, Any]:
         "oracle_status": answer.oracle_status,
         "version": version,
         "feedback": feedback,
+        "reviewer": feedback.get("reviewer_email"),
+        "question_pattern": feedback.get("question_pattern"),
+        "replay_count": len(feedback.get("replays") or []),
     }
 
 
@@ -152,6 +171,312 @@ def record_correct_feedback(
     db.commit()
     db.refresh(feedback)
     return feedback
+
+
+def record_user_feedback(
+    db: Session,
+    *,
+    data: UserFeedbackCreate,
+    principal: Principal,
+) -> dict[str, Any]:
+    """Create one persisted OPEN review item without promoting user SQL."""
+    source = _run(db, data.query_run_id, principal.workspace_id)
+    if data.sentiment == "THUMB_DOWN" and not data.reason:
+        raise ValueError("Thumb down feedback requires a reason")
+    if data.sentiment == "THUMB_UP" and (
+        source.status != "SUCCEEDED" or (source.oracle_payload or {}).get("status") != "PASSED"
+    ):
+        raise ValueError("Thumb up requires an Oracle-passed query result")
+
+    feedback_type = "HELPFUL" if data.sentiment == "THUMB_UP" else "INCORRECT"
+    feedback_row = db.scalar(select(QueryFeedback).where(
+        QueryFeedback.query_run_id == source.id,
+        QueryFeedback.feedback_type == feedback_type,
+    ))
+    if feedback_row is None:
+        feedback_row = QueryFeedback(
+            query_run_id=source.id,
+            feedback_type=feedback_type,
+            comment=data.comment,
+        )
+        db.add(feedback_row)
+    else:
+        feedback_row.comment = data.comment
+
+    existing = [answer for answer in db.scalars(select(VerifiedAnswer).where(
+        VerifiedAnswer.workspace_id == principal.workspace_id,
+        VerifiedAnswer.query_run_id == source.id,
+        VerifiedAnswer.status == "DRAFT",
+    )) if (answer.feedback or {}).get("flow") == PHASE4_FLOW_ID]
+    if existing:
+        raise ValueError("This query already has an open feedback review")
+
+    candidate_sql = source.normalized_sql or source.generated_sql
+    answer = VerifiedAnswer(
+        workspace_id=source.workspace_id,
+        question=source.question,
+        module="评测反馈",
+        sql_synced=False,
+        model_name=f"Semantic v{source.semantic_model_version}",
+        owner_name=principal.display_name,
+        status="DRAFT",
+        accuracy_percent=round(float((source.oracle_payload or {}).get("confidence") or 0) * 100, 2),
+        sort_order=int(db.scalar(select(func.coalesce(func.max(VerifiedAnswer.sort_order), 0))) or 0) + 1,
+        query_run_id=source.id,
+        sql_text=None,
+        result_signature=source.result_signature,
+        semantic_model_version=source.semantic_model_version,
+        semantic_intent={
+            "intent": (source.plan_payload or {}).get("intent"),
+            "metrics": (source.plan_payload or {}).get("metrics", []),
+            "dimensions": (source.plan_payload or {}).get("dimensions", []),
+            "filters": (source.plan_payload or {}).get("filters", []),
+            "time_range": (source.plan_payload or {}).get("time_range"),
+        },
+        sql_plan=source.plan_payload or {},
+        result_snapshot=source.execution_payload or {},
+        chart_spec=source.chart_spec_payload or {},
+        narrative=source.narrative_payload or {},
+        semantic_model_id=source.semantic_model_id,
+        datasource_id=source.datasource_id,
+        oracle_status=(source.oracle_payload or {}).get("status"),
+        feedback={
+            "flow": PHASE4_FLOW_ID,
+            "workflow_state": "OPEN",
+            "source_query_run_id": source.id,
+            "sentiment": data.sentiment,
+            "reason": data.reason,
+            "user_comment": data.comment,
+            "candidate_sql": candidate_sql,
+            "opened_at": _now(),
+            "review_history": [],
+            "replays": [],
+        },
+    )
+    db.add(answer)
+    db.flush()
+    db.add(AnswerVersion(answer_id=answer.id, version=1, snapshot=_snapshot(answer)))
+    db.commit()
+    db.refresh(answer)
+    return _workflow(answer, 1)
+
+
+def start_feedback_review(
+    db: Session,
+    *,
+    answer_id: str,
+    data: FeedbackReviewStartRequest,
+    principal: Principal,
+) -> dict[str, Any]:
+    answer = db.get(VerifiedAnswer, answer_id)
+    if answer is None or answer.workspace_id != principal.workspace_id:
+        raise LookupError("Feedback review not found")
+    feedback = answer.feedback or {}
+    if feedback.get("flow") != PHASE4_FLOW_ID:
+        raise ValueError("Answer is not a Phase 4 feedback review")
+    if feedback.get("workflow_state") != "OPEN" or answer.status != "DRAFT":
+        raise ValueError("Only an OPEN feedback item can enter review")
+    history = list(feedback.get("review_history") or [])
+    history.append({
+        "action": "START_REVIEW",
+        "comment": data.comment,
+        "reviewer_id": principal.user_id,
+        "reviewer": principal.email,
+        "at": _now(),
+    })
+    answer.feedback = {
+        **feedback,
+        "workflow_state": "IN_REVIEW",
+        "reviewer_id": principal.user_id,
+        "reviewer_email": principal.email,
+        "review_started_at": _now(),
+        "review_history": history,
+    }
+    next_version = _version(db, answer.id) + 1
+    db.flush()
+    db.add(AnswerVersion(answer_id=answer.id, version=next_version, snapshot=_snapshot(answer)))
+    db.commit()
+    db.refresh(answer)
+    return _workflow(answer, next_version)
+
+
+def _feedback_regression_case(
+    db: Session,
+    *,
+    answer: VerifiedAnswer,
+    verification: QueryRun,
+    question_pattern: str,
+) -> None:
+    evaluation = db.scalar(select(EvaluationRun).where(
+        EvaluationRun.workspace_id == answer.workspace_id,
+        EvaluationRun.release_name == "Feedback Regression v1.3",
+    ).order_by(EvaluationRun.created_at.desc()))
+    if evaluation is None:
+        evaluation = EvaluationRun(
+            workspace_id=answer.workspace_id,
+            release_name="Feedback Regression v1.3",
+            model_name=answer.model_name,
+            status="COMPLETED",
+            is_current=False,
+            trend_points=[{
+                "kind": "evaluation_profile",
+                "profile": {"version": "v1.3", "artifacts": ["db:evaluation_case_result"]},
+            }],
+        )
+        db.add(evaluation)
+        db.flush()
+    case_id = f"feedback-{answer.id}-v{_version(db, answer.id) + 1}"
+    db.add(EvaluationCaseResult(
+        evaluation_run_id=evaluation.id,
+        case_id=case_id,
+        category="FEEDBACK_VERIFIED_SQL",
+        question=question_pattern,
+        status="PASSED",
+        execution_ok=True,
+        result_ok=True,
+        semantic_ok=True,
+        expected={
+            "workspace_id": answer.workspace_id,
+            "datasource_id": answer.datasource_id,
+            "semantic_model_id": answer.semantic_model_id,
+            "result_signature": answer.result_signature,
+        },
+        actual={
+            "guard_allowed": bool((verification.guard_payload or {}).get("allowed")),
+            "execution_status": (verification.execution_payload or {}).get("status"),
+            "oracle_status": (verification.oracle_payload or {}).get("status"),
+            "result_signature": verification.result_signature,
+        },
+        generated_sql=verification.normalized_sql or verification.generated_sql,
+        query_run_id=verification.id,
+    ))
+    evaluation.golden_set_count += 1
+    evaluation.sql_execution_pass_count += 1
+    evaluation.result_value_pass_count += 1
+    evaluation.semantic_pass_count += 1
+    evaluation.sql_generation_rate = 100.0
+    evaluation.result_accuracy = 100.0
+    evaluation.semantic_accuracy = 100.0
+    evaluation.completed_at = datetime.now(timezone.utc)
+    evaluation.manifest_sha256 = hashlib.sha256(
+        f"{evaluation.id}:{case_id}:{verification.result_signature}".encode("utf-8")
+    ).hexdigest()
+
+
+def decide_feedback_review(
+    db: Session,
+    *,
+    answer_id: str,
+    data: FeedbackDecisionRequest,
+    principal: Principal,
+) -> dict[str, Any]:
+    answer = db.get(VerifiedAnswer, answer_id)
+    if answer is None or answer.workspace_id != principal.workspace_id:
+        raise LookupError("Feedback review not found")
+    feedback = answer.feedback or {}
+    if feedback.get("flow") != PHASE4_FLOW_ID:
+        raise ValueError("Answer is not a Phase 4 feedback review")
+    if feedback.get("workflow_state") != "IN_REVIEW" or answer.status != "DRAFT":
+        raise ValueError("Only an IN_REVIEW feedback item can be decided")
+    if feedback.get("reviewer_id") and feedback.get("reviewer_id") != principal.user_id:
+        raise ValueError("Feedback review is assigned to another reviewer")
+    history = list(feedback.get("review_history") or [])
+    history.append({
+        "action": "DECISION",
+        "decision": data.decision,
+        "comment": data.comment,
+        "reviewer_id": principal.user_id,
+        "reviewer": principal.email,
+        "at": _now(),
+    })
+    next_version = _version(db, answer.id) + 1
+    if data.decision == "REJECT":
+        answer.status = "REJECTED"
+        answer.sql_synced = False
+        answer.feedback = {
+            **feedback,
+            "workflow_state": "REJECTED",
+            "review_history": history,
+            "decided_at": _now(),
+        }
+        db.flush()
+        db.add(AnswerVersion(answer_id=answer.id, version=next_version, snapshot=_snapshot(answer)))
+        db.commit()
+        db.refresh(answer)
+        return _workflow(answer, next_version)
+
+    source = _run(db, str(feedback.get("source_query_run_id") or ""), principal.workspace_id)
+    if source.datasource_id != answer.datasource_id or source.semantic_model_id != answer.semantic_model_id:
+        raise ValueError("Feedback resource binding changed before verification")
+    sql = data.corrected_sql or feedback.get("candidate_sql")
+    if not sql:
+        raise ValueError("Accepted feedback requires reviewer SQL")
+    expected_rows = data.expected_rows
+    if expected_rows is None:
+        expected_rows = list((answer.result_snapshot or {}).get("rows") or [])
+    expected_columns = data.expected_columns or list((answer.result_snapshot or {}).get("columns") or [])
+    pipeline = QueryPipeline()
+    verification = pipeline.execute(db, AskRequest(
+        question=str(sql),
+        datasource_id=answer.datasource_id,
+        semantic_model_id=answer.semantic_model_id,
+        row_limit=500,
+    ), principal=principal)
+    if (verification.execution_payload or {}).get("status") == "SUCCEEDED":
+        verification = pipeline.verify(db, verification, ExpectedResult(
+            columns=expected_columns,
+            rows=expected_rows,
+            tolerance=0.0001,
+            order_independent=True,
+        ))
+    verification_passed = bool(
+        verification.workspace_id == answer.workspace_id
+        and verification.datasource_id == answer.datasource_id
+        and verification.semantic_model_id == answer.semantic_model_id
+        and (verification.guard_payload or {}).get("allowed")
+        and (verification.execution_payload or {}).get("status") == "SUCCEEDED"
+        and (verification.oracle_payload or {}).get("status") == "PASSED"
+    )
+    if not verification_passed:
+        raise ValueError("Verified SQL requires Guard, resource binding, execution and Result Oracle PASS")
+
+    answer.status = "VERIFIED"
+    answer.sql_synced = True
+    answer.sql_text = verification.normalized_sql or verification.generated_sql
+    answer.query_run_id = verification.id
+    answer.result_signature = verification.result_signature
+    answer.result_snapshot = verification.execution_payload or {}
+    answer.oracle_status = "PASSED"
+    question_pattern = data.question_pattern or answer.question
+    attestation = _verified_sql_attestation(answer, answer.sql_text or "")
+    answer.feedback = {
+        **feedback,
+        "workflow_state": "ACCEPTED",
+        "review_history": history,
+        "reviewer_id": principal.user_id,
+        "reviewer_email": principal.email,
+        "question_pattern": question_pattern,
+        "verification_query_run_id": verification.id,
+        "verification_result": {
+            "guard_allowed": True,
+            "execution_status": "SUCCEEDED",
+            "oracle_status": "PASSED",
+            "result_signature": verification.result_signature,
+        },
+        "accepted_at": _now(),
+        **attestation,
+    }
+    _feedback_regression_case(
+        db,
+        answer=answer,
+        verification=verification,
+        question_pattern=question_pattern,
+    )
+    db.flush()
+    db.add(AnswerVersion(answer_id=answer.id, version=next_version, snapshot=_snapshot(answer)))
+    db.commit()
+    db.refresh(answer)
+    return _workflow(answer, next_version)
 
 
 def submit_correction(
@@ -374,9 +699,20 @@ def replay_verified_sql(
         "guard_allowed": bool((replay.guard_payload or {}).get("allowed")),
         "oracle_status": (replay.oracle_payload or {}).get("status"),
         "passed": replay_passed,
+        "workspace_id": principal.workspace_id,
         "at": _now(),
     })
-    answer.feedback = {**(answer.feedback or {}), "workflow_state": "REGRESSION_PASS" if replay_passed else "REGRESSION_FAIL", "replays": events}
+    current_feedback = answer.feedback or {}
+    answer.feedback = {
+        **current_feedback,
+        "workflow_state": (
+            "ACCEPTED"
+            if current_feedback.get("flow") == PHASE4_FLOW_ID
+            else "REGRESSION_PASS" if replay_passed else "REGRESSION_FAIL"
+        ),
+        "last_replay_status": "PASS" if replay_passed else "FAIL",
+        "replays": events,
+    }
     answer.adoption_count += 1
     answer.monthly_adoption_count += 1
     next_version = _version(db, answer.id) + 1
@@ -414,7 +750,7 @@ def feedback_dashboard(db: Session, *, workspace_id: str) -> dict[str, Any]:
     workflow_statement = select(VerifiedAnswer).where(VerifiedAnswer.feedback.is_not(None))
     if workspace_id:
         workflow_statement = workflow_statement.where(VerifiedAnswer.workspace_id == workspace_id)
-    answers = [answer for answer in db.scalars(workflow_statement.order_by(VerifiedAnswer.updated_at.desc())) if (answer.feedback or {}).get("flow") == FLOW_ID]
+    answers = [answer for answer in db.scalars(workflow_statement.order_by(VerifiedAnswer.updated_at.desc())) if (answer.feedback or {}).get("flow") in {FLOW_ID, PHASE4_FLOW_ID}]
     term_rows = list(db.scalars(
         select(BusinessTerm)
         .join(SemanticModel, SemanticModel.id == BusinessTerm.semantic_model_id)

@@ -557,6 +557,7 @@ class OpenAICompatibleProvider(ModelProviderAdapter):
                 request_id=context.request_id,
                 trace_id=context.trace_id,
                 conversation_id=context.conversation_id,
+                route=context.route,
                 user_id=context.user_id,
                 workspace_id=context.workspace_id,
                 datasource_id=context.datasource_id,
@@ -621,6 +622,7 @@ class GatewayNl2SqlProvider(ModelProviderAdapter):
             RequestContext(
                 request_id=context.request_id, trace_id=context.trace_id,
                 conversation_id=context.conversation_id, user_id=context.user_id,
+                route=context.route,
                 workspace_id=context.workspace_id, datasource_id=context.datasource_id,
                 roles=frozenset({context.cache_role}), permission_hash=context.permission_hash,
                 question=question, context_hash=context.input_signature or "none",
@@ -728,6 +730,16 @@ class Nl2SqlRouter(Nl2SqlEngine):
         return self.provider.capabilities()
 
     def plan(self, *, question: str, context: QueryContext) -> SQLPlan:
+        stripped = question.strip().rstrip(";")
+        if re.match(
+            r"^(SELECT|WITH|INSERT|UPDATE|DELETE|DROP|ALTER|CREATE|TRUNCATE|COPY|CALL|GRANT|REVOKE|SET|USE|LOAD)\b",
+            stripped,
+            re.IGNORECASE,
+        ):
+            # Explicit SQL must not be semantically rewritten by a probabilistic
+            # provider.  Preserve it verbatim, then let the normal SqlGuard,
+            # EXPLAIN cost gate, read-only executor and Result Oracle decide.
+            return DeterministicTestProvider().plan(question=question, context=context)
         last_error: Exception | None = None
         for attempt in range(2):
             try:

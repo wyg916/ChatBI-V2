@@ -1,5 +1,15 @@
 # 项目状态
 
+## V1.3.0 Phase 4 产品体验与治理候选（2026-08-22）
+
+- Phase 4 从唯一基线 `8ccf60d2b915406a954790a4f8bf9f3e48b6c60e` 在短期分支 `codex/v1.3.0-product-experience-governance` 增量开发；原共享工作区的用户 WIP 保持原样，`main`、V1.3.0 Tag 与 Phase 5 均未触碰。
+- Chat、Analysis、SSE、受控 RAG、固定 Agent、文件和视觉回答统一输出 canonical `AnswerEnvelope`；React 只通过 Dynamic Renderer 消费 Text/Markdown、KPI、Chart、Table、Citation、Artifact、SQL、Evidence、Warning 与 Follow-up。Markdown 使用 `react-markdown + remark-gfm + rehype-sanitize`，不启用 raw HTML；Citation URL、Artifact 文件名与公开阶段都执行 allowlist/脱敏。
+- Conversation 已形成完整服务端资源：搜索、重命名、Pin、Archive/Restore、Delete、Project 归属、多选批处理与只读 Share。Share Token 只保存哈希，可过期、撤销，公开响应执行字段 allowlist 与私有 URL/SQL/Trace/敏感内容过滤；Archived Conversation 在恢复前不可继续提问。
+- 模型每一次成功、失败、重试和取消尝试写入 append-only `ModelInvocation` 运营台账，只保存 allowlist 元数据。Cost 支持时间、当前 Workspace、用户、会话、路由、Provider、Model 过滤和分摊；ONE_TRACE 展示真实阶段开始时间、耗时、状态、Provider/Model、Tool、SQL/错误与 Artifact 能力，不展示提示词或思考过程；ECharts 已拆为 `EChart` 与 `zrender` chunk，生产构建不再产生 500 kB warning。
+- Feedback 状态冻结为 `OPEN → IN_REVIEW → ACCEPTED/REJECTED`。只有经过 QueryPipeline 的 SQL Guard、只读执行、Result Oracle、数据源/语义版本/结果签名绑定并带 Reviewer/Attestation 的候选 SQL 才可晋升 Verified SQL；Replay 重新走同一安全链并写审计和回归证据。
+- PostgreSQL QueryExecutor 的 EXPLAIN 与真实只读查询现在都把数据源批准的 schema 作为经过标识符转义的事务级 `search_path`。这消除了模型对同一合法查询偶尔省略 schema 时产生的 `QUERY_EXPLAIN_REQUIRED` 随机失败，同时没有扩大 SQL Guard 的表和 schema allowlist。
+- 最终 PASS、测试计数、两次停止态冷启动、远端同步、同 SHA Phase4/Phase3/IBM CI 与 Evidence SHA-256 只以本轮外部 Evidence 和最终交付输出为准；仓库文档不预先宣称尚未完成的远端门禁。
+
 ## V1.3.0 Phase 3 RAG / Agent / File / Multimodal 候选（2026-08-22）
 
 - Phase 3 从 Phase 2 精确基线 `c51c2f238bce0e26777c831fb9b44455b58d4c5c` 在隔离短期 worktree 开发；原共享工作区 WIP 不清理、不覆盖。本节记录候选实现，最终测试、提交、远端与同 SHA CI 结论只以外部 Evidence 和交付输出为准。

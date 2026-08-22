@@ -7,6 +7,8 @@ from typing import Any, Literal
 from chatbi_agent_contracts import QuestionRoute
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
+from app.schemas.answer_envelope import AnswerEnvelope
+
 
 class ConversationCreate(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -24,6 +26,45 @@ class ConversationRename(BaseModel):
         if not cleaned:
             raise ValueError("title must contain visible characters")
         return cleaned
+
+
+class ProjectCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    name: str = Field(min_length=1, max_length=255)
+    description: str = Field(default="", max_length=2_000)
+
+    @field_validator("name")
+    @classmethod
+    def clean_name(cls, value: str) -> str:
+        cleaned = " ".join(value.split())[:255]
+        if not cleaned:
+            raise ValueError("name must contain visible characters")
+        return cleaned
+
+
+class ConversationProjectUpdate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    project_id: str = Field(min_length=1, max_length=36)
+
+
+class ConversationBatchRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    conversation_ids: list[str] = Field(min_length=1, max_length=100)
+
+    @field_validator("conversation_ids")
+    @classmethod
+    def unique_ids(cls, value: list[str]) -> list[str]:
+        normalized = [item.strip() for item in value]
+        if any(not item or len(item) > 36 for item in normalized):
+            raise ValueError("conversation ids must be non-empty identifiers")
+        if len(set(normalized)) != len(normalized):
+            raise ValueError("conversation ids must be unique")
+        return normalized
+
+
+class ConversationShareCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    expires_in_hours: int = Field(default=168, ge=1, le=720)
 
 
 class ResultSemantic(StrEnum):
@@ -102,8 +143,61 @@ class ConversationRead(BaseModel):
     title: str
     summary: str
     active_attachment_ids: list[str]
+    project_id: str | None = None
+    pinned_at: datetime | None = None
+    archived_at: datetime | None = None
     created_at: datetime
     updated_at: datetime
+
+
+class ProjectRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: str
+    name: str
+    description: str
+    archived_at: datetime | None = None
+    created_at: datetime
+    updated_at: datetime
+
+
+class ConversationBatchResult(BaseModel):
+    affected_count: int
+    conversation_ids: list[str]
+
+
+class ConversationShareRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: str
+    conversation_id: str
+    expires_at: datetime
+    revoked_at: datetime | None = None
+    access_count: int
+    last_accessed_at: datetime | None = None
+    created_at: datetime
+
+
+class ConversationShareCreated(ConversationShareRead):
+    token: str
+    share_path: str
+
+
+class SharedMessageRead(BaseModel):
+    id: str
+    role: Literal["user", "assistant"]
+    content: str
+    message_parts: list[dict[str, Any]] = Field(default_factory=list)
+    created_at: datetime
+
+
+class SharedConversationRead(BaseModel):
+    share_id: str
+    title: str
+    summary: str
+    created_at: datetime
+    updated_at: datetime
+    expires_at: datetime
+    read_only: Literal[True] = True
+    messages: list[SharedMessageRead] = Field(default_factory=list)
 
 
 class MessageRead(BaseModel):
@@ -151,6 +245,7 @@ class ChatResponse(BaseModel):
     assistant_message: MessageRead
     message_parts: list[MessagePart] = Field(default_factory=list)
     result_semantic: ResultSemantic = ResultSemantic.VALUE
+    answer_envelope: AnswerEnvelope | None = None
 
 
 class AttachmentRead(BaseModel):

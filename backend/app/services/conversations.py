@@ -1,15 +1,17 @@
 from __future__ import annotations
 
 import re
+from ipaddress import ip_address
 from datetime import datetime, timezone
 from typing import Any
+from urllib.parse import urlsplit
 
 from fastapi import HTTPException
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
 from app.core.access import Principal
-from app.models import ChatMessage, Conversation
+from app.models import ChatMessage, Conversation, ConversationShare, Project
 
 
 def get_conversation(db: Session, conversation_id: str, principal: Principal) -> Conversation:
@@ -25,6 +27,248 @@ def list_messages(db: Session, conversation_id: str) -> list[ChatMessage]:
     return list(db.scalars(select(ChatMessage).where(
         ChatMessage.conversation_id == conversation_id,
     ).order_by(ChatMessage.created_at, ChatMessage.id)))
+
+
+def list_conversations(
+    db: Session,
+    principal: Principal,
+    *,
+    query: str = "",
+    state: str = "active",
+    project_id: str | None = None,
+) -> list[Conversation]:
+    statement = select(Conversation).where(
+        Conversation.workspace_id == principal.workspace_id,
+        Conversation.user_id == principal.user_id,
+    )
+    if state == "active":
+        statement = statement.where(Conversation.archived_at.is_(None))
+    elif state == "archived":
+        statement = statement.where(Conversation.archived_at.is_not(None))
+    elif state != "all":
+        raise HTTPException(status_code=422, detail="Invalid conversation state")
+    if project_id:
+        get_project(db, project_id, principal)
+        statement = statement.where(Conversation.project_id == project_id)
+    normalized_query = " ".join(query.split())[:255]
+    if normalized_query:
+        escaped = normalized_query.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+        pattern = f"%{escaped}%"
+        statement = statement.where(or_(
+            Conversation.title.ilike(pattern, escape="\\"),
+            Conversation.summary.ilike(pattern, escape="\\"),
+        ))
+    return list(db.scalars(statement.order_by(
+        Conversation.pinned_at.is_(None),
+        Conversation.pinned_at.desc(),
+        Conversation.updated_at.desc(),
+        Conversation.id,
+    )))
+
+
+def get_project(db: Session, project_id: str, principal: Principal) -> Project:
+    item = db.get(Project, project_id)
+    if item is None:
+        raise HTTPException(status_code=404, detail="Project not found")
+    if item.workspace_id != principal.workspace_id or item.user_id != principal.user_id:
+        raise HTTPException(status_code=403, detail="Project access denied")
+    return item
+
+
+def list_projects(
+    db: Session,
+    principal: Principal,
+    *,
+    query: str = "",
+    state: str = "active",
+) -> list[Project]:
+    statement = select(Project).where(
+        Project.workspace_id == principal.workspace_id,
+        Project.user_id == principal.user_id,
+    )
+    if state == "active":
+        statement = statement.where(Project.archived_at.is_(None))
+    elif state == "archived":
+        statement = statement.where(Project.archived_at.is_not(None))
+    elif state != "all":
+        raise HTTPException(status_code=422, detail="Invalid project state")
+    normalized_query = " ".join(query.split())[:255]
+    if normalized_query:
+        escaped = normalized_query.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+        pattern = f"%{escaped}%"
+        statement = statement.where(or_(
+            Project.name.ilike(pattern, escape="\\"),
+            Project.description.ilike(pattern, escape="\\"),
+        ))
+    return list(db.scalars(statement.order_by(Project.updated_at.desc(), Project.id)))
+
+
+def require_owned_conversations(
+    db: Session,
+    conversation_ids: list[str],
+    principal: Principal,
+) -> list[Conversation]:
+    items = list(db.scalars(select(Conversation).where(
+        Conversation.id.in_(conversation_ids),
+        Conversation.workspace_id == principal.workspace_id,
+        Conversation.user_id == principal.user_id,
+    )))
+    by_id = {item.id: item for item in items}
+    if len(by_id) != len(conversation_ids):
+        raise HTTPException(status_code=403, detail="Batch conversation access denied")
+    return [by_id[item_id] for item_id in conversation_ids]
+
+
+def get_conversation_share(
+    db: Session,
+    share_id: str,
+    principal: Principal,
+) -> ConversationShare:
+    item = db.get(ConversationShare, share_id)
+    if item is None:
+        raise HTTPException(status_code=404, detail="Conversation share not found")
+    get_conversation(db, item.conversation_id, principal)
+    if item.workspace_id != principal.workspace_id or item.created_by_user_id != principal.user_id:
+        raise HTTPException(status_code=403, detail="Conversation share access denied")
+    return item
+
+
+_SECRET_VALUE = re.compile(
+    r"(?i)\b(api[_ -]?key|password|passwd|secret|authorization|bearer|database[_ -]?credential)\b\s*[:=]\s*[^\s,;]+"
+)
+_PRIVATE_URL = re.compile(r"https?://[^\s)\]}]+", re.IGNORECASE)
+_SQL_FENCE = re.compile(r"```\s*sql\b.*?```", re.IGNORECASE | re.DOTALL)
+_SQL_LINE = re.compile(
+    r"(?im)^\s*(?:WITH|SELECT|FROM|WHERE|JOIN|LEFT\s+JOIN|RIGHT\s+JOIN|INNER\s+JOIN|"
+    r"GROUP\s+BY|ORDER\s+BY|HAVING|LIMIT)\b[^\r\n]*(?:\r?\n|$)"
+)
+_TRACE_VALUE = re.compile(r"(?i)\b(?:trace(?:[_ -]?id)?\s*[:=]\s*|TRACE-)[A-Za-z0-9._:-]+")
+_PRIVATE_KEYS = {
+    "api_key", "authorization", "credential", "credentials", "database_url", "hidden_prompt",
+    "internal_trace", "password", "prompt", "reasoning", "reasoning_content", "secret", "sql",
+    "storage_key", "token", "trace", "trace_payload", "url",
+}
+
+
+def _is_private_key(value: str) -> bool:
+    normalized = value.strip().lower().replace("-", "_").replace(" ", "_")
+    return normalized in _PRIVATE_KEYS or any(marker in normalized for marker in (
+        "api_key", "credential", "password", "private_url", "reasoning", "secret", "storage_key",
+    ))
+
+
+def _safe_public_url(value: str) -> str:
+    if "/attachments/" in value.lower() or "/artifact" in value.lower():
+        return "[已隐藏私有链接]"
+    parsed = urlsplit(value)
+    if parsed.scheme.lower() != "https" or parsed.username or parsed.password or not parsed.hostname:
+        return "[已隐藏不安全链接]"
+    hostname = parsed.hostname.lower().rstrip(".")
+    if hostname == "localhost" or hostname.endswith((".localhost", ".local", ".internal", ".corp", ".lan")):
+        return "[已隐藏私有链接]"
+    try:
+        if not ip_address(hostname).is_global:
+            return "[已隐藏私有链接]"
+    except ValueError:
+        pass
+    if any(marker in parsed.query.lower() for marker in ("token=", "signature=", "x-amz-", "credential=")):
+        return "[已隐藏私有链接]"
+    return value
+
+
+def redact_public_text(value: str, *, limit: int = 8_000) -> str:
+    redacted = _SQL_FENCE.sub("[SQL 已隐藏]", value)
+    redacted = _SQL_LINE.sub("[SQL 已隐藏]\n", redacted)
+    redacted = _TRACE_VALUE.sub("[Trace 已隐藏]", redacted)
+    redacted = _SECRET_VALUE.sub(lambda match: f"{match.group(1)}=[已隐藏]", redacted)
+    redacted = _PRIVATE_URL.sub(lambda match: _safe_public_url(match.group(0)), redacted)
+    return redacted[:limit]
+
+
+def safe_public_locator(value: str) -> str:
+    stripped = value.strip()
+    if re.match(r"^[a-z][a-z0-9+.-]*:", stripped, re.IGNORECASE):
+        return _safe_public_url(stripped) if stripped.lower().startswith("https://") else "[已隐藏不安全链接]"
+    if stripped.startswith("//"):
+        return "[已隐藏不安全链接]"
+    return redact_public_text(stripped, limit=1_000)
+
+
+def _public_value(value: Any, *, depth: int = 0) -> Any:
+    if depth > 4:
+        return None
+    if isinstance(value, str):
+        return redact_public_text(value, limit=4_000)
+    if value is None or isinstance(value, (bool, int, float)):
+        return value
+    if isinstance(value, list):
+        return [_public_value(item, depth=depth + 1) for item in value[:100]]
+    if isinstance(value, dict):
+        return {
+            str(key)[:128]: _public_value(item, depth=depth + 1)
+            for key, item in list(value.items())[:100]
+            if not _is_private_key(str(key))
+        }
+    return redact_public_text(str(value), limit=1_000)
+
+
+def public_message_parts(message: ChatMessage) -> list[dict[str, Any]]:
+    raw_parts = message.response_payload.get("message_parts", []) if isinstance(message.response_payload, dict) else []
+    if not isinstance(raw_parts, list):
+        return []
+    safe_parts: list[dict[str, Any]] = []
+    for raw_part in raw_parts[:30]:
+        if not isinstance(raw_part, dict):
+            continue
+        part_type = str(raw_part.get("type") or "")
+        if part_type == "text":
+            safe_parts.append({
+                "type": "text",
+                "text": redact_public_text(str(raw_part.get("text") or "")),
+                "role": redact_public_text(str(raw_part.get("role") or ""), limit=64),
+            })
+        elif part_type == "kpi":
+            safe_parts.append({"type": "kpi", "items": _public_value(raw_part.get("items") or [])})
+        elif part_type == "chart":
+            safe_parts.append({
+                "type": "chart",
+                "chart_spec": _public_value(raw_part.get("chart_spec") or {}),
+                "result_signature": redact_public_text(str(raw_part.get("result_signature") or ""), limit=128),
+            })
+        elif part_type == "table":
+            columns = [
+                str(column)[:255] for column in (raw_part.get("columns") or [])[:30]
+                if not _is_private_key(str(column))
+            ]
+            rows = []
+            for row in (raw_part.get("rows") or [])[:100]:
+                if isinstance(row, dict):
+                    rows.append({column: _public_value(row.get(column)) for column in columns})
+            safe_parts.append({
+                "type": "table", "columns": columns, "rows": rows,
+                "row_count": len(rows),
+                "result_signature": redact_public_text(str(raw_part.get("result_signature") or ""), limit=128),
+            })
+        elif part_type == "citations":
+            items = []
+            for item in (raw_part.get("items") or [])[:30]:
+                if not isinstance(item, dict):
+                    continue
+                locator = safe_public_locator(str(item.get("locator") or ""))
+                items.append({
+                    "title": redact_public_text(str(item.get("title") or ""), limit=255),
+                    "version": redact_public_text(str(item.get("version") or ""), limit=64),
+                    "locator": locator,
+                })
+            safe_parts.append({"type": "citations", "items": items})
+        elif part_type == "error":
+            safe_parts.append({
+                "type": "error",
+                "code": redact_public_text(str(raw_part.get("code") or "SHARED_ERROR"), limit=64),
+                "message": redact_public_text(str(raw_part.get("message") or "")),
+                "retryable": False,
+            })
+    return safe_parts
 
 
 def extract_slots(question: str, previous: dict | None = None) -> tuple[dict, str]:

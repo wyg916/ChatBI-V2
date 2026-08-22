@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { systemApi } from '../api/system';
 import toggleOff from '../assets/settings/toggle-off.svg';
 import toggleOn from '../assets/settings/toggle-on.svg';
 import type { ModelProviderCatalog, ModelProviderStatus } from '../types/api';
+import { GovernanceCenterPage, type GovernanceView } from './GovernanceCenterPage';
 import './system-settings.css';
 
 const sections = ['模型服务', '查询与安全', '工作空间', '用户与角色', '审计日志', '外观与品牌', '系统信息'] as const;
@@ -22,6 +23,7 @@ function Toggle({ checked, label }: { checked: boolean; label: string }) {
 
 export function SettingsModelsPage() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [activeSection, setActiveSection] = useState<(typeof sections)[number]>('模型服务');
   const [catalog, setCatalog] = useState<ModelProviderCatalog | null>(null);
   const [loadError, setLoadError] = useState('');
@@ -50,11 +52,15 @@ export function SettingsModelsPage() {
   const activeProvider = providers.find((provider) => provider.active);
   const namedIds = new Set(['kimi', 'mimo', 'deepseek']);
   const configuredNamed = providers.filter((provider) => namedIds.has(provider.id) && provider.configured).length;
+  const governanceView = searchParams.get('view');
+  if (governanceView && ['cost', 'trace', 'model', 'evaluation'].includes(governanceView)) {
+    return <GovernanceCenterPage view={governanceView as GovernanceView} />;
+  }
 
   return <div className="settings-surface-page" data-testid="settings-models-page">
     <header className="settings-page-heading">
       <div><h1>系统设置</h1><p>管理模型服务、查询策略、用户权限和系统运行配置。</p></div>
-      <div className="settings-heading-actions"><button className="button secondary" type="button" disabled>凭据仅在服务端配置</button><button className="button primary" type="button" disabled>保存全部设置</button></div>
+      <div className="settings-heading-actions"><button className="button secondary" type="button" onClick={() => navigate('/settings/models?view=model')}>进入模型治理</button><button className="button secondary" type="button" disabled>凭据仅在服务端配置</button><button className="button primary" type="button" disabled>保存全部设置</button></div>
     </header>
     {notice && <div className="settings-inline-notice" role="status"><span>{notice}</span><button type="button" aria-label="关闭提示" onClick={() => setNotice('')}>×</button></div>}
 

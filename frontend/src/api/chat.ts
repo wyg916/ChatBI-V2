@@ -7,7 +7,13 @@ import type {
   ChatStreamEvent,
   ChatStreamHandlers,
   Conversation,
+  ConversationBatchResult,
   ConversationDetail,
+  ConversationListOptions,
+  ConversationShare,
+  ConversationShareCreated,
+  Project,
+  SharedConversation,
 } from '../types/api';
 
 type LegacyProgressHandler = (stage: string) => void;
@@ -44,14 +50,49 @@ function parseUploadBody(responseText: string): Record<string, unknown> {
   }
 }
 
+function queryPath(path: string, values: Record<string, string | undefined>) {
+  const query = new URLSearchParams();
+  Object.entries(values).forEach(([key, value]) => { if (value) query.set(key, value); });
+  const encoded = query.toString();
+  return encoded ? `${path}?${encoded}` : path;
+}
+
 export const chatApi = {
-  conversations: () => api<Conversation[]>('/conversations'),
+  conversations: (options: ConversationListOptions = {}) => api<Conversation[]>(queryPath('/conversations', {
+    q: options.q, state: options.state, project_id: options.project_id,
+  })),
   createConversation: (title = '新会话') => api<Conversation>('/conversations', { method: 'POST', body: JSON.stringify({ title }) }),
   conversation: (id: string) => api<ConversationDetail>(`/conversations/${id}`),
   renameConversation: (id: string, title: string) => api<Conversation>(`/conversations/${id}`, {
     method: 'PATCH', body: JSON.stringify({ title }),
   }),
   deleteConversation: (id: string) => api<void>(`/conversations/${id}`, { method: 'DELETE' }),
+  pinConversation: (id: string) => api<Conversation>(`/conversations/${id}/pin`, { method: 'POST' }),
+  unpinConversation: (id: string) => api<Conversation>(`/conversations/${id}/unpin`, { method: 'POST' }),
+  archiveConversation: (id: string) => api<Conversation>(`/conversations/${id}/archive`, { method: 'POST' }),
+  restoreConversation: (id: string) => api<Conversation>(`/conversations/${id}/restore`, { method: 'POST' }),
+  batchArchiveConversations: (ids: string[]) => api<ConversationBatchResult>('/conversations/batch/archive', {
+    method: 'POST', body: JSON.stringify({ conversation_ids: ids }),
+  }),
+  batchDeleteConversations: (ids: string[]) => api<ConversationBatchResult>('/conversations/batch/delete', {
+    method: 'POST', body: JSON.stringify({ conversation_ids: ids }),
+  }),
+  projects: (q = '', state: 'active' | 'archived' | 'all' = 'active') => api<Project[]>(queryPath('/projects', { q, state })),
+  createProject: (name: string, description = '') => api<Project>('/projects', {
+    method: 'POST', body: JSON.stringify({ name, description }),
+  }),
+  archiveProject: (id: string) => api<Project>(`/projects/${id}/archive`, { method: 'POST' }),
+  restoreProject: (id: string) => api<Project>(`/projects/${id}/restore`, { method: 'POST' }),
+  moveConversationToProject: (conversationId: string, projectId: string) => api<Conversation>(`/conversations/${conversationId}/project`, {
+    method: 'PUT', body: JSON.stringify({ project_id: projectId }),
+  }),
+  removeConversationFromProject: (conversationId: string) => api<Conversation>(`/conversations/${conversationId}/project`, { method: 'DELETE' }),
+  shares: (conversationId: string) => api<ConversationShare[]>(`/conversations/${conversationId}/shares`),
+  createShare: (conversationId: string, expiresInHours = 168) => api<ConversationShareCreated>(`/conversations/${conversationId}/shares`, {
+    method: 'POST', body: JSON.stringify({ expires_in_hours: expiresInHours }),
+  }),
+  revokeShare: (shareId: string) => api<ConversationShare>(`/conversation-shares/${shareId}/revoke`, { method: 'POST' }),
+  sharedConversation: (token: string) => api<SharedConversation>(`/shared-conversations/${encodeURIComponent(token)}`),
   cancelStream: (conversationId: string, clientMessageId: string) => api<{ cancelled: boolean }>('/chat/stream/cancel', {
     method: 'POST',
     body: JSON.stringify({ conversation_id: conversationId, client_message_id: clientMessageId }),

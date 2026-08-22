@@ -5,6 +5,8 @@ from typing import Any
 from chatbi_agent_contracts import QuestionRoute
 from pydantic import BaseModel, ConfigDict, Field
 
+from app.schemas.answer_envelope import AnswerEnvelope
+
 class AnalysisRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -27,3 +29,4 @@ class AnalysisResponse(BaseModel):
     fallback_used: bool = False
     feature_modes: dict[str, str]
     security: dict[str, int]
+    answer_envelope: AnswerEnvelope | None = None

@@ -128,6 +128,29 @@ class FeedbackReviewRequest(BaseModel):
     comment: str = Field(min_length=1, max_length=2000)
 
 
+class UserFeedbackCreate(BaseModel):
+    query_run_id: str
+    sentiment: str = Field(pattern="^(THUMB_UP|THUMB_DOWN)$")
+    reason: str | None = Field(
+        default=None,
+        pattern="^(INCORRECT_RESULT|INCORRECT_SQL|INCORRECT_CHART|CITATION_PROBLEM|OTHER)$",
+    )
+    comment: str | None = Field(default=None, max_length=2000)
+
+
+class FeedbackReviewStartRequest(BaseModel):
+    comment: str | None = Field(default=None, max_length=2000)
+
+
+class FeedbackDecisionRequest(BaseModel):
+    decision: str = Field(pattern="^(ACCEPT|REJECT)$")
+    comment: str = Field(min_length=1, max_length=2000)
+    corrected_sql: str | None = Field(default=None, min_length=1, max_length=20000)
+    expected_rows: list[dict] | None = None
+    expected_columns: list[str] = Field(default_factory=list)
+    question_pattern: str | None = Field(default=None, min_length=1, max_length=1000)
+
+
 class FeedbackRecallRequest(BaseModel):
     question: str = Field(min_length=1, max_length=4000)
     datasource_id: str | None = None
@@ -158,6 +181,9 @@ class FeedbackWorkflowRead(BaseModel):
     oracle_status: str | None = None
     version: int
     feedback: dict
+    reviewer: str | None = None
+    question_pattern: str | None = None
+    replay_count: int = 0
 
 
 class FeedbackReplayResponse(BaseModel):

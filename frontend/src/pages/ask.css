@@ -98,6 +98,54 @@
 .conversation-search:focus-within { border-color: #9293ee; box-shadow: 0 0 0 3px #5b5cf612; }
 .conversation-search input { width: 100%; min-width: 0; border: 0; outline: 0; background: transparent; color: #344057; font-size: 12px; }
 
+.conversation-view-tabs,
+.conversation-batch-toolbar { display: flex; gap: 4px; margin-top: 7px; }
+.conversation-view-tabs button,
+.conversation-batch-toolbar button {
+  min-height: 28px;
+  padding: 0 8px;
+  border: 1px solid #e2e6ef;
+  border-radius: 7px;
+  background: #fff;
+  color: #657086;
+  font-size: 10px;
+}
+.conversation-view-tabs button { flex: 1; }
+.conversation-view-tabs button.active { border-color: #c9c7ff; background: #efedff; color: #5051cd; font-weight: 700; }
+.conversation-batch-toolbar { flex-wrap: wrap; }
+.conversation-batch-toolbar button.danger { color: #bd4057; }
+.conversation-batch-toolbar button:disabled { cursor: not-allowed; opacity: .45; }
+
+.conversation-project-filter { position: relative; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 5px; margin-top: 7px; }
+.conversation-project-filter > select,
+.conversation-project-filter > details > summary {
+  height: 30px;
+  border: 1px solid #e2e6ef;
+  border-radius: 7px;
+  background: #fff;
+  color: #657086;
+  font-size: 10px;
+}
+.conversation-project-filter > select { min-width: 0; padding: 0 6px; }
+.conversation-project-filter > details > summary { display: grid; padding: 0 8px; place-items: center; cursor: pointer; list-style: none; }
+.conversation-project-filter > details > summary::-webkit-details-marker { display: none; }
+.project-manager {
+  position: absolute;
+  z-index: 10;
+  top: 34px;
+  right: 0;
+  width: 224px;
+  padding: 8px;
+  border: 1px solid #dfe3ed;
+  border-radius: 9px;
+  background: #fff;
+  box-shadow: 0 12px 28px #1b27452a;
+}
+.project-manager form { display: flex; gap: 4px; }
+.project-manager input { min-width: 0; height: 29px; flex: 1; padding: 0 7px; border: 1px solid #dfe3ed; border-radius: 6px; font-size: 10px; }
+.project-manager button { border: 0; border-radius: 6px; background: #efefff; color: #5556cb; font-size: 10px; }
+.project-manager > div { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 7px 2px 0; color: #566278; font-size: 10px; }
+
 .conversation-list {
   flex: 1;
   min-height: 0;
@@ -124,6 +172,8 @@
 .conversation-item:hover,
 .conversation-item:focus-within { background: #f1f2f7; }
 .conversation-item.active { border-color: #dedcff; background: #efedff; }
+.conversation-item.selected { border-color: #bfc0f4; }
+.conversation-item > input[type="checkbox"] { flex: 0 0 auto; align-self: center; margin-left: 7px; accent-color: #5b5cf6; }
 .conversation-item.local { align-items: center; gap: 9px; padding: 8px 9px; }
 .conversation-item.local > div { min-width: 0; }
 
@@ -179,10 +229,12 @@
 .conversation-item:hover .conversation-menu summary,
 .conversation-item:focus-within .conversation-menu summary,
 .conversation-menu[open] summary { background: #fff; color: #68748a; box-shadow: 0 1px 4px #16223c18; }
-.conversation-menu > div { position: absolute; top: 29px; right: 0; width: 108px; padding: 5px; border: 1px solid #dfe3ed; border-radius: 9px; background: #fff; box-shadow: 0 10px 28px #1b27452a; }
+.conversation-menu > div { position: absolute; top: 29px; right: 0; width: 176px; padding: 5px; border: 1px solid #dfe3ed; border-radius: 9px; background: #fff; box-shadow: 0 10px 28px #1b27452a; }
 .conversation-menu > div button { width: 100%; padding: 7px 8px; border: 0; border-radius: 6px; background: transparent; color: #465169; text-align: left; font-size: 12px; }
 .conversation-menu > div button:hover { background: #f4f5f9; }
 .conversation-menu > div button.danger { color: #c33f58; }
+.conversation-menu > div label { display: block; padding: 6px 8px; color: #68748a; font-size: 10px; }
+.conversation-menu > div label select { width: 100%; height: 28px; margin-top: 4px; border: 1px solid #dfe3ed; border-radius: 6px; background: #fff; color: #465169; font-size: 10px; }
 
 .conversation-rename { display: grid; width: 100%; grid-template-columns: 1fr auto auto; gap: 4px; align-items: center; padding: 6px; }
 .conversation-rename input { min-width: 0; height: 32px; padding: 0 8px; border: 1px solid #7b7ce8; border-radius: 7px; outline: 0; }
@@ -204,6 +256,32 @@
 .conversation-delete-confirm button { margin-right: 5px; padding: 5px 8px; border: 0; border-radius: 6px; background: #f4f5f8; color: #526077; font-size: 10px; }
 .conversation-delete-confirm button:first-of-type { background: #fff0f2; color: #c43c55; }
 .conversation-list-empty { padding: 28px 8px; color: #9aa3b3; text-align: center; font-size: 12px; }
+.conversation-action-error { margin: 6px 0 0; padding: 7px 8px; border-radius: 7px; background: #fff1f3; color: #af344d; font-size: 10px; }
+
+.conversation-share-dialog {
+  position: absolute;
+  z-index: 30;
+  top: 58px;
+  left: calc(100% + 12px);
+  width: min(340px, calc(100vw - 360px));
+  padding: 14px;
+  border: 1px solid #dfe3ed;
+  border-radius: 12px;
+  background: #fff;
+  box-shadow: 0 18px 48px #17223d2b;
+}
+.conversation-share-dialog header { display: flex; align-items: center; justify-content: space-between; gap: 10px; color: #30394d; font-size: 13px; }
+.conversation-share-dialog header button { border: 0; background: transparent; color: #7f899b; font-size: 18px; }
+.conversation-share-dialog p { color: #69748a; font-size: 11px; line-height: 1.55; }
+.conversation-share-dialog > label { display: flex; align-items: center; gap: 8px; color: #5b667c; font-size: 11px; }
+.conversation-share-dialog select { height: 30px; border: 1px solid #dfe3ed; border-radius: 7px; background: #fff; }
+.conversation-share-dialog > button { margin-top: 10px; padding: 7px 10px; border: 0; border-radius: 7px; background: #5b5cf6; color: #fff; font-size: 11px; }
+.share-created { display: flex; gap: 5px; margin-top: 9px; }
+.share-created input { min-width: 0; height: 31px; flex: 1; padding: 0 7px; border: 1px solid #dfe3ed; border-radius: 7px; font-size: 10px; }
+.share-created button,
+.share-list button { border: 0; border-radius: 6px; background: #efefff; color: #5455cc; font-size: 10px; }
+.share-list { max-height: 170px; margin-top: 10px; overflow-y: auto; }
+.share-list > div { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 6px 0; border-top: 1px solid #eef0f5; color: #69748a; font-size: 10px; }
 
 .conversation-panel.collapsed { padding-right: 8px; padding-left: 8px; }
 .conversation-panel.collapsed .conversation-panel-head { flex-direction: column; }

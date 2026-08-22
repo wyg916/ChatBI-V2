@@ -10,6 +10,17 @@ const proxyTarget = runtimeEnv?.CHATBI_PROXY_TARGET ?? runtimeEnv?.VITE_BACKEND_
 
 export default defineConfig({
   plugins: [react()],
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          const normalized = id.replaceAll('\\', '/');
+          if (normalized.includes('/node_modules/zrender/')) return 'zrender';
+          return undefined;
+        },
+      },
+    },
+  },
   server: {
     port: 5173,
     proxy: {
@@ -22,5 +33,9 @@ export default defineConfig({
     setupFiles: './src/test/setup.ts',
     include: ['src/**/*.test.{ts,tsx}'],
     css: true,
+    // Several page suites intentionally share module-level API mocks. Running
+    // test files in parallel makes those mocks and jsdom timers contend and
+    // produces non-deterministic inputs/timeouts on release runners.
+    fileParallelism: false,
   },
 });

@@ -14,12 +14,15 @@ from app.schemas.evaluation import (
     EvaluationRunRead,
     FeedbackCorrectCreate,
     FeedbackCorrectionCreate,
+    FeedbackDecisionRequest,
     FeedbackDashboardResponse,
     FeedbackRecallRequest,
     FeedbackReplayRequest,
     FeedbackReplayResponse,
+    FeedbackReviewStartRequest,
     FeedbackReviewRequest,
     FeedbackWorkflowRead,
+    UserFeedbackCreate,
     ReleaseGateResponse,
 )
 from app.services.evaluation import (
@@ -35,10 +38,13 @@ from app.services.evaluation import (
 )
 from app.services.feedback_loop import (
     feedback_dashboard,
+    decide_feedback_review,
     recall_candidates,
     record_correct_feedback,
+    record_user_feedback,
     replay_verified_sql,
     review_correction,
+    start_feedback_review,
     submit_correction,
 )
 
@@ -171,6 +177,69 @@ def get_feedback_dashboard(
     return feedback_dashboard(db, workspace_id=principal.workspace_id)
 
 
+@router.post("/feedback", response_model=FeedbackWorkflowRead, status_code=status.HTTP_201_CREATED)
+def create_user_feedback(
+    data: UserFeedbackCreate,
+    db: Session = Depends(get_db),
+    principal: Principal = Depends(require_permission("answer.manage")),
+):
+    try:
+        item = record_user_feedback(db, data=data, principal=principal)
+        record_audit(
+            db, principal, action="FEEDBACK_OPEN", resource_type="VERIFIED_ANSWER",
+            resource_id=item["answer_id"], details={"workflow_state": item["workflow_state"], "sentiment": data.sentiment, "reason": data.reason},
+        )
+        db.commit()
+        return item
+    except LookupError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+@router.post("/feedback/{answer_id}/review/start", response_model=FeedbackWorkflowRead)
+def start_user_feedback_review(
+    answer_id: str,
+    data: FeedbackReviewStartRequest,
+    db: Session = Depends(get_db),
+    principal: Principal = Depends(require_permission("evaluation.run")),
+):
+    try:
+        item = start_feedback_review(db, answer_id=answer_id, data=data, principal=principal)
+        record_audit(
+            db, principal, action="FEEDBACK_REVIEW_START", resource_type="VERIFIED_ANSWER",
+            resource_id=answer_id, details={"workflow_state": item["workflow_state"]},
+        )
+        db.commit()
+        return item
+    except LookupError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+@router.post("/feedback/{answer_id}/decision", response_model=FeedbackWorkflowRead)
+def decide_user_feedback_review(
+    answer_id: str,
+    data: FeedbackDecisionRequest,
+    db: Session = Depends(get_db),
+    principal: Principal = Depends(require_permission("evaluation.run")),
+):
+    try:
+        item = decide_feedback_review(db, answer_id=answer_id, data=data, principal=principal)
+        record_audit(
+            db, principal, action="FEEDBACK_DECISION", resource_type="VERIFIED_ANSWER",
+            resource_id=answer_id, status=item["workflow_state"],
+            details={"decision": data.decision, "workflow_state": item["workflow_state"], "version": item["version"]},
+        )
+        db.commit()
+        return item
+    except LookupError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
 @router.post("/feedback/correct", status_code=status.HTTP_201_CREATED)
 def correct_feedback(
     data: FeedbackCorrectCreate,
@@ -232,7 +301,14 @@ def replay_feedback(
     principal: Principal = Depends(require_permission("evaluation.run")),
 ):
     try:
-        return replay_verified_sql(db, answer_id=answer_id, data=data, principal=principal)
+        item = replay_verified_sql(db, answer_id=answer_id, data=data, principal=principal)
+        record_audit(
+            db, principal, action="FEEDBACK_REGRESSION_REPLAY", resource_type="VERIFIED_ANSWER",
+            resource_id=answer_id, status="PASS" if item["replay_passed"] else "FAIL",
+            details={"query_run_id": item["query_run_id"], "oracle_status": item["oracle_status"]},
+        )
+        db.commit()
+        return item
     except LookupError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     except ValueError as exc:

@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 from app.core.access import Principal, ensure_resource_access, record_audit
 from app.core.config import get_settings
 from app.model_gateway.contracts import BudgetMode, RequestContext
+from app.model_gateway.ledger import bind_model_invocation_session
 from app.models import (
     AnswerVersion,
     DataSource,
@@ -184,6 +185,17 @@ class QueryPipeline:
         self, db: Session, request: AskRequest, principal: Principal | None = None,
         *, cancellation_event: Event | None = None, request_context: RequestContext | None = None,
     ) -> QueryRun:
+        with bind_model_invocation_session(db):
+            return self._execute(
+                db, request, principal,
+                cancellation_event=cancellation_event,
+                request_context=request_context,
+            )
+
+    def _execute(
+        self, db: Session, request: AskRequest, principal: Principal | None = None,
+        *, cancellation_event: Event | None = None, request_context: RequestContext | None = None,
+    ) -> QueryRun:
         settings = get_settings()
         workspace = db.get(Workspace, principal.workspace_id) if principal and principal.workspace_id else default_workspace(db)
         if workspace is None:
@@ -217,6 +229,7 @@ class QueryPipeline:
         runtime_context = request_context or RequestContext(
             request_id=run.id,
             trace_id=f"TRACE-{run.id}",
+            route="DATA_QUERY",
             user_id=(principal.user_id or principal.email) if principal is not None else "SYSTEM",
             workspace_id=workspace.id,
             datasource_id=datasource.id,

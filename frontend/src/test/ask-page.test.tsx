@@ -4,7 +4,13 @@ import { createMemoryRouter, RouterProvider } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Attachment, ChatInput, ChatResponse, Conversation, ConversationDetail, QueryResponse } from '../types/api';
 
-const chatMocks = vi.hoisted(() => ({ conversations: vi.fn(), createConversation: vi.fn(), conversation: vi.fn(), attachments: vi.fn(), stream: vi.fn(), cancelStream: vi.fn(), deleteConversation: vi.fn(), deleteAttachment: vi.fn(), upload: vi.fn() }));
+const chatMocks = vi.hoisted(() => ({
+  conversations: vi.fn(), createConversation: vi.fn(), conversation: vi.fn(), renameConversation: vi.fn(), attachments: vi.fn(), stream: vi.fn(), cancelStream: vi.fn(),
+  deleteConversation: vi.fn(), deleteAttachment: vi.fn(), upload: vi.fn(), projects: vi.fn(), createProject: vi.fn(), archiveProject: vi.fn(),
+  pinConversation: vi.fn(), unpinConversation: vi.fn(), archiveConversation: vi.fn(), restoreConversation: vi.fn(),
+  moveConversationToProject: vi.fn(), removeConversationFromProject: vi.fn(), batchArchiveConversations: vi.fn(), batchDeleteConversations: vi.fn(),
+  shares: vi.fn(), createShare: vi.fn(), revokeShare: vi.fn(),
+}));
 const queryMocks = vi.hoisted(() => ({ feedback: vi.fn(), save: vi.fn(), get: vi.fn(), ask: vi.fn() }));
 vi.mock('../api/chat', () => ({ chatApi: chatMocks }));
 vi.mock('../api/queries', () => ({ queryApi: queryMocks }));
@@ -57,6 +63,7 @@ describe('问数据真实多轮界面', () => {
   beforeEach(() => {
     localStorage.clear(); Object.values(chatMocks).forEach((mock) => mock.mockReset()); Object.values(queryMocks).forEach((mock) => mock.mockReset());
     chatMocks.conversations.mockResolvedValue([conversation]); chatMocks.conversation.mockResolvedValue(detail); chatMocks.attachments.mockResolvedValue([]); chatMocks.createConversation.mockResolvedValue(conversation);
+    chatMocks.projects.mockResolvedValue([]); chatMocks.shares.mockResolvedValue([]);
     chatMocks.cancelStream.mockResolvedValue({ cancelled: true });
     chatMocks.stream.mockImplementation(async (input: ChatInput) => response(input)); queryMocks.feedback.mockResolvedValue({ id: 'feedback', recorded: true }); queryMocks.save.mockResolvedValue({ id: 'answer' });
   });

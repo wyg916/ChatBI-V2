@@ -31,6 +31,7 @@ from app.file_multimodal.security import classify_and_redact, contains_prompt_in
 from app.file_multimodal.vision import PREPROCESS_VERSION, preprocess_image
 from app.integration.contracts import AnalysisRequest
 from app.model_gateway import BudgetMode, ModelGateway, ModelUnavailable, RequestContext, VisionModelUnavailable
+from app.model_gateway.ledger import bind_model_invocation_session
 from app.rag_runtime.answer_guard import (
     GroundedAnswerRejected,
     evidence_payload,
@@ -53,6 +54,7 @@ from app.services.conversations import (
 )
 from app.streaming import phase_for_stage
 from app.streaming.lifecycle import StreamCancelled, stream_registry
+from app.services.answer_envelope import build_answer_envelope
 
 
 _VISUAL_EVIDENCE_CACHE = InMemoryVisualEvidenceCache()
@@ -112,7 +114,8 @@ def _operation_spans(
     tool_calls: list[dict],
     sql_execution: dict,
     response_payload: dict,
-) -> list[dict[str, str]]:
+    measured_spans: list[dict] | None = None,
+) -> list[dict]:
     """Expose only operations that actually crossed the shared control plane."""
     names: list[str] = []
     if sse_streamed:
@@ -131,7 +134,14 @@ def _operation_spans(
     if sql_execution:
         names.extend(("sql.execute", "oracle.verify"))
     names.append("answer.compose")
-    return [{"name": name, "status": "COMPLETED"} for name in dict.fromkeys(names)]
+    spans = list(measured_spans or [])
+    measured_names = {str(item.get("name")) for item in spans}
+    spans.extend(
+        {"name": name, "status": "COMPLETED", "timing_source": "COMPLETION_RECEIPT"}
+        for name in dict.fromkeys(names)
+        if name not in measured_names
+    )
+    return spans
 
 
 def _render_scanned_pdf(data: bytes, *, max_pages: int = 10) -> list[bytes]:
@@ -227,22 +237,55 @@ class ChatService:
         trace_id: str | None = None,
         sse_streamed: bool = False,
     ) -> ChatResponse:
+        with bind_model_invocation_session(db):
+            return self._execute(
+                db, request, principal, progress, cancellation_event,
+                answer_delta, trace_id, sse_streamed,
+            )
+
+    def _execute(
+        self,
+        db: Session,
+        request: ChatRequest,
+        principal: Principal,
+        progress: Callable[[str, dict], None] | None = None,
+        cancellation_event: Event | None = None,
+        answer_delta: Callable[[str], None] | None = None,
+        trace_id: str | None = None,
+        sse_streamed: bool = False,
+    ) -> ChatResponse:
         started = perf_counter()
         public_phases: list[str] = []
+        measured_spans: list[dict] = []
+        active_phase_started = started
 
         def checkpoint() -> None:
             if cancellation_event is not None and cancellation_event.is_set():
                 raise StreamCancelled("chat run cancelled")
 
         def report(stage: str, detail: dict | None = None) -> None:
+            nonlocal active_phase_started
             checkpoint()
             phase = phase_for_stage(stage)
             if phase and phase not in public_phases:
+                now = perf_counter()
+                if measured_spans:
+                    measured_spans[-1]["duration_ms"] = round((now - active_phase_started) * 1000)
+                active_phase_started = now
                 public_phases.append(phase)
+                measured_spans.append({
+                    "name": phase,
+                    "status": "COMPLETED",
+                    "started_at": datetime.now(timezone.utc).isoformat(),
+                    "duration_ms": 0,
+                    "timing_source": "CHAT_STAGE",
+                })
             if progress:
                 progress(stage, detail or {})
 
         conversation = get_conversation(db, request.conversation_id, principal)
+        if conversation.archived_at is not None:
+            raise HTTPException(status_code=409, detail="Archived conversations are read-only; restore before asking")
         duplicate = db.scalar(select(ChatMessage).where(
             ChatMessage.conversation_id == conversation.id,
             ChatMessage.client_message_id == request.client_message_id,
@@ -299,6 +342,7 @@ class ChatService:
             context=request_context,
         )
         route = router_decision.route
+        request_context = request_context.model_copy(update={"route": route.value})
         report("UNDERSTANDING", {"route": route.value})
         if route in {QuestionRoute.DATA_QUERY, QuestionRoute.HYBRID_ANALYSIS, QuestionRoute.COMPLEX_ANALYSIS}:
             report("SCHEMA_LINKED", {"route": route.value})
@@ -494,6 +538,8 @@ class ChatService:
         }
 
         elapsed_ms = round((perf_counter() - started) * 1000)
+        if measured_spans:
+            measured_spans[-1]["duration_ms"] = round((perf_counter() - active_phase_started) * 1000)
         trace = {
             "trace_id": trace_id,
             "request_id": request.client_message_id,
@@ -522,6 +568,7 @@ class ChatService:
                 tool_calls=tool_calls,
                 sql_execution=sql_execution,
                 response_payload=response_payload,
+                measured_spans=measured_spans,
             ),
             "elapsed_ms": elapsed_ms,
         }
@@ -541,6 +588,27 @@ class ChatService:
             error_code=error_code,
         )
         db.add(assistant)
+        db.flush()
+        answer_envelope = build_answer_envelope(
+            answer_id=assistant.id,
+            conversation_id=conversation.id,
+            message_id=assistant.id,
+            trace_id=trace_id,
+            route=route,
+            status=status,
+            content=answer,
+            response_payload=response_payload,
+            trace_payload=trace,
+            message_parts=composed.message_parts,
+            result_semantic=composed.result_semantic,
+            error_code=error_code,
+            attachment_ids=tuple(item.id for item in attachments),
+        )
+        response_payload = {
+            **response_payload,
+            "answer_envelope": answer_envelope.model_dump(mode="json"),
+        }
+        assistant.response_payload = response_payload
         conversation.active_attachment_ids = [item.id for item in attachments]
         slots = merge_runtime_context(
             slots,
@@ -578,6 +646,7 @@ class ChatService:
             assistant_message=_message(assistant),
             message_parts=composed.message_parts,
             result_semantic=composed.result_semantic,
+            answer_envelope=answer_envelope,
         )
 
     def _model_answer(

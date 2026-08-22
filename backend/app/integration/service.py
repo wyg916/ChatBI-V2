@@ -34,6 +34,7 @@ from app.model_gateway import (
     ModelUnavailable,
     RequestContext,
 )
+from app.model_gateway.ledger import bind_model_invocation_session
 from app.rag_runtime.answer_guard import (
     evidence_payload,
     prompt_injection_evidence_used,
@@ -75,6 +76,24 @@ class AnalysisService:
         self._runtime_context: RequestContext | None = None
 
     def execute(
+        self,
+        db: Session,
+        request: AnalysisRequest,
+        principal: Principal,
+        *,
+        progress_callback=None,
+        cancellation_event: Event | None = None,
+        request_context: RequestContext | None = None,
+    ) -> AnalysisResponse:
+        with bind_model_invocation_session(db):
+            return self._execute(
+                db, request, principal,
+                progress_callback=progress_callback,
+                cancellation_event=cancellation_event,
+                request_context=request_context,
+            )
+
+    def _execute(
         self,
         db: Session,
         request: AnalysisRequest,

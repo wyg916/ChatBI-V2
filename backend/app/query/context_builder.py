@@ -210,6 +210,7 @@ class ContextBuilder:
         return QueryContext(
             request_id=request_context.request_id if request_context else "SYSTEM",
             trace_id=request_context.trace_id if request_context else "TRACE-SYSTEM",
+            route=(request_context.route or "DATA_QUERY") if request_context else "DATA_QUERY",
             user_id=request_context.user_id if request_context else "SYSTEM",
             conversation_id=request_context.conversation_id if request_context else None,
             permission_hash=request_context.permission_hash if request_context else "system",

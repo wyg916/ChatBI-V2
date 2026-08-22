@@ -20,10 +20,12 @@ ROLE_PERMISSIONS: dict[str, frozenset[str]] = {
         "workspace.read", "datasource.read", "datasource.manage", "semantic.read", "semantic.manage",
         "query.ask", "answer.read", "answer.manage", "dashboard.read", "dashboard.manage",
         "evaluation.read", "evaluation.run", "settings.read", "settings.manage", "audit.read",
+        "conversation.manage", "conversation.share", "project.manage",
     }),
     "ANALYST": frozenset({
         "workspace.read", "datasource.read", "semantic.read", "query.ask", "answer.read",
         "answer.manage", "dashboard.read", "dashboard.manage", "evaluation.read", "evaluation.run",
+        "conversation.manage", "conversation.share", "project.manage",
     }),
 }
 

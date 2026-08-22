@@ -30,6 +30,7 @@ class SecurityPolicy(BaseModel):
 class QueryContext(BaseModel):
     request_id: str = "SYSTEM"
     trace_id: str = "TRACE-SYSTEM"
+    route: str = "DATA_QUERY"
     user_id: str = "SYSTEM"
     conversation_id: str | None = None
     permission_hash: str = "system"

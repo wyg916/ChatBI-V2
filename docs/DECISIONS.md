@@ -253,3 +253,15 @@ V1.2.0 只把已经通过正式集成门禁的 `codex/v2.1-final-integration` �
 仅依赖浏览器关闭 SSE 连接会存在传播窗口：短分析可能先提交成功消息，用户界面却已经显示取消。V1.2.0 的停止操作因此先调用受 `query.ask`、Conversation Workspace 与用户所有权约束的显式取消端点，以 `(conversation_id, client_message_id)` 精确设置运行取消事件，再终止浏览器 SSE reader。Backend 在运行 checkpoint 与显式取消端点两侧都只清理该 client message 的 user/assistant 消息，覆盖“尚未提交”和“已提交但终态尚未送达”两个竞态窗口；不得按会话批量删除，也不得把该能力扩展成通用任务平台。
 
 发布门禁同时保留两条真实浏览器验证：原生停止按钮激活后不得持久化 SUCCEEDED assistant；停止后必须可继续验证拒绝与重试。取消接口只有在匹配运行结束并完成提交窗口后的二次精准清理后才返回，浏览器收到该确认后再关闭 SSE，因此“已停止”也是服务端持久化边界。由于本地确定性分析可能在 Playwright 的鼠标 actionability 等待期间完成，发布门禁在按钮出现后直接使用原生 Enter 激活，点击处理器另由组件回归覆盖；同一复杂问句带每次运行唯一标识，避免语义运行时缓存进一步缩短取消窗口，但不模拟 SSE、不强制点击、不跳过持久化断言。
+
+## ADR-046：Phase 4 以 canonical AnswerEnvelope 和受控 Conversation 资源统一产品体验
+
+所有正式回答入口必须在既有运行时完成后适配为同一 `AnswerEnvelope`，前端 Dynamic Renderer 不得按 DATA/RAG/Agent/File/Vision 再造平行渲染链。Envelope 只包含可公开验证的正文、结构化结果、引用、Artifact、SQL、阶段、错误、Token/成本和校验状态；Markdown 禁止 raw HTML，URL 和文件名执行 allowlist 与脱敏。旧的 `result-state-*`、`query-success/query-empty/query-mismatch/query-security` 可观测契约作为兼容标记保留，但不参与业务决策。
+
+Conversation、Project、Share 与 Batch 均为 Backend 持久化资源并由 Workspace、用户、RBAC 和审计约束。Share Token 只保存哈希，支持过期与撤销，匿名共享始终只读并通过专用公开 DTO 过滤 SQL、Trace、私有地址和敏感内容。Archive 是服务端只读状态，恢复前禁止继续写消息；批处理在单事务内校验全部资源，任何越权项使整批 fail closed。
+
+## ADR-047：Phase 4 治理以 append-only 调用尝试、阶段级 ONE_TRACE 和受证明 Verified SQL 为准
+
+Model Gateway 每次 Provider 尝试都向请求事务绑定的 append-only `ModelInvocation` 台账追加 allowlist 元数据，包括成功、失败、重试和取消；不得保存提示词、回答正文、凭据或媒体。事务绑定必须位于同一业务调用栈，不能跨 FastAPI 同步 yield dependency 的 AnyIO Context 进入/退出边界。Cost Dashboard 只按当前 Workspace 汇总并支持时间、用户、会话、路由、Provider 和 Model 筛选；ONE_TRACE 使用真实阶段时间与 completion receipt，显示阶段、耗时、状态、Provider/Model、Tool、SQL、错误和 Artifact 能力，不伪造模型内部时间线。
+
+Feedback 采用 `OPEN → IN_REVIEW → ACCEPTED/REJECTED` 有限状态机。ACCEPTED 候选必须重新进入 QueryPipeline 的 SQL Guard、只读执行和 Result Oracle，并把 Reviewer、问题模式、数据源、语义模型/version、SQL SHA-256、结果签名和 Attestation 固定为 Verified SQL 版本；Replay 仍重走同一安全链，不能把历史通过当成当前正确。PostgreSQL EXPLAIN 与执行在同一只读事务策略下设置经过引用的数据源 schema `search_path`，使允许的未限定表名与 Guard/Oracle 语义一致，而不扩大跨 schema 访问范围。

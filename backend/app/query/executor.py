@@ -53,6 +53,23 @@ class QueryExecutor:
             cls._semaphore_size = size
         return cls._semaphore
 
+    @staticmethod
+    def _prepare_postgres_transaction(connection: Any, datasource: DataSource, timeout_ms: int) -> None:
+        """Apply the read-only boundary and the datasource's approved schema.
+
+        NL2SQL plans may legally use an unqualified table name after SqlGuard has
+        checked it against ``allowed_tables``.  PostgreSQL connections do not
+        otherwise inherit the datasource metadata schema, so EXPLAIN and the
+        real query could disagree depending on whether the model happened to
+        qualify the table.  Keep both operations in the same, quoted search path.
+        """
+
+        connection.exec_driver_sql("SET TRANSACTION READ ONLY")
+        connection.exec_driver_sql(f"SET LOCAL statement_timeout = {int(timeout_ms)}")
+        if datasource.schema:
+            quoted_schema = connection.dialect.identifier_preparer.quote(datasource.schema)
+            connection.exec_driver_sql(f"SET LOCAL search_path TO {quoted_schema}")
+
     def execute(
         self,
         *,
@@ -100,8 +117,7 @@ class QueryExecutor:
                 try:
                     if datasource.type == "postgresql":
                         with connection.begin():
-                            connection.exec_driver_sql("SET TRANSACTION READ ONLY")
-                            connection.exec_driver_sql(f"SET LOCAL statement_timeout = {int(timeout_ms)}")
+                            self._prepare_postgres_transaction(connection, datasource, timeout_ms)
                             result = connection.execute(text(normalized_sql))
                             keys = list(result.keys())
                             raw_rows = result.mappings().fetchmany(row_limit)
@@ -177,8 +193,7 @@ class QueryExecutor:
             with engine.connect() as connection:
                 if datasource.type == "postgresql":
                     with connection.begin():
-                        connection.exec_driver_sql("SET TRANSACTION READ ONLY")
-                        connection.exec_driver_sql(f"SET LOCAL statement_timeout = {int(timeout_ms)}")
+                        self._prepare_postgres_transaction(connection, datasource, timeout_ms)
                         value = connection.execute(text(prefix + normalized_sql)).scalar_one()
                 else:
                     connection.exec_driver_sql(f"SET SESSION MAX_EXECUTION_TIME = {int(timeout_ms)}")

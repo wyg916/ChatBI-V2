@@ -1,0 +1,59 @@
+.shared-conversation-page,
+.shared-conversation-state {
+  min-height: 100dvh;
+  margin: 0;
+  background: #f6f7fb;
+  color: #30394d;
+  font-family: Inter, "PingFang SC", "Microsoft YaHei", sans-serif;
+}
+
+.shared-conversation-state { display: grid; padding: 32px; place-content: center; text-align: center; }
+.shared-conversation-state strong { font-size: 18px; }
+.shared-conversation-state p { color: #7a8498; }
+
+.shared-conversation-page > header {
+  display: flex;
+  min-height: 58px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 0 28px;
+  border-bottom: 1px solid #e1e5ee;
+  background: #fff;
+}
+.shared-conversation-page > header div { display: flex; align-items: center; gap: 10px; }
+.shared-conversation-page > header span { display: grid; width: 34px; height: 34px; place-items: center; border-radius: 10px; background: #5b5cf6; color: #fff; font-size: 11px; font-weight: 800; }
+.shared-conversation-page > header small { color: #7c879b; }
+
+.shared-conversation-card { width: min(920px, calc(100% - 32px)); margin: 28px auto; }
+.shared-conversation-card > h1 { margin: 0; font-size: 25px; }
+.shared-summary { margin: 8px 0 24px; color: #737e92; line-height: 1.6; }
+.shared-messages { display: grid; gap: 16px; }
+.shared-message { padding: 18px 20px; border: 1px solid #e1e5ee; border-radius: 14px; background: #fff; box-shadow: 0 8px 24px #1c28400b; }
+.shared-message.user { margin-left: min(18%, 140px); background: #f0efff; }
+.shared-message > small { color: #777fe1; font-weight: 700; }
+.shared-message > p { white-space: pre-wrap; line-height: 1.7; }
+.shared-text { border-top: 1px solid #eef0f5; padding-top: 12px; }
+.shared-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 9px; margin: 12px 0; }
+.shared-kpis > div { padding: 12px; border-radius: 10px; background: #f7f7fb; }
+.shared-kpis small,
+.shared-kpis strong { display: block; }
+.shared-kpis strong { margin-top: 6px; font-size: 20px; }
+.shared-kpis span { color: #7b8699; font-size: 11px; }
+.shared-table-wrap { margin-top: 12px; overflow-x: auto; }
+.shared-table-wrap table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.shared-table-wrap th,
+.shared-table-wrap td { padding: 8px 10px; border-bottom: 1px solid #e7eaf1; text-align: left; }
+.shared-table-wrap th { background: #f6f7fa; color: #5e697e; }
+.shared-citations { padding-left: 20px; color: #566278; }
+.shared-citations li { margin: 6px 0; }
+.shared-citations span,
+.shared-citations small { margin-left: 8px; color: #8791a3; }
+.shared-chart-placeholder { padding: 18px; border: 1px dashed #cfd3e1; border-radius: 10px; color: #727d91; text-align: center; }
+.shared-error { color: #b33d54; }
+.shared-conversation-page > footer { padding: 0 20px 28px; color: #8a94a7; text-align: center; font-size: 11px; }
+
+@media (max-width: 700px) {
+  .shared-conversation-page > header { align-items: flex-start; flex-direction: column; padding: 12px 16px; }
+  .shared-message.user { margin-left: 0; }
+}

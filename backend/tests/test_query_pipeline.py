@@ -96,6 +96,24 @@ def test_deterministic_provider_builds_structured_join_plan(dialect):
     assert plan.dialect == dialect
 
 
+def test_nl2sql_router_preserves_explicit_sql_before_external_provider() -> None:
+    class NeverCalledProvider:
+        @staticmethod
+        def capabilities():
+            return {"runtime_available": True}
+
+        @staticmethod
+        def generate(*, question, context):
+            raise AssertionError("explicit SQL must not reach an external model")
+
+    sql = "SELECT COUNT(*) AS revenue FROM demo_business.orders WHERE 1 = 0"
+    plan = Nl2SqlRouter(provider=NeverCalledProvider()).plan(question=sql, context=semantic_context())
+
+    assert plan.intent == "DIRECT_SQL"
+    assert plan.generated_sql == sql
+    assert plan.provider == "deterministic-semantic-v1"
+
+
 @pytest.mark.parametrize("dialect", ["postgresql", "mysql"])
 def test_day4_planner_supports_growth_ratio_null_and_date_boundaries(dialect):
     provider = DeterministicTestProvider()
@@ -294,6 +312,28 @@ def test_result_oracle_requires_all_metrics_and_rejects_duplicate_grain():
     result = ResultOracle().verify(plan=plan, guard=guard, execution=duplicate)
     assert result.status == "MISMATCH"
     assert next(item for item in result.checks if item.name == "duplicate_grain").passed is False
+
+
+def test_result_oracle_accepts_semantic_relationship_join_shape() -> None:
+    plan = DeterministicTestProvider().plan(question="按地区统计收入", context=semantic_context()).model_copy(update={
+        "joins": [{
+            "left_entity": "orders",
+            "right_entity": "regions",
+            "join_type": "INNER",
+            "join_keys": [{"left": "region_id", "right": "region_id"}],
+        }],
+    })
+    guard = GuardResult(allowed=True, dialect="postgresql", normalized_sql="SELECT ...", statement_type="SELECT")
+    execution = ExecutionResult(
+        status="SUCCEEDED", columns=["region", "revenue"], column_types=["text", "numeric"],
+        rows=[{"region": "华东", "revenue": 100.0}], row_count=1, datasource_id="d",
+        dialect="postgresql", normalized_sql="SELECT ...", result_signature="semantic-join",
+    )
+
+    result = ResultOracle().verify(plan=plan, guard=guard, execution=execution)
+
+    assert result.status == "PASSED"
+    assert next(item for item in result.checks if item.name == "join_semantics").passed is True
 
 
 def test_context_builder_link_score_is_deterministic():

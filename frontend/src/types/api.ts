@@ -152,6 +152,7 @@ export interface FeedbackCandidate { answer_id: string; question: string; sql: s
 export interface FeedbackWorkflow {
   answer_id: string; query_run_id?: string; status: string; workflow_state: string; question: string;
   corrected_sql?: string; oracle_status?: string; version: number; feedback: Record<string, unknown>;
+  reviewer?: string; question_pattern?: string; replay_count?: number;
 }
 export interface FeedbackDashboard {
   terminology: Array<{
@@ -218,7 +219,26 @@ export interface SessionUser { id: string; workspace_id: string; email: string; 
 export interface SessionResponse { authenticated: true; user: SessionUser; expires_at: string }
 export interface LoginInput { email: string; password: string; remember: boolean }
 export interface Conversation {
-  id: string; title: string; summary: string; active_attachment_ids: string[]; created_at: string; updated_at: string;
+  id: string; title: string; summary: string; active_attachment_ids: string[]; project_id?: string | null;
+  pinned_at?: string | null; archived_at?: string | null; created_at: string; updated_at: string;
+}
+export type ConversationListState = 'active' | 'archived' | 'all';
+export interface ConversationListOptions { q?: string; state?: ConversationListState; project_id?: string }
+export interface Project {
+  id: string; name: string; description: string; archived_at?: string | null; created_at: string; updated_at: string;
+}
+export interface ConversationBatchResult { affected_count: number; conversation_ids: string[] }
+export interface ConversationShare {
+  id: string; conversation_id: string; expires_at: string; revoked_at?: string | null; access_count: number;
+  last_accessed_at?: string | null; created_at: string;
+}
+export interface ConversationShareCreated extends ConversationShare { token: string; share_path: string }
+export interface SharedConversationMessage {
+  id: string; role: 'user' | 'assistant'; content: string; message_parts: Array<Record<string, unknown>>; created_at: string;
+}
+export interface SharedConversation {
+  share_id: string; title: string; summary: string; created_at: string; updated_at: string;
+  expires_at: string; read_only: true; messages: SharedConversationMessage[];
 }
 
 export type ResultSemantic = 'VALUE' | 'ZERO' | 'NO_ROWS' | 'NULL_VALUE' | 'FAILED';

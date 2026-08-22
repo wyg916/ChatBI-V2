@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { evaluationApi } from '../api/evaluation';
 import { ErrorNotice, Loading } from '../components/UI';
+import type { FeedbackWorkflow } from '../types/api';
 
 
 export function EvaluationFeedbackPanel() {
@@ -13,36 +14,39 @@ export function EvaluationFeedbackPanel() {
   const [comment, setComment] = useState('业务口径需要人工修正');
   const [correctedSql, setCorrectedSql] = useState('');
   const [expectedRows, setExpectedRows] = useState('[]');
+  const [reason, setReason] = useState<'INCORRECT_RESULT' | 'INCORRECT_SQL' | 'INCORRECT_CHART' | 'CITATION_PROBLEM' | 'OTHER'>('INCORRECT_RESULT');
   const [recallQuestion, setRecallQuestion] = useState('');
 
   const refresh = async () => queryClient.invalidateQueries({ queryKey: ['evaluation-feedback-dashboard'] });
   const correct = useMutation({
-    mutationFn: () => evaluationApi.correct(queryRunId, comment),
-    onSuccess: () => setNotice('回答正确反馈已记录。'),
+    mutationFn: () => evaluationApi.feedback({ query_run_id: queryRunId, sentiment: 'THUMB_UP', comment }),
+    onSuccess: async (workflow) => { setNotice(`Thumb Up 已进入 ${workflow.workflow_state} 队列。`); await refresh(); },
     onError: (error: Error) => setNotice(`正确反馈失败：${error.message}`),
   });
   const incorrect = useMutation({
-    mutationFn: async () => {
-      const rows = JSON.parse(expectedRows) as Array<Record<string, unknown>>;
-      const columns = rows[0] ? Object.keys(rows[0]) : [];
-      return evaluationApi.incorrect({
-        query_run_id: queryRunId,
-        comment,
-        corrected_sql: correctedSql,
-        expected_columns: columns,
-        expected_rows: rows,
-        owner_name: '当前用户',
-      });
-    },
+    mutationFn: () => evaluationApi.feedback({ query_run_id: queryRunId, sentiment: 'THUMB_DOWN', reason, comment }),
     onSuccess: async (workflow) => {
-      setNotice(`人工修正已提交：${workflow.workflow_state}。`);
+      setNotice(`Thumb Down 已进入 ${workflow.workflow_state} 队列。`);
       await refresh();
     },
     onError: (error: Error) => setNotice(`人工修正失败：${error.message}`),
   });
   const review = useMutation({
-    mutationFn: ({ answerId, decision }: { answerId: string; decision: 'APPROVE' | 'REJECT' }) =>
-      evaluationApi.review(answerId, decision, decision === 'APPROVE' ? 'Oracle 与业务口径复核通过' : '业务口径复核不通过'),
+    mutationFn: async ({ item, decision }: { item: FeedbackWorkflow; decision?: 'ACCEPT' | 'REJECT' }) => {
+      if (item.workflow_state === 'OPEN') return evaluationApi.startReview(item.answer_id, '由评测负责人开始复核');
+      if (item.workflow_state === 'IN_REVIEW' && decision) {
+        const rows = JSON.parse(expectedRows) as Array<Record<string, unknown>>;
+        return evaluationApi.decide(item.answer_id, {
+          decision,
+          comment: decision === 'ACCEPT' ? 'Guard、资源绑定、执行与 Oracle 复核通过' : '业务口径复核不通过',
+          corrected_sql: correctedSql || undefined,
+          expected_columns: rows[0] ? Object.keys(rows[0]) : undefined,
+          expected_rows: rows.length ? rows : undefined,
+          question_pattern: item.question,
+        });
+      }
+      return evaluationApi.review(item.answer_id, decision === 'REJECT' ? 'REJECT' : 'APPROVE', decision === 'REJECT' ? '业务口径复核不通过' : 'Oracle 与业务口径复核通过');
+    },
     onSuccess: async (workflow) => {
       setNotice(`审核完成：${workflow.workflow_state}，版本 ${workflow.version}。`);
       await refresh();
@@ -86,10 +90,11 @@ export function EvaluationFeedbackPanel() {
         <header><div><h2>提交用户反馈与人工修正</h2><p>修正 SQL 会重新进入正式 SQL Guard、只读执行和 Result Oracle。</p></div></header>
         <label>Query Run ID<input value={queryRunId} onChange={(event) => setQueryRunId(event.target.value)} placeholder="查询运行 ID" /></label>
         <label>反馈说明<textarea value={comment} onChange={(event) => setComment(event.target.value)} /></label>
-        <div className="feedback-actions"><button className="button secondary" type="button" disabled={!queryRunId || correct.isPending} onClick={() => correct.mutate()}>回答正确</button></div>
+        <div className="feedback-actions"><button className="button secondary" type="button" disabled={!queryRunId || correct.isPending} onClick={() => correct.mutate()}>Thumb Up（回答正确）</button></div>
+        <label>错误类型<select value={reason} onChange={(event) => setReason(event.target.value as typeof reason)}><option value="INCORRECT_RESULT">结果不正确</option><option value="INCORRECT_SQL">SQL 不正确</option><option value="INCORRECT_CHART">图表不正确</option><option value="CITATION_PROBLEM">引用问题</option><option value="OTHER">其他</option></select></label>
         <label>人工修正 SQL<textarea className="sql-input" value={correctedSql} onChange={(event) => setCorrectedSql(event.target.value)} placeholder="单条 SELECT / WITH SELECT" /></label>
         <label>期望结果 JSON<textarea className="sql-input" value={expectedRows} onChange={(event) => setExpectedRows(event.target.value)} /></label>
-        <button className="button primary" type="button" disabled={!queryRunId || !correctedSql || incorrect.isPending} onClick={() => incorrect.mutate()}>提交错误反馈与修正</button>
+        <button className="button primary" type="button" disabled={!queryRunId || incorrect.isPending} onClick={() => incorrect.mutate()}>Thumb Down 并进入审核</button>
       </article>
 
       <article className="evaluation-card feedback-form-card">
@@ -106,7 +111,7 @@ export function EvaluationFeedbackPanel() {
     <section className="evaluation-card feedback-workflows" data-testid="feedback-workflows">
       <header><div><h2>修正审核与版本记录</h2><p>Verified SQL 晋升必须同时满足人工审核和 Oracle PASS。</p></div></header>
       <div className="comparison-scroll"><table><thead><tr><th>问题</th><th>状态</th><th>Oracle</th><th>版本</th><th>操作</th></tr></thead><tbody>
-        {data.workflows.map((item) => <tr key={item.answer_id}><td><b>{item.question}</b><small>{item.workflow_state}</small></td><td>{item.status}</td><td>{item.oracle_status ?? 'NOT_RUN'}</td><td>v{item.version}</td><td>{item.status === 'DRAFT' ? <div className="feedback-actions"><button className="button small" type="button" onClick={() => review.mutate({ answerId: item.answer_id, decision: 'APPROVE' })}>审核通过</button><button className="button small secondary" type="button" onClick={() => review.mutate({ answerId: item.answer_id, decision: 'REJECT' })}>拒绝</button></div> : '已处理'}</td></tr>)}
+        {data.workflows.map((item) => <tr key={item.answer_id}><td><b>{item.question}</b><small>{item.workflow_state}{item.reviewer ? ` · ${item.reviewer}` : ''}</small></td><td>{item.status}</td><td>{item.oracle_status ?? 'NOT_RUN'}</td><td>v{item.version} · 回放 {item.replay_count ?? 0}</td><td>{item.status === 'DRAFT' ? <div className="feedback-actions">{item.workflow_state === 'OPEN' ? <button className="button small" type="button" onClick={() => review.mutate({ item })}>开始审核</button> : <><button className="button small" type="button" onClick={() => review.mutate({ item, decision: 'ACCEPT' })}>审核通过</button><button className="button small secondary" type="button" onClick={() => review.mutate({ item, decision: 'REJECT' })}>拒绝</button></>}</div> : '已处理'}</td></tr>)}
         {data.workflows.length === 0 && <tr><td colSpan={5}>暂无修正工作流</td></tr>}
       </tbody></table></div>
     </section>

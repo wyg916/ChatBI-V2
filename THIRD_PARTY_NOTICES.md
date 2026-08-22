@@ -29,6 +29,18 @@ Phase 3 adds two deliberately narrow third-party runtime boundaries plus one sep
 
 The retained license and provenance records live in `packages/dbgpt-runtime-adapter/` and `packages/pandasai-selected-runtime/`. The worker runs non-root with no host mount, no database/model credential, no external network, a read-only root filesystem, dropped capabilities, no-new-privileges, bounded tmpfs, CPU/RAM/PID/time/file/output limits, and mandatory synchronous removal. Missing dependency, wrong provenance or unavailable Docker fails closed and produces zero verified runtime calls.
 
+## V1.3.0 Phase 4 Markdown rendering dependencies
+
+Phase 4 renders the project-owned `AnswerEnvelope.markdown` through a strict allowlisted pipeline. Raw HTML is disabled; sanitized links allow only HTTP(S), `mailto:`, safe fragments, and controlled `/api/v1/` paths. Images are rendered as inert placeholders.
+
+| Package | Version | License | Runtime use |
+| --- | --- | --- | --- |
+| react-markdown | `10.1.0` | MIT | React Markdown renderer used only by the controlled AnswerEnvelope renderer |
+| remark-gfm | `4.0.1` | MIT | GitHub-Flavored Markdown tables, task lists and related syntax |
+| rehype-sanitize | `6.0.0` | MIT | HTML AST sanitization defense in depth; `rehype-raw` is not installed or enabled |
+
+All three are consumed as unmodified published npm packages pinned by `frontend/package-lock.json`. No upstream source, UI, logo, documentation, or brand asset is copied into ChatBI.
+
 ## v2.1 Day 1 semantic design provenance
 
 No source, UI, logo, trademark asset or binary from the following projects is copied or packaged. ChatBI uses project-owned clean-room adapters behind its own contracts; the references below document design provenance and the exact upstream state reviewed on 2026-08-18.
@@ -106,7 +118,7 @@ ChatBI V2 itself is released under Apache License 2.0. Direct dependencies are c
 | PyArrow, python-multipart | Apache-2.0 |
 | pypdf | BSD-3-Clause |
 | Pillow | MIT-CMU |
-| React, React DOM, React Router, TanStack Query, Testing Library, jsdom, Vite, Vitest | MIT |
+| React, React DOM, React Router, TanStack Query, react-markdown, remark-gfm, rehype-sanitize, Testing Library, jsdom, Vite, Vitest | MIT |
 | TypeScript, Playwright, Apache ECharts | Apache-2.0 |
 | pip-audit (release audit tooling only) | Apache-2.0 |
 

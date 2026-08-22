@@ -132,15 +132,22 @@ def _text_chunks(text: str, *, target_size: int = 80) -> Iterable[str]:
     """Yield stable, lossless business fragments without timers or fake typing."""
     if not text:
         return
+    chunks: list[str] = []
     for sentence in filter(None, re.split(r"(?<=[。！？!?；;\n])", text)):
         start = 0
         while len(sentence) - start > target_size:
             boundary = max(sentence.rfind(mark, start, start + target_size + 1) for mark in ("，", ",", "、", " "))
             end = boundary + 1 if boundary >= start else start + target_size
-            yield sentence[start:end]
+            chunks.append(sentence[start:end])
             start = end
         if start < len(sentence):
-            yield sentence[start:]
+            chunks.append(sentence[start:])
+    # Keep a canonical stream observably incremental even when a deterministic
+    # or direct-SQL answer is shorter than the normal chunk size.
+    if len(chunks) == 1 and len(chunks[0]) > 1:
+        midpoint = max(1, len(chunks[0]) // 2)
+        chunks = [chunks[0][:midpoint], chunks[0][midpoint:]]
+    yield from chunks
 
 
 @dataclass(frozen=True)

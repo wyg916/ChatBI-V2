@@ -201,7 +201,7 @@ test('ZERO 与 NULL_VALUE 用户态语义明确且不展示伪造可信度或空
 test('真实 chat SSE 严格递增、多 delta、成对 phase、唯一终态并与持久化一致', async ({ request }) => {
   const conversation = await createConversation(request);
   try {
-    const frames = await streamQuestion(request, conversation.id, '综合分析各地区收入与利润表现，结合收入口径和成本口径给出完整经营洞察、风险与后续建议');
+    const frames = await streamQuestion(request, conversation.id, 'SELECT SUM(revenue) AS revenue FROM demo_business.orders');
     const types = frames.map((item) => item.event_type);
     expect(types[0]).toBe('run.started');
     expect(types.at(-1)).toBe('run.completed');

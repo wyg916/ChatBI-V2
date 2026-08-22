@@ -5,6 +5,7 @@ on:
     branches:
       - "codex/v1.3.0-data-semantic-upstream"
       - "codex/v1.3.0-rag-agent-file-multimodal"
+      - "codex/v1.3.0-product-experience-governance"
   pull_request:
     paths:
       - ".github/workflows/v21-eval-golden-feedback.yml"

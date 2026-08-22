@@ -37,6 +37,7 @@ class RequestContext(BaseModel):
     request_id: str = Field(min_length=1, max_length=128)
     trace_id: str = Field(min_length=8, max_length=128)
     conversation_id: str | None = Field(default=None, max_length=64)
+    route: str | None = Field(default=None, max_length=64)
     user_id: str = Field(default="SYSTEM", min_length=1, max_length=128)
     workspace_id: str = Field(default="SYSTEM", min_length=1, max_length=128)
     project_id: str | None = Field(default=None, max_length=128)
@@ -56,6 +57,7 @@ class RequestContext(BaseModel):
             "workspace_id": self.workspace_id,
             "user_id": self.user_id,
             "conversation_id": self.conversation_id,
+            "route": self.route,
             "datasource_id": self.datasource_id,
             "permission_hash": self.permission_hash,
             "context_hash": self.context_hash,

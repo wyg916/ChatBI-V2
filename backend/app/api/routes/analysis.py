@@ -7,7 +7,7 @@ from time import perf_counter
 from datetime import datetime, timezone
 from uuid import uuid4
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, Response, status
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
@@ -16,8 +16,10 @@ from app.db.session import SessionLocal, get_db
 from app.integration.contracts import AnalysisRequest, AnalysisResponse
 from app.integration.service import AnalysisService
 from app.model_gateway import BudgetMode, RequestContext
+from app.model_gateway.ledger import bind_model_invocation_session
 from app.core.config import get_settings
 from app.services.answer_composer import AnswerComposer
+from app.services.answer_envelope import build_answer_envelope
 from app.streaming import PHASE_LABELS, StreamCancelled, StreamEventFactory, format_sse, phase_for_stage, stream_registry
 
 
@@ -27,10 +29,33 @@ router = APIRouter(tags=["controlled analysis"])
 @router.post("/analysis", response_model=AnalysisResponse, status_code=status.HTTP_201_CREATED)
 def analyze(
     data: AnalysisRequest,
+    response: Response,
     db: Session = Depends(get_db),
     principal: Principal = Depends(require_permission("query.ask")),
 ) -> AnalysisResponse:
-    return AnalysisService().execute(db, data, principal)
+    result = AnalysisService().execute(db, data, principal)
+    response.headers["X-Trace-ID"] = result.trace_id
+    payload = result.model_dump(mode="json", exclude={"answer_envelope"})
+    content = _answer_text(payload)
+    composed = AnswerComposer().compose(
+        answer=content,
+        status=result.status,
+        response_payload={"analysis": payload},
+    )
+    envelope = build_answer_envelope(
+        answer_id=f"analysis-assistant-{result.trace_id}",
+        conversation_id=f"analysis-{result.trace_id}",
+        message_id=f"analysis-assistant-{result.trace_id}",
+        trace_id=result.trace_id,
+        route=result.route,
+        status=result.status,
+        content=composed.content,
+        response_payload={"analysis": payload, "message_parts": composed.message_parts},
+        trace_payload={"trace_id": result.trace_id},
+        message_parts=composed.message_parts,
+        result_semantic=composed.result_semantic,
+    )
+    return result.model_copy(update={"answer_envelope": envelope})
 
 
 def _answer_text(payload: dict) -> str:
@@ -115,12 +140,30 @@ def _chat_response(
         "error_code": None,
         "created_at": timestamp,
     }
+    envelope = build_answer_envelope(
+        answer_id=assistant_message_id,
+        conversation_id=conversation_id,
+        message_id=assistant_message_id,
+        trace_id=str(payload.get("trace_id") or run_id),
+        route=route,
+        status=str(payload.get("status") or "SUCCEEDED"),
+        content=content,
+        response_payload={"analysis": payload, "message_parts": message_parts},
+        trace_payload=assistant_message["trace_payload"],
+        message_parts=message_parts,
+        result_semantic=result_semantic,
+    )
+    assistant_message["response_payload"] = {
+        **assistant_message["response_payload"],
+        "answer_envelope": envelope.model_dump(mode="json"),
+    }
     return {
         "conversation": conversation,
         "user_message": user_message,
         "assistant_message": assistant_message,
         "message_parts": message_parts,
         "result_semantic": result_semantic,
+        "answer_envelope": envelope.model_dump(mode="json"),
     }
 
 
@@ -163,14 +206,15 @@ def analyze_stream(
         stream_registry.task_started(run_id)
         try:
             with SessionLocal() as db:
-                result = AnalysisService().execute(
-                    db,
-                    data,
-                    principal,
-                    progress_callback=progress,
-                    cancellation_event=lifecycle.cancel_event,
-                    request_context=request_context,
-                )
+                with bind_model_invocation_session(db):
+                    result = AnalysisService().execute(
+                        db,
+                        data,
+                        principal,
+                        progress_callback=progress,
+                        cancellation_event=lifecycle.cancel_event,
+                        request_context=request_context,
+                    )
             lifecycle.checkpoint()
             events.put(("result", result.model_dump(mode="json")))
         except StreamCancelled:

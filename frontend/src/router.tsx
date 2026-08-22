@@ -22,6 +22,7 @@ export const routeManifest = [
 
 export const router = createBrowserRouter([
   { path: '/login', lazy: async () => ({ Component: (await import('./pages/LoginPage')).LoginPage }) },
+  { path: '/share/:token', lazy: async () => ({ Component: (await import('./pages/SharedConversationPage')).SharedConversationPage }) },
   {
     element: <ProtectedRoute />,
     children: [
