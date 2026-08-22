@@ -441,6 +441,14 @@ def secret_scan() -> dict[str, Any]:
     }
     hits: list[dict[str, Any]] = []
     scanned = 0
+    shallow = subprocess.run(
+        ["git", "rev-parse", "--is-shallow-repository"],
+        cwd=ROOT,
+        check=True,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+    ).stdout.strip().lower() == "true"
     for path in _working_files():
         if not path.is_file():
             continue
@@ -502,14 +510,20 @@ def secret_scan() -> dict[str, Any]:
                 },
             )
     hits.extend(history_hits.values())
+    failures = []
+    if shallow:
+        failures.append("Git history is shallow; full-history secret scan is not proven")
+    if hits:
+        failures.append("working tree or Git history contains secret patterns")
     return {
         "working_tree_text_files_scanned": scanned,
         "working_tree_secret_hit_count": sum(item["scope"] == "working-tree" for item in hits),
         "git_history_secret_hit_count": len(history_hits),
+        "git_history_complete": not shallow,
         "secret_hit_count": len(hits),
         "hits": hits[:50],
         "redacted_output": True,
-        "failures": ["working tree or Git history contains secret patterns"] if hits else [],
+        "failures": failures,
     }
 
 
@@ -576,12 +590,34 @@ def dependency_integrity(policy: dict[str, Any]) -> dict[str, Any]:
                 direct_sqlbot_calls += 1
     if forbidden & dependency_names or direct_sqlbot_calls:
         failures.append("SQLBot exception boundary was violated")
+    pip_check = subprocess.run(
+        [sys.executable, "-m", "pip", "check"],
+        cwd=ROOT,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if pip_check.returncode != 0:
+        failures.append("release runtime pip check reported dependency conflicts")
+    try:
+        dbgpt_requirements = importlib.metadata.requires("dbgpt") or []
+    except importlib.metadata.PackageNotFoundError:
+        dbgpt_requirements = []
+        failures.append("selected DB-GPT distribution is not installed")
+    aiohttp_requirements = [
+        requirement for requirement in dbgpt_requirements
+        if requirement.lower().startswith("aiohttp")
+    ]
+    if aiohttp_requirements != ["aiohttp==3.14.3"]:
+        failures.append("selected DB-GPT aiohttp metadata was not corrected exactly")
     return {
         "python_requirement_entries": entry_count,
         "npm_locked_packages": max(0, len(lock_packages) - 1),
         "npm_missing_integrity": missing_integrity,
         "npm_missing_license": missing_license,
         "direct_sqlbot_calls": direct_sqlbot_calls,
+        "pip_check_returncode": pip_check.returncode,
+        "selected_dbgpt_aiohttp_requirements": aiohttp_requirements,
         "failures": failures,
     }
 

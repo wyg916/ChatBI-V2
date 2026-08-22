@@ -6,7 +6,9 @@ V1.3.0 Phase 5 继续冻结 DB-GPT `dbgpt-core/AWEL` 的相同 commit、archive
 SHA 和三个 runtime symbols。该发行 metadata 把 `aiohttp` 精确锁在
 `3.8.4`，但 ChatBI Adapter 不调用 DB-GPT HTTP client/server surface，只调用
 `DAG`、`MapOperator` 和 `BaseOperator.call`。发布环境因此先安装冻结 archive，
-再应用精确的 `aiohttp==3.14.3` 审计覆盖。真实 selected-runtime 测试必须重新
+再应用精确的 `aiohttp==3.14.3` 审计覆盖。安装步骤验证 exact direct URL、archive
+SHA、subdirectory 与旧依赖声明后，只修正已安装 distribution 的 aiohttp metadata
+并同步 RECORD；随后 `pip check` 必须为零冲突。真实 selected-runtime 测试必须重新
 证明兼容，依赖审计必须为零未忽略漏洞；本决定不授权通用 DB-GPT 升级或新增
 第三方运行面。
 

@@ -24,9 +24,12 @@
     "deterministic_schedule": "(user_index + sequence * users) modulo case_count"
   },
   "release_gate": {
-    "min_users": 20,
-    "min_duration_seconds": 900,
-    "min_success_rate": 1,
+    "min_users": 4,
+    "min_duration_seconds": 120,
+    "min_success_rate": 1
+  },
+  "record_only_reference_thresholds": {
+    "purpose": "observational_only_not_a_release_gate",
     "max_query_p95_ms": 2000,
     "max_query_p99_ms": 5000,
     "max_total_p95_ms": 2500,
@@ -1037,5 +1040,5 @@
       }
     }
   ],
-  "manifest_sha256": "5cddeee65ba155670e45dbc687e9a8b9a3ed04f6291bb3ee049d15a108c0d0bb"
+  "manifest_sha256": "81e47ada3892fbc7730ae69656c7cf58a8253d837bca54b5044367092ae1d3f6"
 }

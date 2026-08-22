@@ -316,8 +316,11 @@ def test_supply_integrity_secret_actions_notices_and_deprecations(gate):
     notices = gate.notice_and_license_integrity(policy)
     deprecations = gate.deprecation_integrity()
     assert secret["secret_hit_count"] == 0, secret["hits"]
+    assert secret["git_history_complete"] is True
     assert dependencies["failures"] == []
     assert dependencies["direct_sqlbot_calls"] == 0
+    assert dependencies["pip_check_returncode"] == 0
+    assert dependencies["selected_dbgpt_aiohttp_requirements"] == ["aiohttp==3.14.3"]
     assert actions["failures"] == []
     assert actions["node20_action_uses"] == 0
     assert notices["failures"] == []

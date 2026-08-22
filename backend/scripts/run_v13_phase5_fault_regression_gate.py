@@ -234,6 +234,24 @@ def validate_weird_manifest(payload: dict[str, Any]) -> dict[str, Any]:
             raise ValueError(f"{action} answer contract fields are not exact")
         if contract["claim_mode"] not in {"NONE", "SAFE_ONLY", "DATE_ONLY", "EMPTY_ONLY", "VERIFIED_ONLY"}:
             raise ValueError(f"{action} answer contract has unknown claim mode")
+    ground_truth = payload.get("case_ground_truth") or {}
+    result_sets = payload.get("frozen_result_sets") or {}
+    if set(ground_truth) != set(ids):
+        raise ValueError("Weird 50 must freeze per-case ground truth")
+    allowed_truth_kinds = {
+        "SAFE_NO_BUSINESS_CLAIM", "CLARIFICATION_NO_CLAIM", "REFUSAL_NO_CLAIM",
+        "NO_EVIDENCE_NO_CLAIM", "EXACT_DATE", "EMPTY_RESULT", "STRUCTURED_RESULT",
+    }
+    for case_id, truth in ground_truth.items():
+        if truth.get("kind") not in allowed_truth_kinds:
+            raise ValueError(f"{case_id} has unknown frozen ground truth")
+        if truth.get("kind") in {"STRUCTURED_RESULT", "EMPTY_RESULT"}:
+            if truth.get("result_set") not in result_sets or "expected_claims" not in truth:
+                raise ValueError(f"{case_id} lacks frozen rows/claims")
+        if truth.get("kind") == "STRUCTURED_RESULT" and not truth["expected_claims"]:
+            raise ValueError(f"{case_id} lacks exact answer claims")
+        if truth.get("kind") == "EXACT_DATE" and not truth.get("value"):
+            raise ValueError(f"{case_id} lacks an exact date value")
     return {
         "status": "PASS",
         "case_count": len(cases),
@@ -288,17 +306,21 @@ def validate_complex_manifest(payload: dict[str, Any]) -> dict[str, Any]:
             raise ValueError(f"{case['id']} lacks exact frozen evidence sections")
         result_contract = frozen_evidence["result"]
         if set(result_contract) != {
-            "result_semantic", "oracle_status", "required_metrics", "required_dimensions", "minimum_row_count"
+            "result_semantic", "required_metrics", "required_dimensions", "minimum_row_count",
+            "expected_rows", "expected_answer_claims",
         }:
             raise ValueError(f"{case['id']} result evidence contract is not exact")
-        if result_contract["result_semantic"] != "VALUE" or result_contract["oracle_status"] != "PASSED":
-            raise ValueError(f"{case['id']} result evidence must freeze VALUE/PASSED")
+        if result_contract["result_semantic"] != "VALUE":
+            raise ValueError(f"{case['id']} result evidence must freeze VALUE")
         if int(result_contract["minimum_row_count"]) < 1 or not result_contract["required_metrics"]:
             raise ValueError(f"{case['id']} result evidence is not meaningful")
+        if len(result_contract["expected_rows"]) != int(result_contract["minimum_row_count"]):
+            raise ValueError(f"{case['id']} exact rows do not match the frozen row count")
+        if not result_contract["expected_answer_claims"]:
+            raise ValueError(f"{case['id']} lacks exact frozen answer claims")
         if case["kind"] == "DATA_RAG" and frozen_evidence["citation"] != {
             "required": True,
-            "minimum_count": 1,
-            "required_title_terms": ["收入", "口径"],
+            "expected_citations": [{"title": "收入口径与退款处理"}],
         }:
             raise ValueError(f"{case['id']} citation evidence is not frozen")
         if case["kind"] == "AGENT_PYTHON" and frozen_evidence["sandbox"] != {
@@ -307,6 +329,7 @@ def validate_complex_manifest(payload: dict[str, Any]) -> dict[str, Any]:
             "runtime_verified": True,
             "container_destroyed": True,
             "operation": "correlation",
+            "result": {"correlation": 1.0, "sample_size": 2},
         }:
             raise ValueError(f"{case['id']} sandbox evidence is not frozen")
         if case["kind"] == "FILE_DB":
@@ -569,6 +592,9 @@ def build_report(
     return {
         "schema_version": "chatbi-v1.3-phase5-fault-regression-gate-v1",
         "executed_at": datetime.now(timezone.utc).isoformat(),
+        "tested_sha": subprocess.run(
+            ["git", "rev-parse", "HEAD"], cwd=PROJECT_ROOT, capture_output=True, text=True, check=True,
+        ).stdout.strip(),
         "status": status,
         "external_runtime_success_claim": False,
         "executed_regression_claim": status in {"PASS", "FAULT_PASS"},

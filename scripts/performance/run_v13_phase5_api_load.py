@@ -154,12 +154,27 @@ QUESTIONS = {
     "DATA": "统计全部订单收入，并返回可核验结果。",
     "RAG": "根据已授权业务知识说明收入指标口径，并给出可核验引用。",
     "HYBRID": "结合订单数据与已授权业务口径，分析收入结果并给出引用。",
-    "AGENT": "对订单收入、成本和区域差异做复杂分析，验证结果后给出业务结论。",
+    "AGENT": "对全部订单收入做复杂分析，结合已授权业务口径验证后给出结论。",
     "FILE": "计算附件中收入合计并按区域比较，给出可核验明细。",
     "VISION": "识别附件图表中的各月收入柱并总结趋势，不要编造不可见数值。",
 }
 VISION_EXPECTED_VALUES = (100, 120, 90, 150, 130, 170)
 FILE_EXPECTED_REVENUE = 2_194_620
+EXPECTED_REVENUE_KNOWLEDGE_TITLE = "收入口径与退款处理"
+EXPECTED_REVENUE_KNOWLEDGE_TEXT = (
+    "收入（营收、销售额）按已确认且有效订单的 revenue 求和；取消订单不计入，"
+    "退款按实际冲减金额扣除。数据结果必须经过 SQL Guard 与 Result Oracle 后发布。"
+)
+EXPECTED_REVENUE_KNOWLEDGE_SHA256 = hashlib.sha256(
+    EXPECTED_REVENUE_KNOWLEDGE_TEXT.encode("utf-8")
+).hexdigest()
+_INLINE_CITATION_RE = re.compile(r"\[citation:([^\]]+)\]", re.IGNORECASE)
+_KNOWLEDGE_INJECTION_RE = re.compile(
+    r"ignore\s+(?:all\s+)?previous\s+instructions|忽略.{0,12}(?:之前|以上|系统).{0,8}(?:指令|提示)|"
+    r"(?:system|developer)\s*prompt|(?:绕过|跳过|disable).{0,16}(?:权限|guard|acl|安全)|"
+    r"(?:exfiltrate|reveal).{0,24}(?:secret|credential|prompt)",
+    re.IGNORECASE,
+)
 _DIGITS = {
     "0": ("111", "101", "101", "101", "111"),
     "1": ("010", "110", "010", "010", "111"),
@@ -876,6 +891,56 @@ def _analysis_payload(terminal: dict[str, Any]) -> tuple[str | None, dict[str, A
     return observed_route, analysis
 
 
+def _independent_knowledge_failures(
+    knowledge: dict[str, Any], *, require_inline_claims: bool,
+) -> list[str]:
+    """Validate frozen citation content and answer claims without trusting service verdict fields."""
+    failures: list[str] = []
+    citations = knowledge.get("citations") if isinstance(knowledge.get("citations"), list) else []
+    citation_by_id: dict[str, dict[str, Any]] = {
+        str(item.get("citation_id")): item
+        for item in citations
+        if isinstance(item, dict) and item.get("citation_id")
+    }
+    frozen = [
+        item for item in citation_by_id.values()
+        if str(item.get("title") or "") == EXPECTED_REVENUE_KNOWLEDGE_TITLE
+        and str(item.get("text") or item.get("citation_text") or "") == EXPECTED_REVENUE_KNOWLEDGE_TEXT
+    ]
+    if not frozen or any(
+        hashlib.sha256(str(item.get("text") or item.get("citation_text") or "").encode("utf-8")).hexdigest()
+        != EXPECTED_REVENUE_KNOWLEDGE_SHA256
+        for item in frozen
+    ):
+        failures.append("FROZEN_REVENUE_KNOWLEDGE_CONTENT_NOT_PROVEN")
+    if any(
+        _KNOWLEDGE_INJECTION_RE.search(str(item.get("text") or item.get("citation_text") or ""))
+        for item in citation_by_id.values()
+    ):
+        failures.append("PROMPT_INJECTION_CITATION_PRESENT")
+
+    if require_inline_claims:
+        summary = str(knowledge.get("summary") or "").strip()
+        factual_lines = [line.strip() for line in summary.splitlines() if line.strip()]
+        if not factual_lines:
+            failures.append("KNOWLEDGE_ANSWER_MISSING")
+        for line in factual_lines:
+            cited_ids = _INLINE_CITATION_RE.findall(line)
+            claim = " ".join(_INLINE_CITATION_RE.sub("", line).split()).strip("#*- ")
+            if not claim or not cited_ids or any(identifier not in citation_by_id for identifier in cited_ids):
+                failures.append("KNOWLEDGE_INLINE_CLAIM_CITATION_INVALID")
+                continue
+            cited_text = " ".join(
+                str(citation_by_id[identifier].get("text") or citation_by_id[identifier].get("citation_text") or "")
+                for identifier in cited_ids
+            )
+            normalized_claim = "".join(claim.casefold().split())
+            normalized_evidence = "".join(cited_text.casefold().split())
+            if normalized_claim not in normalized_evidence:
+                failures.append("KNOWLEDGE_CLAIM_NOT_ENTAILED_BY_FROZEN_CITATION")
+    return failures
+
+
 def _data_failures(
     data: dict[str, Any], expected_value: Decimal, expected_signature: str | None = None,
 ) -> list[str]:
@@ -947,6 +1012,7 @@ def validate_business_result(
         cited_ids = {str(item) for item in guard.get("cited_ids") or []}
         if str(analysis.get("status")) != "SUCCEEDED" or str(primary.get("status")) != "SUCCEEDED":
             failures.append("RAG_STATUS_NOT_SUCCEEDED")
+        failures.extend(_independent_knowledge_failures(primary, require_inline_claims=True))
         if not citations or not all(
             isinstance(item, dict)
             and item.get("citation_id") and item.get("document_id") and item.get("document_version_id")
@@ -969,6 +1035,7 @@ def validate_business_result(
         data = primary.get("data") if isinstance(primary.get("data"), dict) else {}
         knowledge = primary.get("knowledge") if isinstance(primary.get("knowledge"), dict) else {}
         failures.extend(_data_failures(data, expected_data_value, expected_data_signature))
+        failures.extend(_independent_knowledge_failures(knowledge, require_inline_claims=True))
         citations = knowledge.get("citations") if isinstance(knowledge.get("citations"), list) else []
         guard = knowledge.get("answer_guard_evidence") if isinstance(knowledge.get("answer_guard_evidence"), dict) else {}
         citation_ids = {
@@ -1010,6 +1077,17 @@ def validate_business_result(
         }
         roles = {str(item.get("agent_role")) for item in steps if isinstance(item, dict) and item.get("agent_role")}
         verification = primary.get("verification") if isinstance(primary.get("verification"), dict) else {}
+        data_evidence = primary.get("data_evidence") if isinstance(primary.get("data_evidence"), dict) else {}
+        knowledge_evidence = (
+            primary.get("knowledge_evidence") if isinstance(primary.get("knowledge_evidence"), dict) else {}
+        )
+        failures.extend(_data_failures(data_evidence, expected_data_value, expected_data_signature))
+        failures.extend(_independent_knowledge_failures(knowledge_evidence, require_inline_claims=False))
+        answer = str(primary.get("answer") or "")
+        if str(expected_data_value) not in answer.replace(",", ""):
+            failures.append("AGENT_ANSWER_FROZEN_VALUE_NOT_PROVEN")
+        if EXPECTED_REVENUE_KNOWLEDGE_TITLE not in answer:
+            failures.append("AGENT_ANSWER_FROZEN_KNOWLEDGE_NOT_PROVEN")
         if str(primary.get("status")) != "SUCCEEDED" or analysis.get("fallback_used") is True:
             failures.append("AGENT_STATUS_OR_FALLBACK_INVALID")
         if primary.get("trace_complete") is not True or not steps:
@@ -1019,7 +1097,7 @@ def validate_business_result(
         if roles != allowed_roles or not all(str(item.get("status")) == "SUCCEEDED" for item in steps if isinstance(item, dict)):
             failures.append("AGENT_ROLES_OR_STEP_SUCCESS_NOT_PROVEN")
         if not verification or not all(bool(value) for value in verification.values()):
-            failures.append("AGENT_VERIFICATION_NOT_PROVEN")
+            failures.append("AGENT_SELF_REPORTED_VERIFICATION_INVALID")
     elif kind == "FILE":
         response = terminal.get("response") if isinstance(terminal.get("response"), dict) else {}
         assistant = response.get("assistant_message") if isinstance(response.get("assistant_message"), dict) else {}

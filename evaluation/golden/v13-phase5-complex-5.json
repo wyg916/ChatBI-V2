@@ -8,7 +8,7 @@
     {
       "id": "P5C01",
       "kind": "MULTI_STEP_DATA",
-      "question": "分析2026年各区域收入趋势、同比与贡献度，验证关键结果后生成图表和结论。",
+      "question": "分析2026年第一季度各地区已支付订单量、收入和成本，按收入降序，逐行验证冻结结果后生成图表和结论。",
       "route": "COMPLEX_ANALYSIS",
       "steps": [
         {"ordinal":1,"role":"PlannerAgent","tool":null,"stage":"PLAN"},
@@ -17,12 +17,12 @@
         {"ordinal":4,"role":"InsightAgent","tool":"GENERATE_CHART","stage":"CHART"},
         {"ordinal":5,"role":"InsightAgent","tool":"GENERATE_INSIGHT","stage":"INSIGHT"}
       ],
-      "expected":{"max_steps":8,"max_tool_calls":12,"model_calls_max":3,"max_latency_ms":30000,"max_cost_cny":0.20,"cancel_terminal":"run.cancelled","verification_required":true,"accuracy_metric":"result_value_accuracy","accuracy_min":0.95,"stale_answer_count":0,"expected_evidence":{"result":{"result_semantic":"VALUE","oracle_status":"PASSED","required_metrics":["revenue"],"required_dimensions":["region","month"],"minimum_row_count":1},"citation":{"required":false},"file":{"required":false},"sandbox":{"required":false}}}
+      "expected":{"max_steps":8,"max_tool_calls":12,"model_calls_max":3,"max_latency_ms":30000,"max_cost_cny":0.20,"cancel_terminal":"run.cancelled","verification_required":true,"accuracy_metric":"result_value_accuracy","accuracy_min":0.95,"stale_answer_count":0,"expected_evidence":{"result":{"result_semantic":"VALUE","required_metrics":["order_count","revenue","cost"],"required_dimensions":["region"],"minimum_row_count":5,"expected_rows":[{"region":"西部","order_count":52,"revenue":87150.0,"cost":47253.5},{"region":"华南","order_count":51,"revenue":80475.0,"cost":46553.5},{"region":"华东","order_count":51,"revenue":78937.5,"cost":43834.0},{"region":"华北","order_count":51,"revenue":77400.0,"cost":43809.5},{"region":"华中","order_count":51,"revenue":75862.5,"cost":42437.5}],"expected_answer_claims":[{"metric":"revenue","dimension":"region","dimension_value":"西部","value":87150.0}]},"citation":{"required":false},"file":{"required":false},"sandbox":{"required":false}}}
     },
     {
       "id": "P5C02",
       "kind": "DATA_RAG",
-      "question": "按已授权收入口径核对2026年Q1区域收入，融合数据库结果和制度引用并逐项验证。",
+      "question": "按已授权收入口径核对2026年Q1华东已支付订单量、收入和成本，融合数据库精确结果和制度引用并逐项验证。",
       "route": "HYBRID_ANALYSIS",
       "steps": [
         {"ordinal":1,"role":"PlannerAgent","tool":null,"stage":"PLAN"},
@@ -32,12 +32,12 @@
         {"ordinal":5,"role":"VerificationAgent","tool":"VERIFY_CITATION","stage":"VERIFY_CITATION"},
         {"ordinal":6,"role":"InsightAgent","tool":"GENERATE_INSIGHT","stage":"INSIGHT"}
       ],
-      "expected":{"max_steps":8,"max_tool_calls":12,"model_calls_max":3,"max_latency_ms":30000,"max_cost_cny":0.25,"cancel_terminal":"run.cancelled","verification_required":true,"accuracy_metric":"citation_and_result_accuracy","accuracy_min":0.95,"stale_answer_count":0,"expected_evidence":{"result":{"result_semantic":"VALUE","oracle_status":"PASSED","required_metrics":["revenue"],"required_dimensions":["region"],"minimum_row_count":1},"citation":{"required":true,"minimum_count":1,"required_title_terms":["收入","口径"]},"file":{"required":false},"sandbox":{"required":false}}}
+      "expected":{"max_steps":8,"max_tool_calls":12,"model_calls_max":3,"max_latency_ms":30000,"max_cost_cny":0.25,"cancel_terminal":"run.cancelled","verification_required":true,"accuracy_metric":"citation_and_result_accuracy","accuracy_min":0.95,"stale_answer_count":0,"expected_evidence":{"result":{"result_semantic":"VALUE","required_metrics":["order_count","revenue","cost"],"required_dimensions":[],"minimum_row_count":1,"expected_rows":[{"order_count":51,"revenue":78937.5,"cost":43834.0}],"expected_answer_claims":[{"metric":"revenue","scope":"2026Q1_PAID_EAST","value":78937.5}]},"citation":{"required":true,"expected_citations":[{"title":"收入口径与退款处理"}]},"file":{"required":false},"sandbox":{"required":false}}}
     },
     {
       "id": "P5C03",
       "kind": "AGENT_SQL",
-      "question": "规划并执行多Join SQL，比较产品类别利润率，验证SQL Guard、EXPLAIN、Oracle和复核查询。",
+      "question": "规划并执行多Join SQL，按品类统计订单量、收入、成本和利润，验证SQL Guard、EXPLAIN和复核查询，并逐行匹配冻结结果。",
       "route": "COMPLEX_ANALYSIS",
       "steps": [
         {"ordinal":1,"role":"PlannerAgent","tool":null,"stage":"PLAN"},
@@ -45,12 +45,12 @@
         {"ordinal":3,"role":"VerificationAgent","tool":"VERIFY_RESULT","stage":"VERIFICATION_QUERY"},
         {"ordinal":4,"role":"InsightAgent","tool":"GENERATE_INSIGHT","stage":"INSIGHT"}
       ],
-      "expected":{"max_steps":8,"max_tool_calls":12,"model_calls_max":3,"max_latency_ms":30000,"max_cost_cny":0.20,"cancel_terminal":"run.cancelled","verification_required":true,"accuracy_metric":"sql_and_result_accuracy","accuracy_min":0.95,"stale_answer_count":0,"expected_evidence":{"result":{"result_semantic":"VALUE","oracle_status":"PASSED","required_metrics":["profit_margin"],"required_dimensions":["category"],"minimum_row_count":1},"citation":{"required":false},"file":{"required":false},"sandbox":{"required":false}}}
+      "expected":{"max_steps":8,"max_tool_calls":12,"model_calls_max":3,"max_latency_ms":30000,"max_cost_cny":0.20,"cancel_terminal":"run.cancelled","verification_required":true,"accuracy_metric":"sql_and_result_accuracy","accuracy_min":0.95,"stale_answer_count":0,"expected_evidence":{"result":{"result_semantic":"VALUE","required_metrics":["order_count","revenue","cost","profit"],"required_dimensions":["category"],"minimum_row_count":4,"expected_rows":[{"category":"充电设备","order_count":438,"revenue":681412.5,"cost":375126.5,"profit":306286.0},{"category":"软件与终端","order_count":219,"revenue":361237.5,"cost":200977.0,"profit":160260.5},{"category":"储能设备","order_count":219,"revenue":353025.0,"cost":195611.5,"profit":157413.5},{"category":"服务","order_count":219,"revenue":330075.0,"cost":180740.0,"profit":149335.0}],"expected_answer_claims":[{"metric":"profit","dimension":"category","dimension_value":"充电设备","value":306286.0}]},"citation":{"required":false},"file":{"required":false},"sandbox":{"required":false}}}
     },
     {
       "id": "P5C04",
       "kind": "AGENT_PYTHON",
-      "question": "对授权数据做受限Python相关性分析，Agent只通过固定QUERY_DATA工具提交数据并验证Sandbox结果。",
+      "question": "对冻结的2025与2026年度收入和成本汇总做受限Python相关性分析，返回精确相关系数与样本量，Agent只通过固定QUERY_DATA工具提交数据并验证Sandbox结果。",
       "route": "COMPLEX_ANALYSIS",
       "steps": [
         {"ordinal":1,"role":"PlannerAgent","tool":null,"stage":"PLAN"},
@@ -60,12 +60,12 @@
         {"ordinal":5,"role":"InsightAgent","tool":"GENERATE_CHART","stage":"CHART"},
         {"ordinal":6,"role":"InsightAgent","tool":"GENERATE_INSIGHT","stage":"INSIGHT"}
       ],
-      "expected":{"max_steps":8,"max_tool_calls":12,"model_calls_max":3,"max_latency_ms":30000,"max_cost_cny":0.20,"cancel_terminal":"run.cancelled","verification_required":true,"accuracy_metric":"sandbox_result_accuracy","accuracy_min":0.95,"stale_answer_count":0,"sandbox_destroyed_required":true,"expected_evidence":{"result":{"result_semantic":"VALUE","oracle_status":"PASSED","required_metrics":["correlation"],"required_dimensions":[],"minimum_row_count":1},"citation":{"required":false},"file":{"required":false},"sandbox":{"required":true,"status":"SUCCEEDED","runtime_verified":true,"container_destroyed":true,"operation":"correlation"}}}
+      "expected":{"max_steps":8,"max_tool_calls":12,"model_calls_max":3,"max_latency_ms":30000,"max_cost_cny":0.20,"cancel_terminal":"run.cancelled","verification_required":true,"accuracy_metric":"sandbox_result_accuracy","accuracy_min":0.95,"stale_answer_count":0,"sandbox_destroyed_required":true,"expected_evidence":{"result":{"result_semantic":"VALUE","required_metrics":["correlation","sample_size"],"required_dimensions":[],"minimum_row_count":1,"expected_rows":[{"correlation":1.0,"sample_size":2}],"expected_answer_claims":[{"metric":"correlation","scope":"ANNUAL_REVENUE_COST_2025_2026","value":1.0}]},"citation":{"required":false},"file":{"required":false},"sandbox":{"required":true,"status":"SUCCEEDED","runtime_verified":true,"container_destroyed":true,"operation":"correlation","result":{"correlation":1.0,"sample_size":2}}}}
     },
     {
       "id": "P5C05",
       "kind": "FILE_DB",
-      "question": "把授权CSV完整数据与数据库区域收入比较，验证文件签名、数据库结果签名和差异值，支持取消。",
+      "question": "把授权CSV中华东、华南收入汇总与数据库2026年Q1同区域已支付收入比较，返回两行精确差异，验证文件、数据库结果并支持取消。",
       "route": "COMPLEX_ANALYSIS",
       "attachment": {
         "path": "backend/tests/fixtures/v13_phase5_file_db.csv",
@@ -79,7 +79,7 @@
         {"ordinal":5,"role":"InsightAgent","tool":"GENERATE_CHART","stage":"CHART"},
         {"ordinal":6,"role":"InsightAgent","tool":"GENERATE_INSIGHT","stage":"INSIGHT"}
       ],
-      "expected":{"max_steps":8,"max_tool_calls":12,"model_calls_max":3,"max_latency_ms":30000,"max_cost_cny":0.20,"cancel_terminal":"run.cancelled","verification_required":true,"accuracy_metric":"file_db_difference_accuracy","accuracy_min":0.95,"stale_answer_count":0,"file_signature_required":true,"expected_evidence":{"result":{"result_semantic":"VALUE","oracle_status":"PASSED","required_metrics":["revenue","cost","difference"],"required_dimensions":["region"],"minimum_row_count":1},"citation":{"required":false},"file":{"required":true,"sha256":"56f70a1be361d0f4353096783cd6319d2e3bc7d6115298c06acee33827fac308","row_count":4,"columns":["month","region","revenue","cost"],"revenue_sum":4430,"cost_sum":2970},"sandbox":{"required":false}}}
+      "expected":{"max_steps":8,"max_tool_calls":12,"model_calls_max":3,"max_latency_ms":30000,"max_cost_cny":0.20,"cancel_terminal":"run.cancelled","verification_required":true,"accuracy_metric":"file_db_difference_accuracy","accuracy_min":0.95,"stale_answer_count":0,"file_signature_required":true,"expected_evidence":{"result":{"result_semantic":"VALUE","required_metrics":["file_revenue","db_revenue","difference"],"required_dimensions":["region"],"minimum_row_count":2,"expected_rows":[{"region":"华东","file_revenue":2550.0,"db_revenue":78937.5,"difference":-76387.5},{"region":"华南","file_revenue":1880.0,"db_revenue":80475.0,"difference":-78595.0}],"expected_answer_claims":[{"metric":"difference","dimension":"region","dimension_value":"华东","value":-76387.5}]},"citation":{"required":false},"file":{"required":true,"sha256":"56f70a1be361d0f4353096783cd6319d2e3bc7d6115298c06acee33827fac308","row_count":4,"columns":["month","region","revenue","cost"],"revenue_sum":4430,"cost_sum":2970},"sandbox":{"required":false}}}
     }
   ]
 }

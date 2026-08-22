@@ -43,8 +43,12 @@ REQUIRED_DIRECTORIES = (
 )
 FORBIDDEN_NAME_PARTS = (".env", "auth-state", "cookie", "credentials", "private-key")
 SECRET_PATTERNS = {
-    "private-key": re.compile(r"-----BEGIN (?:RSA |OPENSSH |EC )?PRIVATE KEY-----"),
+    "private-key": re.compile(r"-----BEGIN (?:RSA |OPENSSH |EC |DSA |ENCRYPTED )?PRIVATE KEY-----"),
     "github-token": re.compile(r"\bgh[pousr]_[A-Za-z0-9]{36,}\b"),
+    "gitlab-token": re.compile(r"\bglpat-[A-Za-z0-9_-]{20,}\b"),
+    "slack-token": re.compile(r"\bxox(?:a|b|p|r|s)-[A-Za-z0-9-]{20,}\b"),
+    "google-api-key": re.compile(r"\bAIza[0-9A-Za-z_-]{35}\b"),
+    "aws-access-key": re.compile(r"\b(?:AKIA|ASIA)[A-Z0-9]{16}\b"),
     "provider-token": re.compile(r"\bsk-(?:proj-)?[A-Za-z0-9_-]{40,}\b"),
     "credential-url": re.compile(
         r"\b(?:postgres(?:ql)?|mysql|mariadb)://[^\s:@/]+:[^\s@/]+@", re.I
@@ -81,11 +85,10 @@ def _secret_hits(root: Path, paths: Iterable[Path]) -> list[dict[str, object]]:
         if any(part in lowered for part in FORBIDDEN_NAME_PARTS):
             hits.append({"path": relative, "pattern": "forbidden-evidence-filename"})
             continue
-        if path.stat().st_size > 20 * 1024 * 1024:
-            continue
         try:
-            content = path.read_text(encoding="utf-8")
-        except UnicodeDecodeError:
+            content = path.read_bytes().decode("utf-8", errors="replace")
+        except OSError as exc:
+            hits.append({"path": relative, "pattern": f"unscannable:{type(exc).__name__}"})
             continue
         for name, pattern in SECRET_PATTERNS.items():
             if pattern.search(content):

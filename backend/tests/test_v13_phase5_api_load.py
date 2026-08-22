@@ -16,6 +16,8 @@ if str(REPO_ROOT) not in sys.path:
 from scripts.performance.run_v13_phase5_api_load import (  # noqa: E402
     ApiSample,
     DEFAULT_CORE_DATA_MANIFEST,
+    EXPECTED_REVENUE_KNOWLEDGE_TEXT,
+    EXPECTED_REVENUE_KNOWLEDGE_TITLE,
     RELEASE_THRESHOLDS,
     ResourceSample,
     UserRuntime,
@@ -267,6 +269,75 @@ def test_file_business_validation_reads_real_nested_result_contract() -> None:
     assert route == "FILE_QUERY"
     assert valid is True
     assert failures == ()
+
+
+def test_rag_business_validation_recomputes_frozen_claim_entailment() -> None:
+    citation = {
+        "citation_id": "c1",
+        "document_id": "document-1",
+        "document_version_id": "version-1",
+        "chunk_id": "chunk-1",
+        "title": EXPECTED_REVENUE_KNOWLEDGE_TITLE,
+        "text": EXPECTED_REVENUE_KNOWLEDGE_TEXT,
+        "source": "ChatBI V1 Business Glossary",
+        "locator": "business-glossary/revenue.md#definition",
+    }
+    primary = {
+        "status": "SUCCEEDED",
+        "summary": f"{EXPECTED_REVENUE_KNOWLEDGE_TEXT} [citation:c1]",
+        "citations": [citation],
+        "answer_guard": "PASSED",
+        "answer_guard_evidence": {
+            "status": "PASSED", "citation_accuracy": 1.0,
+            "prompt_injection_evidence_used": 0, "factual_units": 1, "cited_ids": ["c1"],
+        },
+    }
+    terminal = {"response": {"assistant_message": {"route": "KNOWLEDGE_QUERY", "response_payload": {
+        "analysis": {"route": "KNOWLEDGE_QUERY", "status": "SUCCEEDED", "primary": primary}
+    }}}}
+
+    _route, valid, failures = validate_business_result("RAG", terminal, expected_data_value=Decimal(0))
+    assert valid is True
+    assert failures == ()
+
+    primary["summary"] = "利润等于 999 元。 [citation:c1]"
+    _route, valid, failures = validate_business_result("RAG", terminal, expected_data_value=Decimal(0))
+    assert valid is False
+    assert "KNOWLEDGE_CLAIM_NOT_ENTAILED_BY_FROZEN_CITATION" in failures
+
+
+def test_agent_self_reported_verification_cannot_replace_frozen_data_and_knowledge() -> None:
+    primary = {
+        "status": "SUCCEEDED",
+        "trace_complete": True,
+        "tool_call_count": 6,
+        "fallback_used": False,
+        "verification": {"result_verified": True, "citation_verified": True},
+        "answer": f"1725750.0，相关口径见《{EXPECTED_REVENUE_KNOWLEDGE_TITLE}》。",
+        "steps": [
+            {"agent_role": role, "tool_name": tool, "status": "SUCCEEDED"}
+            for role, tool in (
+                ("PlannerAgent", "QUERY_DATA"),
+                ("DataAnalystAgent", "RETRIEVE_KNOWLEDGE"),
+                ("KnowledgeAgent", "VERIFY_RESULT"),
+                ("VerificationAgent", "VERIFY_CITATION"),
+                ("InsightAgent", "GENERATE_CHART"),
+                ("InsightAgent", "GENERATE_INSIGHT"),
+            )
+        ],
+        "data_evidence": {},
+        "knowledge_evidence": {},
+    }
+    terminal = {"response": {"assistant_message": {"route": "COMPLEX_ANALYSIS", "response_payload": {
+        "analysis": {"route": "COMPLEX_ANALYSIS", "status": "SUCCEEDED", "primary": primary}
+    }}}}
+
+    _route, valid, failures = validate_business_result(
+        "AGENT", terminal, expected_data_value=Decimal("1725750.0"), expected_data_signature="a" * 64,
+    )
+    assert valid is False
+    assert "DATA_EXECUTION_NOT_PROVEN" in failures
+    assert "FROZEN_REVENUE_KNOWLEDGE_CONTENT_NOT_PROVEN" in failures
 
 
 def _passing_samples() -> list[ApiSample]:

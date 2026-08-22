@@ -94,9 +94,11 @@ try {
   $result.sandbox_docker_proxy = 'HEALTHY_RESTRICTED_PROXY'
   $null = Assert-Compose-ServiceHealthy -Service 'sandbox-controller'
   $result.sandbox_controller = 'HEALTHY_NONROOT_NO_HOST_SOCKET'
-  & docker compose exec -T backend python -c 'import httpx2; print(httpx2.__version__)' | Out-Null
-  if($LASTEXITCODE -ne 0) { throw 'Backend runtime dependency httpx2 is unavailable' }
-  $result.runtime_dependency = 'HTTPX2_IMPORT_PASS'
+  & docker compose exec -T backend python -c 'from importlib.metadata import version; assert version("httpx2") == "2.12.0"; assert version("aiohttp") == "3.14.3"; assert version("dbgpt") == "0.8.1"' | Out-Null
+  if($LASTEXITCODE -ne 0) { throw 'Backend runtime dependency versions do not match the release contract' }
+  & docker compose exec -T backend python -c 'from chatbi_dbgpt_runtime import DbgptAwelRuntime, RuntimeRequest; result=DbgptAwelRuntime().run(RuntimeRequest(question="cold start AWEL bridge", route="COMPLEX_ANALYSIS", trace_id="cold-start-awel"), lambda control: "AWEL_OK"); assert result.output == "AWEL_OK" and result.runtime_calls == 1 and result.upstream_package_version == "0.8.1"' | Out-Null
+  if($LASTEXITCODE -ne 0) { throw 'Selected DB-GPT AWEL bridge smoke failed in the release image' }
+  $result.runtime_dependency = 'HTTPX2_2_12_0_AIOHTTP_3_14_3_DBGPT_AWEL_PASS'
 
   $result.stage = 'MIGRATION'
   $migration = (& docker compose exec -T backend sh -c 'alembic current 2>&1' | Out-String)

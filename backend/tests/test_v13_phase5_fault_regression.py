@@ -73,6 +73,12 @@ def test_weird_50_is_frozen_exact_and_covers_route_refusal_clarification_zero_mo
         in {"NONE", "SAFE_ONLY", "DATE_ONLY", "EMPTY_ONLY", "VERIFIED_ONLY"}
         for action in actions
     )
+    assert set(payload["case_ground_truth"]) == {f"W{index:03d}" for index in range(1, 51)}
+    assert all(
+        truth["result_set"] in payload["frozen_result_sets"]
+        for truth in payload["case_ground_truth"].values()
+        if truth["kind"] in {"STRUCTURED_RESULT", "EMPTY_RESULT"}
+    )
 
 
 def test_weird_50_tampering_fails_closed():
@@ -104,6 +110,12 @@ def test_complex_5_has_all_five_families_and_every_evidence_dimension():
     assert any(case["expected"].get("sandbox_destroyed_required") for case in payload["cases"])
     assert any(case["expected"].get("file_signature_required") for case in payload["cases"])
     assert all(set(case["expected"]["expected_evidence"]) == {"result", "citation", "file", "sandbox"} for case in payload["cases"])
+    assert all(
+        "oracle_status" not in case["expected"]["expected_evidence"]["result"]
+        and case["expected"]["expected_evidence"]["result"]["expected_rows"]
+        and case["expected"]["expected_evidence"]["result"]["expected_answer_claims"]
+        for case in payload["cases"]
+    )
     file_case = next(case for case in payload["cases"] if case["kind"] == "FILE_DB")
     assert file_case["expected"]["expected_evidence"]["file"] == {
         "required": True,
@@ -128,6 +140,10 @@ def test_complex_5_rejects_unknown_agent_tool_and_missing_verification():
     unfrozen["cases"][4]["expected"]["expected_evidence"]["file"]["row_count"] = 5
     with pytest.raises(ValueError, match="file evidence"):
         validate_complex_manifest(unfrozen)
+    fake_truth = load_json(COMPLEX_MANIFEST)
+    fake_truth["cases"][0]["expected"]["expected_evidence"]["result"]["expected_rows"] = []
+    with pytest.raises(ValueError, match="exact rows"):
+        validate_complex_manifest(fake_truth)
 
 
 def test_fault_matrix_is_exactly_scoped_and_all_fail_closed_with_release_evidence():

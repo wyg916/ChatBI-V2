@@ -51,6 +51,8 @@ jobs:
       PHASE5_EVIDENCE_DIR: artifacts/v1.3/phase5-security-supply
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5, Node 24
+        with:
+          fetch-depth: 0
       - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6, Node 24
         with:
           python-version: "3.11"
@@ -64,6 +66,8 @@ jobs:
           pip install -r backend/requirements.txt
           pip install -r backend/requirements-phase3-upstream.txt
           pip install --upgrade -r backend/requirements-runtime-hardening.txt
+          python scripts/release/patch_selected_dbgpt_metadata.py
+          pip check
           pip install \
             ./packages/rag-contracts \
             ./packages/rag-adapter \
@@ -94,11 +98,11 @@ jobs:
             --cyclonedx-output "$PHASE5_EVIDENCE_DIR/chatbi-v1.3.cdx.json" \
             --spdx-output "$PHASE5_EVIDENCE_DIR/chatbi-v1.3.spdx.json" \
             --receipt-output "$PHASE5_EVIDENCE_DIR/sbom-receipt.json"
-          python -m venv .phase5-audit-venv
-          .phase5-audit-venv/bin/python -m pip install -r scripts/release/requirements-audit.txt
+          python -m venv "$RUNNER_TEMP/chatbi-phase5-audit"
+          "$RUNNER_TEMP/chatbi-phase5-audit/bin/python" -m pip install -r scripts/release/requirements-audit.txt
       - name: Phase5 security and supply-chain hard gate
         env:
-          CHATBI_PHASE5_AUDIT_PYTHON: ${{ github.workspace }}/.phase5-audit-venv/bin/python
+          CHATBI_PHASE5_AUDIT_PYTHON: ${{ runner.temp }}/chatbi-phase5-audit/bin/python
         run: |
           pytest backend/tests/test_v13_phase5_security_supply.py -q
           python backend/scripts/run_v13_phase5_security_supply_gate.py \

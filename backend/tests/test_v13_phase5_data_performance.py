@@ -50,13 +50,13 @@ def test_phase5_manifest_is_frozen_unique_10m_datasource_sql_performance_100() -
     assert all(isinstance(case["expectation"]["value"], int) for case in cases)
 
 
-def test_release_defaults_are_10m_20_users_and_15_minutes(tmp_path: Path) -> None:
+def test_release_defaults_separate_10m_measurement_from_20_user_api_load(tmp_path: Path) -> None:
     args = build_parser().parse_args([
         "--output", str(tmp_path / "evidence.json"),
     ])
 
-    assert args.users == DEFAULT_USERS == 20
-    assert args.duration_seconds == DEFAULT_DURATION_SECONDS == 900
+    assert args.users == DEFAULT_USERS == 4
+    assert args.duration_seconds == DEFAULT_DURATION_SECONDS == 120
     assert DEFAULT_ROWS == 10_000_000
 
 
@@ -100,11 +100,11 @@ def test_percentiles_are_deterministic_and_report_p50_p95_p99() -> None:
     }
 
 
-def test_mixed_schedule_covers_all_100_cases_with_20_users_in_five_requests_each() -> None:
+def test_mixed_schedule_covers_all_100_cases_with_four_users_in_25_requests_each() -> None:
     scheduled = {
         scheduled_case_index(user, sequence, DEFAULT_USERS, 100)
         for user in range(DEFAULT_USERS)
-        for sequence in range(5)
+        for sequence in range(25)
     }
 
     assert scheduled == set(range(100))
@@ -182,10 +182,10 @@ def _passing_performance() -> dict:
         "successes": 100,
         "failures": 0,
         "success_rate": 1.0,
-        "actual_elapsed_seconds": 900.0,
+        "actual_elapsed_seconds": 120.0,
         "throughput_rps": 10.0,
-        "active_users": 20,
-        "configured_users": 20,
+        "active_users": 4,
+        "configured_users": 4,
         "case_coverage": 1.0,
         "categories_executed": ["a", "b", "c", "d"],
         "query_ms": {"min": 1.0, "p50": 100.0, "p95": 1000.0, "p99": 2000.0, "max": 2500.0},
@@ -193,15 +193,15 @@ def _passing_performance() -> dict:
         "cpu_percent": {"min": 20.0, "p50": 40.0, "p95": 60.0, "p99": 70.0, "max": 75.0},
         "ram_percent": {"min": 30.0, "p50": 50.0, "p95": 65.0, "p99": 75.0, "max": 80.0},
         "db_connections": {"min": 1.0, "p50": 15.0, "p95": 20.0, "p99": 20.0, "max": 20.0},
-        "system_sample_count": 900,
-        "cpu_sample_count": 899,
-        "ram_sample_count": 900,
-        "db_connection_sample_count": 900,
+        "system_sample_count": 120,
+        "cpu_sample_count": 119,
+        "ram_sample_count": 120,
+        "db_connection_sample_count": 120,
         "errors": {},
     }
 
 
-def test_10m_sql_performance_gate_requires_exact_dataset_actual_duration_concurrency_and_cleanup() -> None:
+def test_10m_sql_performance_gate_requires_exact_dataset_measurement_and_cleanup() -> None:
     manifest = load_manifest(DEFAULT_MANIFEST)
     dataset = DatasetReceipt(
         schema="phase5_perf_testgate",
@@ -230,16 +230,16 @@ def test_10m_sql_performance_gate_requires_exact_dataset_actual_duration_concurr
     failures = evaluate_gate(
         manifest=manifest,
         dataset=dataset,
-        config={**config, "users": 19, "duration_seconds": 899},
-        performance={**_passing_performance(), "active_users": 19, "actual_elapsed_seconds": 898.0},
+        config={**config, "users": 3, "duration_seconds": 119},
+        performance={**_passing_performance(), "active_users": 3, "actual_elapsed_seconds": 118.0},
         cleanup={"drop_schema_executed": True, "verified_absent": False, "error_code": None},
         runtime_error=None,
     )
     assert {
-        "concurrency_below_20_users",
-        "duration_below_15_minutes",
+        "concurrency_below_10m_measurement_gate",
+        "duration_below_10m_measurement_gate",
         "isolated_schema_cleanup_not_verified",
-        "actual_duration_below_15_minutes",
+        "actual_duration_below_configured_measurement",
     }.issubset(failures)
 
 

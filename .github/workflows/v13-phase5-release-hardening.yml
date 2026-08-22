@@ -22,6 +22,7 @@ on:
 
 permissions:
   contents: read
+  actions: read
 
 concurrency:
   group: v13-phase5-${{ github.ref }}
@@ -52,6 +53,8 @@ jobs:
           pip install -r backend/requirements.txt
           pip install -r backend/requirements-phase3-upstream.txt
           pip install --upgrade -r backend/requirements-runtime-hardening.txt
+          python scripts/release/patch_selected_dbgpt_metadata.py
+          pip check
       - name: Phase5 contract, security and fault tests
         run: |
           mkdir -p docs/evidence/v1.3/phase5-ci
@@ -62,6 +65,8 @@ jobs:
             backend/tests/test_v13_phase5_fault_regression.py \
             backend/tests/test_v13_phase5_live_questions_gate.py \
             backend/tests/test_v13_phase5_security_supply.py \
+            backend/tests/test_v13_phase5_runtime_metadata_hardening.py \
+            backend/tests/test_v13_phase5_remote_ci_certificate.py \
             -q --junitxml docs/evidence/v1.3/phase5-ci/phase5-junit.xml
           python backend/scripts/run_v13_phase5_fault_regression_gate.py \
             --contract-only \
@@ -128,6 +133,11 @@ jobs:
           python backend/scripts/verify_migrations_postgres.py \
             --schema chatbi_v13_phase5_ci \
             --output docs/evidence/v1.3/phase5-migration-ci/migration.json
+      - name: Evidence checksums
+        if: always()
+        run: |
+          find docs/evidence/v1.3/phase5-migration-ci -maxdepth 1 -type f ! -name SHA256SUMS.txt -print0 \
+            | sort -z | xargs -0 sha256sum > docs/evidence/v1.3/phase5-migration-ci/SHA256SUMS.txt
       - name: Upload migration evidence
         if: always()
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6, Node 24
@@ -160,27 +170,29 @@ jobs:
           cache-dependency-path: frontend/package-lock.json
       - name: Install isolated release runtime and audit tooling
         run: |
-          python -m venv .phase5-runtime-venv
-          .phase5-runtime-venv/bin/python -m pip install -r backend/requirements.txt
-          .phase5-runtime-venv/bin/python -m pip install -r backend/requirements-phase3-upstream.txt
-          .phase5-runtime-venv/bin/python -m pip install --upgrade -r backend/requirements-runtime-hardening.txt
-          python -m venv .phase5-audit-venv
-          .phase5-audit-venv/bin/python -m pip install -r scripts/release/requirements-audit.txt
+          python -m venv "$RUNNER_TEMP/chatbi-phase5-runtime"
+          "$RUNNER_TEMP/chatbi-phase5-runtime/bin/python" -m pip install -r backend/requirements.txt
+          "$RUNNER_TEMP/chatbi-phase5-runtime/bin/python" -m pip install -r backend/requirements-phase3-upstream.txt
+          "$RUNNER_TEMP/chatbi-phase5-runtime/bin/python" -m pip install --upgrade -r backend/requirements-runtime-hardening.txt
+          "$RUNNER_TEMP/chatbi-phase5-runtime/bin/python" scripts/release/patch_selected_dbgpt_metadata.py
+          "$RUNNER_TEMP/chatbi-phase5-runtime/bin/python" -m pip check
+          python -m venv "$RUNNER_TEMP/chatbi-phase5-audit"
+          "$RUNNER_TEMP/chatbi-phase5-audit/bin/python" -m pip install -r scripts/release/requirements-audit.txt
           npm ci --prefix frontend
       - name: Build deterministic runtime SBOM
         run: |
           mkdir -p docs/evidence/v1.3/phase5-supply-ci
-          .phase5-runtime-venv/bin/python scripts/phase5-generate-sbom.py \
-            --backend-python "$PWD/.phase5-runtime-venv/bin/python" \
+          "$RUNNER_TEMP/chatbi-phase5-runtime/bin/python" scripts/phase5-generate-sbom.py \
+            --backend-python "$RUNNER_TEMP/chatbi-phase5-runtime/bin/python" \
             --frontend-lock frontend/package-lock.json \
             --cyclonedx-output docs/evidence/v1.3/phase5-supply-ci/V1_3_0.cdx.json \
             --spdx-output docs/evidence/v1.3/phase5-supply-ci/V1_3_0.spdx.json \
             --receipt-output docs/evidence/v1.3/phase5-supply-ci/sbom-receipt.json
       - name: Run security, attack, license, deprecation and supply-chain gate
         env:
-          CHATBI_PHASE5_AUDIT_PYTHON: ${{ github.workspace }}/.phase5-audit-venv/bin/python
+          CHATBI_PHASE5_AUDIT_PYTHON: ${{ runner.temp }}/chatbi-phase5-audit/bin/python
         run: |
-          .phase5-runtime-venv/bin/python backend/scripts/run_v13_phase5_security_supply_gate.py \
+          "$RUNNER_TEMP/chatbi-phase5-runtime/bin/python" backend/scripts/run_v13_phase5_security_supply_gate.py \
             --evidence-dir docs/evidence/v1.3/phase5-supply-ci/generated-audits \
             --cyclonedx docs/evidence/v1.3/phase5-supply-ci/V1_3_0.cdx.json \
             --spdx docs/evidence/v1.3/phase5-supply-ci/V1_3_0.spdx.json \
@@ -200,3 +212,43 @@ jobs:
           path: docs/evidence/v1.3/phase5-supply-ci
           if-no-files-found: error
           retention-days: 30
+
+  remote-ci-certificate:
+    if: always()
+    needs:
+      - deterministic-release-gates
+      - migration-gate
+      - supply-chain-and-attack-gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5, Node 24
+      - name: Download same-run evidence artifacts
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p .phase5-remote-evidence/{deterministic,migration,supply}
+          gh run download "${GITHUB_RUN_ID}" --name "v13-phase5-deterministic-${GITHUB_SHA}" --dir .phase5-remote-evidence/deterministic
+          gh run download "${GITHUB_RUN_ID}" --name "v13-phase5-migration-${GITHUB_SHA}" --dir .phase5-remote-evidence/migration
+          gh run download "${GITHUB_RUN_ID}" --name "v13-phase5-supply-${GITHUB_SHA}" --dir .phase5-remote-evidence/supply
+      - name: Certify remote CI scope fail closed
+        id: certify
+        continue-on-error: true
+        run: |
+          python scripts/phase5-certify-remote-ci.py \
+            --root .phase5-remote-evidence \
+            --expected-sha "${GITHUB_SHA}" \
+            --output .phase5-remote-evidence/remote-ci-certificate.json
+      - name: Upload remote CI certificate
+        if: always()
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6, Node 24
+        with:
+          name: v13-phase5-remote-ci-certificate-${{ github.sha }}
+          path: .phase5-remote-evidence/remote-ci-certificate.json
+          if-no-files-found: error
+          retention-days: 30
+      - name: Enforce certificate result
+        if: always()
+        env:
+          CERTIFICATE_OUTCOME: ${{ steps.certify.outcome }}
+        run: test "$CERTIFICATE_OUTCOME" = success

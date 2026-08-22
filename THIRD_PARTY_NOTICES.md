@@ -30,7 +30,10 @@ Phase 3 adds two deliberately narrow third-party runtime boundaries plus one sep
 The retained license and provenance records live in `packages/dbgpt-runtime-adapter/` and `packages/pandasai-selected-runtime/`. The worker runs non-root with no host mount, no database/model credential, no external network, a read-only root filesystem, dropped capabilities, no-new-privileges, bounded tmpfs, CPU/RAM/PID/time/file/output limits, and mandatory synchronous removal. Missing dependency, wrong provenance or unavailable Docker fails closed and produces zero verified runtime calls.
 
 Phase 5 retains the exact DB-GPT source revision but overrides its transitive
-`aiohttp==3.8.4` pin with `aiohttp==3.14.3`. ChatBI does not call DB-GPT's
+`aiohttp==3.8.4` pin with `aiohttp==3.14.3`. The release install verifies the
+exact archive URL, SHA-256 and subdirectory, corrects only the installed
+distribution dependency metadata plus RECORD, and requires `pip check` to pass.
+ChatBI does not call DB-GPT's
 HTTP surfaces; the selected AWEL symbols are compatibility-tested with the
 audited override. No DB-GPT source file is modified, and the exact archive,
 revision, runtime symbols, and provenance checks remain unchanged.

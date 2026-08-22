@@ -4,8 +4,8 @@
 
 - Phase 5 以 `89bdc12936be0555bdad8a85f06932fb7dc476ee` 为唯一 Phase 4 基线，在短期分支 `codex/v1.3.0-release-hardening-full-gate` 只做测试、Evidence、性能、安全、故障恢复、依赖兼容和发布工程加固；不启动 Phase 6，不修改 `main`，不创建 V1.3.0 Tag 或正式 Release。
 - Sandbox Controller 不再直接持有 Host Docker Socket。唯一持有只读 socket bind 的 restricted proxy 只接受固定 worker 镜像、命令、non-root 用户、无网络、只读根文件系统、能力清空、no-new-privileges、确定资源上限和所有权标签的有状态 Docker API 子集；未知字段、Host namespace、任意容器或 Docker 管理请求一律拒绝。最终风险关闭仍须由同一候选 SHA 的真实 worker/cancel/destroy 与负向攻击实跑证明。
-- GitHub Actions 已迁移到不可变 Node 24 action SHA；应用 `httpx==0.28.1` 与 Starlette `httpx2==2.12.0` 兼容桥分别精确固定。Phase 5 新增确定性 SBOM、许可证/依赖/Secret/攻击审计、独立迁移 Gate 和 Phase 1～4 工作流复验；外部审计输入必须绑定工具版本、依赖清单哈希和被测 Git SHA。
-- Data100、10M、20 用户 15 分钟六路 API、Weird50、Complex5、三 Provider 及 DB/RAG/Sandbox 故障、Multimodal10、两次冷启动、完整浏览器、成本账本和远端同 SHA CI 只有在外部 Evidence 真实执行并通过后才能标记 PASS。清单结构、直接 SQL 压测、合成故障信封和历史 Phase 1～4 结果均不能替代最终门禁。
+- GitHub Actions 已迁移到不可变 Node 24 action SHA；应用 `httpx==0.28.1` 与 Starlette `httpx2==2.12.0` 兼容桥分别精确固定。冻结的 DB-GPT source/archive 不变，安装时验证 exact provenance 后把未使用但易受攻击的 `aiohttp==3.8.4` 依赖 metadata 精确修正为已审计 `3.14.3`，同步 RECORD 并强制 `pip check` 零冲突。Phase 5 新增确定性 SBOM、许可证/依赖/Secret/攻击审计、独立迁移 Gate 和 Phase 1～4 工作流复验；外部审计输入必须绑定工具版本、依赖清单哈希和被测 Git SHA。
+- Data100、10M、20 用户 15 分钟六路 API、Weird50、Complex5、三 Provider 及 DB/RAG/Sandbox 故障、Multimodal10、两次冷启动、完整浏览器、成本账本和远端同 SHA CI 只有在外部 Evidence 真实执行并通过后才能标记 PASS。Weird/Complex 与 API 混合负载的准确性由冻结 rows、result signature、answer claims、citation chunk 和文件/视觉值独立重算，不信任服务自报 VERIFIED/PASSED。远端 workflow 最终 job 只签发 deterministic/migration/supply 的同 SHA CI 证书，并明确不冒充完整 Phase 5 Release Gate。清单结构、直接 SQL 压测、合成故障信封和历史 Phase 1～4 结果均不能替代最终门禁。
 - 候选发布文档只描述范围、回滚和待验收条件；最终 SHA、测试计数、性能数字、成本比例、远端 Run ID、Evidence 校验和与 Phase 5 总 Gate 以本轮最终外部 Evidence 为唯一事实源。
 
 ## V1.3.0 Phase 4 产品体验与治理候选（2026-08-22）

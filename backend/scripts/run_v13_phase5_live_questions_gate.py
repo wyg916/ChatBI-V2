@@ -134,6 +134,16 @@ def load_manifest(path: Path, *, expected_count: int) -> dict[str, Any]:
             raise ValueError(f"{path.name} must freeze one answer contract per action")
         if any((case.get("expected") or {}).get("hallucination_allowed") is not False for case in cases):
             raise ValueError(f"{path.name} must fail closed on hallucination")
+        ground_truth = payload.get("case_ground_truth") or {}
+        result_sets = payload.get("frozen_result_sets") or {}
+        if set(ground_truth) != {str(case["id"]) for case in cases}:
+            raise ValueError(f"{path.name} must freeze per-case ground truth")
+        if any(
+            truth.get("result_set") not in result_sets
+            for truth in ground_truth.values()
+            if truth.get("kind") in {"STRUCTURED_RESULT", "EMPTY_RESULT"}
+        ):
+            raise ValueError(f"{path.name} has an unresolved frozen result set")
     if expected_count == 5:
         if any(
             set(((case.get("expected") or {}).get("expected_evidence") or {}))
@@ -141,6 +151,13 @@ def load_manifest(path: Path, *, expected_count: int) -> dict[str, Any]:
             for case in cases
         ):
             raise ValueError(f"{path.name} must freeze result/citation/file/sandbox evidence")
+        if any(
+            "oracle_status" in case["expected"]["expected_evidence"]["result"]
+            or not case["expected"]["expected_evidence"]["result"].get("expected_rows")
+            or not case["expected"]["expected_evidence"]["result"].get("expected_answer_claims")
+            for case in cases
+        ):
+            raise ValueError(f"{path.name} must use independent exact rows/claims, not reported status")
     return payload
 
 
@@ -224,9 +241,6 @@ def _answer_oracle(response: Mapping[str, Any], verification: Mapping[str, Any])
         "refusal_detected": refusal_detected,
         "clarification_detected": clarification_detected,
         "no_evidence_detected": no_evidence_detected,
-        "verified_evidence_present": bool(
-            verification.get("result_verified") or verification.get("citation_verified")
-        ),
     }
 
 
@@ -350,6 +364,17 @@ def _optional_trace_evidence(client: httpx.Client, trace_id: str) -> dict[str, A
     }
 
 
+def _cancel_readability_failures(
+    trace: Mapping[str, Any], diagnostics: Mapping[str, Any]
+) -> list[str]:
+    failures: list[str] = []
+    if not trace.get("available"):
+        failures.append("cancel_trace_persistence_unreadable")
+    if not diagnostics.get("available"):
+        failures.append("cancel_stream_diagnostics_unreadable")
+    return failures
+
+
 def _verification_evidence(response: Mapping[str, Any]) -> dict[str, Any]:
     primary = _analysis_primary(response)
     envelope = response.get("answer_envelope") or {}
@@ -365,15 +390,40 @@ def _verification_evidence(response: Mapping[str, Any]) -> dict[str, Any]:
     citation_ids = [str(item) for item in _nested_values(primary, "citation_id") if item]
     envelope_verification = envelope.get("verification") or {}
     status = str(envelope_verification.get("status") or "")
-    result_verified = bool(verification.get("result_verified")) or status == "VERIFIED" or bool(oracle_statuses)
-    citation_verified = bool(verification.get("citation_verified")) or bool(citation_ids)
+    reported_result = bool(verification.get("result_verified")) or status == "VERIFIED" or bool(oracle_statuses)
+    reported_citation = bool(verification.get("citation_verified")) or bool(citation_ids)
     return {
-        "result_verified": result_verified,
-        "citation_verified": citation_verified,
-        "oracle_passed_count": len(oracle_statuses),
+        "self_reported_result_verified": reported_result,
+        "self_reported_citation_verified": reported_citation,
+        "self_reported_oracle_passed_count": len(oracle_statuses),
         "result_signature_count": len(set(result_signatures)),
         "citation_count": len(set(citation_ids)),
         "envelope_status": status or None,
+    }
+
+
+def _ground_truth_evidence(case: Mapping[str, Any], response: Mapping[str, Any]) -> dict[str, Any]:
+    truth = case.get("expected_ground_truth") or {}
+    primary = _analysis_primary(response)
+    result_evidence = _first_mapping(primary, "result_evidence")
+    actual_rows = result_evidence.get("rows") if isinstance(result_evidence.get("rows"), list) else None
+    actual_claims = primary.get("answer_claims") if isinstance(primary.get("answer_claims"), list) else None
+    expected_rows = truth.get("expected_rows")
+    expected_claims = truth.get("expected_claims")
+    kind = str(truth.get("kind") or "")
+    answer_text = _answer_text(response)
+    exact_rows_match = expected_rows is not None and actual_rows == expected_rows
+    exact_claims_match = expected_claims is not None and actual_claims == expected_claims
+    return {
+        "kind": kind,
+        "exact_rows_match": exact_rows_match,
+        "exact_claims_match": exact_claims_match,
+        "actual_rows_present": actual_rows is not None,
+        "actual_claims_present": actual_claims is not None,
+        "structured_claim_count": len(actual_claims or []),
+        "actual_rows_sha256": sha256_text(json.dumps(actual_rows, ensure_ascii=False, sort_keys=True)) if actual_rows is not None else None,
+        "actual_claims_sha256": sha256_text(json.dumps(actual_claims, ensure_ascii=False, sort_keys=True)) if actual_claims is not None else None,
+        "exact_date_match": kind == "EXACT_DATE" and str(truth.get("value") or "") in answer_text,
     }
 
 
@@ -418,6 +468,7 @@ def _action_failures(
     trace: Mapping[str, Any],
     verification: Mapping[str, Any],
     answer_oracle: Mapping[str, Any],
+    ground_truth: Mapping[str, Any],
 ) -> list[str]:
     expected = case["expected"]
     action = str(expected["action"])
@@ -441,8 +492,6 @@ def _action_failures(
         failures.append("clarification_answer_missing")
     if contract.get("no_evidence_required") and not answer_oracle["no_evidence_detected"]:
         failures.append("no_evidence_disclosure_missing")
-    if contract.get("verified_evidence_required") and not answer_oracle["verified_evidence_present"]:
-        failures.append("verified_answer_evidence_missing")
     claim_mode = str(contract.get("claim_mode") or "")
     if claim_mode == "NONE" and answer_oracle["answer_claim_present"]:
         failures.append("answer_claim_forbidden")
@@ -454,8 +503,29 @@ def _action_failures(
         failures.append("verified_answer_claim_missing")
     if expected["hallucination_allowed"] is not False:
         failures.append("hallucination_policy_not_fail_closed")
-    elif answer_oracle["business_claim_present"] and not answer_oracle["verified_evidence_present"]:
+    truth_kind = str(ground_truth.get("kind") or "")
+    if truth_kind == "STRUCTURED_RESULT" and not ground_truth["exact_rows_match"]:
+        failures.append("frozen_result_rows_mismatch")
+    if truth_kind == "STRUCTURED_RESULT" and not ground_truth["exact_claims_match"]:
+        failures.append("frozen_answer_claims_mismatch")
+    if contract.get("verified_evidence_required") and not (
+        ground_truth["exact_rows_match"] and ground_truth["exact_claims_match"]
+    ):
+        failures.append("verified_answer_evidence_missing")
+    if answer_oracle["business_claim_present"] and not (
+        ground_truth["exact_rows_match"] and ground_truth["exact_claims_match"]
+    ):
         failures.append("unverified_business_claim")
+    if truth_kind == "EMPTY_RESULT" and not (
+        ground_truth["exact_rows_match"] and ground_truth["exact_claims_match"]
+    ):
+        failures.append("frozen_empty_result_mismatch")
+    if truth_kind == "EXACT_DATE" and not ground_truth["exact_date_match"]:
+        failures.append("frozen_date_value_mismatch")
+    if truth_kind in {
+        "SAFE_NO_BUSINESS_CLAIM", "CLARIFICATION_NO_CLAIM", "REFUSAL_NO_CLAIM", "NO_EVIDENCE_NO_CLAIM"
+    } and int(ground_truth["structured_claim_count"]) != 0:
+        failures.append("safe_contract_exposed_structured_claims")
     if action == "MODEL_NONE_DATE" and (ledger["invocation_count"] != 0 or ledger["cost_cny"] != 0):
         failures.append("date_trap_called_model")
     if action == "EMPTY_RESULT_NO_FABRICATION":
@@ -464,8 +534,6 @@ def _action_failures(
             failures.append("empty_result_semantic_missing")
     if action == "NO_EVIDENCE_NO_CLAIM" and response.get("result_semantic") == "VALUE":
         failures.append("unsupported_claim_without_evidence")
-    if action in {"QUERY_READ_ONLY", "BOUNDED_VERIFIED_ANALYSIS"} and not verification["result_verified"]:
-        failures.append("result_verification_missing")
     return failures
 
 
@@ -592,6 +660,7 @@ class LiveQuestionsGate:
         trace = _trace_evidence(self.client, trace_id)
         verification = _verification_evidence(response)
         answer_oracle = _answer_oracle(response, verification)
+        ground_truth = _ground_truth_evidence(case, response)
         if explicit_route:
             expected = case["expected"]
             failures = _common_failures(
@@ -612,6 +681,7 @@ class LiveQuestionsGate:
                 trace=trace,
                 verification=verification,
                 answer_oracle=answer_oracle,
+                ground_truth=ground_truth,
             )
         evidence = {
             "id": case["id"],
@@ -629,6 +699,7 @@ class LiveQuestionsGate:
             "trace": trace,
             "verification": verification,
             "answer_oracle": answer_oracle,
+            "ground_truth": ground_truth,
             "failures": failures,
             "status": "PASS" if not failures else "FAIL",
         }
@@ -711,7 +782,11 @@ class LiveQuestionsGate:
                 "active_tasks": int(diagnostics_payload.get("active_tasks") or 0),
             }
         elif diagnostics_response.status_code in {403, 404}:
-            diagnostics = {"available": False, "trace_released": None}
+            diagnostics = {
+                "available": False,
+                "trace_released": None,
+                "read_status": diagnostics_response.status_code,
+            }
         else:
             raise LiveGateError(
                 f"HTTP_{diagnostics_response.status_code}:GET:/chat/stream/diagnostics"
@@ -747,6 +822,7 @@ class LiveQuestionsGate:
             failures.append("cancel_stale_answer_persisted")
         if diagnostics["available"] and diagnostics["trace_released"] is not True:
             failures.append("cancel_stream_resources_not_released")
+        failures.extend(_cancel_readability_failures(trace, diagnostics))
         return {
             "request_id": request_id,
             "conversation_id": conversation_id,
@@ -812,10 +888,6 @@ class LiveQuestionsGate:
             failures.append("complex_latency_budget_exceeded")
         if float(evidence["ledger"]["cost_cny"]) > float(expected["max_cost_cny"]):
             failures.append("complex_cost_budget_exceeded")
-        if expected["verification_required"] and not evidence["verification"]["result_verified"]:
-            failures.append("complex_result_verification_missing")
-        if case["kind"] == "DATA_RAG" and not evidence["verification"]["citation_verified"]:
-            failures.append("complex_citation_verification_missing")
         if not evidence["answer_oracle"]["answer_present"]:
             failures.append("complex_answer_text_missing")
         elif not evidence["answer_oracle"]["answer_claim_present"]:
@@ -830,36 +902,35 @@ class LiveQuestionsGate:
             int(value) for value in _nested_values(result_payload, "row_count")
             if isinstance(value, (int, float)) or str(value).isdigit()
         ]
+        actual_rows = result_payload.get("rows") if isinstance(result_payload.get("rows"), list) else None
+        actual_claims = primary.get("answer_claims") if isinstance(primary.get("answer_claims"), list) else None
         result_evidence = {
             "result_semantic": evidence["result_semantic"],
-            "oracle_status": "PASSED" if evidence["verification"]["oracle_passed_count"] else None,
             "metrics": sorted(metrics),
             "dimensions": sorted(dimensions),
             "maximum_row_count": max(row_counts, default=0),
+            "rows_sha256": sha256_text(json.dumps(actual_rows, ensure_ascii=False, sort_keys=True)) if actual_rows is not None else None,
+            "answer_claims_sha256": sha256_text(json.dumps(actual_claims, ensure_ascii=False, sort_keys=True)) if actual_claims is not None else None,
         }
         if result_evidence["result_semantic"] != result_contract["result_semantic"]:
             failures.append("complex_frozen_result_semantic_mismatch")
-        if result_evidence["oracle_status"] != result_contract["oracle_status"]:
-            failures.append("complex_frozen_oracle_status_mismatch")
         if not set(result_contract["required_metrics"]).issubset(metrics):
             failures.append("complex_frozen_metric_evidence_missing")
         if not set(result_contract["required_dimensions"]).issubset(dimensions):
             failures.append("complex_frozen_dimension_evidence_missing")
         if result_evidence["maximum_row_count"] < int(result_contract["minimum_row_count"]):
             failures.append("complex_frozen_row_evidence_missing")
+        if actual_rows != result_contract["expected_rows"]:
+            failures.append("complex_frozen_result_rows_mismatch")
+        if actual_claims != result_contract["expected_answer_claims"]:
+            failures.append("complex_frozen_answer_claims_mismatch")
 
         citation_contract = frozen["citation"]
-        citation_titles: list[str] = []
-        for citation_container in _nested_values(primary, "citations"):
-            citation_titles.extend(
-                str(value) for value in _nested_values(citation_container, "title") if value
-            )
-        citation_text = " ".join(citation_titles)
+        actual_citations = primary.get("citations") if isinstance(primary.get("citations"), list) else None
+        citation_titles = [str(item.get("title") or "") for item in actual_citations or [] if isinstance(item, Mapping)]
         if citation_contract["required"]:
-            if len(citation_titles) < int(citation_contract["minimum_count"]):
-                failures.append("complex_frozen_citation_count_missing")
-            if any(term not in citation_text for term in citation_contract["required_title_terms"]):
-                failures.append("complex_frozen_citation_terms_missing")
+            if actual_citations != citation_contract["expected_citations"]:
+                failures.append("complex_frozen_citations_mismatch")
 
         file_contract = frozen["file"]
         file_evidence = _first_mapping(primary, "file_evidence")
@@ -886,6 +957,7 @@ class LiveQuestionsGate:
                 "runtime_verified": sandbox_evidence.get("runtime_verified") is True,
                 "container_destroyed": sandbox_evidence.get("container_destroyed") is True,
                 "operation": sandbox_evidence.get("operation"),
+                "result": sandbox_evidence.get("result"),
             }
             if observed_sandbox != sandbox_contract:
                 failures.append("complex_frozen_sandbox_evidence_mismatch")
@@ -995,9 +1067,22 @@ def run_live_gate(
         for case in weird_manifest["cases"]:
             action = str((case.get("expected") or {}).get("action") or "")
             contract = (weird_manifest.get("answer_contracts") or {}).get(action)
+            truth = (weird_manifest.get("case_ground_truth") or {}).get(str(case["id"]))
             if not isinstance(contract, dict):
                 raise LiveGateError(f"ANSWER_CONTRACT_MISSING:{action}")
-            executable_case = {**case, "expected_answer_contract": contract}
+            if not isinstance(truth, dict):
+                raise LiveGateError(f"GROUND_TRUTH_MISSING:{case['id']}")
+            executable_truth = dict(truth)
+            if truth.get("result_set") is not None:
+                result_sets = weird_manifest.get("frozen_result_sets") or {}
+                if truth["result_set"] not in result_sets:
+                    raise LiveGateError(f"GROUND_TRUTH_RESULT_SET_MISSING:{case['id']}")
+                executable_truth["expected_rows"] = result_sets[truth["result_set"]]
+            executable_case = {
+                **case,
+                "expected_answer_contract": contract,
+                "expected_ground_truth": executable_truth,
+            }
             weird_results.append(gate.run_question(executable_case, explicit_route=False))
         for case in complex_manifest["cases"]:
             evidence = gate.run_question(case, explicit_route=True)

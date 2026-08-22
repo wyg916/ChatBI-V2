@@ -1,7 +1,9 @@
 # Phase 5 release-runtime hardening, installed after selected upstream packages.
 # DB-GPT 0.8.1 pins aiohttp 3.8.4 even though ChatBI only imports its AWEL
 # DAG/MapOperator symbols. 3.14.3 is the minimum single tested override that
-# clears every currently reported aiohttp advisory in the release audit.
+# clears every currently reported aiohttp advisory in the release audit. The
+# exact selected distribution metadata is then corrected by the audited
+# patch_selected_dbgpt_metadata.py step, and pip check must report zero conflicts.
 aiohttp==3.14.3
 
 # The release image intentionally retains Python packaging tools, so they are

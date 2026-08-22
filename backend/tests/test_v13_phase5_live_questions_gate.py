@@ -13,6 +13,7 @@ from scripts.run_v13_phase5_live_questions_gate import (
     REPO_ROOT,
     _action_failures,
     _answer_oracle,
+    _cancel_readability_failures,
     _sse_events,
     load_external_credentials,
     load_manifest,
@@ -114,6 +115,14 @@ def test_weird_answer_oracle_consumes_hallucination_contract_and_requires_refusa
         trace={"trace_id_exact": True, "status": "SUCCEEDED", "has_sql": True},
         verification=verification,
         answer_oracle=oracle,
+        ground_truth={
+            "kind": "STRUCTURED_RESULT",
+            "exact_rows_match": False,
+            "exact_claims_match": False,
+            "actual_claims_present": False,
+            "structured_claim_count": 0,
+            "exact_date_match": False,
+        },
     )
     assert oracle["business_claim_present"] is True
     assert "unverified_business_claim" in failures
@@ -140,6 +149,14 @@ def test_weird_answer_oracle_consumes_hallucination_contract_and_requires_refusa
         trace={"trace_id_exact": True, "status": "SUCCEEDED", "has_sql": False},
         verification=verification,
         answer_oracle=_answer_oracle(refusal_response, verification),
+        ground_truth={
+            "kind": "REFUSAL_NO_CLAIM",
+            "exact_rows_match": False,
+            "exact_claims_match": False,
+            "actual_claims_present": False,
+            "structured_claim_count": 0,
+            "exact_date_match": False,
+        },
     )
     assert "refusal_answer_missing" in refusal_failures
 
@@ -152,6 +169,18 @@ def test_sse_parser_emits_final_event_at_eof_without_trailing_blank_line():
         request=httpx.Request("POST", "http://127.0.0.1/chat/stream"),
     )
     assert list(_sse_events(response)) == [payload]
+
+
+@pytest.mark.parametrize("status", [403, 404])
+def test_cancel_unreadable_trace_or_diagnostics_fails_closed(status: int):
+    failures = _cancel_readability_failures(
+        {"available": False, "read_status": 404},
+        {"available": False, "read_status": status},
+    )
+    assert failures == [
+        "cancel_trace_persistence_unreadable",
+        "cancel_stream_diagnostics_unreadable",
+    ]
 
 
 def test_complex_oracle_requires_common_checks_exact_success_sequence_and_frozen_evidence():
@@ -174,10 +203,12 @@ def test_complex_oracle_requires_common_checks_exact_success_sequence_and_frozen
         "steps": steps,
         "oracle": {"status": "PASSED"},
         "result_evidence": {
-            "metrics": ["revenue"],
-            "dimensions": ["region", "month"],
-            "row_count": 2,
+            "metrics": case["expected"]["expected_evidence"]["result"]["required_metrics"],
+            "dimensions": ["region"],
+            "row_count": 5,
+            "rows": case["expected"]["expected_evidence"]["result"]["expected_rows"],
         },
+        "answer_claims": case["expected"]["expected_evidence"]["result"]["expected_answer_claims"],
         "performance": {"total_latency_ms": 10},
     }
     base = {
@@ -191,9 +222,9 @@ def test_complex_oracle_requires_common_checks_exact_success_sequence_and_frozen
             "tools": [step["tool"] for step in case["steps"] if step["tool"]],
         },
         "verification": {
-            "result_verified": True,
-            "citation_verified": False,
-            "oracle_passed_count": 1,
+            "self_reported_result_verified": True,
+            "self_reported_citation_verified": False,
+            "self_reported_oracle_passed_count": 1,
             "result_signature_count": 0,
         },
         "answer_oracle": {"answer_present": True, "answer_claim_present": True},
@@ -231,6 +262,15 @@ def test_complex_oracle_requires_common_checks_exact_success_sequence_and_frozen
         missing_metric = copy.deepcopy(base)
         missing_metric["response_primary"]["result_evidence"]["metrics"] = []
         assert "complex_frozen_metric_evidence_missing" in gate.validate_complex(case, missing_metric)
+
+        self_reported_only = copy.deepcopy(base)
+        self_reported_only["response_primary"]["result_evidence"]["rows"] = [{"revenue": 999999}]
+        self_reported_only["response_primary"]["answer_claims"] = [{"metric": "revenue", "value": 999999}]
+        self_reported_only["verification"]["self_reported_result_verified"] = True
+        self_reported_only["verification"]["self_reported_oracle_passed_count"] = 99
+        truth_failures = gate.validate_complex(case, self_reported_only)
+        assert "complex_frozen_result_rows_mismatch" in truth_failures
+        assert "complex_frozen_answer_claims_mismatch" in truth_failures
 
 
 def test_live_gate_executes_all_real_http_contracts_auto_routes_weird_and_cleans_exactly():
@@ -278,6 +318,12 @@ def test_live_gate_executes_all_real_http_contracts_auto_routes_weird_and_cleans
                 "oracle": {"status": "PASSED"} if has_sql else {},
                 "result_signature": "phase5-result" if has_sql else None,
             }
+            truth = weird["case_ground_truth"][case["id"]]
+            if truth["kind"] in {"STRUCTURED_RESULT", "EMPTY_RESULT"}:
+                primary["result_evidence"] = {
+                    "rows": weird["frozen_result_sets"][truth["result_set"]],
+                }
+                primary["answer_claims"] = truth["expected_claims"]
             if action in {"REFUSE", "REFUSE_INJECTION", "REFUSE_SQL_INJECTION", "REFUSE_UNAUTHORIZED", "REFUSE_UNBOUNDED"}:
                 answer_text = "抱歉，无法执行或支持该请求。"
             elif action in {"ASK_CLARIFICATION", "UNKNOWN_METRIC_CLARIFICATION", "UNKNOWN_ENTITY_CLARIFICATION"}:
@@ -324,17 +370,20 @@ def test_live_gate_executes_all_real_http_contracts_auto_routes_weird_and_cleans
                     "metrics": case["expected"]["expected_evidence"]["result"]["required_metrics"],
                     "dimensions": case["expected"]["expected_evidence"]["result"]["required_dimensions"],
                     "row_count": case["expected"]["expected_evidence"]["result"]["minimum_row_count"],
+                    "rows": case["expected"]["expected_evidence"]["result"]["expected_rows"],
                 },
+                "answer_claims": case["expected"]["expected_evidence"]["result"]["expected_answer_claims"],
             }
             if case["kind"] == "DATA_RAG":
                 primary["citation_id"] = "phase5-citation"
-                primary["citations"] = [{"title": "授权收入口径"}]
+                primary["citations"] = case["expected"]["expected_evidence"]["citation"]["expected_citations"]
             if case["kind"] == "AGENT_PYTHON":
                 primary["sandbox_evidence"] = {
                     "status": "SUCCEEDED",
                     "runtime_verified": True,
                     "container_destroyed": True,
                     "operation": "correlation",
+                    "result": {"correlation": 1.0, "sample_size": 2},
                 }
             if case["kind"] == "FILE_DB":
                 primary["file_evidence"] = {
