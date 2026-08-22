@@ -1,0 +1,36 @@
+{
+  "schema_version": "chatbi-owner-authorized-selected-source-v1",
+  "source_project": "E:\\新能源企业经营分析智能平台",
+  "source_commit": "b2573a9dc1881a54581c5c556fb4a8c34046f9c3",
+  "ownership": "OWNER_ATTESTED_PASS",
+  "provenance_audit": "NOT_REQUIRED",
+  "integration_mode": "SELECTED_SOURCE_INTERNAL_PACKAGE",
+  "files": [
+    {
+      "source_path": "backend/app/knowledge/indexer.py",
+      "vendored_path": "app/knowledge/indexer.py",
+      "git_blob": "cba723f77dc5809d2689a04770ba44c62f552727",
+      "sha256": "11cfa0775041adef174fc548f49e11d31d7ba6f0006915f040e69887b02323b6"
+    },
+    {
+      "source_path": "backend/app/knowledge/reranker.py",
+      "vendored_path": "app/knowledge/reranker.py",
+      "git_blob": "0b2891ba51d6eaac9270b58d476a8a5d784a43a1",
+      "sha256": "c299d3d64919d908963562e289aa950be9f8107ee33db76fae164b713753f738"
+    },
+    {
+      "source_path": "backend/app/knowledge/security.py",
+      "vendored_path": "app/knowledge/security.py",
+      "git_blob": "3a59166e7669f79fcb7c713376022a7997979f2a",
+      "sha256": "9c85db5c157c8345b63f7fb5ed9b73da094baef4ec96ca759cc37a01494df4f4"
+    }
+  ],
+  "external_dependencies": [
+    "python-standard-library"
+  ],
+  "secret_references": [],
+  "data_dependencies": [
+    "ChatBI-authorized KnowledgeDocument/Version/Chunk rows supplied by adapter"
+  ],
+  "rollback": "Revert the successor commit; no schema or data migration is required."
+}

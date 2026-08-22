@@ -17,12 +17,13 @@ SuperSonic remains an independently authored clean-room semantic contract. IBM's
 
 ## V1.3.0 Phase 3 selected Agent, File and scanning-PDF runtimes
 
-Phase 3 adds two deliberately narrow direct-runtime boundaries. DB-GPT is installed only from the exact `packages/dbgpt-core` revision and executes AWEL; its application, RAG, datasource, auth, conversation, model-key and skill surfaces are excluded. PandasAI contributes exactly one byte-identical MIT community file, `pandasai/sandbox/sandbox.py`; no root `pandasai` import and no `ee/**` path is packaged.
+Phase 3 adds two deliberately narrow third-party runtime boundaries plus one separately identified owner-authorized internal reuse boundary. DB-GPT is installed only from the exact `packages/dbgpt-core` revision and executes AWEL; its application, RAG, datasource, auth, conversation, model-key and skill surfaces are excluded. PandasAI contributes exactly one byte-identical MIT community file, `pandasai/sandbox/sandbox.py`; no root `pandasai` import and no `ee/**` path is packaged. Legacy RAG is not asserted as third-party open source: the project owner explicitly authorized selected-source reuse from their own old project, so external provenance review is not required.
 
 | Project | Official revision / version | Selected path | License | Runtime boundary |
 | --- | --- | --- | --- | --- |
 | DB-GPT | `db580e952e544acf9f6c6c153da29dc67e9e40d7` / `0.8.1` | `packages/dbgpt-core`, specifically `DAG`, `MapOperator`, `BaseOperator.call` | MIT | AWEL receives only route, Trace ID and hard budgets, then calls the existing ChatBI five-role/six-tool orchestrator. It never receives SQL, datasource identifiers, model keys, connectors, RAG state or tool results. Exact archive SHA-256: `e225a2e222874adfb504e03f6a2d091729d8ecb2c874783fd4bcbc2c7c8ef31b`. |
 | PandasAI | `bbbb771d31062d81f6fa19bafb40620d5cbe48f4` | `pandasai/sandbox/sandbox.py`, Git blob `6f31f9dfd3dbd023c7f82a1533bb3c577efd19fd` | MIT Expat | The inherited upstream `Sandbox.execute` delegates to ChatBI's disposable hardened Docker worker. Selected file SHA-256: `a6d4934cffc70d8a325071d8ab94b12ec0ded9043cdc01e9ba3a4d1f64d210c6`. |
+| Owner-authorized Legacy RAG | `b2573a9dc1881a54581c5c556fb4a8c34046f9c3` | `backend/app/knowledge/indexer.py`, `reranker.py`, `security.py` | Owner-attested internal reuse; external provenance audit not required | Three byte-identical Git blobs provide the real deterministic index/vector, BM25/RRF/rerank and prompt-injection runtime. ChatBI retains HMAC identity, Workspace/RBAC/ACL, Citation, the single Model Gateway, Answer Guard, Trace/SSE and all data models. Checksums and rollback are locked in `backend/vendor/legacy_energy_rag/.../LOCK.json`. |
 | pypdfium2 | `5.13.0` | published Python package and bundled PDFium binary | BSD-3-Clause / Apache-2.0 plus dependency notices | Bounded scanned-PDF pages are rendered to clean PNG before the existing Vision preprocessing and Model Gateway. |
 | Docker SDK for Python | `7.1.0` | published Python package | Apache-2.0 | Host-side control API for creating and synchronously destroying the isolated worker; never installed inside or exposed to the worker. |
 
@@ -124,12 +125,11 @@ Day 3 introduced no copied third-party source, logo, brand asset, or restricted 
 
 ## Legacy project two interoperability
 
-- Source repository: user-controlled frozen repository, audited at commit `b6be894a7153f7ce8d31dfc65da7222bd7af1b5f`.
-- Integration: independently authored `LiveRagAdapter`, RAG Runtime, contracts and bounded five-role orchestrator; ChatBI does not import or copy the old repository's internal Python classes.
-- Copied production source: none.
-- Evaluation provenance: `evaluation/legacy-rag/SOURCE.json` records the source commit, blob IDs, case counts and SHA-256 values for two internal 60-case RAG inputs. The payload JSON files are deliberately excluded from the public V1 repository.
-- License boundary: the old repository has no root LICENSE/NOTICE. No legacy production source or provenance-pending test payload is redistributed. No old brand, logo, UI, database dump, secret, or credential is included.
-- Published dependencies used by the new adapters: `httpx` (BSD-3-Clause), Pydantic (MIT), SQLAlchemy (MIT), and Alembic (MIT). No dependency source was copied or modified.
+- Current source repository: project-owner-controlled `E:\新能源企业经营分析智能平台`, locked at `b2573a9dc1881a54581c5c556fb4a8c34046f9c3`; ownership is `OWNER_ATTESTED_PASS` and external provenance audit is `NOT_REQUIRED` by explicit owner authorization.
+- Current integration: the independently authored `LiveRagAdapter`, HMAC bridge and ChatBI control plane invoke byte-identical selected-source copies of only `indexer.py`, `reranker.py` and `security.py`. Real runtime call count is recorded by the Phase 3 gate.
+- Excluded surfaces: old Auth/Workspace/Conversation, database schema/models, source API, Model Gateway, SQL execution, SSE, UI, brand, data dump, secret and credential.
+- Historical evaluation provenance: `evaluation/legacy-rag/SOURCE.json` remains unchanged as prior evidence; its excluded 120-case payload files are not used to justify the current direct-reuse gate.
+- Exact selected paths, Git blobs, canonical SHA-256 values, dependency/secret/data audit and rollback are in `docs/runtime/V1_3_PHASE3_OWNER_AUTHORIZED_LEGACY_RAG_LOCK.md` and `backend/vendor/legacy_energy_rag/.../LOCK.json`.
 
 ## External model API integrations
 

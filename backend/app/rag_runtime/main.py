@@ -12,6 +12,7 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from app.core.config import get_settings
 from app.db.session import SessionLocal
+from app.rag_runtime.legacy_selected_source import RETRIEVAL_MODE, selected_source_status
 from app.rag_runtime.service import IdentityDenied, RuntimeIdentity, retrieve
 
 
@@ -51,6 +52,7 @@ def health() -> dict[str, Any]:
         "component": "chatbi-rag-runtime",
         "version": "1.0.1",
         "identity_signing": secret_configured,
+        "legacy_rag": selected_source_status(),
     }
 
 
@@ -101,7 +103,7 @@ async def retrieve_knowledge(request: Request, response: Response) -> dict[str, 
         return {
             "trace_id": context.trace_id,
             "run_id": run_id,
-            "retrieval_mode": "hybrid_bm25_vector_rrf_rerank_v2",
+            "retrieval_mode": RETRIEVAL_MODE,
             "answer_guard_status": "REFUSED",
             "refusal_reason": "NO_AUTHORIZED_EVIDENCE",
             "citations": [],
@@ -109,7 +111,7 @@ async def retrieve_knowledge(request: Request, response: Response) -> dict[str, 
     return {
         "trace_id": context.trace_id,
         "run_id": run_id,
-        "retrieval_mode": "hybrid_bm25_vector_rrf_rerank_v2",
+        "retrieval_mode": RETRIEVAL_MODE,
         "answer_guard_status": "PASSED",
         "vector_status": "DETERMINISTIC_TOKEN_VECTOR_ACTIVE",
         "citations": [

@@ -1,10 +1,7 @@
 from __future__ import annotations
 
 import hashlib
-import re
 from dataclasses import dataclass
-from collections import Counter
-from math import log
 
 from sqlalchemy import exists, or_, select
 from sqlalchemy.orm import Session
@@ -18,19 +15,13 @@ from app.models import (
     KnowledgeSource,
     Workspace,
 )
-
-
-_WORD = re.compile(r"[a-zA-Z0-9_]+|[\u4e00-\u9fff]+")
-_INJECTION = tuple(
-    re.compile(pattern, re.IGNORECASE)
-    for pattern in (
-        r"ignore\s+(all\s+)?previous\s+instructions",
-        r"忽略.{0,12}(之前|以上|系统).{0,8}(指令|提示)",
-        r"(system|developer)\s*prompt",
-        r"(绕过|跳过|disable).{0,16}(权限|guard|acl|安全)",
-        r"(exfiltrate|reveal).{0,24}(secret|credential|prompt)",
-    )
+from app.rag_runtime.legacy_selected_source import (
+    LegacyCandidate,
+    RETRIEVAL_MODE,
+    prompt_injection_detected,
+    rank_candidates as legacy_rank_candidates,
 )
+
 
 
 class IdentityDenied(RuntimeError):
@@ -84,7 +75,7 @@ def retrieve(
     # A malicious request must not be allowed to use even otherwise legitimate
     # governed evidence as fuel for prompt injection. Fail closed before any
     # retrieval run or ranking is performed.
-    if any(pattern.search(query) for pattern in _INJECTION):
+    if prompt_injection_detected(query):
         return ()
     canonical_scenario_id = "charging_ops" if scenario_id in {"chatbi-v1", "charging_ops"} else scenario_id
     acl_predicates = [
@@ -127,70 +118,45 @@ def retrieve(
             ),
         )
     ).all()
-    query_tokens = _tokens(query)
-    if not query_tokens:
-        return ()
-    candidates: list[tuple[RetrievedChunk, frozenset[str], Counter[str]]] = []
+    candidates: list[LegacyCandidate] = []
     for chunk, version, document, source in rows:
-        if any(pattern.search(chunk.content) for pattern in _INJECTION):
+        if prompt_injection_detected(chunk.content):
             continue
         document_metadata = document.metadata_payload or {}
         if str(document_metadata.get("scenario_id") or "charging_ops") != canonical_scenario_id:
             continue
         metadata = chunk.metadata_payload or {}
-        searchable = " ".join(
-            (document.title, chunk.content, " ".join(metadata.get("keywords", [])))
-        )
-        candidate_tokens = _tokens(searchable)
-        token_counts = Counter(_WORD.findall(searchable.lower()))
-        if not query_tokens.intersection(candidate_tokens):
-            continue
         locator = chunk.locator or {}
-        candidates.append((RetrievedChunk(
+        candidates.append(LegacyCandidate(
             document_id=document.id,
             document_version_id=version.id,
             chunk_id=chunk.id,
             title=document.title,
-            text=chunk.content,
+            content=chunk.content,
+            source_path=document.source_path,
             source=f"{source.name}:{document.source_path}",
             locator=str(locator.get("section") or f"chunk:{chunk.ordinal}"),
-            score=0,
-        ), candidate_tokens, token_counts))
+            ordinal=chunk.ordinal,
+            section=str(locator.get("section") or metadata.get("section") or "") or None,
+            content_sha256=chunk.content_sha256,
+        ))
     if not candidates:
         return ()
-
-    document_frequency = Counter(token for _, tokens, _ in candidates for token in query_tokens if token in tokens)
-    bm25_scores: dict[str, float] = {}
-    vector_scores: dict[str, float] = {}
-    for item, tokens, counts in candidates:
-        bm25_scores[item.chunk_id] = sum(
-            (counts.get(token, 0) / (counts.get(token, 0) + 1.2))
-            * log((len(candidates) + 1) / (document_frequency[token] + 0.5) + 1)
-            for token in query_tokens
+    ranked = legacy_rank_candidates(query, candidates, limit=limit)
+    return tuple(
+        RetrievedChunk(
+            document_id=item.candidate.document_id,
+            document_version_id=item.candidate.document_version_id,
+            chunk_id=item.candidate.chunk_id,
+            title=item.candidate.title,
+            text=item.candidate.content,
+            source=item.candidate.source,
+            locator=item.candidate.locator,
+            score=item.score,
         )
-        vector_scores[item.chunk_id] = len(query_tokens & tokens) / max(1, len(query_tokens | tokens))
-    bm25_rank = {item.chunk_id: index for index, (item, _, _) in enumerate(sorted(candidates, key=lambda row: (-bm25_scores[row[0].chunk_id], row[0].chunk_id)), 1)}
-    vector_rank = {item.chunk_id: index for index, (item, _, _) in enumerate(sorted(candidates, key=lambda row: (-vector_scores[row[0].chunk_id], row[0].chunk_id)), 1)}
-    reranked: list[tuple[float, RetrievedChunk]] = []
-    for item, tokens, _ in candidates:
-        rrf = 1 / (60 + bm25_rank[item.chunk_id]) + 1 / (60 + vector_rank[item.chunk_id])
-        coverage = len(query_tokens & tokens) / max(1, len(query_tokens))
-        final = min(1.0, rrf * 15 + coverage * 0.5)
-        reranked.append((final, RetrievedChunk(**{**item.__dict__, "score": round(final, 6)})))
-    reranked.sort(key=lambda row: (-row[0], row[1].chunk_id))
-    return tuple(item for _, item in reranked[:limit])
+        for item in ranked
+    )
 
 
 def content_hash(text: str) -> str:
     return hashlib.sha256(text.encode("utf-8")).hexdigest()
-
-
-def _tokens(text: str) -> frozenset[str]:
-    tokens: set[str] = set()
-    for raw in _WORD.findall(text.lower()):
-        if re.fullmatch(r"[\u4e00-\u9fff]+", raw):
-            tokens.add(raw)
-            tokens.update(raw[index : index + 2] for index in range(max(0, len(raw) - 1)))
-        else:
-            tokens.add(raw)
-    return frozenset(token for token in tokens if token)

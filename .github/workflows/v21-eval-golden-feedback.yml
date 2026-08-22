@@ -12,11 +12,13 @@ on:
       - "backend/app/services/evaluation.py"
       - "backend/scripts/run_v13_ibm_ci_bootstrap.py"
       - "backend/scripts/run_v13_ibm_official_eval.py"
+      - "backend/scripts/run_v13_legacy_rag_gate.py"
       - "backend/tests/test_v13_ibm_ci_bootstrap.py"
       - "backend/tests/test_v13_ibm_official_eval.py"
       - "evaluation/golden/**"
       - "backend/app/file_multimodal/**"
       - "backend/app/rag_runtime/**"
+      - "backend/vendor/legacy_energy_rag/**"
       - "backend/app/sandbox/**"
       - "backend/app/integration/**"
       - "backend/app/services/chat.py"
@@ -110,7 +112,7 @@ jobs:
           done
           docker logs chatbi-sandbox-controller-ci
           exit 1
-      - name: Exact DB-GPT AWEL, PandasAI, File, Vision and Sandbox gates
+      - name: Exact Legacy RAG, DB-GPT AWEL, PandasAI, File, Vision and Sandbox gates
         id: phase3_tests
         run: |
           mkdir -p "$PHASE3_EVIDENCE_DIR"
@@ -123,6 +125,8 @@ jobs:
             backend/tests/test_v13_phase3_vision_policy.py \
             backend/tests/test_v13_phase3_multimodal_live_runner.py \
             -q --junitxml "$PHASE3_EVIDENCE_DIR/phase3-junit.xml"
+          python backend/scripts/run_v13_legacy_rag_gate.py \
+            --output "$PHASE3_EVIDENCE_DIR/legacy-rag-runtime.json"
           python backend/scripts/run_v13_file_golden.py \
             --output "$PHASE3_EVIDENCE_DIR/file12-runtime.json"
       - name: Collect Phase3 runner and digest receipt
@@ -141,6 +145,7 @@ jobs:
           output = Path(os.environ["PHASE3_EVIDENCE_DIR"])
           junit = output / "phase3-junit.xml"
           file12_path = output / "file12-runtime.json"
+          legacy_rag_path = output / "legacy-rag-runtime.json"
           junit_summary = None
           if junit.is_file():
               root = ET.parse(junit).getroot()
@@ -150,6 +155,7 @@ jobs:
                   for key in ("tests", "failures", "errors", "skipped")
               }
           file12 = json.loads(file12_path.read_text(encoding="utf-8")) if file12_path.is_file() else None
+          legacy_rag = json.loads(legacy_rag_path.read_text(encoding="utf-8")) if legacy_rag_path.is_file() else None
           file12_results = {
               item.get("id"): item for item in (file12 or {}).get("results", [])
           }
@@ -174,6 +180,15 @@ jobs:
               "docker_real_runtime_required": True,
               "sandbox_controller_real_runtime_required": True,
               "runtime_metrics": {
+                  "legacy_rag_direct_reuse": (legacy_rag or {}).get("legacy_rag_direct_reuse"),
+                  "legacy_rag_source_commit": (legacy_rag or {}).get("source_commit"),
+                  "legacy_rag_runtime_calls": (legacy_rag or {}).get("rag_runtime_calls"),
+                  "knowledge_golden": (legacy_rag or {}).get("knowledge_golden"),
+                  "citation_accuracy": (legacy_rag or {}).get("citation_accuracy"),
+                  "unauthorized_recall": (legacy_rag or {}).get("unauthorized_recall"),
+                  "cross_scenario_recall": (legacy_rag or {}).get("cross_scenario_recall"),
+                  "prompt_injection_evidence_used": (legacy_rag or {}).get("prompt_injection_evidence_used"),
+                  "rag_cross_workspace_leak": (legacy_rag or {}).get("cross_workspace_leak"),
                   "dbgpt_agent_cases": 15,
                   "dbgpt_agent_success_rate": 1.0,
                   "dbgpt_base_operator_calls": 15,

@@ -1,5 +1,13 @@
 # Architecture Decisions
 
+## ADR-051：负责人授权的 Legacy RAG 只复用三个锁定源码模块
+
+项目负责人明确确认 `E:\新能源企业经营分析智能平台` 为其自有旧项目并授权 ChatBI 内部复用；外部作者、公司和权属证明不再是本轮 Gate。工程 Gate 仍锁定 Git commit `b2573a9dc1881a54581c5c556fb4a8c34046f9c3`、selected paths、Git blobs、SHA-256、依赖、Secret、数据隔离、接口和回滚。
+
+旧知识 API/Retrieval Service 依赖其模块化单体的 Identity、Governance、ORM 和数据库，若按 Service 整体接入会建立第二套 Auth/Workspace/Data Model。ChatBI 因此选择最小 `SELECTED_SOURCE_INTERNAL_PACKAGE`：byte-identical `indexer.py`、`reranker.py`、`security.py` 在导入前校验锁文件，真实执行 deterministic feature-hash vector、BM25、RRF、rerank 与 prompt-injection detection；ChatBI Adapter 只把已经通过 HMAC、Workspace/用户/角色、ACL、场景和版本过滤的 Chunk 映射为无持久化结构对象。
+
+正式路径保持 `Question → ChatBI Workspace/RBAC → LiveRagAdapter/HMAC → ChatBI ACL/scenario → selected-source BM25/vector/RRF/rerank → Citation → 唯一 ModelGateway → Answer Guard → AnswerEnvelope → ChatBI SSE`。旧项目不得获得数据库连接、Provider Key、Conversation、SQL Executor、外部 SSE 或动态工具。锁校验失败必须 fail closed；回滚只需 revert Successor commit，不含 Schema 或数据迁移。完整清单见 `docs/runtime/V1_3_PHASE3_OWNER_AUTHORIZED_LEGACY_RAG_LOCK.md`。
+
 ## ADR-050：Phase 3 仅引入窄范围上游运行时，并保持单一安全与证据控制面
 
 DB-GPT 只允许固定提交 `db580e952e544acf9f6c6c153da29dc67e9e40d7` 的 `dbgpt-core/AWEL` 执行 `DAG`、`MapOperator` 与 `BaseOperator.call`；AWEL 输入不包含原始问题、SQL、数据源/模型标识、连接器、密钥、RAG 状态或工具结果。它只承载路由、Trace ID 和硬预算，并回调现有 ChatBI 固定五角色六工具编排。任何来源校验失败、运行时缺失或预算越界均 fail closed，不得回落后再记为真实 DB-GPT 调用。
@@ -8,7 +16,7 @@ PandasAI 只允许固定提交 `bbbb771d31062d81f6fa19bafb40620d5cbe48f4`、Git 
 
 Vision 先执行方向归一化、元数据清除、尺寸约束、必要分块、提示词注入识别与敏感字段脱敏，形成可签名 `VisualEvidence`。普通视觉默认 MiMo；Kimi 只由多图、低质量文档或大图分块等显式 premium trigger 选择，DeepSeek 不接收原始图片。扫描 PDF 经固定 pypdfium2 逐页渲染后复用同一 Vision 链。图片与数据库对照必须重新走 ChatBI Schema/Semantic/NL2SQL/SQL Guard/只读 Executor/Result Oracle，并保留 Query Run 与结果签名；视觉文本不得直接生成或执行数据库 SQL。
 
-正式 Trace 只记录实际执行的 `rag.retrieve`、`agent.step`、`file.parse`、`python.execute`、`model.invoke`、`sql.execute`、`oracle.verify`、`answer.compose` 和 `sse.stream`。同步入口不得记录 `sse.stream`，失败或回滚不得冒充已完成 span。Legacy RAG 在所有权和许可证无法闭合时维持 clean-room Adapter，直接源码复用状态为 `BLOCKED`，但不削弱 ACL、Citation 和 Answer Guard 的 P0 产品要求。
+正式 Trace 只记录实际执行的 `rag.retrieve`、`agent.step`、`file.parse`、`python.execute`、`model.invoke`、`sql.execute`、`oracle.verify`、`answer.compose` 和 `sse.stream`。同步入口不得记录 `sse.stream`，失败或回滚不得冒充已完成 span。Legacy RAG 的历史 `BLOCKED` 结论已被项目负责人授权和 ADR-051 的最小 selected-source lock 覆盖；ACL、Citation、Answer Guard 与单一控制平面要求不变。
 
 ## ADR-049：V1.3.0 以自包含 IBM 远端 Gate 和受控 SQLBot 例外收口 Phase 2
 

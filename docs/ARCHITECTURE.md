@@ -84,7 +84,7 @@ MiMo 是 Balanced 普通请求的低成本默认 Provider，DeepSeek 是 NL2SQL/
 - `HYBRID_ANALYSIS`：只合并 Oracle 已通过的数据结果与 CitationVerifier 已通过的知识证据。
 - `COMPLEX_ANALYSIS`：进入固定五角色编排；任何验证失败均不得发布未验证结论。
 
-RAG Runtime 是当前仓库独立编写的 FastAPI 服务，通过 HMAC 签名的 Workspace、用户、角色和 Trace 身份调用。Runtime 先验证用户与 Workspace 归属，再按 `knowledge_acl` 过滤文档版本，随后召回并返回带 document/version/chunk 身份的引用；超时、签名错误、身份不一致、无授权证据均失败关闭。旧仓库生产源码复制数为 0。
+RAG Runtime 保持 ChatBI 自有 FastAPI/HMAC/Workspace/RBAC/ACL 服务边界，但其内部索引、BM25、确定性向量、RRF、rerank 与注入检测直接调用项目负责人已授权旧项目 commit `b2573a9d...` 的三个 checksum-locked selected-source 模块。Runtime 先验证用户与 Workspace 归属，再按 `knowledge_acl` 与场景过滤文档版本，只有授权 Chunk 才进入旧 RAG 算法；返回引用后继续通过唯一 ChatBI Model Gateway、Citation/Answer Guard、AnswerEnvelope 与 SSE。旧项目的 Auth、Workspace、数据库模型、Conversation、Model Gateway、SQL Executor 和 SSE 均未复制。完整锁定与回滚见 [`docs/runtime/V1_3_PHASE3_OWNER_AUTHORIZED_LEGACY_RAG_LOCK.md`](runtime/V1_3_PHASE3_OWNER_AUTHORIZED_LEGACY_RAG_LOCK.md)。
 
 契约位于根目录 `packages/`。Multi-Agent 固定为 `PlannerAgent`、`DataAnalystAgent`、`KnowledgeAgent`、`VerificationAgent`、`InsightAgent`；统一 `ToolExecutor` 只暴露 `QUERY_DATA`、`RETRIEVE_KNOWLEDGE`、`VERIFY_RESULT`、`VERIFY_CITATION`、`GENERATE_CHART`、`GENERATE_INSIGHT`。最大步骤 8、工具调用 12、重规划 2、深度 2、总超时 30 秒。Agent 不能获得数据库连接、Connector、文件、任意 URL 或动态工具；`QUERY_DATA` 始终执行 `Semantic Context → NL2SQL → SQL Guard → Query Executor → Result Oracle`。
 
