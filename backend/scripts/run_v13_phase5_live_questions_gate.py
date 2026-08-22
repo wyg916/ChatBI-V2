@@ -8,6 +8,7 @@ import re
 import subprocess
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
+from decimal import Decimal, InvalidOperation
 from pathlib import Path
 from time import perf_counter
 from typing import Any, Callable, Iterable, Mapping, Sequence
@@ -55,6 +56,7 @@ _ASSERTION_MARKERS = (
     "达到", "为", "是", "增长", "下降", "增加", "减少", "最高", "最低", "同比", "环比", "approved", "grew",
     "increased", "decreased", "equals", " is ",
 )
+_NUMBER_TOKEN = re.compile(r"(?<![A-Za-z0-9])[+-]?\d[\d,]*(?:\.\d+)?")
 
 
 class LiveGateError(RuntimeError):
@@ -106,6 +108,15 @@ def validate_backend_url(value: str) -> str:
     if path and path != "/api/v1":
         raise ValueError("Backend URL path must be empty or /api/v1")
     return f"{parsed.scheme}://{parsed.netloc}/api/v1"
+
+
+def validate_controller_url(value: str) -> str:
+    parsed = urlparse(value.strip())
+    if parsed.scheme not in {"http", "https"} or parsed.hostname not in _LOCAL_HOSTS:
+        raise ValueError("Phase5 live questions gate requires a loopback Sandbox Controller")
+    if parsed.username or parsed.password or parsed.query or parsed.fragment or parsed.path.rstrip("/"):
+        raise ValueError("Sandbox Controller URL cannot contain credentials, path, query or fragment")
+    return f"{parsed.scheme}://{parsed.netloc}"
 
 
 def load_external_credentials(path: Path) -> dict[str, str]:
@@ -241,6 +252,63 @@ def _answer_oracle(response: Mapping[str, Any], verification: Mapping[str, Any])
         "refusal_detected": refusal_detected,
         "clarification_detected": clarification_detected,
         "no_evidence_detected": no_evidence_detected,
+    }
+
+
+def _numbers(value: Any) -> set[Decimal]:
+    values: set[Decimal] = set()
+    if isinstance(value, bool) or value is None:
+        return values
+    if isinstance(value, (int, float, Decimal)):
+        try:
+            values.add(Decimal(str(value)))
+        except InvalidOperation:
+            pass
+        return values
+    if isinstance(value, Mapping):
+        for item in value.values():
+            values.update(_numbers(item))
+        return values
+    if isinstance(value, (list, tuple)):
+        for item in value:
+            values.update(_numbers(item))
+        return values
+    if isinstance(value, str):
+        for token in _NUMBER_TOKEN.findall(value):
+            try:
+                values.add(Decimal(token.replace(",", "")))
+            except InvalidOperation:
+                continue
+    return values
+
+
+def _visible_claim_evidence(
+    *, question: str, answer_text: str, expected_rows: Any, expected_claims: Any,
+) -> dict[str, Any]:
+    allowed_numbers = _numbers(question) | _numbers(expected_rows) | _numbers(expected_claims)
+    answer_numbers = _numbers(answer_text)
+    claim_values = {
+        value
+        for claim in expected_claims or [] if isinstance(claim, Mapping)
+        for value in _numbers(claim.get("value"))
+    }
+    required_labels = {
+        str(claim[key])
+        for claim in expected_claims or [] if isinstance(claim, Mapping)
+        for key in ("dimension_value",)
+        if claim.get(key) is not None
+    }
+    unexpected = answer_numbers - allowed_numbers
+    missing_values = claim_values - answer_numbers
+    missing_labels = {label for label in required_labels if label not in answer_text}
+    return {
+        "visible_claims_exact": not unexpected and not missing_values and not missing_labels,
+        "answer_numeric_claim_count": len(answer_numbers),
+        "expected_claim_value_count": len(claim_values),
+        "unexpected_number_count": len(unexpected),
+        "missing_claim_value_count": len(missing_values),
+        "missing_dimension_label_count": len(missing_labels),
+        "answer_text_sha256": sha256_text(answer_text),
     }
 
 
@@ -414,6 +482,20 @@ def _ground_truth_evidence(case: Mapping[str, Any], response: Mapping[str, Any])
     answer_text = _answer_text(response)
     exact_rows_match = expected_rows is not None and actual_rows == expected_rows
     exact_claims_match = expected_claims is not None and actual_claims == expected_claims
+    visible = _visible_claim_evidence(
+        question=str(case.get("question") or ""),
+        answer_text=answer_text,
+        expected_rows=expected_rows,
+        expected_claims=expected_claims,
+    ) if kind in {"STRUCTURED_RESULT", "EMPTY_RESULT"} else {
+        "visible_claims_exact": kind not in {"STRUCTURED_RESULT", "EMPTY_RESULT"},
+        "answer_numeric_claim_count": len(_numbers(answer_text)),
+        "expected_claim_value_count": 0,
+        "unexpected_number_count": 0,
+        "missing_claim_value_count": 0,
+        "missing_dimension_label_count": 0,
+        "answer_text_sha256": sha256_text(answer_text),
+    }
     return {
         "kind": kind,
         "exact_rows_match": exact_rows_match,
@@ -423,7 +505,10 @@ def _ground_truth_evidence(case: Mapping[str, Any], response: Mapping[str, Any])
         "structured_claim_count": len(actual_claims or []),
         "actual_rows_sha256": sha256_text(json.dumps(actual_rows, ensure_ascii=False, sort_keys=True)) if actual_rows is not None else None,
         "actual_claims_sha256": sha256_text(json.dumps(actual_claims, ensure_ascii=False, sort_keys=True)) if actual_claims is not None else None,
-        "exact_date_match": kind == "EXACT_DATE" and str(truth.get("value") or "") in answer_text,
+        "exact_date_match": kind in {"EXACT_DATE", "EXACT_WEEKDAY"} and (
+            str(truth.get("value") or "").casefold() in answer_text.casefold()
+        ),
+        **visible,
     }
 
 
@@ -508,6 +593,8 @@ def _action_failures(
         failures.append("frozen_result_rows_mismatch")
     if truth_kind == "STRUCTURED_RESULT" and not ground_truth["exact_claims_match"]:
         failures.append("frozen_answer_claims_mismatch")
+    if truth_kind == "STRUCTURED_RESULT" and not ground_truth["visible_claims_exact"]:
+        failures.append("visible_answer_claims_mismatch")
     if contract.get("verified_evidence_required") and not (
         ground_truth["exact_rows_match"] and ground_truth["exact_claims_match"]
     ):
@@ -520,8 +607,8 @@ def _action_failures(
         ground_truth["exact_rows_match"] and ground_truth["exact_claims_match"]
     ):
         failures.append("frozen_empty_result_mismatch")
-    if truth_kind == "EXACT_DATE" and not ground_truth["exact_date_match"]:
-        failures.append("frozen_date_value_mismatch")
+    if truth_kind in {"EXACT_DATE", "EXACT_WEEKDAY"} and not ground_truth["exact_date_match"]:
+        failures.append("frozen_temporal_value_mismatch")
     if truth_kind in {
         "SAFE_NO_BUSINESS_CLAIM", "CLARIFICATION_NO_CLAIM", "REFUSAL_NO_CLAIM", "NO_EVIDENCE_NO_CLAIM"
     } and int(ground_truth["structured_claim_count"]) != 0:
@@ -576,12 +663,14 @@ class LiveQuestionsGate:
         semantic_model_id: str,
         credentials: Mapping[str, str],
         secret_values: Sequence[str],
+        controller_client: httpx.Client | None = None,
     ) -> None:
         self.client = client
         self.datasource_id = datasource_id
         self.semantic_model_id = semantic_model_id
         self.credentials = credentials
         self.secret_values = tuple(value for value in secret_values if value)
+        self.controller_client = controller_client
         self.cleanup_tracker = CleanupTracker()
 
     def login(self) -> dict[str, Any]:
@@ -700,11 +789,13 @@ class LiveQuestionsGate:
             "verification": verification,
             "answer_oracle": answer_oracle,
             "ground_truth": ground_truth,
+            "answer_text_sha256": sha256_text(_answer_text(response)),
             "failures": failures,
             "status": "PASS" if not failures else "FAIL",
         }
         if explicit_route:
             evidence["response_primary"] = _analysis_primary(response)
+            evidence["response_answer_text"] = _answer_text(response)
         return evidence
 
     def cancel_probe(self, case: Mapping[str, Any]) -> dict[str, Any]:
@@ -777,9 +868,16 @@ class LiveQuestionsGate:
             diagnostic_trace_ids = [str(item) for item in diagnostics_payload.get("trace_ids") or []]
             diagnostics = {
                 "available": True,
+                "resource_counters_present": all(
+                    key in diagnostics_payload for key in (
+                        "active_connections", "active_tasks", "active_agent_tasks", "active_sandbox_tasks",
+                    )
+                ),
                 "trace_released": trace_id not in diagnostic_trace_ids,
                 "active_connections": int(diagnostics_payload.get("active_connections") or 0),
                 "active_tasks": int(diagnostics_payload.get("active_tasks") or 0),
+                "active_agent_tasks": int(diagnostics_payload.get("active_agent_tasks") or 0),
+                "active_sandbox_tasks": int(diagnostics_payload.get("active_sandbox_tasks") or 0),
             }
         elif diagnostics_response.status_code in {403, 404}:
             diagnostics = {
@@ -791,6 +889,26 @@ class LiveQuestionsGate:
             raise LiveGateError(
                 f"HTTP_{diagnostics_response.status_code}:GET:/chat/stream/diagnostics"
             )
+        if self.controller_client is None:
+            controller_diagnostics = {"available": False}
+        else:
+            controller_response = self.controller_client.get("/diagnostics")
+            if controller_response.status_code == 200:
+                controller_payload = controller_response.json()
+                controller_diagnostics = {
+                    "available": True,
+                    "resource_counters_present": all(
+                        key in controller_payload for key in ("status", "running_jobs", "worker_containers")
+                    ),
+                    "status": controller_payload.get("status"),
+                    "running_jobs": int(controller_payload.get("running_jobs") or 0),
+                    "worker_containers": int(controller_payload.get("worker_containers") or 0),
+                }
+            else:
+                controller_diagnostics = {
+                    "available": False,
+                    "read_status": controller_response.status_code,
+                }
         failures: list[str] = []
         if cancel_status != 202:
             failures.append("cancel_ack_not_202")
@@ -820,8 +938,25 @@ class LiveQuestionsGate:
             failures.append("cancelled_messages_not_cleaned")
         if stale_succeeded_assistants:
             failures.append("cancel_stale_answer_persisted")
-        if diagnostics["available"] and diagnostics["trace_released"] is not True:
-            failures.append("cancel_stream_resources_not_released")
+        if diagnostics["available"] and (
+            diagnostics["resource_counters_present"] is not True
+            or
+            diagnostics["trace_released"] is not True
+            or diagnostics["active_connections"] != 0
+            or diagnostics["active_tasks"] != 0
+            or diagnostics["active_agent_tasks"] != 0
+            or diagnostics["active_sandbox_tasks"] != 0
+        ):
+            failures.append("cancel_stream_agent_or_sandbox_resources_not_released")
+        if not controller_diagnostics.get("available"):
+            failures.append("cancel_sandbox_controller_diagnostics_unreadable")
+        elif (
+            controller_diagnostics.get("resource_counters_present") is not True
+            or controller_diagnostics.get("status") != "OK"
+            or controller_diagnostics.get("running_jobs") != 0
+            or controller_diagnostics.get("worker_containers") != 0
+        ):
+            failures.append("cancel_sandbox_worker_or_container_not_destroyed")
         failures.extend(_cancel_readability_failures(trace, diagnostics))
         return {
             "request_id": request_id,
@@ -841,6 +976,7 @@ class LiveQuestionsGate:
                 "stale_succeeded_assistant_count": len(stale_succeeded_assistants),
             },
             "stream_diagnostics": diagnostics,
+            "sandbox_controller_diagnostics": controller_diagnostics,
             "failures": failures,
             "status": "PASS" if not failures else "FAIL",
         }
@@ -848,6 +984,7 @@ class LiveQuestionsGate:
     def validate_complex(self, case: Mapping[str, Any], evidence: dict[str, Any]) -> list[str]:
         expected = case["expected"]
         primary = evidence.pop("response_primary")
+        answer_text = str(evidence.pop("response_answer_text", ""))
         steps = primary.get("steps") or []
         actual_sequence = [
             {
@@ -924,13 +1061,53 @@ class LiveQuestionsGate:
             failures.append("complex_frozen_result_rows_mismatch")
         if actual_claims != result_contract["expected_answer_claims"]:
             failures.append("complex_frozen_answer_claims_mismatch")
+        visible_claims = _visible_claim_evidence(
+            question=str(case["question"]),
+            answer_text=answer_text,
+            expected_rows=result_contract["expected_rows"],
+            expected_claims=result_contract["expected_answer_claims"],
+        )
+        if not visible_claims["visible_claims_exact"]:
+            failures.append("complex_visible_answer_claims_mismatch")
 
         citation_contract = frozen["citation"]
-        actual_citations = primary.get("citations") if isinstance(primary.get("citations"), list) else None
-        citation_titles = [str(item.get("title") or "") for item in actual_citations or [] if isinstance(item, Mapping)]
+        actual_citations = next(
+            (item for item in _nested_values(primary, "citations") if isinstance(item, list)),
+            [],
+        )
+        citation_titles = [str(item.get("title") or "") for item in actual_citations if isinstance(item, Mapping)]
+        citation_observed: list[dict[str, Any]] = []
         if citation_contract["required"]:
-            if actual_citations != citation_contract["expected_citations"]:
+            for contract in citation_contract["expected_citations"]:
+                candidates = [
+                    item for item in actual_citations
+                    if isinstance(item, Mapping) and str(item.get("title") or "") == contract["title"]
+                ]
+                if len(candidates) != 1:
+                    citation_observed.append({"title": contract["title"], "matched": False})
+                    continue
+                item = candidates[0]
+                text_value = str(item.get("text") or item.get("citation_text") or "")
+                identity_complete = all(str(item.get(key) or "") for key in contract["identity_fields"])
+                matched = (
+                    identity_complete
+                    and str(item.get("source") or "") == contract["source"]
+                    and str(item.get("locator") or "") == contract["locator"]
+                    and sha256_text(text_value) == contract["content_sha256"]
+                )
+                citation_observed.append({
+                    "title": contract["title"],
+                    "matched": matched,
+                    "identity_complete": identity_complete,
+                    "content_sha256": sha256_text(text_value),
+                    "locator_sha256": sha256_text(str(item.get("locator") or "")),
+                })
+            if len(actual_citations) != len(citation_contract["expected_citations"]) or not all(
+                item["matched"] for item in citation_observed
+            ):
                 failures.append("complex_frozen_citations_mismatch")
+            if str(citation_contract["required_answer_text"]) not in answer_text:
+                failures.append("complex_citation_claim_not_entailed_in_visible_answer")
 
         file_contract = frozen["file"]
         file_evidence = _first_mapping(primary, "file_evidence")
@@ -980,7 +1157,9 @@ class LiveQuestionsGate:
             "total_latency_ms": total_latency_ms,
             "accuracy_metric": expected["accuracy_metric"],
             "frozen_result_evidence": result_evidence,
+            "visible_claim_evidence": visible_claims,
             "frozen_citation_titles_sha256": [sha256_text(item) for item in citation_titles],
+            "frozen_citation_evidence": citation_observed,
             "frozen_file_evidence": observed_file,
             "frozen_sandbox_evidence": observed_sandbox,
             "accuracy_evidence_passed": not any(
@@ -1047,6 +1226,7 @@ def run_live_gate(
     datasource_id: str,
     semantic_model_id: str,
     credentials: Mapping[str, str],
+    controller_client: httpx.Client,
 ) -> dict[str, Any]:
     started_at = utc_now()
     gate = LiveQuestionsGate(
@@ -1055,6 +1235,7 @@ def run_live_gate(
         semantic_model_id=semantic_model_id,
         credentials=credentials,
         secret_values=(credentials["password"],),
+        controller_client=controller_client,
     )
     weird_results: list[dict[str, Any]] = []
     complex_results: list[dict[str, Any]] = []
@@ -1155,6 +1336,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--complex-manifest", type=Path, default=DEFAULT_COMPLEX_MANIFEST)
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--timeout-seconds", type=float, default=60.0)
+    parser.add_argument("--sandbox-controller-url", required=True)
     return parser
 
 
@@ -1166,13 +1348,20 @@ def main(argv: Sequence[str] | None = None) -> int:
     weird = load_manifest(args.weird_manifest, expected_count=50)
     complex_manifest = load_manifest(args.complex_manifest, expected_count=5)
     api_base = validate_backend_url(args.api_base)
+    controller_base = validate_controller_url(args.sandbox_controller_url)
     with httpx.Client(
         base_url=api_base,
         timeout=httpx.Timeout(args.timeout_seconds),
         follow_redirects=False,
         trust_env=False,
         headers={"User-Agent": "chatbi-v13-phase5-live-gate"},
-    ) as client:
+    ) as client, httpx.Client(
+        base_url=controller_base,
+        timeout=httpx.Timeout(args.timeout_seconds),
+        follow_redirects=False,
+        trust_env=False,
+        headers={"User-Agent": "chatbi-v13-phase5-live-gate-controller"},
+    ) as controller_client:
         evidence = run_live_gate(
             client=client,
             weird_manifest=weird,
@@ -1180,6 +1369,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             datasource_id=args.datasource_id,
             semantic_model_id=args.semantic_model_id,
             credentials=credentials,
+            controller_client=controller_client,
         )
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps(evidence, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")

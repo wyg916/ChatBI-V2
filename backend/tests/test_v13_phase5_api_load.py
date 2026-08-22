@@ -16,6 +16,8 @@ if str(REPO_ROOT) not in sys.path:
 from scripts.performance.run_v13_phase5_api_load import (  # noqa: E402
     ApiSample,
     DEFAULT_CORE_DATA_MANIFEST,
+    DEFAULT_API_DURATION_SECONDS,
+    DEFAULT_API_USERS,
     EXPECTED_REVENUE_KNOWLEDGE_TEXT,
     EXPECTED_REVENUE_KNOWLEDGE_TITLE,
     RELEASE_THRESHOLDS,
@@ -38,6 +40,7 @@ from scripts.performance.run_v13_phase5_api_load import (  # noqa: E402
     validate_business_result,
     validate_backend_url,
     workload_kind,
+    build_parser,
 )
 
 
@@ -133,6 +136,19 @@ def test_real_api_workload_mix_is_complete_and_vision_is_low_frequency() -> None
     }
     assert scheduled == {"DATA", "RAG", "HYBRID", "AGENT", "FILE", "VISION"}
     assert WORKLOAD_MIX.count("VISION") / len(WORKLOAD_MIX) == 0.05
+
+
+def test_api_load_defaults_remain_20_users_for_15_minutes(tmp_path: Path) -> None:
+    args = build_parser().parse_args([
+        "--metadata-schema", "phase5_metadata_test",
+        "--workspace-id", "workspace",
+        "--datasource-id", "datasource",
+        "--semantic-model-id", "semantic-model",
+        "--backend-pid", "1",
+        "--output", str(tmp_path / "load.json"),
+    ])
+    assert args.users == DEFAULT_API_USERS == 20
+    assert args.duration_seconds == DEFAULT_API_DURATION_SECONDS == 900
 
 
 def test_fixtures_are_reproducible_real_csv_and_png() -> None:
@@ -338,6 +354,13 @@ def test_agent_self_reported_verification_cannot_replace_frozen_data_and_knowled
     assert valid is False
     assert "DATA_EXECUTION_NOT_PROVEN" in failures
     assert "FROZEN_REVENUE_KNOWLEDGE_CONTENT_NOT_PROVEN" in failures
+
+    primary["answer"] += " 错误利润为 999999。"
+    _route, valid, failures = validate_business_result(
+        "AGENT", terminal, expected_data_value=Decimal("1725750.0"), expected_data_signature="a" * 64,
+    )
+    assert valid is False
+    assert "AGENT_ANSWER_UNMATCHED_NUMERIC_CLAIM" in failures
 
 
 def _passing_samples() -> list[ApiSample]:

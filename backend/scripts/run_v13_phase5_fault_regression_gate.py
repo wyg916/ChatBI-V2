@@ -240,7 +240,8 @@ def validate_weird_manifest(payload: dict[str, Any]) -> dict[str, Any]:
         raise ValueError("Weird 50 must freeze per-case ground truth")
     allowed_truth_kinds = {
         "SAFE_NO_BUSINESS_CLAIM", "CLARIFICATION_NO_CLAIM", "REFUSAL_NO_CLAIM",
-        "NO_EVIDENCE_NO_CLAIM", "EXACT_DATE", "EMPTY_RESULT", "STRUCTURED_RESULT",
+        "NO_EVIDENCE_NO_CLAIM", "EXACT_DATE", "EXACT_WEEKDAY", "EMPTY_RESULT",
+        "STRUCTURED_RESULT",
     }
     for case_id, truth in ground_truth.items():
         if truth.get("kind") not in allowed_truth_kinds:
@@ -250,8 +251,8 @@ def validate_weird_manifest(payload: dict[str, Any]) -> dict[str, Any]:
                 raise ValueError(f"{case_id} lacks frozen rows/claims")
         if truth.get("kind") == "STRUCTURED_RESULT" and not truth["expected_claims"]:
             raise ValueError(f"{case_id} lacks exact answer claims")
-        if truth.get("kind") == "EXACT_DATE" and not truth.get("value"):
-            raise ValueError(f"{case_id} lacks an exact date value")
+        if truth.get("kind") in {"EXACT_DATE", "EXACT_WEEKDAY"} and not truth.get("value"):
+            raise ValueError(f"{case_id} lacks an exact date/weekday value")
     return {
         "status": "PASS",
         "case_count": len(cases),
@@ -320,7 +321,14 @@ def validate_complex_manifest(payload: dict[str, Any]) -> dict[str, Any]:
             raise ValueError(f"{case['id']} lacks exact frozen answer claims")
         if case["kind"] == "DATA_RAG" and frozen_evidence["citation"] != {
             "required": True,
-            "expected_citations": [{"title": "收入口径与退款处理"}],
+            "expected_citations": [{
+                "title": "收入口径与退款处理",
+                "source": "ChatBI V1 Business Glossary:business-glossary/revenue.md",
+                "locator": "definition",
+                "content_sha256": "fe712c2023f5d299ae0bb1f2fe8b7c4e157c3ab28ec34fa1935d18990c519a35",
+                "identity_fields": ["citation_id", "document_id", "document_version_id", "chunk_id"],
+            }],
+            "required_answer_text": "收入（营收、销售额）按已确认且有效订单的 revenue 求和",
         }:
             raise ValueError(f"{case['id']} citation evidence is not frozen")
         if case["kind"] == "AGENT_PYTHON" and frozen_evidence["sandbox"] != {

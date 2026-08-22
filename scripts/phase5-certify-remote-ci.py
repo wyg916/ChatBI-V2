@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import xml.etree.ElementTree as ET
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -35,8 +36,20 @@ def _verify_checksums(directory: Path) -> list[str]:
     return failures
 
 
-def certify(root: Path, expected_sha: str) -> dict[str, object]:
+def _junit_failures(path: Path) -> int:
+    root = ET.parse(path).getroot()
+    suites = [root] if root.tag == "testsuite" else list(root.iter("testsuite"))
+    return sum(int(item.get("failures", "0")) + int(item.get("errors", "0")) for item in suites)
+
+
+def certify(root: Path, expected_sha: str, *, job_results: dict[str, str]) -> dict[str, object]:
     failures: list[str] = []
+    expected_jobs = {"deterministic", "migration", "supply"}
+    if set(job_results) != expected_jobs:
+        failures.append("remote_job_results_incomplete")
+    for name in sorted(expected_jobs):
+        if job_results.get(name) != "success":
+            failures.append(f"remote_job_not_success:{name}:{job_results.get(name, 'missing')}")
     deterministic = root / "deterministic"
     migration = root / "migration"
     supply = root / "supply"
@@ -56,9 +69,14 @@ def certify(root: Path, expected_sha: str) -> dict[str, object]:
             failures.append("deterministic:contract_gate_invalid")
         if fault.get("status") != "FAULT_PASS" or fault.get("tested_sha") != expected_sha:
             failures.append("deterministic:fault_gate_invalid")
-        for junit in ("phase5-junit.xml", "frontend-junit.xml", "frontend-build.txt"):
+        for junit in ("phase5-junit.xml", "frontend-junit.xml"):
             if not (deterministic / junit).is_file() or not (deterministic / junit).stat().st_size:
                 failures.append(f"deterministic:{junit}_missing")
+            elif _junit_failures(deterministic / junit) != 0:
+                failures.append(f"deterministic:{junit}_failed")
+        build_receipt = deterministic / "frontend-build-success.txt"
+        if not build_receipt.is_file() or build_receipt.read_text(encoding="utf-8").strip() != expected_sha:
+            failures.append("deterministic:frontend_build_success_not_proven")
 
     if migration.is_dir():
         payload = _json(migration / "migration.json")
@@ -84,6 +102,7 @@ def certify(root: Path, expected_sha: str) -> dict[str, object]:
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "tested_sha": expected_sha,
         "scope": "REMOTE_DETERMINISTIC_MIGRATION_SUPPLY_ONLY",
+        "job_results": job_results,
         "remote_ci_certified": not failures,
         "phase5_release_gate_certified": False,
         "release_gate_note": "Full live/local and Git synchronization evidence is certified separately.",
@@ -96,15 +115,24 @@ def main() -> int:
     parser.add_argument("--root", type=Path, required=True)
     parser.add_argument("--expected-sha", required=True)
     parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument("--deterministic-result", required=True)
+    parser.add_argument("--migration-result", required=True)
+    parser.add_argument("--supply-result", required=True)
     args = parser.parse_args()
+    job_results = {
+        "deterministic": args.deterministic_result,
+        "migration": args.migration_result,
+        "supply": args.supply_result,
+    }
     try:
-        receipt = certify(args.root, args.expected_sha)
-    except (OSError, ValueError, json.JSONDecodeError) as exc:
+        receipt = certify(args.root, args.expected_sha, job_results=job_results)
+    except (OSError, ValueError, json.JSONDecodeError, ET.ParseError) as exc:
         receipt = {
             "schema_version": "chatbi-v1.3-phase5-remote-ci-certificate-v1",
             "generated_at": datetime.now(timezone.utc).isoformat(),
             "tested_sha": args.expected_sha,
             "scope": "REMOTE_DETERMINISTIC_MIGRATION_SUPPLY_ONLY",
+            "job_results": job_results,
             "remote_ci_certified": False,
             "phase5_release_gate_certified": False,
             "failures": [f"certificate_runtime:{type(exc).__name__}"],

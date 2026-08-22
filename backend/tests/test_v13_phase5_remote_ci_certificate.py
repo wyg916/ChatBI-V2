@@ -36,8 +36,12 @@ def _evidence(tmp_path: Path, sha: str) -> Path:
     (deterministic / "tested-sha.txt").write_text(sha + "\n", encoding="utf-8")
     _write_json(deterministic / "fault-contract.json", {"status": "CONTRACT_PASS", "tested_sha": sha})
     _write_json(deterministic / "fault-production-boundaries.json", {"status": "FAULT_PASS", "tested_sha": sha})
-    for name in ("phase5-junit.xml", "frontend-junit.xml", "frontend-build.txt"):
-        (deterministic / name).write_text("PASS", encoding="utf-8")
+    for name in ("phase5-junit.xml", "frontend-junit.xml"):
+        (deterministic / name).write_text(
+            '<testsuites tests="1" failures="0" errors="0"><testsuite tests="1" failures="0" errors="0"/></testsuites>',
+            encoding="utf-8",
+        )
+    (deterministic / "frontend-build-success.txt").write_text(sha + "\n", encoding="utf-8")
     _write_json(migration / "migration.json", {
         "tested_sha": sha, "single_head": True,
         "upgrade_base_upgrade_pass": True, "temporary_schema_removed": True,
@@ -55,7 +59,8 @@ def test_remote_ci_certificate_requires_same_sha_and_all_three_scopes(tmp_path: 
     sha = "a" * 40
     root = _evidence(tmp_path, sha)
 
-    receipt = MODULE.certify(root, sha)
+    job_results = {"deterministic": "success", "migration": "success", "supply": "success"}
+    receipt = MODULE.certify(root, sha, job_results=job_results)
 
     assert receipt["remote_ci_certified"] is True
     assert receipt["phase5_release_gate_certified"] is False
@@ -65,6 +70,10 @@ def test_remote_ci_certificate_requires_same_sha_and_all_three_scopes(tmp_path: 
     migration["tested_sha"] = "b" * 40
     _write_json(root / "migration" / "migration.json", migration)
     _checksum(root / "migration")
-    receipt = MODULE.certify(root, sha)
+    receipt = MODULE.certify(root, sha, job_results=job_results)
     assert receipt["remote_ci_certified"] is False
     assert "migration:tested_sha_mismatch" in receipt["failures"]
+
+    receipt = MODULE.certify(root, sha, job_results={**job_results, "deterministic": "failure"})
+    assert receipt["remote_ci_certified"] is False
+    assert "remote_job_not_success:deterministic:failure" in receipt["failures"]

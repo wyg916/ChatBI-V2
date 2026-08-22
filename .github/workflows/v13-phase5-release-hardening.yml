@@ -54,6 +54,12 @@ jobs:
           pip install -r backend/requirements-phase3-upstream.txt
           pip install --upgrade -r backend/requirements-runtime-hardening.txt
           python scripts/release/patch_selected_dbgpt_metadata.py
+          pip install \
+            ./packages/rag-contracts \
+            ./packages/rag-adapter \
+            ./packages/agent-contracts \
+            ./packages/agent-orchestrator \
+            ./packages/prompt-registry
           pip check
       - name: Phase5 contract, security and fault tests
         run: |
@@ -85,6 +91,7 @@ jobs:
           npm ci
           npm test -- --reporter=default --reporter=junit --outputFile.junit=../docs/evidence/v1.3/phase5-ci/frontend-junit.xml
           npm run build 2>&1 | tee ../docs/evidence/v1.3/phase5-ci/frontend-build.txt
+          echo "${GITHUB_SHA}" > ../docs/evidence/v1.3/phase5-ci/frontend-build-success.txt
       - name: Evidence checksums
         if: always()
         run: |
@@ -175,6 +182,12 @@ jobs:
           "$RUNNER_TEMP/chatbi-phase5-runtime/bin/python" -m pip install -r backend/requirements-phase3-upstream.txt
           "$RUNNER_TEMP/chatbi-phase5-runtime/bin/python" -m pip install --upgrade -r backend/requirements-runtime-hardening.txt
           "$RUNNER_TEMP/chatbi-phase5-runtime/bin/python" scripts/release/patch_selected_dbgpt_metadata.py
+          "$RUNNER_TEMP/chatbi-phase5-runtime/bin/python" -m pip install \
+            ./packages/rag-contracts \
+            ./packages/rag-adapter \
+            ./packages/agent-contracts \
+            ./packages/agent-orchestrator \
+            ./packages/prompt-registry
           "$RUNNER_TEMP/chatbi-phase5-runtime/bin/python" -m pip check
           python -m venv "$RUNNER_TEMP/chatbi-phase5-audit"
           "$RUNNER_TEMP/chatbi-phase5-audit/bin/python" -m pip install -r scripts/release/requirements-audit.txt
@@ -238,6 +251,9 @@ jobs:
           python scripts/phase5-certify-remote-ci.py \
             --root .phase5-remote-evidence \
             --expected-sha "${GITHUB_SHA}" \
+            --deterministic-result "${{ needs.deterministic-release-gates.result }}" \
+            --migration-result "${{ needs.migration-gate.result }}" \
+            --supply-result "${{ needs.supply-chain-and-attack-gate.result }}" \
             --output .phase5-remote-evidence/remote-ci-certificate.json
       - name: Upload remote CI certificate
         if: always()

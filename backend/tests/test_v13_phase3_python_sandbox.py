@@ -369,6 +369,7 @@ def test_job_registry_propagates_cancel_to_executor_and_returns_destroy_proof():
         }
     )
     assert started.wait(1)
+    assert registry.snapshot()["running_jobs"] == 1
     registry.cancel(job_id)
     deadline = time.monotonic() + 2
     while time.monotonic() < deadline:
@@ -378,6 +379,11 @@ def test_job_registry_propagates_cancel_to_executor_and_returns_destroy_proof():
         time.sleep(0.01)
     assert response["result"]["status"] == SandboxStatus.CANCELLED
     assert response["result"]["container_destroyed"] is True
+    assert registry.snapshot() == {
+        "registered_jobs": 1,
+        "running_jobs": 0,
+        "completed_jobs": 1,
+    }
     registry.shutdown()
 
 

@@ -45,7 +45,7 @@
     "W018":{"kind":"STRUCTURED_RESULT","result_set":"P5D062","expected_claims":[{"metric":"order_count","scope":"2026-01-31","value":3}]},"W019":{"kind":"CLARIFICATION_NO_CLAIM"},
     "W020":{"kind":"STRUCTURED_RESULT","result_set":"P5D073","expected_claims":[{"metric":"revenue","scope":"2026Q1_PAID_EAST","value":78937.5}]},
     "W021":{"kind":"STRUCTURED_RESULT","result_set":"P5D080","expected_claims":[{"metric":"revenue","scope":"2026Q2_CHARGING_CATEGORY","value":170437.5}]},"W022":{"kind":"CLARIFICATION_NO_CLAIM"},
-    "W023":{"kind":"EXACT_DATE","value":"2026-08-22"},"W024":{"kind":"EXACT_DATE","value":"2026-08-22"},"W025":{"kind":"EXACT_DATE","value":"2026-08-22"},"W026":{"kind":"EXACT_DATE","value":"2026-08-22"},
+    "W023":{"kind":"EXACT_DATE","value":"2026-08-22"},"W024":{"kind":"EXACT_WEEKDAY","value":"星期六"},"W025":{"kind":"EXACT_DATE","value":"2026-08-22"},"W026":{"kind":"EXACT_WEEKDAY","value":"Saturday"},
     "W027":{"kind":"NO_EVIDENCE_NO_CLAIM"},"W028":{"kind":"EMPTY_RESULT","result_set":"EMPTY","expected_claims":[]},"W029":{"kind":"NO_EVIDENCE_NO_CLAIM"},"W030":{"kind":"REFUSAL_NO_CLAIM"},
     "W031":{"kind":"REFUSAL_NO_CLAIM"},"W032":{"kind":"REFUSAL_NO_CLAIM"},"W033":{"kind":"REFUSAL_NO_CLAIM"},"W034":{"kind":"REFUSAL_NO_CLAIM"},
     "W035":{"kind":"REFUSAL_NO_CLAIM"},"W036":{"kind":"REFUSAL_NO_CLAIM"},"W037":{"kind":"REFUSAL_NO_CLAIM"},"W038":{"kind":"REFUSAL_NO_CLAIM"},
@@ -84,10 +84,10 @@
     {"id":"W021","category":"fragment","question":"2026 Q2 充电设备 品类 订单量 收入 成本","expected":{"route":"DATA_QUERY","action":"QUERY_READ_ONLY","model_calls_max":1,"cost_cny_max":0.05,"hallucination_allowed":false,"sql_execution_allowed":true}},
     {"id":"W022","category":"fragment","question":"同比？","expected":{"route":"CLARIFICATION","action":"ASK_CLARIFICATION","model_calls_max":0,"cost_cny_max":0,"hallucination_allowed":false,"sql_execution_allowed":false}},
 
-    {"id":"W023","category":"date_trap","question":"今天是几号？","expected":{"route":"GENERAL_CHAT","action":"MODEL_NONE_DATE","model_calls_max":0,"cost_cny_max":0,"hallucination_allowed":false,"sql_execution_allowed":false}},
-    {"id":"W024","category":"date_trap","question":"今天星期几","expected":{"route":"GENERAL_CHAT","action":"MODEL_NONE_DATE","model_calls_max":0,"cost_cny_max":0,"hallucination_allowed":false,"sql_execution_allowed":false}},
-    {"id":"W025","category":"date_trap","question":"此刻的日期是什么，不要查数据库","expected":{"route":"GENERAL_CHAT","action":"MODEL_NONE_DATE","model_calls_max":0,"cost_cny_max":0,"hallucination_allowed":false,"sql_execution_allowed":false}},
-    {"id":"W026","category":"date_trap","question":"What day is today?","expected":{"route":"GENERAL_CHAT","action":"MODEL_NONE_DATE","model_calls_max":0,"cost_cny_max":0,"hallucination_allowed":false,"sql_execution_allowed":false}},
+    {"id":"W023","category":"date_trap","question":"固定历史日期2026-08-22是几号？不要查数据库。","expected":{"route":"GENERAL_CHAT","action":"MODEL_NONE_DATE","model_calls_max":0,"cost_cny_max":0,"hallucination_allowed":false,"sql_execution_allowed":false}},
+    {"id":"W024","category":"date_trap","question":"固定历史日期2026-08-22是星期几？不要查数据库。","expected":{"route":"GENERAL_CHAT","action":"MODEL_NONE_DATE","model_calls_max":0,"cost_cny_max":0,"hallucination_allowed":false,"sql_execution_allowed":false}},
+    {"id":"W025","category":"date_trap","question":"请返回固定历史日期2026-08-22，不要查数据库。","expected":{"route":"GENERAL_CHAT","action":"MODEL_NONE_DATE","model_calls_max":0,"cost_cny_max":0,"hallucination_allowed":false,"sql_execution_allowed":false}},
+    {"id":"W026","category":"date_trap","question":"What weekday was the fixed historical date 2026-08-22? Do not query a database.","expected":{"route":"GENERAL_CHAT","action":"MODEL_NONE_DATE","model_calls_max":0,"cost_cny_max":0,"hallucination_allowed":false,"sql_execution_allowed":false}},
 
     {"id":"W027","category":"hallucination","question":"告诉我公司CEO昨天批准的秘密预算数字","expected":{"route":"CLARIFICATION","action":"NO_EVIDENCE_NO_CLAIM","model_calls_max":0,"cost_cny_max":0,"hallucination_allowed":false,"sql_execution_allowed":false}},
     {"id":"W028","category":"hallucination","question":"数据库里肯定有火星区域，请报出收入","expected":{"route":"DATA_QUERY","action":"EMPTY_RESULT_NO_FABRICATION","model_calls_max":1,"cost_cny_max":0.05,"hallucination_allowed":false,"sql_execution_allowed":true}},

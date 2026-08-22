@@ -19,12 +19,14 @@ from scripts.run_v13_phase5_live_questions_gate import (
     load_manifest,
     run_live_gate,
     validate_backend_url,
+    validate_controller_url,
 )
 
 
 def test_live_gate_requires_loopback_backend_and_external_secret_file(tmp_path: Path):
     assert validate_backend_url("http://127.0.0.1:8000") == "http://127.0.0.1:8000/api/v1"
     assert validate_backend_url("https://[::1]:8443/api/v1") == "https://[::1]:8443/api/v1"
+    assert validate_controller_url("http://127.0.0.1:8765") == "http://127.0.0.1:8765"
     for value in (
         "https://chatbi.example.invalid/api/v1",
         "http://user:password@127.0.0.1:8000/api/v1",
@@ -122,6 +124,7 @@ def test_weird_answer_oracle_consumes_hallucination_contract_and_requires_refusa
             "actual_claims_present": False,
             "structured_claim_count": 0,
             "exact_date_match": False,
+            "visible_claims_exact": False,
         },
     )
     assert oracle["business_claim_present"] is True
@@ -156,6 +159,7 @@ def test_weird_answer_oracle_consumes_hallucination_contract_and_requires_refusa
             "actual_claims_present": False,
             "structured_claim_count": 0,
             "exact_date_match": False,
+            "visible_claims_exact": True,
         },
     )
     assert "refusal_answer_missing" in refusal_failures
@@ -228,6 +232,7 @@ def test_complex_oracle_requires_common_checks_exact_success_sequence_and_frozen
             "result_signature_count": 0,
         },
         "answer_oracle": {"answer_present": True, "answer_claim_present": True},
+        "response_answer_text": "西部收入为 87150.0。",
         "failures": [],
         "response_primary": primary,
     }
@@ -271,6 +276,10 @@ def test_complex_oracle_requires_common_checks_exact_success_sequence_and_frozen
         truth_failures = gate.validate_complex(case, self_reported_only)
         assert "complex_frozen_result_rows_mismatch" in truth_failures
         assert "complex_frozen_answer_claims_mismatch" in truth_failures
+
+        wrong_visible = copy.deepcopy(base)
+        wrong_visible["response_answer_text"] += " 但另一个错误业务值为 999999。"
+        assert "complex_visible_answer_claims_mismatch" in gate.validate_complex(case, wrong_visible)
 
 
 def test_live_gate_executes_all_real_http_contracts_auto_routes_weird_and_cleans_exactly():
@@ -333,9 +342,15 @@ def test_live_gate_executes_all_real_http_contracts_auto_routes_weird_and_cleans
             elif action == "EMPTY_RESULT_NO_FABRICATION":
                 answer_text = "查询未返回数据，不提供推测结果。"
             elif action == "MODEL_NONE_DATE":
-                answer_text = "当前日期是 2026-08-22。"
+                answer_text = (
+                    "星期六" if case["id"] == "W024" else
+                    "Saturday" if case["id"] == "W026" else
+                    "固定历史日期是 2026-08-22。"
+                )
             elif action in {"QUERY_READ_ONLY", "BOUNDED_VERIFIED_ANALYSIS"}:
-                answer_text = "经验证，查询结果为 100。"
+                claim = truth["expected_claims"][0]
+                label = str(claim.get("dimension_value") or "")
+                answer_text = f"经验证，{label}{claim['metric']}为 {claim['value']}。"
             else:
                 answer_text = "这是安全的通用回答，不包含业务数据结论。"
         else:
@@ -376,7 +391,17 @@ def test_live_gate_executes_all_real_http_contracts_auto_routes_weird_and_cleans
             }
             if case["kind"] == "DATA_RAG":
                 primary["citation_id"] = "phase5-citation"
-                primary["citations"] = case["expected"]["expected_evidence"]["citation"]["expected_citations"]
+                citation_contract = case["expected"]["expected_evidence"]["citation"]["expected_citations"][0]
+                primary["citations"] = [{
+                    "citation_id": "phase5-citation",
+                    "document_id": "document-phase5",
+                    "document_version_id": "version-phase5",
+                    "chunk_id": "chunk-phase5",
+                    "title": citation_contract["title"],
+                    "text": "收入（营收、销售额）按已确认且有效订单的 revenue 求和；取消订单不计入，退款按实际冲减金额扣除。数据结果必须经过 SQL Guard 与 Result Oracle 后发布。",
+                    "source": citation_contract["source"],
+                    "locator": citation_contract["locator"],
+                }]
             if case["kind"] == "AGENT_PYTHON":
                 primary["sandbox_evidence"] = {
                     "status": "SUCCEEDED",
@@ -391,7 +416,11 @@ def test_live_gate_executes_all_real_http_contracts_auto_routes_weird_and_cleans
                     for key, value in case["expected"]["expected_evidence"]["file"].items()
                     if key != "required"
                 }
-            answer_text = "经验证，结果符合冻结的准确性证据。"
+            claim = case["expected"]["expected_evidence"]["result"]["expected_answer_claims"][0]
+            label = str(claim.get("dimension_value") or "")
+            answer_text = f"经验证，{label}{claim['metric']}为 {claim['value']}。"
+            if case["kind"] == "DATA_RAG":
+                answer_text += " 收入（营收、销售额）按已确认且有效订单的 revenue 求和。"
         state["conversation_request"][conversation_id] = {
             "request_id": request_id,
             "invocation_count": invocation_count,
@@ -496,7 +525,17 @@ def test_live_gate_executes_all_real_http_contracts_auto_routes_weird_and_cleans
             return httpx.Response(200, json={
                 "active_connections": 0,
                 "active_tasks": 0,
+                "active_agent_tasks": 0,
+                "active_sandbox_tasks": 0,
                 "trace_ids": [],
+            })
+        if path == "/diagnostics":
+            return httpx.Response(200, json={
+                "status": "OK",
+                "registered_jobs": 0,
+                "running_jobs": 0,
+                "completed_jobs": 0,
+                "worker_containers": 0,
             })
         if path == "/governance/cost":
             conversation_id = request.url.params["conversation_id"]
@@ -554,6 +593,7 @@ def test_live_gate_executes_all_real_http_contracts_auto_routes_weird_and_cleans
             datasource_id="datasource-phase5",
             semantic_model_id="semantic-phase5",
             credentials={"email": "phase5@example.invalid", "password": "external-test-only"},
+            controller_client=client,
         )
 
     assert evidence["status"] == "PASS", evidence["failures"]

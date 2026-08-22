@@ -13,14 +13,14 @@ RUN pip install --no-cache-dir -r requirements-phase3-upstream.txt
 COPY backend/requirements-runtime-hardening.txt .
 COPY scripts/release/patch_selected_dbgpt_metadata.py /tmp/patch_selected_dbgpt_metadata.py
 RUN pip install --no-cache-dir --upgrade -r requirements-runtime-hardening.txt \
-    && python /tmp/patch_selected_dbgpt_metadata.py \
-    && pip check
+    && python /tmp/patch_selected_dbgpt_metadata.py
 RUN pip install --no-cache-dir \
     ./packages/rag-contracts \
     ./packages/rag-adapter \
     ./packages/agent-contracts \
     ./packages/agent-orchestrator \
-    ./packages/prompt-registry
+    ./packages/prompt-registry \
+    && pip check
 COPY backend/alembic.ini ./
 COPY backend/alembic ./alembic
 COPY backend/app ./app

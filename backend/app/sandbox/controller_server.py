@@ -114,6 +114,16 @@ class JobRegistry:
             if job.thread is not None:
                 job.thread.join(max(0.0, deadline - time.monotonic()))
 
+    def snapshot(self) -> dict[str, int]:
+        with self._lock:
+            self._reap_locked()
+            running = sum(job.result is None for job in self._jobs.values())
+            return {
+                "registered_jobs": len(self._jobs),
+                "running_jobs": running,
+                "completed_jobs": len(self._jobs) - running,
+            }
+
     def _reap_locked(self) -> None:
         now = time.monotonic()
         expired = [
@@ -148,6 +158,18 @@ class SandboxControllerHandler(BaseHTTPRequestHandler):
                     200,
                     {"status": "OK", "protocol_version": PROTOCOL_VERSION},
                 )
+            return
+        if self.path == "/diagnostics":
+            try:
+                worker_containers = _worker_container_count()
+            except Exception:
+                self._write(503, {"status": "UNAVAILABLE"})
+            else:
+                self._write(200, {
+                    "status": "OK",
+                    **self.registry.snapshot(),
+                    "worker_containers": worker_containers,
+                })
             return
         match = _JOB_PATH.fullmatch(self.path)
         if match:
@@ -253,6 +275,18 @@ def _verify_docker_runtime() -> None:
     try:
         client.ping()
         client.images.get(DockerWorkerSpec().image)
+    finally:
+        client.close()
+
+
+def _worker_container_count() -> int:
+    import docker
+
+    client = docker.from_env()
+    try:
+        return len(client.containers.list(
+            all=True, filters={"label": "com.chatbi.sandbox=true"}
+        ))
     finally:
         client.close()
 

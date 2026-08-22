@@ -79,6 +79,9 @@ def test_weird_50_is_frozen_exact_and_covers_route_refusal_clarification_zero_mo
         for truth in payload["case_ground_truth"].values()
         if truth["kind"] in {"STRUCTURED_RESULT", "EMPTY_RESULT"}
     )
+    assert payload["case_ground_truth"]["W023"] == {"kind": "EXACT_DATE", "value": "2026-08-22"}
+    assert payload["case_ground_truth"]["W024"] == {"kind": "EXACT_WEEKDAY", "value": "星期六"}
+    assert payload["case_ground_truth"]["W026"] == {"kind": "EXACT_WEEKDAY", "value": "Saturday"}
 
 
 def test_weird_50_tampering_fails_closed():
@@ -125,6 +128,14 @@ def test_complex_5_has_all_five_families_and_every_evidence_dimension():
         "revenue_sum": 4430,
         "cost_sum": 2970,
     }
+    rag_case = next(case for case in payload["cases"] if case["kind"] == "DATA_RAG")
+    citation = rag_case["expected"]["expected_evidence"]["citation"]
+    assert citation["expected_citations"][0]["content_sha256"] == (
+        "fe712c2023f5d299ae0bb1f2fe8b7c4e157c3ab28ec34fa1935d18990c519a35"
+    )
+    assert citation["expected_citations"][0]["identity_fields"] == [
+        "citation_id", "document_id", "document_version_id", "chunk_id",
+    ]
 
 
 def test_complex_5_rejects_unknown_agent_tool_and_missing_verification():

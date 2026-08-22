@@ -38,8 +38,6 @@ if str(BACKEND_ROOT) not in sys.path:
     sys.path.insert(0, str(BACKEND_ROOT))
 
 from scripts.run_v13_phase5_data_performance_gate import (  # noqa: E402
-    DEFAULT_DURATION_SECONDS,
-    DEFAULT_USERS,
     SystemProbe,
     aggregate_cost_ledger,
     distribution,
@@ -84,6 +82,8 @@ RELEASE_THRESHOLDS = {
     "max_kimi_premium_share": 0.10,
     "min_saving_vs_all_premium": 0.60,
 }
+DEFAULT_API_USERS = 20
+DEFAULT_API_DURATION_SECONDS = 15 * 60
 
 
 @dataclass(frozen=True)
@@ -175,6 +175,7 @@ _KNOWLEDGE_INJECTION_RE = re.compile(
     r"(?:exfiltrate|reveal).{0,24}(?:secret|credential|prompt)",
     re.IGNORECASE,
 )
+_NUMBER_TOKEN_RE = re.compile(r"(?<![A-Za-z0-9])[+-]?\d[\d,]*(?:\.\d+)?")
 _DIGITS = {
     "0": ("111", "101", "101", "101", "111"),
     "1": ("010", "110", "010", "010", "111"),
@@ -882,6 +883,32 @@ def _decimal(value: Any) -> Decimal | None:
         return None
 
 
+def _numeric_claims(value: Any) -> set[Decimal]:
+    if isinstance(value, bool) or value is None:
+        return set()
+    if isinstance(value, (int, float, Decimal)):
+        converted = _decimal(value)
+        return {converted} if converted is not None else set()
+    if isinstance(value, dict):
+        result: set[Decimal] = set()
+        for item in value.values():
+            result.update(_numeric_claims(item))
+        return result
+    if isinstance(value, (list, tuple)):
+        result = set()
+        for item in value:
+            result.update(_numeric_claims(item))
+        return result
+    if isinstance(value, str):
+        return {
+            converted
+            for token in _NUMBER_TOKEN_RE.findall(value)
+            for converted in [_decimal(token)]
+            if converted is not None
+        }
+    return set()
+
+
 def _analysis_payload(terminal: dict[str, Any]) -> tuple[str | None, dict[str, Any]]:
     response = terminal.get("response") if isinstance(terminal.get("response"), dict) else {}
     assistant = response.get("assistant_message") if isinstance(response.get("assistant_message"), dict) else {}
@@ -1084,8 +1111,16 @@ def validate_business_result(
         failures.extend(_data_failures(data_evidence, expected_data_value, expected_data_signature))
         failures.extend(_independent_knowledge_failures(knowledge_evidence, require_inline_claims=False))
         answer = str(primary.get("answer") or "")
-        if str(expected_data_value) not in answer.replace(",", ""):
+        data_rows = (
+            (data_evidence.get("execution") or {}).get("rows")
+            if isinstance(data_evidence.get("execution"), dict) else []
+        )
+        expected_answer_numbers = _numeric_claims(data_rows) | {expected_data_value}
+        actual_answer_numbers = _numeric_claims(answer)
+        if expected_data_value not in actual_answer_numbers:
             failures.append("AGENT_ANSWER_FROZEN_VALUE_NOT_PROVEN")
+        if actual_answer_numbers - expected_answer_numbers:
+            failures.append("AGENT_ANSWER_UNMATCHED_NUMERIC_CLAIM")
         if EXPECTED_REVENUE_KNOWLEDGE_TITLE not in answer:
             failures.append("AGENT_ANSWER_FROZEN_KNOWLEDGE_NOT_PROVEN")
         if str(primary.get("status")) != "SUCCEEDED" or analysis.get("fallback_used") is True:
@@ -1731,8 +1766,8 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--core-data-manifest", type=Path, default=DEFAULT_CORE_DATA_MANIFEST)
     parser.add_argument("--load-data-case-id", default="G01", help="Frozen Core Data100 scalar case used by DATA/HYBRID validation")
     parser.add_argument("--backend-pid", type=int, required=True)
-    parser.add_argument("--users", type=int, default=DEFAULT_USERS)
-    parser.add_argument("--duration-seconds", type=int, default=DEFAULT_DURATION_SECONDS)
+    parser.add_argument("--users", type=int, default=DEFAULT_API_USERS)
+    parser.add_argument("--duration-seconds", type=int, default=DEFAULT_API_DURATION_SECONDS)
     parser.add_argument("--request-timeout-seconds", type=float, default=40.0)
     parser.add_argument("--output", type=Path, required=True)
     return parser
@@ -1925,7 +1960,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         "config": {
             "users": args.users,
             "duration_seconds": args.duration_seconds,
-            "production_default_duration_seconds": DEFAULT_DURATION_SECONDS,
+            "production_default_duration_seconds": DEFAULT_API_DURATION_SECONDS,
             "transport": "REAL_AUTHENTICATED_BACKEND_API_SSE",
             "route_evidence_scope": "CALLER_PINNED_ROUTE_SPECIFIC_LOAD_NOT_ROUTER_CLASSIFICATION_EVIDENCE",
             "temporary_identity_bootstrap": "ATOMIC_APP_USER_RESOURCE_GRANT",
