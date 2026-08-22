@@ -1107,7 +1107,6 @@ class ChatService:
                     "".join(value.preprocess_sha256 for _page, value in related).encode("ascii")
                 ).hexdigest(),
                 metadata={
-                    "attachment_id": item.id,
                     "pages": [page for page, _value in related if page is not None],
                     "width": prepared_image.width,
                     "height": prepared_image.height,
