@@ -49,6 +49,8 @@ jobs:
     runs-on: ubuntu-latest
     env:
       PHASE5_EVIDENCE_DIR: artifacts/v1.3/phase5-security-supply
+      PYTHONPATH: >-
+        backend:packages/agent-contracts/src:packages/agent-orchestrator/src:packages/prompt-registry/src:packages/rag-adapter/src:packages/rag-contracts/src:packages/dbgpt-runtime-adapter/src:packages/pandasai-selected-runtime/src
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5, Node 24
         with:
