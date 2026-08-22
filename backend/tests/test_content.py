@@ -1,3 +1,4 @@
+from app.models import Dashboard
 from app.services.seed import seed_demo_semantic_model
 
 
@@ -27,6 +28,10 @@ def test_answer_library_is_database_backed_and_summary_is_derived(client, db_ses
     assert drafts.status_code == 200
     assert drafts.json()["total"] == 1
     assert drafts.json()["items"][0]["status"] == "DRAFT"
+    review = client.get("/api/v1/answers", params={"tab": "review"})
+    assert review.status_code == 200
+    assert review.json()["total"] == 14
+    assert all(item["status"] == "DRAFT" for item in review.json()["items"])
 
 
 def test_answer_create_persists_through_api(client):
@@ -51,21 +56,30 @@ def test_dashboard_library_summary_and_create_are_database_backed(client, db_ses
     response = client.get("/api/v1/dashboards")
     assert response.status_code == 200
     payload = response.json()
-    assert payload["summary"] == {"total": 18, "cards": 147, "shared": 9, "refreshes_today": 36}
+    assert payload["summary"] == {"total": 18, "cards": 0, "shared": 9, "refreshes_today": 0}
     assert len(payload["items"]) == 6
 
     created = client.post("/api/v1/dashboards", json={
         "name": "订单质量看板",
         "description": "订单异常与退款趋势",
-        "card_count": 3,
         "is_shared": True,
     })
     assert created.status_code == 201
+    stored = db_session.get(Dashboard, created.json()["id"])
+    stored.card_count = 99
+    db_session.commit()
 
     listed = client.get("/api/v1/dashboards", params={"query": "订单质量"})
     assert listed.status_code == 200
     assert listed.json()["total"] == 1
-    assert listed.json()["items"][0]["card_count"] == 3
+    assert listed.json()["items"][0]["card_count"] == 0
+
+    rejected_fake_count = client.post("/api/v1/dashboards", json={
+        "name": "伪造卡片数看板",
+        "description": "客户端不得提交派生卡片数",
+        "card_count": 3,
+    })
+    assert rejected_fake_count.status_code == 422
 
 
 def test_dashboard_detail_uses_backend_business_snapshot(client, db_session, monkeypatch):

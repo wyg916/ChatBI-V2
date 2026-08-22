@@ -44,7 +44,6 @@ export function NewDashboardDialog({ onClose, onSaved }: DialogProps) {
       await contentApi.createDashboard({
         name: String(data.get('name') ?? ''),
         description: String(data.get('description') ?? ''),
-        card_count: Number(data.get('card_count') ?? 0),
         is_shared: data.get('is_shared') === 'on',
       });
       await onSaved(); onClose();
@@ -53,7 +52,7 @@ export function NewDashboardDialog({ onClose, onSaved }: DialogProps) {
   return <Modal title="新建看板" onClose={onClose}><form className="form-grid" onSubmit={submit}>
     <Field label="看板名称"><input name="name" required minLength={2} placeholder="例如：经营总览看板" /></Field>
     <Field label="看板说明"><textarea name="description" required minLength={2} placeholder="说明看板覆盖的指标和业务范围" /></Field>
-    <Field label="初始卡片数"><input name="card_count" type="number" min="0" defaultValue="0" /></Field>
+    <p className="notice">新看板从 0 张卡片开始；卡片数只由已保存的真实答案卡片计算。</p>
     <label className="check-row"><input name="is_shared" type="checkbox" /> 创建后共享给当前工作空间</label>
     <ErrorNotice error={error} /><FormActions busy={busy} onCancel={onClose} submitLabel="创建看板" />
   </form></Modal>;
@@ -76,7 +75,11 @@ export function ContentImportDialog({ kind, onClose, onSaved }: DialogProps & { 
       if (kind === 'answers') {
         await Promise.all(parsed.map((item) => contentApi.createAnswer(item as unknown as AnswerInput)));
       } else {
-        await Promise.all(parsed.map((item) => contentApi.createDashboard(item as unknown as DashboardInput)));
+        await Promise.all(parsed.map((item) => contentApi.createDashboard({
+          name: String(item.name ?? ''),
+          description: String(item.description ?? ''),
+          is_shared: item.is_shared === true,
+        })));
       }
       await onSaved(); onClose();
     } catch (reason) { setError(reason instanceof SyntaxError ? new Error('JSON 文件格式不正确') : reason); } finally { setBusy(false); }

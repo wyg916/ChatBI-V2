@@ -2,6 +2,7 @@
 
 ## V1.3.0 Phase 5 发布加固候选（2026-08-22）
 
+- 2026-08-23 前端全可见控件追加门禁已进入同一候选：数据源/数据表、语义模型/资源和成员搜索筛选均把条件传入 Backend API 并由 Workspace 约束的数据库查询执行；答案库“待审核”枚举已与后端契约对齐。无实现的工作空间筛选已移除，P1 壳控件保持禁用并说明边界。新建或导入看板不再接受客户端卡片数，看板列表、排序、汇总和详情均从真实 `dashboard_card` 行派生数量；演示 Seed 不再预填虚假卡片或刷新计数。最终可见控件覆盖率和浏览器结论仍只以最终 SHA 的外部 Evidence 为准。
 - Phase 5 以 `89bdc12936be0555bdad8a85f06932fb7dc476ee` 为唯一 Phase 4 基线，在短期分支 `codex/v1.3.0-release-hardening-full-gate` 只做测试、Evidence、性能、安全、故障恢复、依赖兼容和发布工程加固；不启动 Phase 6，不修改 `main`，不创建 V1.3.0 Tag 或正式 Release。
 - Sandbox Controller 不再直接持有 Host Docker Socket。唯一持有只读 socket bind 的 restricted proxy 只接受固定 worker 镜像、命令、non-root 用户、无网络、只读根文件系统、能力清空、no-new-privileges、确定资源上限和所有权标签的有状态 Docker API 子集；未知字段、Host namespace、任意容器或 Docker 管理请求一律拒绝。最终风险关闭仍须由同一候选 SHA 的真实 worker/cancel/destroy 与负向攻击实跑证明。
 - GitHub Actions 已迁移到不可变 Node 24 action SHA；应用 `httpx==0.28.1` 与 Starlette `httpx2==2.12.0` 兼容桥分别精确固定。冻结的 DB-GPT source/archive 不变，安装时验证 exact provenance 后把未使用但易受攻击的 `aiohttp==3.8.4` 依赖 metadata 精确修正为已审计 `3.14.3`，同步 RECORD 并强制 `pip check` 零冲突。Phase 5 新增确定性 SBOM、许可证/依赖/Secret/攻击审计、独立迁移 Gate 和 Phase 1～4 工作流复验；外部审计输入必须绑定工具版本、依赖清单哈希和被测 Git SHA。

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type FormEvent } from 'react';
+import { useDeferredValue, useEffect, useState, type FormEvent } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Link, useParams } from 'react-router-dom';
 import { datasourceApi } from '../api/datasources';
@@ -41,9 +41,11 @@ export function DatasourceDetailPage() {
   const schemas = useSchemas(id);
   const [selectedSchema, setSelectedSchema] = useState('');
   const activeSchema = selectedSchema || source.data?.schema || schemas.data?.[0]?.name || '';
-  const tables = useTables(id, activeSchema);
+  const allTables = useTables(id, activeSchema);
   const [selected, setSelected] = useState('');
   const [tableSearch, setTableSearch] = useState('');
+  const deferredTableSearch = useDeferredValue(tableSearch);
+  const tables = useTables(id, activeSchema, deferredTableSearch);
   const [message, setMessage] = useState('');
   const [showEdit, setShowEdit] = useState(false);
   const [editForm, setEditForm] = useState<EditForm>(emptyEditForm);
@@ -56,16 +58,16 @@ export function DatasourceDetailPage() {
   }, [schemas.data, selectedSchema, source.data?.schema]);
 
   useEffect(() => {
-    if (!tables.data?.length) {
+    if (!allTables.data?.length) {
       setSelected('');
       return;
     }
-    if (!tables.data.some((table) => table.name === selected)) setSelected(tables.data[0].name);
-  }, [selected, tables.data]);
+    if (!allTables.data.some((table) => table.name === selected)) setSelected(allTables.data[0].name);
+  }, [selected, allTables.data]);
 
   const columns = useColumns(id, selected, activeSchema);
-  const currentTable = tables.data?.find((table) => table.name === selected);
-  const filteredTables = useMemo(() => (tables.data ?? []).filter((table) => table.name.toLowerCase().includes(tableSearch.trim().toLowerCase())), [tables.data, tableSearch]);
+  const currentTable = allTables.data?.find((table) => table.name === selected);
+  const filteredTables = tables.data ?? [];
   const previewColumns = (columns.data ?? []).slice(0, 5);
   const sampleCount = Math.min(5, Math.max(0, ...previewColumns.map((column) => column.sample_values?.length ?? 0)));
   const sampleRows = Array.from({ length: sampleCount }, (_, rowIndex) => previewColumns.map((column) => column.sample_values?.[rowIndex]));
@@ -121,7 +123,7 @@ export function DatasourceDetailPage() {
 
   const submitEdit = (event: FormEvent) => { event.preventDefault(); update.mutate(); };
 
-  if (source.isLoading || schemas.isLoading || tables.isLoading) return <Loading />;
+  if (source.isLoading || schemas.isLoading || allTables.isLoading) return <Loading />;
   if (!source.data) return <ErrorNotice error={source.error ?? new Error('未找到数据源')} />;
 
   const queryAvailable = source.data.status === 'CONNECTED' || source.data.status === 'SYNCED';
@@ -141,13 +143,13 @@ export function DatasourceDetailPage() {
     />
 
     {message && <div className="notice success" role="status">{message}</div>}
-    <ErrorNotice error={source.error ?? schemas.error ?? tables.error ?? columns.error ?? test.error ?? sync.error ?? update.error} />
+    <ErrorNotice error={source.error ?? schemas.error ?? allTables.error ?? tables.error ?? columns.error ?? test.error ?? sync.error ?? update.error} />
 
     <div className="schema-layout">
       <aside className="object-tree">
-        <header><strong>数据库对象</strong><span>{tables.data?.length ?? 0} 张表</span></header>
+        <header><strong>数据库对象</strong><span>{allTables.data?.length ?? 0} 张表</span></header>
         <label className="tree-search"><span aria-hidden="true">⌕</span><input aria-label="搜索数据表" placeholder="搜索数据表" value={tableSearch} onChange={(event) => setTableSearch(event.target.value)} /></label>
-        <div className="schema-tree-title"><strong>▾&nbsp;&nbsp;{activeSchema || 'Schema'}</strong><span>{tables.data?.reduce((sum, table) => sum + (table.column_count ?? 0), 0) ?? 0}</span></div>
+        <div className="schema-tree-title"><strong>▾&nbsp;&nbsp;{activeSchema || 'Schema'}</strong><span>{allTables.data?.reduce((sum, table) => sum + (table.column_count ?? 0), 0) ?? 0}</span></div>
         <div className="table-tree-list">
           {filteredTables.map((table) => <button data-testid="schema-table" className={table.name === selected ? 'active' : ''} onClick={() => setSelected(table.name)} key={table.name}>
             <span>{table.name}</span><small>{table.column_count ?? ''}</small>

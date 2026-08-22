@@ -1,5 +1,5 @@
-from fastapi import APIRouter, Depends, HTTPException, Response, status
-from sqlalchemy import select
+from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
+from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
 from app.db.session import get_db
@@ -61,12 +61,51 @@ def create_model(data: SemanticModelCreate, db: Session = Depends(get_db), princ
 
 
 @router.get("", response_model=list[SemanticModelDetail])
-def list_models(db: Session = Depends(get_db), principal: Principal = Depends(require_permission("semantic.read"))):
+def list_models(
+    query: str = "",
+    model_status: str = Query(default="ALL", alias="status", pattern="^(ALL|PUBLISHED|DRAFT|DEPRECATED)$"),
+    datasource_id: str = "ALL",
+    db: Session = Depends(get_db),
+    principal: Principal = Depends(require_permission("semantic.read")),
+):
     return [
-        semantic_payload(model) for model in list_semantic_models(db)
-        if model.workspace_id == principal.workspace_id
+        semantic_payload(model) for model in list_semantic_models(
+            db,
+            workspace_id=principal.workspace_id,
+            query=query,
+            status=model_status,
+            datasource_id=datasource_id,
+        )
         if has_resource_access(db, principal, resource_type="SEMANTIC_MODEL", resource_id=model.id)
     ]
+
+
+_RESOURCE_SEARCH = {
+    "entities": (SemanticEntity, EntityRead, (SemanticEntity.name, SemanticEntity.source_table, SemanticEntity.primary_key, SemanticEntity.time_dimension)),
+    "metrics": (Metric, MetricRead, (Metric.name, Metric.label, Metric.expression, Metric.description)),
+    "dimensions": (Dimension, DimensionRead, (Dimension.name, Dimension.label, Dimension.source_column, Dimension.type)),
+    "relationships": (SemanticRelation, RelationRead, (SemanticRelation.left_entity, SemanticRelation.right_entity, SemanticRelation.join_type, SemanticRelation.cardinality)),
+    "business-terms": (BusinessTerm, BusinessTermRead, (BusinessTerm.term, BusinessTerm.definition, BusinessTerm.mapped_object)),
+}
+
+
+@router.get("/{model_id}/resources")
+def search_model_resources(
+    model_id: str,
+    kind: str = Query(pattern="^(entities|metrics|dimensions|relationships|business-terms)$"),
+    query: str = "",
+    db: Session = Depends(get_db),
+    principal: Principal = Depends(require_permission("semantic.read")),
+):
+    ensure_resource_access(db, principal, resource_type="SEMANTIC_MODEL", resource_id=model_id)
+    _get_or_404(db, model_id)
+    resource_type, read_type, searchable_columns = _RESOURCE_SEARCH[kind]
+    statement = select(resource_type).where(resource_type.semantic_model_id == model_id)
+    if query.strip():
+        keyword = f"%{query.strip()}%"
+        statement = statement.where(or_(*(column.ilike(keyword) for column in searchable_columns)))
+    rows = list(db.scalars(statement.order_by(resource_type.id)))
+    return [read_type.model_validate(item) for item in rows]
 
 
 @router.get("/{model_id}", response_model=SemanticModelDetail)

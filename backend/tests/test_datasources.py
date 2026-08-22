@@ -51,6 +51,25 @@ def test_datasource_crud_hides_password(client, datasource_payload):
     assert client.get(f"/api/v1/datasources/{datasource_id}").status_code == 404
 
 
+def test_datasource_search_type_and_status_filters_are_database_backed(client, datasource_payload):
+    first = client.post("/api/v1/datasources", json={**datasource_payload, "name": "Revenue PostgreSQL"})
+    second = client.post("/api/v1/datasources", json={
+        **datasource_payload,
+        "name": "Warehouse MySQL",
+        "type": "mysql",
+        "port": 3306,
+        "schema": None,
+    })
+    assert first.status_code == second.status_code == 201
+
+    searched = client.get("/api/v1/datasources", params={"query": "Revenue"}).json()
+    assert [item["name"] for item in searched] == ["Revenue PostgreSQL"]
+    typed = client.get("/api/v1/datasources", params={"type": "mysql"}).json()
+    assert [item["name"] for item in typed] == ["Warehouse MySQL"]
+    assert len(client.get("/api/v1/datasources", params={"status": "attention"}).json()) == 2
+    assert client.get("/api/v1/datasources", params={"status": "normal"}).json() == []
+
+
 def test_connection_test(client, datasource_id, monkeypatch):
     monkeypatch.setattr("app.services.datasources.build_connector", lambda _: FakeConnector())
     response = client.post(f"/api/v1/datasources/{datasource_id}/test")
@@ -82,6 +101,11 @@ def test_schema_sync_and_metadata_catalog(client, datasource_id, monkeypatch):
     tables = client.get(f"/api/v1/datasources/{datasource_id}/tables?schema=public").json()
     assert {item["name"] for item in tables} == {"customers", "orders"}
     assert {item["name"]: item["column_count"] for item in tables} == {"customers": 2, "orders": 3}
+    searched_tables = client.get(
+        f"/api/v1/datasources/{datasource_id}/tables",
+        params={"schema": "public", "query": "ord"},
+    ).json()
+    assert [item["name"] for item in searched_tables] == ["orders"]
 
     columns = client.get(f"/api/v1/datasources/{datasource_id}/tables/orders/columns?schema=public").json()
     assert len(columns) == 3

@@ -82,9 +82,10 @@ class AnswerLibraryResponse(BaseModel):
 
 
 class DashboardCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     name: str = Field(min_length=2, max_length=255)
     description: str = Field(min_length=2, max_length=1000)
-    card_count: int = Field(default=0, ge=0)
     is_shared: bool = False
 
 

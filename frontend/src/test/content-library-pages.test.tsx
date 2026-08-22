@@ -34,7 +34,8 @@ describe('答案库和看板列表高保真界面', () => {
   beforeEach(() => vi.restoreAllMocks());
 
   it('从 Backend API 渲染答案统计、分类和表格', async () => {
-    vi.spyOn(contentApi, 'answers').mockResolvedValue(answers);
+    const loadAnswers = vi.spyOn(contentApi, 'answers').mockResolvedValue(answers);
+    const user = userEvent.setup();
     renderPage('/answers', <AnswerLibraryPage />);
 
     expect(await screen.findByText('1,284')).toBeVisible();
@@ -42,6 +43,8 @@ describe('答案库和看板列表高保真界面', () => {
     expect(screen.getAllByTestId('answer-row')).toHaveLength(2);
     expect(screen.getByRole('tab', { name: '已验证 1' })).toBeVisible();
     expect(screen.getByText('过去 30 天退款笔数最高的商品')).toBeVisible();
+    await user.selectOptions(screen.getByLabelText('筛选答案状态'), 'review');
+    await waitFor(() => expect(loadAnswers).toHaveBeenCalledWith(expect.objectContaining({ tab: 'review' })));
   });
 
   it('新建标准答案通过 API 保存并刷新列表', async () => {
@@ -71,5 +74,26 @@ describe('答案库和看板列表高保真界面', () => {
     expect(screen.getByText('经营总览看板', { selector: 'h2' })).toBeVisible();
     await user.click(screen.getByRole('button', { name: '列表视图' }));
     expect(screen.getByRole('button', { name: '列表视图' })).toHaveClass('active');
+  });
+
+  it('新建看板不接受客户端伪造卡片数并通过 Backend API 持久化', async () => {
+    const user = userEvent.setup();
+    vi.spyOn(contentApi, 'dashboards').mockResolvedValue(dashboards);
+    const create = vi.spyOn(contentApi, 'createDashboard').mockResolvedValue({
+      ...dashboards.items[0], id: 'created-dashboard', name: '真实卡片看板', description: '仅统计已保存卡片', card_count: 0,
+    });
+    renderPage('/dashboards', <DashboardListPage />);
+    await screen.findByText('经营总览看板', { selector: 'h2' });
+
+    await user.click(screen.getByRole('button', { name: '＋ 新建看板' }));
+    expect(screen.queryByLabelText('初始卡片数')).not.toBeInTheDocument();
+    expect(screen.getByText(/新看板从 0 张卡片开始/)).toBeVisible();
+    await user.type(screen.getByLabelText('看板名称'), '真实卡片看板');
+    await user.type(screen.getByLabelText('看板说明'), '仅统计已保存卡片');
+    await user.click(screen.getByRole('button', { name: '创建看板' }));
+
+    await waitFor(() => expect(create).toHaveBeenCalledWith({
+      name: '真实卡片看板', description: '仅统计已保存卡片', is_shared: false,
+    }));
   });
 });

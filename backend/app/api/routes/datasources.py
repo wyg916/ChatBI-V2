@@ -1,5 +1,5 @@
-from fastapi import APIRouter, Depends, HTTPException, Response, status
-from sqlalchemy import func, select
+from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
+from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
 from app.core.access import Principal, ensure_resource_access, has_resource_access, record_audit, require_permission
@@ -56,8 +56,29 @@ def create_datasource(data: DataSourceCreate, db: Session = Depends(get_db), pri
 
 
 @router.get("", response_model=list[DataSourceRead])
-def list_datasources(db: Session = Depends(get_db), principal: Principal = Depends(require_permission("datasource.read"))):
-    datasources = list(db.scalars(select(DataSource).where(DataSource.workspace_id == principal.workspace_id).order_by(DataSource.created_at.desc())))
+def list_datasources(
+    query: str = "",
+    datasource_type: str = Query(default="all", alias="type", pattern="^(all|postgresql|mysql)$"),
+    connection_status: str = Query(default="all", alias="status", pattern="^(all|normal|attention)$"),
+    db: Session = Depends(get_db),
+    principal: Principal = Depends(require_permission("datasource.read")),
+):
+    statement = select(DataSource).where(DataSource.workspace_id == principal.workspace_id)
+    if query.strip():
+        keyword = f"%{query.strip()}%"
+        statement = statement.where(or_(
+            DataSource.name.ilike(keyword),
+            DataSource.database.ilike(keyword),
+            DataSource.type.ilike(keyword),
+        ))
+    if datasource_type != "all":
+        statement = statement.where(DataSource.type == datasource_type)
+    normal_statuses = ("CONNECTED", "SYNCED")
+    if connection_status == "normal":
+        statement = statement.where(DataSource.status.in_(normal_statuses))
+    elif connection_status == "attention":
+        statement = statement.where(~DataSource.status.in_(normal_statuses))
+    datasources = list(db.scalars(statement.order_by(DataSource.created_at.desc())))
     datasources = [item for item in datasources if has_resource_access(db, principal, resource_type="DATASOURCE", resource_id=item.id)]
     table_counts, column_counts = _datasource_counts(db)
     return [
@@ -146,10 +167,16 @@ def list_schemas(datasource_id: str, db: Session = Depends(get_db), principal: P
 
 
 @router.get("/{datasource_id}/tables", response_model=list[TableRead])
-def list_tables(datasource_id: str, schema: str | None = None, db: Session = Depends(get_db), principal: Principal = Depends(require_permission("datasource.read"))):
+def list_tables(
+    datasource_id: str,
+    schema: str | None = None,
+    query: str = "",
+    db: Session = Depends(get_db),
+    principal: Principal = Depends(require_permission("datasource.read")),
+):
     ensure_resource_access(db, principal, resource_type="DATASOURCE", resource_id=datasource_id)
     _get_or_404(db, datasource_id)
-    query = (
+    statement = (
         select(DataSourceTable, DataSourceSchema.name, func.count(DataSourceColumn.id))
         .join(DataSourceSchema, DataSourceTable.schema_id == DataSourceSchema.id)
         .outerjoin(DataSourceColumn, DataSourceColumn.table_id == DataSourceTable.id)
@@ -158,7 +185,10 @@ def list_tables(datasource_id: str, schema: str | None = None, db: Session = Dep
         .order_by(DataSourceSchema.name, DataSourceTable.name)
     )
     if schema:
-        query = query.where(DataSourceSchema.name == schema)
+        statement = statement.where(DataSourceSchema.name == schema)
+    if query.strip():
+        keyword = f"%{query.strip()}%"
+        statement = statement.where(or_(DataSourceTable.name.ilike(keyword), DataSourceTable.comment.ilike(keyword)))
     return [
         TableRead(
             id=table.id,
@@ -168,7 +198,7 @@ def list_tables(datasource_id: str, schema: str | None = None, db: Session = Dep
             comment=table.comment,
             column_count=column_count,
         )
-        for table, schema_name, column_count in db.execute(query)
+        for table, schema_name, column_count in db.execute(statement)
     ]
 
 

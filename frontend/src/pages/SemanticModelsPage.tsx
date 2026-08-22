@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState, type ChangeEvent, type FormEvent } from 'react';
+import { useDeferredValue, useRef, useState, type ChangeEvent, type FormEvent } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Link, useNavigate } from 'react-router-dom';
 import { semanticApi } from '../api/semantic';
@@ -52,7 +52,6 @@ function ModelCard({ model }: { model: SemanticModel }) {
 }
 
 export function SemanticModelsPage() {
-  const models = useSemanticModels();
   const sources = useDatasources();
   const client = useQueryClient();
   const navigate = useNavigate();
@@ -64,6 +63,9 @@ export function SemanticModelsPage() {
   const [showAllHistory, setShowAllHistory] = useState(false);
   const [importError, setImportError] = useState<Error | null>(null);
   const [form, setForm] = useState<SemanticModelInput>({ name: '', description: '', datasource_id: '' });
+  const deferredSearch = useDeferredValue(search);
+  const allModelsQuery = useSemanticModels();
+  const models = useSemanticModels({ query: deferredSearch, status, datasourceId: domain });
 
   const create = useMutation({
     mutationFn: semanticApi.create,
@@ -74,14 +76,8 @@ export function SemanticModelsPage() {
     },
   });
 
-  const allModels = models.data ?? [];
-  const filtered = useMemo(() => allModels.filter((model) => {
-    const query = search.trim().toLowerCase();
-    const matchesSearch = !query || `${model.name} ${model.description ?? ''}`.toLowerCase().includes(query);
-    const matchesStatus = status === 'ALL' || model.status === status;
-    const matchesDomain = domain === 'ALL' || model.datasource_id === domain;
-    return matchesSearch && matchesStatus && matchesDomain;
-  }), [allModels, domain, search, status]);
+  const allModels = allModelsQuery.data ?? [];
+  const filtered = models.data ?? [];
 
   const publishedCount = allModels.filter((model) => model.status === 'PUBLISHED').length;
   const draftCount = allModels.filter((model) => model.status === 'DRAFT').length;
@@ -122,7 +118,7 @@ export function SemanticModelsPage() {
         </div>
       </header>
 
-      <ErrorNotice error={models.error ?? sources.error ?? create.error ?? importError} />
+      <ErrorNotice error={models.error ?? allModelsQuery.error ?? sources.error ?? create.error ?? importError} />
 
       <div className="semantic-filters">
         <label className="semantic-search">
@@ -145,7 +141,7 @@ export function SemanticModelsPage() {
         </div>
       </div>
 
-      {models.isLoading ? <Loading /> : (
+      {models.isLoading || allModelsQuery.isLoading ? <Loading /> : (
         <>
           <div className="semantic-model-grid">
             {filtered.map((model) => <ModelCard model={model} key={model.id} />)}

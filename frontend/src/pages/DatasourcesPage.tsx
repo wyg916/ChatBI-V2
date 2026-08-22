@@ -1,4 +1,4 @@
-import { useMemo, useState, type FormEvent } from 'react';
+import { useDeferredValue, useState, type FormEvent } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { datasourceApi } from '../api/datasources';
@@ -39,7 +39,6 @@ function formatRelativeTime(value?: string) {
 }
 
 export function DatasourcesPage() {
-  const { data = [], isLoading, error } = useDatasources();
   const client = useQueryClient();
   const [showCreate, setShowCreate] = useState(false);
   const [form, setForm] = useState(defaultForm);
@@ -47,16 +46,13 @@ export function DatasourcesPage() {
   const [typeFilter, setTypeFilter] = useState<'all' | DatasourceKind>('all');
   const [statusFilter, setStatusFilter] = useState<'all' | 'normal' | 'attention'>('all');
   const [feedback, setFeedback] = useState('');
-
-  const filtered = useMemo(() => data.filter((item) => {
-    const text = `${item.name} ${item.type} ${item.database}`.toLowerCase();
-    const matchesSearch = text.includes(search.trim().toLowerCase());
-    const matchesType = typeFilter === 'all' || item.type === typeFilter;
-    const matchesStatus = statusFilter === 'all'
-      || (statusFilter === 'normal' && isNormal(item))
-      || (statusFilter === 'attention' && !isNormal(item));
-    return matchesSearch && matchesType && matchesStatus;
-  }), [data, search, typeFilter, statusFilter]);
+  const deferredSearch = useDeferredValue(search);
+  const allSources = useDatasources();
+  const filteredSources = useDatasources({ query: deferredSearch, type: typeFilter, status: statusFilter });
+  const data = allSources.data ?? [];
+  const filtered = filteredSources.data ?? [];
+  const isLoading = allSources.isLoading || filteredSources.isLoading;
+  const error = allSources.error ?? filteredSources.error;
 
   const create = useMutation({
     mutationFn: async (input: DatasourceInput) => {

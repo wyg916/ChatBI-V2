@@ -43,7 +43,12 @@ function renderRoute(path: string, element: React.ReactNode) {
 describe('语义模型高保真界面', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.mocked(useSemanticModels).mockReturnValue(queryResult(models));
+    vi.mocked(useSemanticModels).mockImplementation((options = {}) => queryResult(models.filter((model) => {
+      const query = options.query?.trim().toLowerCase() ?? '';
+      return (!query || `${model.name} ${model.description ?? ''}`.toLowerCase().includes(query))
+        && (!options.status || options.status === 'ALL' || model.status === options.status)
+        && (!options.datasourceId || options.datasourceId === 'ALL' || model.datasource_id === options.datasourceId);
+    })));
     vi.mocked(useSemanticModel).mockReturnValue(queryResult(models[0]));
     vi.mocked(useDatasources).mockReturnValue(queryResult([
       { id: 'source-1', name: '经营分析库', type: 'postgresql', host: '', port: 5432, database: '', username: '' },
@@ -68,6 +73,7 @@ describe('语义模型高保真界面', () => {
 
   it('在关系画布选择真实资源并通过现有 API 保存配置', async () => {
     const user = userEvent.setup();
+    const searchResources = vi.spyOn(semanticApi, 'searchResources').mockResolvedValue(models[0].entities!);
     vi.spyOn(semanticApi, 'updateResource').mockResolvedValue(models[0].entities![0]);
     vi.spyOn(semanticApi, 'update').mockResolvedValue(models[0]);
     renderRoute('/semantic-models/model-1', <SemanticEditorPage />);
@@ -79,6 +85,8 @@ describe('语义模型高保真界面', () => {
     expect(screen.getByRole('button', { name: '查询缓存策略' })).toBeDisabled();
     expect(screen.getByRole('button', { name: '全量缓存策略' })).toBeDisabled();
     expect(screen.getByRole('button', { name: '部门' })).toBeDisabled();
+    await user.type(screen.getByRole('textbox', { name: '搜索模型资源' }), 'orders');
+    await waitFor(() => expect(searchResources).toHaveBeenCalledWith('model-1', 'entities', 'orders'));
     const nameInput = screen.getByLabelText('实体名称');
     await user.clear(nameInput);
     await user.type(nameInput, 'sales_orders');

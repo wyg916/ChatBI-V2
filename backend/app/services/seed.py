@@ -227,12 +227,12 @@ def _seed_demo_content(db: Session, workspace_id: str) -> None:
 
     if db.scalar(select(Dashboard.id).limit(1)) is None:
         dashboard_rows = [
-            ("经营总览看板", "收入、利润、订单与客户增长总览", 8, True, 5),
-            ("区域经营看板", "各区域收入、订单、毛利与完成率", 12, True, 4),
-            ("客户增长看板", "新增、活跃、留存、复购和渠道", 9, True, 4),
-            ("供应链运营看板", "库存、采购、交付、履约和异常", 10, True, 3),
-            ("市场投放看板", "渠道、线索、转化、获客成本", 7, False, 3),
-            ("财务分析看板", "收入、费用、现金流与应收应付", 11, False, 2),
+            ("经营总览看板", "收入、利润、订单与客户增长总览", True),
+            ("区域经营看板", "各区域收入、订单、毛利与完成率", True),
+            ("客户增长看板", "新增、活跃、留存、复购和渠道", True),
+            ("供应链运营看板", "库存、采购、交付、履约和异常", True),
+            ("市场投放看板", "渠道、线索、转化、获客成本", False),
+            ("财务分析看板", "收入、费用、现金流与应收应付", False),
         ]
         minute_offsets = [0, 5, 12, 60, 24 * 60, 24 * 60]
         now = utcnow()
@@ -241,24 +241,24 @@ def _seed_demo_content(db: Session, workspace_id: str) -> None:
                 workspace_id=workspace_id,
                 name=name,
                 description=description,
-                card_count=card_count,
+                card_count=0,
                 is_shared=is_shared,
-                refresh_count_today=refreshes,
+                refresh_count_today=0,
                 status="REALTIME",
                 trend_variant=index - 1,
                 sort_order=index,
                 updated_at=now - timedelta(minutes=minute_offsets[index - 1]),
             )
-            for index, (name, description, card_count, is_shared, refreshes) in enumerate(dashboard_rows, 1)
+            for index, (name, description, is_shared) in enumerate(dashboard_rows, 1)
         ])
         for offset in range(12):
             db.add(Dashboard(
                 workspace_id=workspace_id,
                 name=f"经营分析看板 {offset + 7:02d}",
                 description="基于已验证答案生成的可刷新经营分析页面",
-                card_count=8 if offset < 6 else 7,
+                card_count=0,
                 is_shared=offset < 5,
-                refresh_count_today=2 if offset < 3 else 1,
+                refresh_count_today=0,
                 status="REALTIME",
                 trend_variant=offset % 6,
                 sort_order=offset + 7,

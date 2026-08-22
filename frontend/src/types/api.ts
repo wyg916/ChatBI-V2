@@ -100,7 +100,7 @@ export interface Dashboard {
 }
 export interface DashboardSummary { total: number; cards: number; shared: number; refreshes_today: number }
 export interface DashboardLibraryResponse { summary: DashboardSummary; items: Dashboard[]; total: number; page: number; page_size: number }
-export interface DashboardInput { name: string; description: string; card_count?: number; is_shared?: boolean }
+export interface DashboardInput { name: string; description: string; is_shared?: boolean }
 
 export interface DashboardKpi { label: string; value: number; unit: string; change: number; change_unit: string }
 export interface DashboardTrendPoint { date: string; revenue: number }

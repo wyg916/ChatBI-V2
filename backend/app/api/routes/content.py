@@ -39,7 +39,7 @@ router = APIRouter(tags=["answers and dashboards"])
 @router.get("/answers", response_model=AnswerLibraryResponse)
 def get_answers(
     query: str = "",
-    tab: str = Query(default="all", pattern="^(all|favorites|drafts|published|verified|rejected|deprecated)$"),
+    tab: str = Query(default="all", pattern="^(all|favorites|drafts|review|published|verified|rejected|deprecated)$"),
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=6, ge=1, le=100),
     db: Session = Depends(get_db),
@@ -161,7 +161,7 @@ def create_dashboard(
         workspace_id=principal.workspace_id,
         name=data.name,
         description=data.description,
-        card_count=data.card_count,
+        card_count=0,
         is_shared=data.is_shared,
         trend_variant=sort_order % 6,
         sort_order=sort_order,

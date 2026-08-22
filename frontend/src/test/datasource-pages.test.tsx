@@ -51,7 +51,14 @@ afterEach(() => vi.restoreAllMocks());
 
 describe('数据源高保真页面', () => {
   it('用 Backend API 统计渲染列表，并支持搜索和状态筛选', async () => {
-    vi.spyOn(datasourceApi, 'list').mockResolvedValue(sources);
+    const list = vi.spyOn(datasourceApi, 'list').mockImplementation(async (options = {}) => sources.filter((item) => {
+      const query = options.query?.trim().toLowerCase() ?? '';
+      const matchesQuery = !query || `${item.name} ${item.database}`.toLowerCase().includes(query);
+      const matchesType = !options.type || options.type === 'all' || item.type === options.type;
+      const normal = item.status === 'CONNECTED' || item.status === 'SYNCED';
+      const matchesStatus = !options.status || options.status === 'all' || (options.status === 'normal' ? normal : !normal);
+      return matchesQuery && matchesType && matchesStatus;
+    }));
     vi.spyOn(datasourceApi, 'sync').mockResolvedValue({ success: true, tables: 2, columns: 5 });
     const user = userEvent.setup();
     renderRoute('/datasources');
@@ -63,12 +70,14 @@ describe('数据源高保真页面', () => {
     expect(screen.getAllByTestId('datasource-card')).toHaveLength(2);
 
     await user.selectOptions(screen.getByLabelText('连接状态'), 'normal');
-    expect(screen.getAllByTestId('datasource-card')).toHaveLength(1);
+    await waitFor(() => expect(list).toHaveBeenCalledWith(expect.objectContaining({ status: 'normal' })));
+    expect(await screen.findAllByTestId('datasource-card')).toHaveLength(1);
     expect(screen.getByText('财务分析 PostgreSQL')).toBeVisible();
 
     await user.selectOptions(screen.getByLabelText('连接状态'), 'all');
     await user.type(screen.getByLabelText('搜索数据源'), 'CRM');
-    expect(screen.getAllByTestId('datasource-card')).toHaveLength(1);
+    await waitFor(() => expect(list).toHaveBeenCalledWith(expect.objectContaining({ query: 'CRM' })));
+    expect(await screen.findAllByTestId('datasource-card')).toHaveLength(1);
     expect(screen.getByText('CRM MySQL')).toBeVisible();
 
     await user.clear(screen.getByLabelText('搜索数据源'));
@@ -80,9 +89,12 @@ describe('数据源高保真页面', () => {
   it('展示真实 Schema、字段角色和样例值，并可切换 Schema', async () => {
     vi.spyOn(datasourceApi, 'get').mockResolvedValue(sources[0]);
     vi.spyOn(datasourceApi, 'schemas').mockResolvedValue(schemas);
-    vi.spyOn(datasourceApi, 'tables').mockImplementation(async (_id, schema) => schema === 'finance'
-      ? [{ id: 'table-budget', name: 'budget', schema_name: 'finance', qualified_name: 'source-pg.finance.budget', column_count: 2 }]
-      : publicTables);
+    const tables = vi.spyOn(datasourceApi, 'tables').mockImplementation(async (_id, schema, query) => {
+      const rows = schema === 'finance'
+        ? [{ id: 'table-budget', name: 'budget', schema_name: 'finance', qualified_name: 'source-pg.finance.budget', column_count: 2 }]
+        : publicTables;
+      return query ? rows.filter((item) => item.name.includes(query)) : rows;
+    });
     vi.spyOn(datasourceApi, 'columns').mockImplementation(async (_id, table) => table === 'orders' ? orderColumns : []);
     const user = userEvent.setup();
     renderRoute('/datasources/source-pg', true);
@@ -95,8 +107,14 @@ describe('数据源高保真页面', () => {
     expect(screen.getByText('ORD-001')).toBeVisible();
     expect(screen.getByDisplayValue('经营订单明细')).toBeVisible();
 
+    await user.type(screen.getByLabelText('搜索数据表'), 'reg');
+    await waitFor(() => expect(tables).toHaveBeenCalledWith('source-pg', 'public', 'reg'));
+    expect(await screen.findByRole('button', { name: /regions/ })).toBeVisible();
+    expect(screen.queryByRole('button', { name: /orders/ })).not.toBeInTheDocument();
+
+    await user.clear(screen.getByLabelText('搜索数据表'));
     await user.selectOptions(screen.getByLabelText('切换 Schema'), 'finance');
     expect(await screen.findByRole('button', { name: /budget/ })).toBeVisible();
-    await waitFor(() => expect(datasourceApi.tables).toHaveBeenCalledWith('source-pg', 'finance'));
+    await waitFor(() => expect(datasourceApi.tables).toHaveBeenCalledWith('source-pg', 'finance', undefined));
   });
 });

@@ -45,7 +45,6 @@ export function DashboardListPage() {
     <section className="dashboard-tools" aria-label="看板筛选">
       <div className="dashboard-filter-group">
         <label className="content-search"><span>⌕</span><input aria-label="搜索看板" value={query} onChange={(event) => setQuery(event.target.value)} /></label>
-        <select aria-label="工作空间"><option>全部工作空间</option></select>
         <select aria-label="排序方式" value={sort} onChange={(event) => setSort(event.target.value)}><option value="recent">最近更新</option><option value="name">名称排序</option><option value="cards">卡片数量</option></select>
       </div>
       <div className="view-switch" aria-label="视图切换"><button type="button" className={view === 'cards' ? 'active' : ''} onClick={() => setView('cards')}>卡片视图</button><button type="button" className={view === 'list' ? 'active' : ''} onClick={() => setView('list')}>列表视图</button></div>

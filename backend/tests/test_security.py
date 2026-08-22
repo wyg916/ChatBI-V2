@@ -84,7 +84,7 @@ def test_admin_analyst_resource_access_and_denial_audit(raw_client, db_session):
         "status": "DRAFT", "accuracy_percent": 0,
     }).status_code == 201
     assert raw_client.post("/api/v1/dashboards", json={
-        "name": "分析师看板", "description": "RBAC 回归", "card_count": 0, "is_shared": False,
+        "name": "分析师看板", "description": "RBAC 回归", "is_shared": False,
     }).status_code == 201
 
     denied = list(db_session.scalars(select(AuditEvent).where(AuditEvent.status == "DENIED")))
@@ -99,6 +99,10 @@ def test_admin_analyst_resource_access_and_denial_audit(raw_client, db_session):
     assert payload["user_count"] == 2
     assert {item["name"] for item in payload["roles"]} == {"ADMIN", "ANALYST"}
     assert payload["audit_event_count"] >= 4
+    filtered = raw_client.get("/api/v1/security/overview", params={"user_query": "analyst", "user_status": "ACTIVE"})
+    assert filtered.status_code == 200
+    assert filtered.json()["user_count"] == 2
+    assert [item["email"] for item in filtered.json()["users"]] == [analyst.email]
 
 
 def test_disabled_and_missing_session_are_rejected_and_audited(raw_client, db_session):

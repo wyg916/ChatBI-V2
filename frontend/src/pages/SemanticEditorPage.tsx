@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState, type FormEvent } from 'react';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useDeferredValue, useEffect, useMemo, useState, type FormEvent } from 'react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useParams } from 'react-router-dom';
 import { semanticApi } from '../api/semantic';
 import { useSemanticModel } from '../hooks/useData';
@@ -126,13 +126,15 @@ export function SemanticEditorPage() {
   const [historyOpen, setHistoryOpen] = useState(false);
   const [history, setHistory] = useState<SemanticVersion[]>([]);
   const [historyError, setHistoryError] = useState<unknown>();
+  const deferredResourceSearch = useDeferredValue(resourceSearch);
 
   const items = useMemo(() => model.data ? itemsFor(model.data, active) : [], [active, model.data]);
-  const filteredItems = useMemo(() => {
-    const query = resourceSearch.trim().toLowerCase();
-    if (!query) return items;
-    return items.filter((item, index) => itemTitle(item, active, index).toLowerCase().includes(query));
-  }, [active, items, resourceSearch]);
+  const resourceResults = useQuery({
+    queryKey: ['semantic-model-resources', id, active, deferredResourceSearch],
+    queryFn: () => semanticApi.searchResources(id, active, deferredResourceSearch),
+    enabled: Boolean(id && deferredResourceSearch.trim()),
+  });
+  const filteredItems = deferredResourceSearch.trim() ? ((resourceResults.data ?? []) as ResourceItem[]) : items;
   const selected = items.find((item) => item.id === selectedId) ?? items[0];
 
   useEffect(() => {
@@ -228,7 +230,7 @@ export function SemanticEditorPage() {
       </header>
 
       {message && <div className="semantic-editor-message" role="status">{message}</div>}
-      <ErrorNotice error={model.error ?? add.error ?? save.error ?? publish.error} />
+      <ErrorNotice error={model.error ?? resourceResults.error ?? add.error ?? save.error ?? publish.error} />
       <ErrorNotice error={historyError ?? rollback.error} />
 
       <div className="semantic-editor-shell">

@@ -35,6 +35,16 @@ def prepare_catalog(db_session, datasource_id):
 
 def test_semantic_model_crud(client, datasource_id):
     model_id = create_model(client, datasource_id)
+    second = client.post("/api/v1/semantic-models", json={
+        "name": "客户流失分析",
+        "description": "留存业务域",
+        "datasource_id": datasource_id,
+    })
+    assert second.status_code == 201
+    searched = client.get("/api/v1/semantic-models", params={"query": "新能源", "status": "DRAFT", "datasource_id": datasource_id})
+    assert searched.status_code == 200
+    assert [item["id"] for item in searched.json()] == [model_id]
+    client.delete(f"/api/v1/semantic-models/{second.json()['id']}")
     assert len(client.get("/api/v1/semantic-models").json()) == 1
     detail = client.get(f"/api/v1/semantic-models/{model_id}")
     assert detail.status_code == 200
@@ -81,6 +91,17 @@ def test_semantic_children_and_publish(client, datasource_id, db_session):
     assert len(detail["dimensions"]) == 1
     assert len(detail["relationships"]) == 1
     assert len(detail["business_terms"]) == 1
+
+    searched_resources = client.get(
+        f"/api/v1/semantic-models/{model_id}/resources",
+        params={"kind": "metrics", "query": "收入"},
+    )
+    assert searched_resources.status_code == 200
+    assert [item["name"] for item in searched_resources.json()] == ["revenue"]
+    assert client.get(
+        f"/api/v1/semantic-models/{model_id}/resources",
+        params={"kind": "entities", "query": "missing"},
+    ).json() == []
 
     listed = client.get("/api/v1/semantic-models").json()[0]
     assert len(listed["entities"]) == 2

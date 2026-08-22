@@ -57,7 +57,7 @@ def list_answers(
         ))
     if tab == "favorites":
         statement = statement.where(VerifiedAnswer.is_favorite.is_(True))
-    elif tab == "drafts":
+    elif tab in {"drafts", "review"}:
         statement = statement.where(VerifiedAnswer.status == "DRAFT")
     elif tab in {"published", "verified"}:
         statement = statement.where(VerifiedAnswer.status == "VERIFIED")
@@ -77,15 +77,36 @@ def list_answers(
 
 def dashboard_summary(db: Session, workspace_id: str | None = None) -> dict[str, int]:
     statement = select(
-            func.count(Dashboard.id),
-            func.coalesce(func.sum(Dashboard.card_count), 0),
-            func.coalesce(func.sum(case((Dashboard.is_shared.is_(True), 1), else_=0)), 0),
-            func.coalesce(func.sum(Dashboard.refresh_count_today), 0),
-        )
+        func.count(Dashboard.id),
+        func.coalesce(func.sum(case((Dashboard.is_shared.is_(True), 1), else_=0)), 0),
+        func.coalesce(func.sum(Dashboard.refresh_count_today), 0),
+    )
     if workspace_id:
         statement = statement.where(Dashboard.workspace_id == workspace_id)
     row = db.execute(statement).one()
-    return {"total": row[0], "cards": row[1], "shared": row[2], "refreshes_today": row[3]}
+    cards_statement = select(func.count(DashboardCard.id)).join(Dashboard, DashboardCard.dashboard_id == Dashboard.id)
+    if workspace_id:
+        cards_statement = cards_statement.where(Dashboard.workspace_id == workspace_id)
+    return {
+        "total": row[0],
+        "cards": db.scalar(cards_statement) or 0,
+        "shared": row[1],
+        "refreshes_today": row[2],
+    }
+
+
+def _dashboard_payload(dashboard: Dashboard, card_count: int) -> dict:
+    return {
+        "id": dashboard.id,
+        "name": dashboard.name,
+        "description": dashboard.description,
+        "card_count": card_count,
+        "is_shared": dashboard.is_shared,
+        "refresh_count_today": dashboard.refresh_count_today,
+        "status": dashboard.status,
+        "trend_variant": dashboard.trend_variant,
+        "updated_at": dashboard.updated_at,
+    }
 
 
 def list_dashboards(
@@ -96,23 +117,29 @@ def list_dashboards(
     page: int = 1,
     page_size: int = 6,
     workspace_id: str | None = None,
-) -> tuple[list[Dashboard], int]:
-    statement = select(Dashboard)
+) -> tuple[list[dict], int]:
+    actual_card_count = func.count(DashboardCard.id).label("actual_card_count")
+    statement = select(Dashboard, actual_card_count).outerjoin(
+        DashboardCard, DashboardCard.dashboard_id == Dashboard.id,
+    ).group_by(Dashboard.id)
+    total_statement = select(func.count(Dashboard.id))
     if workspace_id:
         statement = statement.where(Dashboard.workspace_id == workspace_id)
+        total_statement = total_statement.where(Dashboard.workspace_id == workspace_id)
     if query.strip():
         keyword = f"%{query.strip()}%"
         statement = statement.where(or_(Dashboard.name.ilike(keyword), Dashboard.description.ilike(keyword)))
-    total = db.scalar(select(func.count()).select_from(statement.subquery())) or 0
+        total_statement = total_statement.where(or_(Dashboard.name.ilike(keyword), Dashboard.description.ilike(keyword)))
+    total = db.scalar(total_statement) or 0
     ordering = {
         "name": (Dashboard.name.asc(),),
-        "cards": (Dashboard.card_count.desc(), Dashboard.name.asc()),
+        "cards": (actual_card_count.desc(), Dashboard.name.asc()),
         "recent": (Dashboard.updated_at.desc(), Dashboard.sort_order.asc()),
     }.get(sort, (Dashboard.updated_at.desc(), Dashboard.sort_order.asc()))
-    items = list(db.scalars(
+    rows = list(db.execute(
         statement.order_by(*ordering).offset((page - 1) * page_size).limit(page_size)
     ))
-    return items, total
+    return [_dashboard_payload(dashboard, card_count) for dashboard, card_count in rows], total
 
 
 def _number(value) -> float:
@@ -250,7 +277,7 @@ def dashboard_detail(db: Session, dashboard: Dashboard) -> dict:
             "updated_at": card.updated_at,
         })
     return {
-        "dashboard": dashboard,
+        "dashboard": _dashboard_payload(dashboard, len(cards)),
         "data_as_of": summary["max_date"].isoformat(),
         "range_start": (summary["max_date"] - timedelta(days=29)).isoformat(),
         "range_end": summary["max_date"].isoformat(),

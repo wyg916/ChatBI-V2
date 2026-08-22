@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useDeferredValue, useEffect, useState } from 'react';
 import avatarCircle from '../assets/settings/avatar-circle.svg';
 import timelineDot from '../assets/settings/timeline-dot.svg';
 import { ApiError } from '../api/client';
@@ -22,25 +22,21 @@ function formatTime(value?: string) {
 export function SecurityAuditPage() {
   const [tab, setTab] = useState<SecurityTab>('用户');
   const [query, setQuery] = useState('');
-  const [status, setStatus] = useState('全部状态');
+  const [status, setStatus] = useState('ALL');
   const [overview, setOverview] = useState<SecurityOverview>();
   const [error, setError] = useState<unknown>();
+  const deferredQuery = useDeferredValue(query);
 
   useEffect(() => {
     let active = true;
-    securityApi.overview().then((value) => {
+    setError(undefined);
+    securityApi.overview({ query: deferredQuery, status }).then((value) => {
       if (active) setOverview(value);
     }).catch((reason) => {
       if (active) setError(reason);
     });
     return () => { active = false; };
-  }, []);
-
-  const filteredUsers = useMemo(() => (overview?.users ?? []).filter((user) => {
-    const matchesQuery = `${user.display_name}${user.email}${user.role}`.toLowerCase().includes(query.trim().toLowerCase());
-    const normalizedStatus = user.status === 'ACTIVE' ? '活跃' : '已停用';
-    return matchesQuery && (status === '全部状态' || normalizedStatus === status);
-  }), [overview?.users, query, status]);
+  }, [deferredQuery, status]);
 
   if (!overview && !error) {
     return <div className="settings-surface-page security-audit-page" data-testid="security-audit-page"><header className="settings-page-heading"><div><h1>用户、角色与审计</h1><p>正在读取真实权限与审计记录…</p></div></header><div className="settings-provider-state" role="status">安全设置加载中…</div></div>;
@@ -68,15 +64,15 @@ export function SecurityAuditPage() {
       <article className="security-table-card">
         <header className="security-table-tools">
           <div className="security-tabs" role="tablist" aria-label="安全管理视图">{(['用户', '角色', '权限策略'] as SecurityTab[]).map((item) => <button key={item} type="button" role="tab" aria-selected={tab === item} className={tab === item ? 'active' : ''} onClick={() => setTab(item)}>{item}</button>)}</div>
-          <div className="security-filters"><label><span className="sr-only">搜索成员</span><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="搜索姓名、邮箱或角色" /></label><select aria-label="筛选状态" value={status} onChange={(event) => setStatus(event.target.value)}><option>全部状态</option><option>活跃</option><option>已停用</option></select></div>
+          <div className="security-filters"><label><span className="sr-only">搜索成员</span><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="搜索姓名、邮箱或角色" /></label><select aria-label="筛选状态" value={status} onChange={(event) => setStatus(event.target.value)}><option value="ALL">全部状态</option><option value="ACTIVE">活跃</option><option value="DISABLED">已停用</option></select></div>
         </header>
 
         <div className="security-table-scroll">
-          {tab === '用户' && <table><thead><tr><th>用户</th><th>角色</th><th>状态</th><th>最后活跃</th><th>操作</th></tr></thead><tbody>{filteredUsers.length ? filteredUsers.map((user: SecurityUser) => <tr key={user.id}><td><div className="security-user-cell"><UserAvatar name={user.display_name} /><div><b>{user.display_name}</b><small>{user.email}</small></div></div></td><td>{roleLabels[user.role]}</td><td><span className={`security-state ${user.status === 'ACTIVE' ? 'active' : 'disabled'}`}>{user.status === 'ACTIVE' ? '活跃' : '已停用'}</span></td><td>{formatTime(user.last_active_at)}</td><td><button type="button" disabled>只读</button></td></tr>) : <tr><td className="security-empty-row" colSpan={5}>没有符合当前条件的成员</td></tr>}</tbody></table>}
+          {tab === '用户' && <table><thead><tr><th>用户</th><th>角色</th><th>状态</th><th>最后活跃</th><th>操作</th></tr></thead><tbody>{overview.users.length ? overview.users.map((user: SecurityUser) => <tr key={user.id}><td><div className="security-user-cell"><UserAvatar name={user.display_name} /><div><b>{user.display_name}</b><small>{user.email}</small></div></div></td><td>{roleLabels[user.role]}</td><td><span className={`security-state ${user.status === 'ACTIVE' ? 'active' : 'disabled'}`}>{user.status === 'ACTIVE' ? '活跃' : '已停用'}</span></td><td>{formatTime(user.last_active_at)}</td><td><button type="button" disabled>只读</button></td></tr>) : <tr><td className="security-empty-row" colSpan={5}>没有符合当前条件的成员</td></tr>}</tbody></table>}
           {tab === '角色' && <table><thead><tr><th>角色</th><th>成员数</th><th>权限数量</th><th>状态</th><th>操作</th></tr></thead><tbody>{overview.roles.map((role) => <tr key={role.name}><td><b>{roleLabels[role.name]}</b></td><td>{role.user_count} 人</td><td>{role.permissions.length} 项</td><td><span className="security-state active">启用</span></td><td><button type="button" disabled>系统角色</button></td></tr>)}</tbody></table>}
           {tab === '权限策略' && <table><thead><tr><th>权限</th><th>适用角色</th><th>资源范围</th><th>状态</th><th>操作</th></tr></thead><tbody>{policyRows.map((item) => <tr key={`${item.role}-${item.permission}`}><td><b>{item.permission}</b></td><td>{roleLabels[item.role]}</td><td>{item.permission.split('.')[0]}</td><td><span className="security-state active">已生效</span></td><td><button type="button" disabled>只读</button></td></tr>)}</tbody></table>}
         </div>
-        <footer className="security-table-footer"><span>{tab === '用户' ? `共 ${overview.user_count} 位成员` : `${tab} · Backend API`}</span><div><button type="button" aria-label="上一页" disabled>‹</button><button type="button" className="active" aria-label="第 1 页" aria-current="page" disabled title="当前只有一页">1</button><button type="button" aria-label="下一页" disabled>›</button></div></footer>
+        <footer className="security-table-footer"><span>{tab === '用户' ? `当前条件 ${overview.users.length} 位 · 工作空间共 ${overview.user_count} 位` : `${tab} · Backend API`}</span><div><button type="button" aria-label="上一页" disabled>‹</button><button type="button" className="active" aria-label="第 1 页" aria-current="page" disabled title="当前只有一页">1</button><button type="button" aria-label="下一页" disabled>›</button></div></footer>
       </article>
 
       <aside className="security-side-column">

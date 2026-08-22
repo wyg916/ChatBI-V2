@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import { describe, expect, it, vi } from 'vitest';
@@ -7,6 +7,7 @@ import { ApiError } from '../api/client';
 import { securityApi } from '../api/security';
 import { SecurityAuditPage } from '../pages/SecurityAuditPage';
 import { SettingsModelsPage } from '../pages/SettingsModelsPage';
+import type { SecurityOverview } from '../types/api';
 
 describe('系统设置高保真页面', () => {
   it('从 Backend API 展示模型服务且不在浏览器提供密钥编辑', async () => {
@@ -43,7 +44,7 @@ describe('系统设置高保真页面', () => {
 
   it('从 Backend API 展示 ADMIN/ANALYST、权限矩阵与审计事件', async () => {
     const user = userEvent.setup();
-    vi.spyOn(securityApi, 'overview').mockResolvedValue({
+    const overview: SecurityOverview = {
       current_actor: { id: 'u1', email: 'admin@chatbi.local', display_name: '管理员', role: 'ADMIN', status: 'ACTIVE' },
       user_count: 2, role_count: 2, active_user_count: 2, audit_event_count: 1,
       users: [
@@ -55,13 +56,22 @@ describe('系统设置高保真页面', () => {
         { name: 'ANALYST', permissions: ['query.ask', 'datasource.read'], user_count: 1 },
       ],
       audit_events: [{ id: 'e1', actor_email: 'analyst@chatbi.local', action: 'RESOURCE_ACCESS', resource_type: 'DATASOURCE', status: 'DENIED', details: {}, created_at: '2026-08-17T12:00:00Z' }],
-    });
+    };
+    const loadOverview = vi.spyOn(securityApi, 'overview').mockImplementation(async (options = {}) => ({
+      ...overview,
+      users: overview.users.filter((item) => {
+        const query = options.query?.toLowerCase() ?? '';
+        return (!query || `${item.display_name}${item.email}${item.role}`.toLowerCase().includes(query))
+          && (!options.status || options.status === 'ALL' || item.status === options.status);
+      }),
+    }));
     render(<MemoryRouter><SecurityAuditPage /></MemoryRouter>);
 
     expect(screen.getByRole('heading', { name: '用户、角色与审计', level: 1 })).toBeInTheDocument();
     const search = await screen.findByPlaceholderText('搜索姓名、邮箱或角色');
     await user.type(search, 'analyst');
-    expect(screen.getByText('analyst@chatbi.local')).toBeInTheDocument();
+    await waitFor(() => expect(loadOverview).toHaveBeenCalledWith({ query: 'analyst', status: 'ALL' }));
+    expect(await screen.findByText('analyst@chatbi.local')).toBeInTheDocument();
     expect(screen.queryByText('admin@chatbi.local')).not.toBeInTheDocument();
 
     await user.clear(search);
