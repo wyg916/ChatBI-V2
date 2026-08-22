@@ -462,8 +462,11 @@ def test_gate_generated_audits_bind_commands_tools_inventory_and_locks(
         {"name": "beta", "version": "2.0", "license": "BSD", "classifiers": []},
     ]
     monkeypatch.setattr(gate, "_current_distribution_inventory", lambda: inventory)
-    audit_python = tmp_path / "isolated-audit-python"
+    audit_prefix = tmp_path / "isolated-audit-venv"
+    audit_python = audit_prefix / "bin" / "python"
+    audit_python.parent.mkdir(parents=True)
     audit_python.write_text("isolated", encoding="utf-8")
+    (audit_prefix / "pyvenv.cfg").write_text("home = isolated", encoding="utf-8")
     monkeypatch.setenv("CHATBI_PHASE5_AUDIT_PYTHON", str(audit_python))
 
     def fake_recorded(command, *, stdout_path=None, expose_stdout=False):
@@ -502,8 +505,9 @@ def test_gate_generated_audits_bind_commands_tools_inventory_and_locks(
     receipt = json.loads((tmp_path / "audit-receipt.json").read_text(encoding="utf-8"))
     assert receipt["commands"]["pip"]["command"][1:3] == ["-m", "pip_audit"]
     assert "--path" in receipt["commands"]["pip"]["command"]
-    assert Path(receipt["isolated_audit_python"]) == audit_python.resolve()
-    assert Path(receipt["isolated_audit_python"]) != Path(receipt["python_executable"]).resolve()
+    assert Path(receipt["isolated_audit_python"]) == audit_python.absolute()
+    assert Path(receipt["isolated_audit_prefix"]) == audit_prefix.absolute()
+    assert Path(receipt["isolated_audit_prefix"]) != Path(sys.prefix).absolute()
     assert receipt["commands"]["npm"]["command"][-4:] == [
         "audit",
         "--prefix",

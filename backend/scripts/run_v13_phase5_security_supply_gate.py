@@ -811,13 +811,28 @@ def generated_audits(evidence_dir: Path) -> dict[str, Any]:
     _atomic_json(inventory_path, inventory)
     failures: list[str] = []
     audit_python_raw = os.getenv("CHATBI_PHASE5_AUDIT_PYTHON", "").strip()
-    audit_python = Path(audit_python_raw).resolve() if audit_python_raw else None
-    runtime_python = Path(sys.executable).resolve()
+    # Do not resolve the interpreter symlink.  POSIX virtual environments
+    # intentionally point their ``bin/python`` entries at the same base
+    # executable, while the lexical path selects the venv through pyvenv.cfg.
+    # Resolving here both produced a false isolation failure and executed the
+    # audit outside the requested venv on GitHub-hosted Linux runners.
+    audit_python = Path(os.path.abspath(os.path.expanduser(audit_python_raw))) if audit_python_raw else None
+    runtime_prefix = Path(os.path.abspath(sys.prefix))
     runtime_purelib = Path(sysconfig.get_paths()["purelib"]).resolve()
+    audit_prefix = (
+        audit_python.parent.parent
+        if audit_python is not None and audit_python.parent.name.lower() in {"bin", "scripts"}
+        else None
+    )
+    audit_is_isolated = False
     if audit_python is None or not audit_python.is_file():
         failures.append("CHATBI_PHASE5_AUDIT_PYTHON must name an isolated audit interpreter")
-    elif audit_python == runtime_python:
+    elif audit_prefix is None or not (audit_prefix / "pyvenv.cfg").is_file():
+        failures.append("audit interpreter must belong to an isolated virtual environment")
+    elif audit_prefix == runtime_prefix:
         failures.append("audit interpreter must be isolated from the release runtime")
+    else:
+        audit_is_isolated = True
     pip_command = [
         str(audit_python) if audit_python is not None else "MISSING_AUDIT_PYTHON",
         "-m",
@@ -876,7 +891,7 @@ def generated_audits(evidence_dir: Path) -> dict[str, Any]:
             [str(audit_python), "-m", "pip_audit", "--version"],
             expose_stdout=True,
         )
-        if audit_python is not None and audit_python.is_file() and audit_python != runtime_python
+        if audit_python is not None and audit_python.is_file() and audit_is_isolated
         else {"returncode": -1, "stdout": "NOT_AVAILABLE"}
     )
     npm_version = _recorded_command([npm_executable, "--version"], expose_stdout=True)
@@ -886,6 +901,7 @@ def generated_audits(evidence_dir: Path) -> dict[str, Any]:
         "python_executable": sys.executable,
         "runtime_purelib": str(runtime_purelib),
         "isolated_audit_python": None if audit_python is None else str(audit_python),
+        "isolated_audit_prefix": None if audit_prefix is None else str(audit_prefix),
         "tool_versions": {
             "python": sys.version.split()[0],
             "pip-audit": pip_audit_version.get("stdout") or "NOT_AVAILABLE",

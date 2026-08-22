@@ -7,12 +7,13 @@ from pathlib import Path
 
 import httpx
 import pytest
-import scripts.performance.run_v13_phase5_api_load as api_load_module
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
+
+import scripts.performance.run_v13_phase5_api_load as api_load_module  # noqa: E402
 
 from scripts.performance.run_v13_phase5_api_load import (  # noqa: E402
     ApiSample,
