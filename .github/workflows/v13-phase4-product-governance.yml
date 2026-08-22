@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - "codex/v1.3.0-product-experience-governance"
+      - "codex/v1.3.0-release-hardening-full-gate"
   pull_request:
     paths:
       - ".github/workflows/v13-phase4-product-governance.yml"
@@ -38,8 +39,8 @@ jobs:
       PYTHONPATH: >-
         backend:packages/agent-contracts/src:packages/agent-orchestrator/src:packages/prompt-registry/src:packages/rag-adapter/src:packages/rag-contracts/src:packages/dbgpt-runtime-adapter/src:packages/pandasai-selected-runtime/src
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5, Node 24
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6, Node 24
         with:
           python-version: "3.11"
           cache: pip
@@ -56,7 +57,7 @@ jobs:
             backend/tests/test_phase4_model_invocation_ledger.py \
             backend/tests/test_migrations.py \
             -q --junitxml phase4-backend-junit.xml
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5, Node 24
         with:
           node-version: "22"
           cache: npm
@@ -76,7 +77,7 @@ jobs:
           ! grep -E "Some chunks are larger|Circular chunk" ../phase4-frontend-build.txt
       - name: Upload Phase4 deterministic evidence
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6, Node 24
         with:
           name: v13-phase4-deterministic-${{ github.sha }}
           path: |

@@ -1,0 +1,1041 @@
+{
+  "name": "ChatBI V1.3 Phase5 10M Datasource SQL Performance 100",
+  "version": "1.3.0-phase5",
+  "suite": "CHATBI_V13_PHASE5_10M_DATASOURCE_SQL_PERFORMANCE_100",
+  "classification": "10M_DATASOURCE_SQL_PERFORMANCE",
+  "core_data_golden_status": "NOT_PROVEN_NOT_EXECUTED_THROUGH_BACKEND",
+  "frozen": true,
+  "dataset": {
+    "engine": "local_postgresql",
+    "isolation": "unique_schema_drop_cascade_finally",
+    "row_count": 10000000,
+    "formula_version": "phase5-orders-v1",
+    "expected_revenue_cents": 549984170000,
+    "expected_cost_cents": 357485012234
+  },
+  "workload": {
+    "request_mix": {
+      "region_join_count": 20,
+      "region_revenue_metric": 20,
+      "product_join_count": 20,
+      "product_profit_metric": 20,
+      "time_window_revenue": 20
+    },
+    "deterministic_schedule": "(user_index + sequence * users) modulo case_count"
+  },
+  "release_gate": {
+    "min_users": 20,
+    "min_duration_seconds": 900,
+    "min_success_rate": 1,
+    "max_query_p95_ms": 2000,
+    "max_query_p99_ms": 5000,
+    "max_total_p95_ms": 2500,
+    "max_total_p99_ms": 5500,
+    "max_cpu_p99_percent": 90,
+    "max_ram_p99_percent": 90,
+    "max_db_connections": 20
+  },
+  "cases": [
+    {
+      "id": "P5D001",
+      "category": "region_join_count",
+      "question": "统计区域-01的订单量",
+      "sql_template": "SELECT COUNT(*)::bigint AS value FROM $SCHEMA$.fact_orders AS f JOIN $SCHEMA$.dim_region AS r ON r.region_id = f.region_id WHERE r.region_name = '区域-01'",
+      "expectation": {
+        "column": "value",
+        "value": 500000
+      }
+    },
+    {
+      "id": "P5D002",
+      "category": "region_join_count",
+      "question": "统计区域-02的订单量",
+      "sql_template": "SELECT COUNT(*)::bigint AS value FROM $SCHEMA$.fact_orders AS f JOIN $SCHEMA$.dim_region AS r ON r.region_id = f.region_id WHERE r.region_name = '区域-02'",
+      "expectation": {
+        "column": "value",
+        "value": 500000
+      }
+    },
+    {
+      "id": "P5D003",
+      "category": "region_join_count",
+      "question": "统计区域-03的订单量",
+      "sql_template": "SELECT COUNT(*)::bigint AS value FROM $SCHEMA$.fact_orders AS f JOIN $SCHEMA$.dim_region AS r ON r.region_id = f.region_id WHERE r.region_name = '区域-03'",
+      "expectation": {
+        "column": "value",
+        "value": 500000
+      }
+    },
+    {
+      "id": "P5D004",
+      "category": "region_join_count",
+      "question": "统计区域-04的订单量",
+      "sql_template": "SELECT COUNT(*)::bigint AS value FROM $SCHEMA$.fact_orders AS f JOIN $SCHEMA$.dim_region AS r ON r.region_id = f.region_id WHERE r.region_name = '区域-04'",
+      "expectation": {
+        "column": "value",
+        "value": 500000
+      }
+    },
+    {
+      "id": "P5D005",
+      "category": "region_join_count",
+      "question": "统计区域-05的订单量",
+      "sql_template": "SELECT COUNT(*)::bigint AS value FROM $SCHEMA$.fact_orders AS f JOIN $SCHEMA$.dim_region AS r ON r.region_id = f.region_id WHERE r.region_name = '区域-05'",
+      "expectation": {
+        "column": "value",
+        "value": 500000
+      }
+    },
+    {
+      "id": "P5D006",
+      "category": "region_join_count",
+      "question": "统计区域-06的订单量",
+      "sql_template": "SELECT COUNT(*)::bigint AS value FROM $SCHEMA$.fact_orders AS f JOIN $SCHEMA$.dim_region AS r ON r.region_id = f.region_id WHERE r.region_name = '区域-06'",
+      "expectation": {
+        "column": "value",
+        "value": 500000
+      }
+    },
+    {
+      "id": "P5D007",
+      "category": "region_join_count",
+      "question": "统计区域-07的订单量",
+      "sql_template": "SELECT COUNT(*)::bigint AS value FROM $SCHEMA$.fact_orders AS f JOIN $SCHEMA$.dim_region AS r ON r.region_id = f.region_id WHERE r.region_name = '区域-07'",
+      "expectation": {
+        "column": "value",
+        "value": 500000
+      }
+    },
+    {
+      "id": "P5D008",
+      "category": "region_join_count",
+      "question": "统计区域-08的订单量",
+      "sql_template": "SELECT COUNT(*)::bigint AS value FROM $SCHEMA$.fact_orders AS f JOIN $SCHEMA$.dim_region AS r ON r.region_id = f.region_id WHERE r.region_name = '区域-08'",
+      "expectation": {
+        "column": "value",
+        "value": 500000
+      }
+    },
+    {
+      "id": "P5D009",
+      "category": "region_join_count",
+      "question": "统计区域-09的订单量",
+      "sql_template": "SELECT COUNT(*)::bigint AS value FROM $SCHEMA$.fact_orders AS f JOIN $SCHEMA$.dim_region AS r ON r.region_id = f.region_id WHERE r.region_name = '区域-09'",
+      "expectation": {
+        "column": "value",
+        "value": 500000
+      }
+    },
+    {
+      "id": "P5D010",
+      "category": "region_join_count",
+      "question": "统计区域-10的订单量",
+      "sql_template": "SELECT COUNT(*)::bigint AS value FROM $SCHEMA$.fact_orders AS f JOIN $SCHEMA$.dim_region AS r ON r.region_id = f.region_id WHERE r.region_name = '区域-10'",
+      "expectation": {
+        "column": "value",
+        "value": 500000
+      }
+    },
+    {
+      "id": "P5D011",
+      "category": "region_join_count",
+      "question": "统计区域-11的订单量",
+      "sql_template": "SELECT COUNT(*)::bigint AS value FROM $SCHEMA$.fact_orders AS f JOIN $SCHEMA$.dim_region AS r ON r.region_id = f.region_id WHERE r.region_name = '区域-11'",
+      "expectation": {
+        "column": "value",
+        "value": 500000
+      }
+    },
+    {
+      "id": "P5D012",
+      "category": "region_join_count",
+      "question": "统计区域-12的订单量",
+      "sql_template": "SELECT COUNT(*)::bigint AS value FROM $SCHEMA$.fact_orders AS f JOIN $SCHEMA$.dim_region AS r ON r.region_id = f.region_id WHERE r.region_name = '区域-12'",
+      "expectation": {
+        "column": "value",
+        "value": 500000
+      }
+    },
+    {
+      "id": "P5D013",
+      "category": "region_join_count",
+      "question": "统计区域-13的订单量",
+      "sql_template": "SELECT COUNT(*)::bigint AS value FROM $SCHEMA$.fact_orders AS f JOIN $SCHEMA$.dim_region AS r ON r.region_id = f.region_id WHERE r.region_name = '区域-13'",
+      "expectation": {
+        "column": "value",
+        "value": 500000
+      }
+    },
+    {
+      "id": "P5D014",
+      "category": "region_join_count",
+      "question": "统计区域-14的订单量",
+      "sql_template": "SELECT COUNT(*)::bigint AS value FROM $SCHEMA$.fact_orders AS f JOIN $SCHEMA$.dim_region AS r ON r.region_id = f.region_id WHERE r.region_name = '区域-14'",
+      "expectation": {
+        "column": "value",
+        "value": 500000
+      }
+    },
+    {
+      "id": "P5D015",
+      "category": "region_join_count",
+      "question": "统计区域-15的订单量",
+      "sql_template": "SELECT COUNT(*)::bigint AS value FROM $SCHEMA$.fact_orders AS f JOIN $SCHEMA$.dim_region AS r ON r.region_id = f.region_id WHERE r.region_name = '区域-15'",
+      "expectation": {
+        "column": "value",
+        "value": 500000
+      }
+    },
+    {
+      "id": "P5D016",
+      "category": "region_join_count",
+      "question": "统计区域-16的订单量",
+      "sql_template": "SELECT COUNT(*)::bigint AS value FROM $SCHEMA$.fact_orders AS f JOIN $SCHEMA$.dim_region AS r ON r.region_id = f.region_id WHERE r.region_name = '区域-16'",
+      "expectation": {
+        "column": "value",
+        "value": 500000
+      }
+    },
+    {
+      "id": "P5D017",
+      "category": "region_join_count",
+      "question": "统计区域-17的订单量",
+      "sql_template": "SELECT COUNT(*)::bigint AS value FROM $SCHEMA$.fact_orders AS f JOIN $SCHEMA$.dim_region AS r ON r.region_id = f.region_id WHERE r.region_name = '区域-17'",
+      "expectation": {
+        "column": "value",
+        "value": 500000
+      }
+    },
+    {
+      "id": "P5D018",
+      "category": "region_join_count",
+      "question": "统计区域-18的订单量",
+      "sql_template": "SELECT COUNT(*)::bigint AS value FROM $SCHEMA$.fact_orders AS f JOIN $SCHEMA$.dim_region AS r ON r.region_id = f.region_id WHERE r.region_name = '区域-18'",
+      "expectation": {
+        "column": "value",
+        "value": 500000
+      }
+    },
+    {
+      "id": "P5D019",
+      "category": "region_join_count",
+      "question": "统计区域-19的订单量",
+      "sql_template": "SELECT COUNT(*)::bigint AS value FROM $SCHEMA$.fact_orders AS f JOIN $SCHEMA$.dim_region AS r ON r.region_id = f.region_id WHERE r.region_name = '区域-19'",
+      "expectation": {
+        "column": "value",
+        "value": 500000
+      }
+    },
+    {
+      "id": "P5D020",
+      "category": "region_join_count",
+      "question": "统计区域-20的订单量",
+      "sql_template": "SELECT COUNT(*)::bigint AS value FROM $SCHEMA$.fact_orders AS f JOIN $SCHEMA$.dim_region AS r ON r.region_id = f.region_id WHERE r.region_name = '区域-20'",
+      "expectation": {
+        "column": "value",
+        "value": 500000
+      }
+    },
+    {
+      "id": "P5D021",
+      "category": "region_revenue_metric",
+      "question": "统计区域-01的收入分",
+      "sql_template": "SELECT SUM(f.revenue_cents)::bigint AS value FROM $SCHEMA$.fact_orders AS f WHERE f.region_id = 1",
+      "expectation": {
+        "column": "value",
+        "value": 27502950000
+      }
+    },
+    {
+      "id": "P5D022",
+      "category": "region_revenue_metric",
+      "question": "统计区域-02的收入分",
+      "sql_template": "SELECT SUM(f.revenue_cents)::bigint AS value FROM $SCHEMA$.fact_orders AS f WHERE f.region_id = 2",
+      "expectation": {
+        "column": "value",
+        "value": 27501470000
+      }
+    },
+    {
+      "id": "P5D023",
+      "category": "region_revenue_metric",
+      "question": "统计区域-03的收入分",
+      "sql_template": "SELECT SUM(f.revenue_cents)::bigint AS value FROM $SCHEMA$.fact_orders AS f WHERE f.region_id = 3",
+      "expectation": {
+        "column": "value",
+        "value": 27499990000
+      }
+    },
+    {
+      "id": "P5D024",
+      "category": "region_revenue_metric",
+      "question": "统计区域-04的收入分",
+      "sql_template": "SELECT SUM(f.revenue_cents)::bigint AS value FROM $SCHEMA$.fact_orders AS f WHERE f.region_id = 4",
+      "expectation": {
+        "column": "value",
+        "value": 27498510000
+      }
+    },
+    {
+      "id": "P5D025",
+      "category": "region_revenue_metric",
+      "question": "统计区域-05的收入分",
+      "sql_template": "SELECT SUM(f.revenue_cents)::bigint AS value FROM $SCHEMA$.fact_orders AS f WHERE f.region_id = 5",
+      "expectation": {
+        "column": "value",
+        "value": 27496940000
+      }
+    },
+    {
+      "id": "P5D026",
+      "category": "region_revenue_metric",
+      "question": "统计区域-06的收入分",
+      "sql_template": "SELECT SUM(f.revenue_cents)::bigint AS value FROM $SCHEMA$.fact_orders AS f WHERE f.region_id = 6",
+      "expectation": {
+        "column": "value",
+        "value": 27495460000
+      }
+    },
+    {
+      "id": "P5D027",
+      "category": "region_revenue_metric",
+      "question": "统计区域-07的收入分",
+      "sql_template": "SELECT SUM(f.revenue_cents)::bigint AS value FROM $SCHEMA$.fact_orders AS f WHERE f.region_id = 7",
+      "expectation": {
+        "column": "value",
+        "value": 27503970000
+      }
+    },
+    {
+      "id": "P5D028",
+      "category": "region_revenue_metric",
+      "question": "统计区域-08的收入分",
+      "sql_template": "SELECT SUM(f.revenue_cents)::bigint AS value FROM $SCHEMA$.fact_orders AS f WHERE f.region_id = 8",
+      "expectation": {
+        "column": "value",
+        "value": 27502490000
+      }
+    },
+    {
+      "id": "P5D029",
+      "category": "region_revenue_metric",
+      "question": "统计区域-09的收入分",
+      "sql_template": "SELECT SUM(f.revenue_cents)::bigint AS value FROM $SCHEMA$.fact_orders AS f WHERE f.region_id = 9",
+      "expectation": {
+        "column": "value",
+        "value": 27501010000
+      }
+    },
+    {
+      "id": "P5D030",
+      "category": "region_revenue_metric",
+      "question": "统计区域-10的收入分",
+      "sql_template": "SELECT SUM(f.revenue_cents)::bigint AS value FROM $SCHEMA$.fact_orders AS f WHERE f.region_id = 10",
+      "expectation": {
+        "column": "value",
+        "value": 27499440000
+      }
+    },
+    {
+      "id": "P5D031",
+      "category": "region_revenue_metric",
+      "question": "统计区域-11的收入分",
+      "sql_template": "SELECT SUM(f.revenue_cents)::bigint AS value FROM $SCHEMA$.fact_orders AS f WHERE f.region_id = 11",
+      "expectation": {
+        "column": "value",
+        "value": 27497960000
+      }
+    },
+    {
+      "id": "P5D032",
+      "category": "region_revenue_metric",
+      "question": "统计区域-12的收入分",
+      "sql_template": "SELECT SUM(f.revenue_cents)::bigint AS value FROM $SCHEMA$.fact_orders AS f WHERE f.region_id = 12",
+      "expectation": {
+        "column": "value",
+        "value": 27496480000
+      }
+    },
+    {
+      "id": "P5D033",
+      "category": "region_revenue_metric",
+      "question": "统计区域-13的收入分",
+      "sql_template": "SELECT SUM(f.revenue_cents)::bigint AS value FROM $SCHEMA$.fact_orders AS f WHERE f.region_id = 13",
+      "expectation": {
+        "column": "value",
+        "value": 27494910000
+      }
+    },
+    {
+      "id": "P5D034",
+      "category": "region_revenue_metric",
+      "question": "统计区域-14的收入分",
+      "sql_template": "SELECT SUM(f.revenue_cents)::bigint AS value FROM $SCHEMA$.fact_orders AS f WHERE f.region_id = 14",
+      "expectation": {
+        "column": "value",
+        "value": 27503420000
+      }
+    },
+    {
+      "id": "P5D035",
+      "category": "region_revenue_metric",
+      "question": "统计区域-15的收入分",
+      "sql_template": "SELECT SUM(f.revenue_cents)::bigint AS value FROM $SCHEMA$.fact_orders AS f WHERE f.region_id = 15",
+      "expectation": {
+        "column": "value",
+        "value": 27501940000
+      }
+    },
+    {
+      "id": "P5D036",
+      "category": "region_revenue_metric",
+      "question": "统计区域-16的收入分",
+      "sql_template": "SELECT SUM(f.revenue_cents)::bigint AS value FROM $SCHEMA$.fact_orders AS f WHERE f.region_id = 16",
+      "expectation": {
+        "column": "value",
+        "value": 27500460000
+      }
+    },
+    {
+      "id": "P5D037",
+      "category": "region_revenue_metric",
+      "question": "统计区域-17的收入分",
+      "sql_template": "SELECT SUM(f.revenue_cents)::bigint AS value FROM $SCHEMA$.fact_orders AS f WHERE f.region_id = 17",
+      "expectation": {
+        "column": "value",
+        "value": 27498980000
+      }
+    },
+    {
+      "id": "P5D038",
+      "category": "region_revenue_metric",
+      "question": "统计区域-18的收入分",
+      "sql_template": "SELECT SUM(f.revenue_cents)::bigint AS value FROM $SCHEMA$.fact_orders AS f WHERE f.region_id = 18",
+      "expectation": {
+        "column": "value",
+        "value": 27497410000
+      }
+    },
+    {
+      "id": "P5D039",
+      "category": "region_revenue_metric",
+      "question": "统计区域-19的收入分",
+      "sql_template": "SELECT SUM(f.revenue_cents)::bigint AS value FROM $SCHEMA$.fact_orders AS f WHERE f.region_id = 19",
+      "expectation": {
+        "column": "value",
+        "value": 27495930000
+      }
+    },
+    {
+      "id": "P5D040",
+      "category": "region_revenue_metric",
+      "question": "统计区域-20的收入分",
+      "sql_template": "SELECT SUM(f.revenue_cents)::bigint AS value FROM $SCHEMA$.fact_orders AS f WHERE f.region_id = 20",
+      "expectation": {
+        "column": "value",
+        "value": 27494450000
+      }
+    },
+    {
+      "id": "P5D041",
+      "category": "product_join_count",
+      "question": "统计产品-01的订单量",
+      "sql_template": "SELECT COUNT(*)::bigint AS value FROM $SCHEMA$.fact_orders AS f JOIN $SCHEMA$.dim_product AS p ON p.product_id = f.product_id WHERE p.product_name = '产品-01'",
+      "expectation": {
+        "column": "value",
+        "value": 200000
+      }
+    },
+    {
+      "id": "P5D042",
+      "category": "product_join_count",
+      "question": "统计产品-02的订单量",
+      "sql_template": "SELECT COUNT(*)::bigint AS value FROM $SCHEMA$.fact_orders AS f JOIN $SCHEMA$.dim_product AS p ON p.product_id = f.product_id WHERE p.product_name = '产品-02'",
+      "expectation": {
+        "column": "value",
+        "value": 200000
+      }
+    },
+    {
+      "id": "P5D043",
+      "category": "product_join_count",
+      "question": "统计产品-03的订单量",
+      "sql_template": "SELECT COUNT(*)::bigint AS value FROM $SCHEMA$.fact_orders AS f JOIN $SCHEMA$.dim_product AS p ON p.product_id = f.product_id WHERE p.product_name = '产品-03'",
+      "expectation": {
+        "column": "value",
+        "value": 200000
+      }
+    },
+    {
+      "id": "P5D044",
+      "category": "product_join_count",
+      "question": "统计产品-04的订单量",
+      "sql_template": "SELECT COUNT(*)::bigint AS value FROM $SCHEMA$.fact_orders AS f JOIN $SCHEMA$.dim_product AS p ON p.product_id = f.product_id WHERE p.product_name = '产品-04'",
+      "expectation": {
+        "column": "value",
+        "value": 200000
+      }
+    },
+    {
+      "id": "P5D045",
+      "category": "product_join_count",
+      "question": "统计产品-05的订单量",
+      "sql_template": "SELECT COUNT(*)::bigint AS value FROM $SCHEMA$.fact_orders AS f JOIN $SCHEMA$.dim_product AS p ON p.product_id = f.product_id WHERE p.product_name = '产品-05'",
+      "expectation": {
+        "column": "value",
+        "value": 200000
+      }
+    },
+    {
+      "id": "P5D046",
+      "category": "product_join_count",
+      "question": "统计产品-06的订单量",
+      "sql_template": "SELECT COUNT(*)::bigint AS value FROM $SCHEMA$.fact_orders AS f JOIN $SCHEMA$.dim_product AS p ON p.product_id = f.product_id WHERE p.product_name = '产品-06'",
+      "expectation": {
+        "column": "value",
+        "value": 200000
+      }
+    },
+    {
+      "id": "P5D047",
+      "category": "product_join_count",
+      "question": "统计产品-07的订单量",
+      "sql_template": "SELECT COUNT(*)::bigint AS value FROM $SCHEMA$.fact_orders AS f JOIN $SCHEMA$.dim_product AS p ON p.product_id = f.product_id WHERE p.product_name = '产品-07'",
+      "expectation": {
+        "column": "value",
+        "value": 200000
+      }
+    },
+    {
+      "id": "P5D048",
+      "category": "product_join_count",
+      "question": "统计产品-08的订单量",
+      "sql_template": "SELECT COUNT(*)::bigint AS value FROM $SCHEMA$.fact_orders AS f JOIN $SCHEMA$.dim_product AS p ON p.product_id = f.product_id WHERE p.product_name = '产品-08'",
+      "expectation": {
+        "column": "value",
+        "value": 200000
+      }
+    },
+    {
+      "id": "P5D049",
+      "category": "product_join_count",
+      "question": "统计产品-09的订单量",
+      "sql_template": "SELECT COUNT(*)::bigint AS value FROM $SCHEMA$.fact_orders AS f JOIN $SCHEMA$.dim_product AS p ON p.product_id = f.product_id WHERE p.product_name = '产品-09'",
+      "expectation": {
+        "column": "value",
+        "value": 200000
+      }
+    },
+    {
+      "id": "P5D050",
+      "category": "product_join_count",
+      "question": "统计产品-10的订单量",
+      "sql_template": "SELECT COUNT(*)::bigint AS value FROM $SCHEMA$.fact_orders AS f JOIN $SCHEMA$.dim_product AS p ON p.product_id = f.product_id WHERE p.product_name = '产品-10'",
+      "expectation": {
+        "column": "value",
+        "value": 200000
+      }
+    },
+    {
+      "id": "P5D051",
+      "category": "product_join_count",
+      "question": "统计产品-11的订单量",
+      "sql_template": "SELECT COUNT(*)::bigint AS value FROM $SCHEMA$.fact_orders AS f JOIN $SCHEMA$.dim_product AS p ON p.product_id = f.product_id WHERE p.product_name = '产品-11'",
+      "expectation": {
+        "column": "value",
+        "value": 200000
+      }
+    },
+    {
+      "id": "P5D052",
+      "category": "product_join_count",
+      "question": "统计产品-12的订单量",
+      "sql_template": "SELECT COUNT(*)::bigint AS value FROM $SCHEMA$.fact_orders AS f JOIN $SCHEMA$.dim_product AS p ON p.product_id = f.product_id WHERE p.product_name = '产品-12'",
+      "expectation": {
+        "column": "value",
+        "value": 200000
+      }
+    },
+    {
+      "id": "P5D053",
+      "category": "product_join_count",
+      "question": "统计产品-13的订单量",
+      "sql_template": "SELECT COUNT(*)::bigint AS value FROM $SCHEMA$.fact_orders AS f JOIN $SCHEMA$.dim_product AS p ON p.product_id = f.product_id WHERE p.product_name = '产品-13'",
+      "expectation": {
+        "column": "value",
+        "value": 200000
+      }
+    },
+    {
+      "id": "P5D054",
+      "category": "product_join_count",
+      "question": "统计产品-14的订单量",
+      "sql_template": "SELECT COUNT(*)::bigint AS value FROM $SCHEMA$.fact_orders AS f JOIN $SCHEMA$.dim_product AS p ON p.product_id = f.product_id WHERE p.product_name = '产品-14'",
+      "expectation": {
+        "column": "value",
+        "value": 200000
+      }
+    },
+    {
+      "id": "P5D055",
+      "category": "product_join_count",
+      "question": "统计产品-15的订单量",
+      "sql_template": "SELECT COUNT(*)::bigint AS value FROM $SCHEMA$.fact_orders AS f JOIN $SCHEMA$.dim_product AS p ON p.product_id = f.product_id WHERE p.product_name = '产品-15'",
+      "expectation": {
+        "column": "value",
+        "value": 200000
+      }
+    },
+    {
+      "id": "P5D056",
+      "category": "product_join_count",
+      "question": "统计产品-16的订单量",
+      "sql_template": "SELECT COUNT(*)::bigint AS value FROM $SCHEMA$.fact_orders AS f JOIN $SCHEMA$.dim_product AS p ON p.product_id = f.product_id WHERE p.product_name = '产品-16'",
+      "expectation": {
+        "column": "value",
+        "value": 200000
+      }
+    },
+    {
+      "id": "P5D057",
+      "category": "product_join_count",
+      "question": "统计产品-17的订单量",
+      "sql_template": "SELECT COUNT(*)::bigint AS value FROM $SCHEMA$.fact_orders AS f JOIN $SCHEMA$.dim_product AS p ON p.product_id = f.product_id WHERE p.product_name = '产品-17'",
+      "expectation": {
+        "column": "value",
+        "value": 200000
+      }
+    },
+    {
+      "id": "P5D058",
+      "category": "product_join_count",
+      "question": "统计产品-18的订单量",
+      "sql_template": "SELECT COUNT(*)::bigint AS value FROM $SCHEMA$.fact_orders AS f JOIN $SCHEMA$.dim_product AS p ON p.product_id = f.product_id WHERE p.product_name = '产品-18'",
+      "expectation": {
+        "column": "value",
+        "value": 200000
+      }
+    },
+    {
+      "id": "P5D059",
+      "category": "product_join_count",
+      "question": "统计产品-19的订单量",
+      "sql_template": "SELECT COUNT(*)::bigint AS value FROM $SCHEMA$.fact_orders AS f JOIN $SCHEMA$.dim_product AS p ON p.product_id = f.product_id WHERE p.product_name = '产品-19'",
+      "expectation": {
+        "column": "value",
+        "value": 200000
+      }
+    },
+    {
+      "id": "P5D060",
+      "category": "product_join_count",
+      "question": "统计产品-20的订单量",
+      "sql_template": "SELECT COUNT(*)::bigint AS value FROM $SCHEMA$.fact_orders AS f JOIN $SCHEMA$.dim_product AS p ON p.product_id = f.product_id WHERE p.product_name = '产品-20'",
+      "expectation": {
+        "column": "value",
+        "value": 200000
+      }
+    },
+    {
+      "id": "P5D061",
+      "category": "product_profit_metric",
+      "question": "统计产品-21的利润分",
+      "sql_template": "SELECT SUM(f.revenue_cents - f.cost_cents)::bigint AS value FROM $SCHEMA$.fact_orders AS f WHERE f.product_id = 21",
+      "expectation": {
+        "column": "value",
+        "value": 3849035334
+      }
+    },
+    {
+      "id": "P5D062",
+      "category": "product_profit_metric",
+      "question": "统计产品-22的利润分",
+      "sql_template": "SELECT SUM(f.revenue_cents - f.cost_cents)::bigint AS value FROM $SCHEMA$.fact_orders AS f WHERE f.product_id = 22",
+      "expectation": {
+        "column": "value",
+        "value": 3848404667
+      }
+    },
+    {
+      "id": "P5D063",
+      "category": "product_profit_metric",
+      "question": "统计产品-23的利润分",
+      "sql_template": "SELECT SUM(f.revenue_cents - f.cost_cents)::bigint AS value FROM $SCHEMA$.fact_orders AS f WHERE f.product_id = 23",
+      "expectation": {
+        "column": "value",
+        "value": 3851271175
+      }
+    },
+    {
+      "id": "P5D064",
+      "category": "product_profit_metric",
+      "question": "统计产品-24的利润分",
+      "sql_template": "SELECT SUM(f.revenue_cents - f.cost_cents)::bigint AS value FROM $SCHEMA$.fact_orders AS f WHERE f.product_id = 24",
+      "expectation": {
+        "column": "value",
+        "value": 3850683259
+      }
+    },
+    {
+      "id": "P5D065",
+      "category": "product_profit_metric",
+      "question": "统计产品-25的利润分",
+      "sql_template": "SELECT SUM(f.revenue_cents - f.cost_cents)::bigint AS value FROM $SCHEMA$.fact_orders AS f WHERE f.product_id = 25",
+      "expectation": {
+        "column": "value",
+        "value": 3850011116
+      }
+    },
+    {
+      "id": "P5D066",
+      "category": "product_profit_metric",
+      "question": "统计产品-26的利润分",
+      "sql_template": "SELECT SUM(f.revenue_cents - f.cost_cents)::bigint AS value FROM $SCHEMA$.fact_orders AS f WHERE f.product_id = 26",
+      "expectation": {
+        "column": "value",
+        "value": 3849402888
+      }
+    },
+    {
+      "id": "P5D067",
+      "category": "product_profit_metric",
+      "question": "统计产品-27的利润分",
+      "sql_template": "SELECT SUM(f.revenue_cents - f.cost_cents)::bigint AS value FROM $SCHEMA$.fact_orders AS f WHERE f.product_id = 27",
+      "expectation": {
+        "column": "value",
+        "value": 3848761614
+      }
+    },
+    {
+      "id": "P5D068",
+      "category": "product_profit_metric",
+      "question": "统计产品-28的利润分",
+      "sql_template": "SELECT SUM(f.revenue_cents - f.cost_cents)::bigint AS value FROM $SCHEMA$.fact_orders AS f WHERE f.product_id = 28",
+      "expectation": {
+        "column": "value",
+        "value": 3851628644
+      }
+    },
+    {
+      "id": "P5D069",
+      "category": "product_profit_metric",
+      "question": "统计产品-29的利润分",
+      "sql_template": "SELECT SUM(f.revenue_cents - f.cost_cents)::bigint AS value FROM $SCHEMA$.fact_orders AS f WHERE f.product_id = 29",
+      "expectation": {
+        "column": "value",
+        "value": 3851015196
+      }
+    },
+    {
+      "id": "P5D070",
+      "category": "product_profit_metric",
+      "question": "统计产品-30的利润分",
+      "sql_template": "SELECT SUM(f.revenue_cents - f.cost_cents)::bigint AS value FROM $SCHEMA$.fact_orders AS f WHERE f.product_id = 30",
+      "expectation": {
+        "column": "value",
+        "value": 3850332019
+      }
+    },
+    {
+      "id": "P5D071",
+      "category": "product_profit_metric",
+      "question": "统计产品-31的利润分",
+      "sql_template": "SELECT SUM(f.revenue_cents - f.cost_cents)::bigint AS value FROM $SCHEMA$.fact_orders AS f WHERE f.product_id = 31",
+      "expectation": {
+        "column": "value",
+        "value": 3849745309
+      }
+    },
+    {
+      "id": "P5D072",
+      "category": "product_profit_metric",
+      "question": "统计产品-32的利润分",
+      "sql_template": "SELECT SUM(f.revenue_cents - f.cost_cents)::bigint AS value FROM $SCHEMA$.fact_orders AS f WHERE f.product_id = 32",
+      "expectation": {
+        "column": "value",
+        "value": 3849109756
+      }
+    },
+    {
+      "id": "P5D073",
+      "category": "product_profit_metric",
+      "question": "统计产品-33的利润分",
+      "sql_template": "SELECT SUM(f.revenue_cents - f.cost_cents)::bigint AS value FROM $SCHEMA$.fact_orders AS f WHERE f.product_id = 33",
+      "expectation": {
+        "column": "value",
+        "value": 3848478497
+      }
+    },
+    {
+      "id": "P5D074",
+      "category": "product_profit_metric",
+      "question": "统计产品-34的利润分",
+      "sql_template": "SELECT SUM(f.revenue_cents - f.cost_cents)::bigint AS value FROM $SCHEMA$.fact_orders AS f WHERE f.product_id = 34",
+      "expectation": {
+        "column": "value",
+        "value": 3851377199
+      }
+    },
+    {
+      "id": "P5D075",
+      "category": "product_profit_metric",
+      "question": "统计产品-35的利润分",
+      "sql_template": "SELECT SUM(f.revenue_cents - f.cost_cents)::bigint AS value FROM $SCHEMA$.fact_orders AS f WHERE f.product_id = 35",
+      "expectation": {
+        "column": "value",
+        "value": 3850710465
+      }
+    },
+    {
+      "id": "P5D076",
+      "category": "product_profit_metric",
+      "question": "统计产品-36的利润分",
+      "sql_template": "SELECT SUM(f.revenue_cents - f.cost_cents)::bigint AS value FROM $SCHEMA$.fact_orders AS f WHERE f.product_id = 36",
+      "expectation": {
+        "column": "value",
+        "value": 3850084480
+      }
+    },
+    {
+      "id": "P5D077",
+      "category": "product_profit_metric",
+      "question": "统计产品-37的利润分",
+      "sql_template": "SELECT SUM(f.revenue_cents - f.cost_cents)::bigint AS value FROM $SCHEMA$.fact_orders AS f WHERE f.product_id = 37",
+      "expectation": {
+        "column": "value",
+        "value": 3849457799
+      }
+    },
+    {
+      "id": "P5D078",
+      "category": "product_profit_metric",
+      "question": "统计产品-38的利润分",
+      "sql_template": "SELECT SUM(f.revenue_cents - f.cost_cents)::bigint AS value FROM $SCHEMA$.fact_orders AS f WHERE f.product_id = 38",
+      "expectation": {
+        "column": "value",
+        "value": 3848811548
+      }
+    },
+    {
+      "id": "P5D079",
+      "category": "product_profit_metric",
+      "question": "统计产品-39的利润分",
+      "sql_template": "SELECT SUM(f.revenue_cents - f.cost_cents)::bigint AS value FROM $SCHEMA$.fact_orders AS f WHERE f.product_id = 39",
+      "expectation": {
+        "column": "value",
+        "value": 3851698603
+      }
+    },
+    {
+      "id": "P5D080",
+      "category": "product_profit_metric",
+      "question": "统计产品-40的利润分",
+      "sql_template": "SELECT SUM(f.revenue_cents - f.cost_cents)::bigint AS value FROM $SCHEMA$.fact_orders AS f WHERE f.product_id = 40",
+      "expectation": {
+        "column": "value",
+        "value": 3851060832
+      }
+    },
+    {
+      "id": "P5D081",
+      "category": "time_window_revenue",
+      "question": "统计2024-01-01至2024-01-31（不含结束日）的收入分",
+      "sql_template": "SELECT SUM(f.revenue_cents)::bigint AS value FROM $SCHEMA$.fact_orders AS f WHERE f.order_day >= DATE '2024-01-01' AND f.order_day < DATE '2024-01-31'",
+      "expectation": {
+        "column": "value",
+        "value": 22585526595
+      }
+    },
+    {
+      "id": "P5D082",
+      "category": "time_window_revenue",
+      "question": "统计2024-01-31至2024-03-01（不含结束日）的收入分",
+      "sql_template": "SELECT SUM(f.revenue_cents)::bigint AS value FROM $SCHEMA$.fact_orders AS f WHERE f.order_day >= DATE '2024-01-31' AND f.order_day < DATE '2024-03-01'",
+      "expectation": {
+        "column": "value",
+        "value": 22592243295
+      }
+    },
+    {
+      "id": "P5D083",
+      "category": "time_window_revenue",
+      "question": "统计2024-03-01至2024-03-31（不含结束日）的收入分",
+      "sql_template": "SELECT SUM(f.revenue_cents)::bigint AS value FROM $SCHEMA$.fact_orders AS f WHERE f.order_day >= DATE '2024-03-01' AND f.order_day < DATE '2024-03-31'",
+      "expectation": {
+        "column": "value",
+        "value": 22598959995
+      }
+    },
+    {
+      "id": "P5D084",
+      "category": "time_window_revenue",
+      "question": "统计2024-03-31至2024-04-30（不含结束日）的收入分",
+      "sql_template": "SELECT SUM(f.revenue_cents)::bigint AS value FROM $SCHEMA$.fact_orders AS f WHERE f.order_day >= DATE '2024-03-31' AND f.order_day < DATE '2024-04-30'",
+      "expectation": {
+        "column": "value",
+        "value": 22605496695
+      }
+    },
+    {
+      "id": "P5D085",
+      "category": "time_window_revenue",
+      "question": "统计2024-04-30至2024-05-30（不含结束日）的收入分",
+      "sql_template": "SELECT SUM(f.revenue_cents)::bigint AS value FROM $SCHEMA$.fact_orders AS f WHERE f.order_day >= DATE '2024-04-30' AND f.order_day < DATE '2024-05-30'",
+      "expectation": {
+        "column": "value",
+        "value": 22612033395
+      }
+    },
+    {
+      "id": "P5D086",
+      "category": "time_window_revenue",
+      "question": "统计2024-05-30至2024-06-29（不含结束日）的收入分",
+      "sql_template": "SELECT SUM(f.revenue_cents)::bigint AS value FROM $SCHEMA$.fact_orders AS f WHERE f.order_day >= DATE '2024-05-30' AND f.order_day < DATE '2024-06-29'",
+      "expectation": {
+        "column": "value",
+        "value": 22618840095
+      }
+    },
+    {
+      "id": "P5D087",
+      "category": "time_window_revenue",
+      "question": "统计2024-06-29至2024-07-29（不含结束日）的收入分",
+      "sql_template": "SELECT SUM(f.revenue_cents)::bigint AS value FROM $SCHEMA$.fact_orders AS f WHERE f.order_day >= DATE '2024-06-29' AND f.order_day < DATE '2024-07-29'",
+      "expectation": {
+        "column": "value",
+        "value": 22617186795
+      }
+    },
+    {
+      "id": "P5D088",
+      "category": "time_window_revenue",
+      "question": "统计2024-07-29至2024-08-28（不含结束日）的收入分",
+      "sql_template": "SELECT SUM(f.revenue_cents)::bigint AS value FROM $SCHEMA$.fact_orders AS f WHERE f.order_day >= DATE '2024-07-29' AND f.order_day < DATE '2024-08-28'",
+      "expectation": {
+        "column": "value",
+        "value": 22594833495
+      }
+    },
+    {
+      "id": "P5D089",
+      "category": "time_window_revenue",
+      "question": "统计2024-08-28至2024-09-27（不含结束日）的收入分",
+      "sql_template": "SELECT SUM(f.revenue_cents)::bigint AS value FROM $SCHEMA$.fact_orders AS f WHERE f.order_day >= DATE '2024-08-28' AND f.order_day < DATE '2024-09-27'",
+      "expectation": {
+        "column": "value",
+        "value": 22583460195
+      }
+    },
+    {
+      "id": "P5D090",
+      "category": "time_window_revenue",
+      "question": "统计2024-09-27至2024-10-27（不含结束日）的收入分",
+      "sql_template": "SELECT SUM(f.revenue_cents)::bigint AS value FROM $SCHEMA$.fact_orders AS f WHERE f.order_day >= DATE '2024-09-27' AND f.order_day < DATE '2024-10-27'",
+      "expectation": {
+        "column": "value",
+        "value": 22589996895
+      }
+    },
+    {
+      "id": "P5D091",
+      "category": "time_window_revenue",
+      "question": "统计2024-10-27至2024-11-26（不含结束日）的收入分",
+      "sql_template": "SELECT SUM(f.revenue_cents)::bigint AS value FROM $SCHEMA$.fact_orders AS f WHERE f.order_day >= DATE '2024-10-27' AND f.order_day < DATE '2024-11-26'",
+      "expectation": {
+        "column": "value",
+        "value": 22596533595
+      }
+    },
+    {
+      "id": "P5D092",
+      "category": "time_window_revenue",
+      "question": "统计2024-11-26至2024-12-26（不含结束日）的收入分",
+      "sql_template": "SELECT SUM(f.revenue_cents)::bigint AS value FROM $SCHEMA$.fact_orders AS f WHERE f.order_day >= DATE '2024-11-26' AND f.order_day < DATE '2024-12-26'",
+      "expectation": {
+        "column": "value",
+        "value": 22603070295
+      }
+    },
+    {
+      "id": "P5D093",
+      "category": "time_window_revenue",
+      "question": "统计2024-12-26至2025-01-25（不含结束日）的收入分",
+      "sql_template": "SELECT SUM(f.revenue_cents)::bigint AS value FROM $SCHEMA$.fact_orders AS f WHERE f.order_day >= DATE '2024-12-26' AND f.order_day < DATE '2025-01-25'",
+      "expectation": {
+        "column": "value",
+        "value": 22609876995
+      }
+    },
+    {
+      "id": "P5D094",
+      "category": "time_window_revenue",
+      "question": "统计2025-01-25至2025-02-24（不含结束日）的收入分",
+      "sql_template": "SELECT SUM(f.revenue_cents)::bigint AS value FROM $SCHEMA$.fact_orders AS f WHERE f.order_day >= DATE '2025-01-25' AND f.order_day < DATE '2025-02-24'",
+      "expectation": {
+        "column": "value",
+        "value": 22616413695
+      }
+    },
+    {
+      "id": "P5D095",
+      "category": "time_window_revenue",
+      "question": "统计2025-02-24至2025-03-26（不含结束日）的收入分",
+      "sql_template": "SELECT SUM(f.revenue_cents)::bigint AS value FROM $SCHEMA$.fact_orders AS f WHERE f.order_day >= DATE '2025-02-24' AND f.order_day < DATE '2025-03-26'",
+      "expectation": {
+        "column": "value",
+        "value": 22618090395
+      }
+    },
+    {
+      "id": "P5D096",
+      "category": "time_window_revenue",
+      "question": "统计2025-03-26至2025-04-25（不含结束日）的收入分",
+      "sql_template": "SELECT SUM(f.revenue_cents)::bigint AS value FROM $SCHEMA$.fact_orders AS f WHERE f.order_day >= DATE '2025-03-26' AND f.order_day < DATE '2025-04-25'",
+      "expectation": {
+        "column": "value",
+        "value": 22597309325
+      }
+    },
+    {
+      "id": "P5D097",
+      "category": "time_window_revenue",
+      "question": "统计2025-04-25至2025-05-25（不含结束日）的收入分",
+      "sql_template": "SELECT SUM(f.revenue_cents)::bigint AS value FROM $SCHEMA$.fact_orders AS f WHERE f.order_day >= DATE '2025-04-25' AND f.order_day < DATE '2025-05-25'",
+      "expectation": {
+        "column": "value",
+        "value": 22583634390
+      }
+    },
+    {
+      "id": "P5D098",
+      "category": "time_window_revenue",
+      "question": "统计2025-05-25至2025-06-24（不含结束日）的收入分",
+      "sql_template": "SELECT SUM(f.revenue_cents)::bigint AS value FROM $SCHEMA$.fact_orders AS f WHERE f.order_day >= DATE '2025-05-25' AND f.order_day < DATE '2025-06-24'",
+      "expectation": {
+        "column": "value",
+        "value": 22589597790
+      }
+    },
+    {
+      "id": "P5D099",
+      "category": "time_window_revenue",
+      "question": "统计2025-06-24至2025-07-24（不含结束日）的收入分",
+      "sql_template": "SELECT SUM(f.revenue_cents)::bigint AS value FROM $SCHEMA$.fact_orders AS f WHERE f.order_day >= DATE '2025-06-24' AND f.order_day < DATE '2025-07-24'",
+      "expectation": {
+        "column": "value",
+        "value": 22596101190
+      }
+    },
+    {
+      "id": "P5D100",
+      "category": "time_window_revenue",
+      "question": "统计2025-07-24至2025-08-23（不含结束日）的收入分",
+      "sql_template": "SELECT SUM(f.revenue_cents)::bigint AS value FROM $SCHEMA$.fact_orders AS f WHERE f.order_day >= DATE '2025-07-24' AND f.order_day < DATE '2025-08-23'",
+      "expectation": {
+        "column": "value",
+        "value": 22602874590
+      }
+    }
+  ],
+  "manifest_sha256": "5cddeee65ba155670e45dbc687e9a8b9a3ed04f6291bb3ee049d15a108c0d0bb"
+}

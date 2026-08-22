@@ -21,7 +21,7 @@ from urllib.parse import quote
 
 ROOT = Path(__file__).resolve().parents[2]
 PROJECT_NAME = "ChatBI V2"
-PROJECT_VERSION = "1.2.0"
+PROJECT_VERSION = "1.3.0"
 PROJECT_LICENSE = "Apache-2.0"
 
 
@@ -31,11 +31,18 @@ def _normalise_license(raw: str, classifiers: list[str], name: str) -> str:
     if name.startswith("chatbi-"):
         return PROJECT_LICENSE
     exact = {
+        "apache 2": "Apache-2.0",
+        "apache 2.0": "Apache-2.0",
+        "apache license 2.0": "Apache-2.0",
         "apache software license": "Apache-2.0",
         "bsd": "BSD-3-Clause",
         "dual license": "BSD-3-Clause OR Apache-2.0",
+        "lgpl": "LGPL-2.1-or-later",
         "gnu lesser general public license v3 (lgplv3)": "LGPL-3.0-only",
         "mit license": "MIT",
+        "psf": "PSF-2.0",
+        "psfl": "PSF-2.0",
+        "bsd-3-clause, apache-2.0, dependency licenses": "BSD-3-Clause AND Apache-2.0",
     }
     if lower in exact:
         return exact[lower]
@@ -47,9 +54,11 @@ def _normalise_license(raw: str, classifiers: list[str], name: str) -> str:
     classifier_map = {
         "Apache Software License": "Apache-2.0",
         "BSD License": "BSD-3-Clause",
+        "GNU Lesser General Public License v2 or later (LGPLv2+)": "LGPL-2.1-or-later",
         "GNU Lesser General Public License v3 (LGPLv3)": "LGPL-3.0-only",
         "MIT License": "MIT",
         "Mozilla Public License 2.0 (MPL 2.0)": "MPL-2.0",
+        "Python Software Foundation License": "PSF-2.0",
     }
     mapped = sorted({classifier_map[item] for item in classifiers if item in classifier_map})
     if mapped:
@@ -246,8 +255,8 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--backend-container", default="chatbi-v2-backend-1")
     parser.add_argument("--frontend-lock", type=Path, default=ROOT / "frontend" / "package-lock.json")
-    parser.add_argument("--cyclonedx-output", type=Path, default=ROOT / "docs" / "sbom" / "V1_2_0.cdx.json")
-    parser.add_argument("--spdx-output", type=Path, default=ROOT / "docs" / "sbom" / "V1_2_0.spdx.json")
+    parser.add_argument("--cyclonedx-output", type=Path, default=ROOT / "docs" / "sbom" / "V1_3_0.cdx.json")
+    parser.add_argument("--spdx-output", type=Path, default=ROOT / "docs" / "sbom" / "V1_3_0.spdx.json")
     args = parser.parse_args()
 
     components = _backend_inventory(args.backend_container) + _frontend_inventory(args.frontend_lock)

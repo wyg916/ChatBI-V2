@@ -10,6 +10,8 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY packages ./packages
 COPY backend/requirements-phase3-upstream.txt .
 RUN pip install --no-cache-dir -r requirements-phase3-upstream.txt
+COPY backend/requirements-runtime-hardening.txt .
+RUN pip install --no-cache-dir --upgrade -r requirements-runtime-hardening.txt
 RUN pip install --no-cache-dir \
     ./packages/rag-contracts \
     ./packages/rag-adapter \

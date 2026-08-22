@@ -6,6 +6,7 @@ on:
       - "codex/v1.3.0-data-semantic-upstream"
       - "codex/v1.3.0-rag-agent-file-multimodal"
       - "codex/v1.3.0-product-experience-governance"
+      - "codex/v1.3.0-release-hardening-full-gate"
   pull_request:
     paths:
       - ".github/workflows/v21-eval-golden-feedback.yml"
@@ -26,9 +27,14 @@ on:
       - "backend/app/services/attachments.py"
       - "backend/tests/test_v13_phase3_*.py"
       - "backend/requirements-phase3-upstream.txt"
+      - "backend/requirements-runtime-hardening.txt"
       - "packages/dbgpt-runtime-adapter/**"
       - "packages/pandasai-selected-runtime/**"
       - "sandbox_runtime/**"
+      - "backend/scripts/run_v13_phase5_security_supply_gate.py"
+      - "backend/tests/test_v13_phase5_security_supply.py"
+      - "scripts/phase5-*"
+      - "supply-chain/**"
   workflow_dispatch:
 
 permissions:
@@ -41,22 +47,35 @@ concurrency:
 jobs:
   deterministic-gate:
     runs-on: ubuntu-latest
+    env:
+      PHASE5_EVIDENCE_DIR: artifacts/v1.3/phase5-security-supply
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5, Node 24
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6, Node 24
         with:
           python-version: "3.11"
           cache: pip
-          cache-dependency-path: backend/requirements.txt
+          cache-dependency-path: |
+            backend/requirements.txt
+            backend/requirements-phase3-upstream.txt
+            backend/requirements-runtime-hardening.txt
+            scripts/release/requirements-audit.txt
       - run: |
           pip install -r backend/requirements.txt
           pip install -r backend/requirements-phase3-upstream.txt
+          pip install --upgrade -r backend/requirements-runtime-hardening.txt
+          pip install \
+            ./packages/rag-contracts \
+            ./packages/rag-adapter \
+            ./packages/agent-contracts \
+            ./packages/agent-orchestrator \
+            ./packages/prompt-registry
       - name: Backend unit and integration
         env:
           PYTHONPATH: >-
             backend:packages/agent-contracts/src:packages/agent-orchestrator/src:packages/prompt-registry/src:packages/rag-adapter/src:packages/rag-contracts/src:packages/dbgpt-runtime-adapter/src:packages/pandasai-selected-runtime/src
         run: pytest backend/tests -q
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5, Node 24
         with:
           node-version: "22"
           cache: npm
@@ -67,6 +86,35 @@ jobs:
           npm ci
           npm test
           npm run build
+      - name: Deterministic SBOM and dependency audits
+        run: |
+          mkdir -p "$PHASE5_EVIDENCE_DIR"
+          python scripts/phase5-generate-sbom.py \
+            --backend-python "$(command -v python)" \
+            --cyclonedx-output "$PHASE5_EVIDENCE_DIR/chatbi-v1.3.cdx.json" \
+            --spdx-output "$PHASE5_EVIDENCE_DIR/chatbi-v1.3.spdx.json" \
+            --receipt-output "$PHASE5_EVIDENCE_DIR/sbom-receipt.json"
+          python -m venv .phase5-audit-venv
+          .phase5-audit-venv/bin/python -m pip install -r scripts/release/requirements-audit.txt
+      - name: Phase5 security and supply-chain hard gate
+        env:
+          CHATBI_PHASE5_AUDIT_PYTHON: ${{ github.workspace }}/.phase5-audit-venv/bin/python
+        run: |
+          pytest backend/tests/test_v13_phase5_security_supply.py -q
+          python backend/scripts/run_v13_phase5_security_supply_gate.py \
+            --evidence-dir "$PHASE5_EVIDENCE_DIR/generated-audits" \
+            --cyclonedx "$PHASE5_EVIDENCE_DIR/chatbi-v1.3.cdx.json" \
+            --spdx "$PHASE5_EVIDENCE_DIR/chatbi-v1.3.spdx.json" \
+            --sbom-receipt "$PHASE5_EVIDENCE_DIR/sbom-receipt.json" \
+            --output "$PHASE5_EVIDENCE_DIR/security-supply-gate.json"
+      - name: Upload Phase5 security and supply evidence
+        if: always()
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6, Node 24
+        with:
+          name: v13-phase5-security-supply-${{ github.sha }}
+          path: artifacts/v1.3/phase5-security-supply
+          if-no-files-found: warn
+          retention-days: 30
 
   phase3-upstream-and-sandbox:
     if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
@@ -82,29 +130,55 @@ jobs:
       CHATBI_SANDBOX_CONTROLLER_URL: http://127.0.0.1:8765
       PHASE3_EVIDENCE_DIR: docs/evidence/v1.3/phase3-ci
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5, Node 24
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6, Node 24
         with:
           python-version: "3.11"
           cache: pip
           cache-dependency-path: |
             backend/requirements.txt
             backend/requirements-phase3-upstream.txt
+            backend/requirements-runtime-hardening.txt
       - name: Install exact Phase3 dependency closure
         run: |
           pip install -r backend/requirements.txt
           pip install -r backend/requirements-phase3-upstream.txt
+          pip install --upgrade -r backend/requirements-runtime-hardening.txt
       - name: Build hardened disposable Python worker
         run: docker build -f sandbox_runtime/Dockerfile -t chatbi-sandbox-runtime:phase3 .
-      - name: Start fixed-protocol Sandbox Controller
+      - name: Start restricted Docker proxy and fixed-protocol Sandbox Controller
         run: |
-          docker run -d --name chatbi-sandbox-controller-ci \
+          docker network create chatbi-sandbox-docker-control-ci
+          docker run -d --name chatbi-sandbox-docker-proxy-ci \
             --user 0:0 \
+            --read-only \
+            --tmpfs /tmp:rw,noexec,nosuid,nodev,size=4m,mode=1777 \
+            --cap-drop ALL \
+            --security-opt no-new-privileges:true \
+            --mount type=bind,source=/var/run/docker.sock,target=/var/run/docker.sock,readonly \
+            --network chatbi-sandbox-docker-control-ci \
+            --network-alias sandbox-docker-proxy \
+            chatbi-sandbox-runtime:phase3 \
+            python /opt/chatbi/docker_control_proxy.py
+          proxy_ready=0
+          for attempt in $(seq 1 30); do
+            docker exec chatbi-sandbox-docker-proxy-ci \
+              python -c "import urllib.request; urllib.request.urlopen('http://localhost:2375/_ping', timeout=2)" \
+              && proxy_ready=1 && break
+            sleep 1
+          done
+          if [ "$proxy_ready" != 1 ]; then
+            docker logs chatbi-sandbox-docker-proxy-ci
+            exit 1
+          fi
+          docker run -d --name chatbi-sandbox-controller-ci \
+            --user 65532:65532 \
             --read-only \
             --tmpfs /tmp:rw,noexec,nosuid,nodev,size=8m,mode=1777 \
             --cap-drop ALL \
             --security-opt no-new-privileges:true \
-            --mount type=bind,source=/var/run/docker.sock,target=/var/run/docker.sock \
+            --env DOCKER_HOST=tcp://sandbox-docker-proxy:2375 \
+            --network chatbi-sandbox-docker-control-ci \
             --publish 127.0.0.1:8765:8765 \
             chatbi-sandbox-runtime:phase3
           for attempt in $(seq 1 30); do
@@ -216,10 +290,13 @@ jobs:
             | sort -z | xargs -0 sha256sum > "$PHASE3_EVIDENCE_DIR/SHA256SUMS.txt"
       - name: Remove Phase3 Sandbox Controller
         if: always()
-        run: docker rm -f chatbi-sandbox-controller-ci || true
+        run: |
+          docker rm -f chatbi-sandbox-controller-ci || true
+          docker rm -f chatbi-sandbox-docker-proxy-ci || true
+          docker network rm chatbi-sandbox-docker-control-ci || true
       - name: Upload Phase3 runtime evidence
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6, Node 24
         with:
           name: v13-phase3-runtime-${{ github.sha }}
           path: docs/evidence/v1.3/phase3-ci
@@ -258,19 +335,19 @@ jobs:
       IBM_UPSTREAM_COMMIT: 60dd4515236adb335f2053b7c069397d7d88fe0a
       IBM_EVIDENCE_DIR: docs/evidence/v1.3/ibm-official-ci
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5, Node 24
       - name: Checkout pinned IBM Text-to-SQL selected source
-        uses: actions/checkout@v4
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5, Node 24
         with:
           repository: IBM/text2sql-eval-toolkit
           ref: 60dd4515236adb335f2053b7c069397d7d88fe0a
           path: vendor/ibm-text2sql-eval-toolkit
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6, Node 24
         with:
           python-version: "3.11"
           cache: pip
           cache-dependency-path: backend/requirements.txt
-      - uses: astral-sh/setup-uv@v6
+      - uses: astral-sh/setup-uv@eb1897b8dc4b5d5bfe39a428a8f2304605e0983c # v7.0.0, Node 24
         with:
           enable-cache: true
       - name: Install ChatBI runtime dependencies
@@ -383,7 +460,7 @@ jobs:
       - name: Upload IBM Gate evidence
         id: ibm_artifact
         if: always() && steps.collect_evidence.outcome == 'success'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6, Node 24
         with:
           name: v13-ibm-official-${{ github.sha }}
           path: docs/evidence/v1.3/ibm-official-ci

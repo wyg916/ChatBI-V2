@@ -1,0 +1,202 @@
+name: V1.3 Phase5 Release Hardening Gate
+
+on:
+  push:
+    branches:
+      - "codex/v1.3.0-release-hardening-full-gate"
+  pull_request:
+    paths:
+      - ".github/workflows/v13-phase5-release-hardening.yml"
+      - "backend/app/**"
+      - "backend/scripts/run_v13_phase5_*"
+      - "backend/tests/test_v13_phase5_*"
+      - "evaluation/golden/v13-phase5-*"
+      - "frontend/**"
+      - "sandbox_runtime/**"
+      - "scripts/performance/run_v13_phase5_*"
+      - "scripts/phase5-*"
+      - "supply-chain/**"
+      - "docker-compose.yml"
+      - "THIRD_PARTY_NOTICES.md"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: v13-phase5-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  PYTHONPATH: >-
+    backend:packages/agent-contracts/src:packages/agent-orchestrator/src:packages/prompt-registry/src:packages/rag-adapter/src:packages/rag-contracts/src:packages/dbgpt-runtime-adapter/src:packages/pandasai-selected-runtime/src
+
+jobs:
+  deterministic-release-gates:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5, Node 24
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6, Node 24
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: |
+            backend/requirements.txt
+            backend/requirements-phase3-upstream.txt
+            backend/requirements-runtime-hardening.txt
+      - name: Install exact Backend and selected upstream dependencies
+        run: |
+          pip install -r backend/requirements.txt
+          pip install -r backend/requirements-phase3-upstream.txt
+          pip install --upgrade -r backend/requirements-runtime-hardening.txt
+      - name: Phase5 contract, security and fault tests
+        run: |
+          mkdir -p docs/evidence/v1.3/phase5-ci
+          git rev-parse HEAD > docs/evidence/v1.3/phase5-ci/tested-sha.txt
+          pytest \
+            backend/tests/test_v13_phase5_data_performance.py \
+            backend/tests/test_v13_phase5_api_load.py \
+            backend/tests/test_v13_phase5_fault_regression.py \
+            backend/tests/test_v13_phase5_live_questions_gate.py \
+            backend/tests/test_v13_phase5_security_supply.py \
+            -q --junitxml docs/evidence/v1.3/phase5-ci/phase5-junit.xml
+          python backend/scripts/run_v13_phase5_fault_regression_gate.py \
+            --contract-only \
+            --output docs/evidence/v1.3/phase5-ci/fault-contract.json
+          python backend/scripts/run_v13_phase5_fault_regression_gate.py \
+            --faults-only \
+            --output docs/evidence/v1.3/phase5-ci/fault-production-boundaries.json
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5, Node 24
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Frontend regression and build
+        working-directory: frontend
+        run: |
+          npm ci
+          npm test -- --reporter=default --reporter=junit --outputFile.junit=../docs/evidence/v1.3/phase5-ci/frontend-junit.xml
+          npm run build 2>&1 | tee ../docs/evidence/v1.3/phase5-ci/frontend-build.txt
+      - name: Evidence checksums
+        if: always()
+        run: |
+          find docs/evidence/v1.3/phase5-ci -maxdepth 1 -type f ! -name SHA256SUMS.txt -print0 \
+            | sort -z | xargs -0 sha256sum > docs/evidence/v1.3/phase5-ci/SHA256SUMS.txt
+      - name: Upload deterministic evidence
+        if: always()
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6, Node 24
+        with:
+          name: v13-phase5-deterministic-${{ github.sha }}
+          path: docs/evidence/v1.3/phase5-ci
+          if-no-files-found: error
+          retention-days: 30
+
+  migration-gate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:16.9-alpine@sha256:7c688148e5e156d0e86df7ba8ae5a05a2386aaec1e2ad8e6d11bdf10504b1fb7
+        env:
+          POSTGRES_USER: chatbi_ci_admin
+          POSTGRES_HOST_AUTH_METHOD: trust
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U chatbi_ci_admin -d postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+    env:
+      CHATBI_DATABASE_URL: postgresql+psycopg://chatbi_ci_admin@127.0.0.1:5432/postgres
+      CHATBI_META_PASSWORD: ""
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5, Node 24
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6, Node 24
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+      - run: pip install -r backend/requirements.txt
+      - name: Unique head and base-head-base-head migration
+        run: |
+          mkdir -p docs/evidence/v1.3/phase5-migration-ci
+          python backend/scripts/verify_migrations_postgres.py \
+            --schema chatbi_v13_phase5_ci \
+            --output docs/evidence/v1.3/phase5-migration-ci/migration.json
+      - name: Upload migration evidence
+        if: always()
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6, Node 24
+        with:
+          name: v13-phase5-migration-${{ github.sha }}
+          path: docs/evidence/v1.3/phase5-migration-ci
+          if-no-files-found: error
+          retention-days: 30
+
+  supply-chain-and-attack-gate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5, Node 24
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6, Node 24
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: |
+            backend/requirements.txt
+            backend/requirements-phase3-upstream.txt
+            backend/requirements-runtime-hardening.txt
+            scripts/release/requirements-audit.txt
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5, Node 24
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Install isolated release runtime and audit tooling
+        run: |
+          python -m venv .phase5-runtime-venv
+          .phase5-runtime-venv/bin/python -m pip install -r backend/requirements.txt
+          .phase5-runtime-venv/bin/python -m pip install -r backend/requirements-phase3-upstream.txt
+          .phase5-runtime-venv/bin/python -m pip install --upgrade -r backend/requirements-runtime-hardening.txt
+          python -m venv .phase5-audit-venv
+          .phase5-audit-venv/bin/python -m pip install -r scripts/release/requirements-audit.txt
+          npm ci --prefix frontend
+      - name: Build deterministic runtime SBOM
+        run: |
+          mkdir -p docs/evidence/v1.3/phase5-supply-ci
+          .phase5-runtime-venv/bin/python scripts/phase5-generate-sbom.py \
+            --backend-python "$PWD/.phase5-runtime-venv/bin/python" \
+            --frontend-lock frontend/package-lock.json \
+            --cyclonedx-output docs/evidence/v1.3/phase5-supply-ci/V1_3_0.cdx.json \
+            --spdx-output docs/evidence/v1.3/phase5-supply-ci/V1_3_0.spdx.json \
+            --receipt-output docs/evidence/v1.3/phase5-supply-ci/sbom-receipt.json
+      - name: Run security, attack, license, deprecation and supply-chain gate
+        env:
+          CHATBI_PHASE5_AUDIT_PYTHON: ${{ github.workspace }}/.phase5-audit-venv/bin/python
+        run: |
+          .phase5-runtime-venv/bin/python backend/scripts/run_v13_phase5_security_supply_gate.py \
+            --evidence-dir docs/evidence/v1.3/phase5-supply-ci/generated-audits \
+            --cyclonedx docs/evidence/v1.3/phase5-supply-ci/V1_3_0.cdx.json \
+            --spdx docs/evidence/v1.3/phase5-supply-ci/V1_3_0.spdx.json \
+            --sbom-receipt docs/evidence/v1.3/phase5-supply-ci/sbom-receipt.json \
+            --output docs/evidence/v1.3/phase5-supply-ci/security-supply.json
+      - name: Evidence checksums
+        if: always()
+        run: |
+          git rev-parse HEAD > docs/evidence/v1.3/phase5-supply-ci/tested-sha.txt
+          find docs/evidence/v1.3/phase5-supply-ci -maxdepth 1 -type f ! -name SHA256SUMS.txt -print0 \
+            | sort -z | xargs -0 sha256sum > docs/evidence/v1.3/phase5-supply-ci/SHA256SUMS.txt
+      - name: Upload supply-chain evidence
+        if: always()
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6, Node 24
+        with:
+          name: v13-phase5-supply-${{ github.sha }}
+          path: docs/evidence/v1.3/phase5-supply-ci
+          if-no-files-found: error
+          retention-days: 30

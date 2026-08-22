@@ -96,10 +96,10 @@ services:
     build:
       context: .
       dockerfile: sandbox_runtime/Dockerfile
-    user: "0:0"
+    user: "65532:65532"
     command: ["python", "-m", "app.sandbox.controller_server"]
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+      DOCKER_HOST: tcp://sandbox-docker-proxy:2375
     read_only: true
     tmpfs:
       - /tmp:rw,noexec,nosuid,nodev,size=8m,mode=1777
@@ -109,8 +109,40 @@ services:
       - no-new-privileges:true
     networks:
       - sandbox-control
+      - sandbox-docker-control
+    depends_on:
+      sandbox-docker-proxy:
+        condition: service_healthy
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8765/healthz', timeout=2)"]
+      interval: 4s
+      timeout: 4s
+      retries: 30
+    restart: unless-stopped
+
+  sandbox-docker-proxy:
+    image: chatbi-sandbox-runtime:phase3
+    build:
+      context: .
+      dockerfile: sandbox_runtime/Dockerfile
+    user: "0:0"
+    command: ["python", "/opt/chatbi/docker_control_proxy.py"]
+    volumes:
+      - type: bind
+        source: ${CHATBI_DOCKER_SOCKET_PATH:-/var/run/docker.sock}
+        target: /var/run/docker.sock
+        read_only: true
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,nodev,size=4m,mode=1777
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    networks:
+      - sandbox-docker-control
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:2375/_ping', timeout=2)"]
       interval: 4s
       timeout: 4s
       retries: 30
@@ -154,4 +186,6 @@ services:
 
 networks:
   sandbox-control:
+    internal: true
+  sandbox-docker-control:
     internal: true

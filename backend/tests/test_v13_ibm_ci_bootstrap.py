@@ -142,7 +142,11 @@ def test_workflow_is_self_contained_and_has_no_repository_secret_dependency() ->
     assert "uv pip sync" in workflow
     assert "IBM_SELECTED_SOURCE_ENV=PASS" in workflow
     assert "import ibm_watsonx_ai, numpy, pandas, requests, sqlglot, sqlparse, tqdm, yaml" in workflow
-    assert "actions/upload-artifact@v4" in workflow
+    assert (
+        "actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f"
+        in workflow
+    )
+    assert "actions/upload-artifact@v4" not in workflow
     assert "--sanitize-artifacts" in workflow
     assert "steps.collect_evidence.outcome == 'success'" in workflow
     assert 'gate_status == "PASS" and release_status == "PASS"' in workflow

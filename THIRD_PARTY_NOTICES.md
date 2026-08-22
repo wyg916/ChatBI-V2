@@ -29,6 +29,12 @@ Phase 3 adds two deliberately narrow third-party runtime boundaries plus one sep
 
 The retained license and provenance records live in `packages/dbgpt-runtime-adapter/` and `packages/pandasai-selected-runtime/`. The worker runs non-root with no host mount, no database/model credential, no external network, a read-only root filesystem, dropped capabilities, no-new-privileges, bounded tmpfs, CPU/RAM/PID/time/file/output limits, and mandatory synchronous removal. Missing dependency, wrong provenance or unavailable Docker fails closed and produces zero verified runtime calls.
 
+Phase 5 retains the exact DB-GPT source revision but overrides its transitive
+`aiohttp==3.8.4` pin with `aiohttp==3.14.3`. ChatBI does not call DB-GPT's
+HTTP surfaces; the selected AWEL symbols are compatibility-tested with the
+audited override. No DB-GPT source file is modified, and the exact archive,
+revision, runtime symbols, and provenance checks remain unchanged.
+
 ## V1.3.0 Phase 4 Markdown rendering dependencies
 
 Phase 4 renders the project-owned `AnswerEnvelope.markdown` through a strict allowlisted pipeline. Raw HTML is disabled; sanitized links allow only HTTP(S), `mailto:`, safe fragments, and controlled `/api/v1/` paths. Images are rendered as inert placeholders.
@@ -40,6 +46,15 @@ Phase 4 renders the project-owned `AnswerEnvelope.markdown` through a strict all
 | rehype-sanitize | `6.0.0` | MIT | HTML AST sanitization defense in depth; `rehype-raw` is not installed or enabled |
 
 All three are consumed as unmodified published npm packages pinned by `frontend/package-lock.json`. No upstream source, UI, logo, documentation, or brand asset is copied into ChatBI.
+
+## Phase 5 HTTPX2 test-client compatibility
+
+- Source repository: `https://github.com/pydantic/httpx2`
+- Package version: `httpx2==2.12.0`
+- License: BSD-3-Clause
+- Project file: `backend/requirements.txt`
+- Purpose: provide Starlette 1.3.1's supported test-client transport and remove the deprecated plain-HTTPX fallback warning. The existing pinned `httpx` package remains the application/runtime HTTP client.
+- Modification: no HTTPX2 source, documentation, logo, or brand asset is copied or modified; ChatBI consumes the published package only through Starlette's test client.
 
 ## v2.1 Day 1 semantic design provenance
 
@@ -109,7 +124,7 @@ ChatBI V2 itself is released under Apache License 2.0. Direct dependencies are c
 | Component | License |
 | --- | --- |
 | FastAPI, SQLAlchemy, Alembic, Pydantic, pydantic-settings, PyMySQL, pytest, SQLGlot | MIT |
-| Starlette, Uvicorn, HTTPX | BSD-3-Clause |
+| Starlette, Uvicorn, HTTPX, HTTPX2 | BSD-3-Clause |
 | psycopg / psycopg-binary | LGPL-3.0-only |
 | cryptography | Apache-2.0 OR BSD-3-Clause |
 | pandas | BSD-3-Clause |

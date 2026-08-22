@@ -1,5 +1,31 @@
 # Architecture Decisions
 
+## ADR-054：在冻结的 DB-GPT AWEL 边界覆盖未使用的易受攻击 aiohttp 版本
+
+V1.3.0 Phase 5 继续冻结 DB-GPT `dbgpt-core/AWEL` 的相同 commit、archive
+SHA 和三个 runtime symbols。该发行 metadata 把 `aiohttp` 精确锁在
+`3.8.4`，但 ChatBI Adapter 不调用 DB-GPT HTTP client/server surface，只调用
+`DAG`、`MapOperator` 和 `BaseOperator.call`。发布环境因此先安装冻结 archive，
+再应用精确的 `aiohttp==3.14.3` 审计覆盖。真实 selected-runtime 测试必须重新
+证明兼容，依赖审计必须为零未忽略漏洞；本决定不授权通用 DB-GPT 升级或新增
+第三方运行面。
+
+## ADR-053：Phase 5 将发布结论绑定到真实链路 Evidence，而不是清单或合成信封
+
+Phase 5 的 Data100、10M、并发、Weird50、Complex5、Multimodal10、故障注入、成本、迁移、冷启动、浏览器和远端 CI 都必须记录 `tested_sha`、真实命令/工具来源、输入哈希、逐例观察、清理收据和 SHA-256。Manifest validator 只产生 `CONTRACT_PASS`；直接 SQL 只能证明数据源执行性能；由测试代码预填的 fail-closed 信封只能证明预期契约。三者均不得提升为真实 ChatBI 主链、Router、SQL Guard、Result Oracle、RAG/Agent、Provider 或发布总 Gate 的 PASS。
+
+真实并发必须由 20 个不同认证用户持续至少 900 秒访问 Backend API/SSE，并覆盖 Data、RAG、Hybrid、Agent、File 和 Vision。报告要解析唯一终态及业务 Evidence，记录实际 elapsed、P50/P95/P99、CPU/RAM/连接池并精确清理临时主体、会话、附件和负载数据。成本只统计本次 request ID 与时间窗交集中的 append-only `ModelInvocation`，逐请求和逐路由证明台账完整后才能计算 Kimi Premium Share 与全 Premium 反事实节省率。
+
+远端 `V1.3 Phase5 Release Hardening Gate` 负责确定性合约、迁移、安全、供应链和前后端回归；Phase 4、Phase 3 与 IBM 工作流在同一 Phase 5 分支提交上复验。需要本机数据库、真实 Provider 或浏览器拓扑的门禁保存在仓库外 Evidence 根并与最终 SHA 校验。任一必需门禁缺失、过期或无法绑定同一 SHA 时，Phase 5 必须保持 FAIL/PARTIAL，Phase 6 不允许开始。
+
+## ADR-052：Sandbox Docker 控制面采用有状态最小权限代理
+
+Phase 3 的独立 Controller 虽不把 Docker Socket 暴露给 Backend 或一次性 Worker，但 Controller 自身仍可通过 daemon API 管理主机容器。Phase 5 在 Controller 与 Host Socket 之间增加专用 restricted proxy：Controller 以 `65532:65532` 非 root 运行，只加入 private internal control network；proxy 是唯一 socket 持有者，不发布 Host 端口、不进入应用网络，并保持只读根文件系统、能力清空与 no-new-privileges。
+
+代理对 create 请求执行 exact schema 和不可变 WorkerSpec 校验，仅允许固定镜像、固定命令、固定用户/工作目录/环境、`network_mode=none`、无挂载、只读根、资源上限、固定 tmpfs 与 ownership labels。代理维护 `job_id → container_id` 状态，start/wait/logs/kill/delete 只允许由同一受控 create 产生的对象；列举、镜像、卷、网络、secret、exec、build、未知参数、未知字段、Host namespace、privileged/capability/security-opt 扩张和任意对象 ID 均 fail closed。正常完成、取消、超时和异常都必须销毁对象并清除代理状态。
+
+此方案不把 Host Docker Socket 交给 Worker，也不把通用 Docker API 交给 Controller；但“风险关闭”仍依赖真实 daemon 正向生命周期与完整负向攻击证据。proxy 不可用或策略拒绝时 Sandbox 必须失败，不得回落到直连 socket。若真实攻击 Gate 不能证明 `DOCKER_CONTROL_ESCAPE=0`，V1.3.0 正式发布继续阻断。
+
 ## ADR-051：负责人授权的 Legacy RAG 只复用三个锁定源码模块
 
 项目负责人明确确认 `E:\新能源企业经营分析智能平台` 为其自有旧项目并授权 ChatBI 内部复用；外部作者、公司和权属证明不再是本轮 Gate。工程 Gate 仍锁定 Git commit `b2573a9dc1881a54581c5c556fb4a8c34046f9c3`、selected paths、Git blobs、SHA-256、依赖、Secret、数据隔离、接口和回滚。

@@ -1,0 +1,54 @@
+{
+  "schema_version": "chatbi-v1.3-phase5-supply-policy-v1",
+  "project_version": "1.3.0",
+  "source_date_epoch": 1787397616,
+  "allowed_license_ids": [
+    "0BSD",
+    "Apache-2.0",
+    "BSD-2-Clause",
+    "BSD-3-Clause",
+    "CC-BY-4.0",
+    "CC0-1.0",
+    "ISC",
+    "LGPL-2.1-or-later",
+    "LGPL-3.0-only",
+    "MIT",
+    "MIT-0",
+    "MIT-CMU",
+    "MPL-2.0",
+    "PSF-2.0",
+    "Python-2.0",
+    "Unlicense",
+    "Zlib"
+  ],
+  "denied_license_prefixes": [
+    "AGPL-",
+    "GPL-",
+    "LicenseRef-"
+  ],
+  "required_notice_terms": [
+    "OpenChatBI",
+    "WrenAI",
+    "IBM Text-to-SQL Evaluation Toolkit",
+    "SQLBot",
+    "DB-GPT",
+    "PandasAI",
+    "Docker SDK for Python",
+    "HTTPX2"
+  ],
+  "sqlbot_exception": {
+    "required_integration_mode_prefix": "BLOCKED_",
+    "required_runtime_calls": 0,
+    "forbidden_dependency_names": [
+      "sqlbot",
+      "sqlbot-xpack"
+    ]
+  },
+  "github_action_pins": {
+    "actions/checkout": "fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09",
+    "actions/setup-python": "ece7cb06caefa5fff74198d8649806c4678c61a1",
+    "actions/setup-node": "a0853c24544627f65ddf259abe73b1d18a591444",
+    "actions/upload-artifact": "b7c566a772e6b6bfb58ed0dc250532a479d7789f",
+    "astral-sh/setup-uv": "eb1897b8dc4b5d5bfe39a428a8f2304605e0983c"
+  }
+}

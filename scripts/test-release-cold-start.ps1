@@ -19,6 +19,7 @@ $passed = $false
 $cleanup = $false
 $result = [ordered]@{
   timestamp = (Get-Date).ToString('o')
+  tested_sha = (& git -C $projectRoot rev-parse HEAD).Trim()
   cold_start = 'FAIL'
   duration_seconds = 0
   project_metadata = 'ISOLATED_TEMPORARY_POSTGRES_SCHEMA'
@@ -29,6 +30,9 @@ $result = [ordered]@{
   demo_data = 'NOT_RUN'
   backend = 'NOT_RUN'
   frontend = 'NOT_RUN'
+  sandbox_controller = 'NOT_RUN'
+  sandbox_docker_proxy = 'NOT_RUN'
+  runtime_dependency = 'NOT_RUN'
   authentication = 'NOT_RUN'
   ask = 'NOT_RUN'
   evaluation = 'NOT_RUN'
@@ -36,6 +40,19 @@ $result = [ordered]@{
   cleanup = 'NOT_RUN'
   stage = 'INITIALIZE'
   secrets_recorded = $false
+}
+
+function Assert-Compose-ServiceHealthy {
+  param([Parameter(Mandatory=$true)][string]$Service)
+  $containerId = (& docker compose ps -q $Service | Out-String).Trim()
+  if($LASTEXITCODE -ne 0 -or -not $containerId) {
+    throw "Compose service $Service has no container"
+  }
+  $health = (& docker inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' $containerId | Out-String).Trim()
+  if($LASTEXITCODE -ne 0 -or $health -ne 'healthy') {
+    throw "Compose service $Service is not healthy: $health"
+  }
+  return $containerId
 }
 
 function Read-LocalEnv {
@@ -71,6 +88,15 @@ try {
   $result.bootstrap = 'PASS'
   $result.backend = 'HTTP_200'
   $result.frontend = 'HTTP_200'
+
+  $result.stage = 'SANDBOX_RUNTIME'
+  $null = Assert-Compose-ServiceHealthy -Service 'sandbox-docker-proxy'
+  $result.sandbox_docker_proxy = 'HEALTHY_RESTRICTED_PROXY'
+  $null = Assert-Compose-ServiceHealthy -Service 'sandbox-controller'
+  $result.sandbox_controller = 'HEALTHY_NONROOT_NO_HOST_SOCKET'
+  & docker compose exec -T backend python -c 'import httpx2; print(httpx2.__version__)' | Out-Null
+  if($LASTEXITCODE -ne 0) { throw 'Backend runtime dependency httpx2 is unavailable' }
+  $result.runtime_dependency = 'HTTPX2_IMPORT_PASS'
 
   $result.stage = 'MIGRATION'
   $migration = (& docker compose exec -T backend sh -c 'alembic current 2>&1' | Out-String)

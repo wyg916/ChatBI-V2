@@ -104,7 +104,9 @@ def test_worker_spec_has_no_network_mount_secret_or_privilege_and_has_limits():
         job_id="safejob", limits=limits, command=["tail", "-f", "/dev/null"]
     )
     DockerWorkerSpec.assert_hardened(kwargs)
+    assert kwargs["use_config_proxy"] is False
     assert kwargs["network_disabled"] is True
+    assert kwargs["network_mode"] == "none"
     assert kwargs["read_only"] is True
     assert kwargs["user"] == "65532:65532"
     assert kwargs["cap_drop"] == ["ALL"]
@@ -387,6 +389,7 @@ def test_compose_backend_has_no_docker_socket_and_controller_is_private_fixed_bo
     services = compose["services"]
     backend = services["backend"]
     controller = services["sandbox-controller"]
+    proxy = services["sandbox-docker-proxy"]
     backend_mounts = json.dumps(backend.get("volumes") or [])
     assert "docker.sock" not in backend_mounts
     assert backend["environment"]["CHATBI_SANDBOX_CONTROLLER_URL"] == (
@@ -394,14 +397,38 @@ def test_compose_backend_has_no_docker_socket_and_controller_is_private_fixed_bo
     )
     assert backend["depends_on"]["sandbox-controller"]["condition"] == "service_healthy"
     assert controller["image"] == DockerWorkerSpec().image
-    assert controller["volumes"] == ["/var/run/docker.sock:/var/run/docker.sock"]
+    assert "volumes" not in controller
     assert "ports" not in controller
-    assert "environment" not in controller
-    assert controller["networks"] == ["sandbox-control"]
+    assert controller["user"] == "65532:65532"
+    assert controller["environment"] == {
+        "DOCKER_HOST": "tcp://sandbox-docker-proxy:2375"
+    }
+    assert controller["networks"] == ["sandbox-control", "sandbox-docker-control"]
+    assert controller["depends_on"]["sandbox-docker-proxy"]["condition"] == "service_healthy"
     assert compose["networks"]["sandbox-control"]["internal"] is True
+    assert compose["networks"]["sandbox-docker-control"]["internal"] is True
     assert controller["read_only"] is True
     assert controller["cap_drop"] == ["ALL"]
     assert "no-new-privileges:true" in controller["security_opt"]
+    assert "ports" not in proxy
+    assert proxy["networks"] == ["sandbox-docker-control"]
+    assert proxy["read_only"] is True
+    assert proxy["cap_drop"] == ["ALL"]
+    assert "no-new-privileges:true" in proxy["security_opt"]
+    assert proxy["volumes"] == [
+        {
+            "type": "bind",
+            "source": "${CHATBI_DOCKER_SOCKET_PATH:-/var/run/docker.sock}",
+            "target": "/var/run/docker.sock",
+            "read_only": True,
+        }
+    ]
+    socket_services = [
+        name
+        for name, service in services.items()
+        if "docker.sock" in json.dumps(service.get("volumes") or [])
+    ]
+    assert socket_services == ["sandbox-docker-proxy"]
 
 
 def test_missing_docker_fails_closed_as_unavailable():
@@ -592,6 +619,7 @@ def test_real_docker_attacks_limits_engine_spec_and_destroy_proof():
         config = attrs["Config"]
         host = attrs["HostConfig"]
         assert config["NetworkDisabled"] is True
+        assert host["NetworkMode"] == "none"
         assert config["User"] == "65532:65532"
         inherited_public_names = {"GPG_KEY"}
         assert not any(

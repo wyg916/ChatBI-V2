@@ -12,9 +12,11 @@ RUN pip install --no-cache-dir -r /tmp/requirements.txt \
     && rm -f /tmp/requirements.txt
 
 COPY sandbox_runtime/sandbox_runner.py /opt/chatbi/sandbox_runner.py
+COPY sandbox_runtime/docker_control_proxy.py /opt/chatbi/docker_control_proxy.py
 COPY backend/app/__init__.py /opt/chatbi/app/__init__.py
 COPY backend/app/sandbox /opt/chatbi/app/sandbox
 RUN chmod 0555 /opt/chatbi/sandbox_runner.py \
+    /opt/chatbi/docker_control_proxy.py \
     && find /opt/chatbi/app/sandbox -type f -name '*.py' -exec chmod 0444 {} \;
 
 ENV PYTHONPATH=/opt/chatbi

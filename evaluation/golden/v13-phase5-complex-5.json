@@ -1,0 +1,85 @@
+{
+  "schema_version": "chatbi-v1.3-phase5-complex-v1",
+  "name": "ChatBI V1.3 Phase 5 Complex 5",
+  "frozen": true,
+  "purpose": "Five bounded long-running scenarios with explicit step, tool, latency, cost, cancellation, verification and accuracy evidence requirements.",
+  "allowed_agent_tools": ["QUERY_DATA", "RETRIEVE_KNOWLEDGE", "VERIFY_RESULT", "VERIFY_CITATION", "GENERATE_CHART", "GENERATE_INSIGHT"],
+  "cases": [
+    {
+      "id": "P5C01",
+      "kind": "MULTI_STEP_DATA",
+      "question": "分析2026年各区域收入趋势、同比与贡献度，验证关键结果后生成图表和结论。",
+      "route": "COMPLEX_ANALYSIS",
+      "steps": [
+        {"ordinal":1,"role":"PlannerAgent","tool":null,"stage":"PLAN"},
+        {"ordinal":2,"role":"DataAnalystAgent","tool":"QUERY_DATA","stage":"DATA"},
+        {"ordinal":3,"role":"VerificationAgent","tool":"VERIFY_RESULT","stage":"VERIFY"},
+        {"ordinal":4,"role":"InsightAgent","tool":"GENERATE_CHART","stage":"CHART"},
+        {"ordinal":5,"role":"InsightAgent","tool":"GENERATE_INSIGHT","stage":"INSIGHT"}
+      ],
+      "expected":{"max_steps":8,"max_tool_calls":12,"model_calls_max":3,"max_latency_ms":30000,"max_cost_cny":0.20,"cancel_terminal":"run.cancelled","verification_required":true,"accuracy_metric":"result_value_accuracy","accuracy_min":0.95,"stale_answer_count":0,"expected_evidence":{"result":{"result_semantic":"VALUE","oracle_status":"PASSED","required_metrics":["revenue"],"required_dimensions":["region","month"],"minimum_row_count":1},"citation":{"required":false},"file":{"required":false},"sandbox":{"required":false}}}
+    },
+    {
+      "id": "P5C02",
+      "kind": "DATA_RAG",
+      "question": "按已授权收入口径核对2026年Q1区域收入，融合数据库结果和制度引用并逐项验证。",
+      "route": "HYBRID_ANALYSIS",
+      "steps": [
+        {"ordinal":1,"role":"PlannerAgent","tool":null,"stage":"PLAN"},
+        {"ordinal":2,"role":"DataAnalystAgent","tool":"QUERY_DATA","stage":"DATA"},
+        {"ordinal":3,"role":"KnowledgeAgent","tool":"RETRIEVE_KNOWLEDGE","stage":"RAG"},
+        {"ordinal":4,"role":"VerificationAgent","tool":"VERIFY_RESULT","stage":"VERIFY_DATA"},
+        {"ordinal":5,"role":"VerificationAgent","tool":"VERIFY_CITATION","stage":"VERIFY_CITATION"},
+        {"ordinal":6,"role":"InsightAgent","tool":"GENERATE_INSIGHT","stage":"INSIGHT"}
+      ],
+      "expected":{"max_steps":8,"max_tool_calls":12,"model_calls_max":3,"max_latency_ms":30000,"max_cost_cny":0.25,"cancel_terminal":"run.cancelled","verification_required":true,"accuracy_metric":"citation_and_result_accuracy","accuracy_min":0.95,"stale_answer_count":0,"expected_evidence":{"result":{"result_semantic":"VALUE","oracle_status":"PASSED","required_metrics":["revenue"],"required_dimensions":["region"],"minimum_row_count":1},"citation":{"required":true,"minimum_count":1,"required_title_terms":["收入","口径"]},"file":{"required":false},"sandbox":{"required":false}}}
+    },
+    {
+      "id": "P5C03",
+      "kind": "AGENT_SQL",
+      "question": "规划并执行多Join SQL，比较产品类别利润率，验证SQL Guard、EXPLAIN、Oracle和复核查询。",
+      "route": "COMPLEX_ANALYSIS",
+      "steps": [
+        {"ordinal":1,"role":"PlannerAgent","tool":null,"stage":"PLAN"},
+        {"ordinal":2,"role":"DataAnalystAgent","tool":"QUERY_DATA","stage":"SQL_GUARD_EXPLAIN_EXECUTE_ORACLE"},
+        {"ordinal":3,"role":"VerificationAgent","tool":"VERIFY_RESULT","stage":"VERIFICATION_QUERY"},
+        {"ordinal":4,"role":"InsightAgent","tool":"GENERATE_INSIGHT","stage":"INSIGHT"}
+      ],
+      "expected":{"max_steps":8,"max_tool_calls":12,"model_calls_max":3,"max_latency_ms":30000,"max_cost_cny":0.20,"cancel_terminal":"run.cancelled","verification_required":true,"accuracy_metric":"sql_and_result_accuracy","accuracy_min":0.95,"stale_answer_count":0,"expected_evidence":{"result":{"result_semantic":"VALUE","oracle_status":"PASSED","required_metrics":["profit_margin"],"required_dimensions":["category"],"minimum_row_count":1},"citation":{"required":false},"file":{"required":false},"sandbox":{"required":false}}}
+    },
+    {
+      "id": "P5C04",
+      "kind": "AGENT_PYTHON",
+      "question": "对授权数据做受限Python相关性分析，Agent只通过固定QUERY_DATA工具提交数据并验证Sandbox结果。",
+      "route": "COMPLEX_ANALYSIS",
+      "steps": [
+        {"ordinal":1,"role":"PlannerAgent","tool":null,"stage":"PLAN"},
+        {"ordinal":2,"role":"DataAnalystAgent","tool":"QUERY_DATA","stage":"GUARDED_DATASET"},
+        {"ordinal":3,"role":"DataAnalystAgent","tool":null,"stage":"PYTHON_SANDBOX_INTERNAL"},
+        {"ordinal":4,"role":"VerificationAgent","tool":"VERIFY_RESULT","stage":"VERIFY_SANDBOX_SIGNATURE"},
+        {"ordinal":5,"role":"InsightAgent","tool":"GENERATE_CHART","stage":"CHART"},
+        {"ordinal":6,"role":"InsightAgent","tool":"GENERATE_INSIGHT","stage":"INSIGHT"}
+      ],
+      "expected":{"max_steps":8,"max_tool_calls":12,"model_calls_max":3,"max_latency_ms":30000,"max_cost_cny":0.20,"cancel_terminal":"run.cancelled","verification_required":true,"accuracy_metric":"sandbox_result_accuracy","accuracy_min":0.95,"stale_answer_count":0,"sandbox_destroyed_required":true,"expected_evidence":{"result":{"result_semantic":"VALUE","oracle_status":"PASSED","required_metrics":["correlation"],"required_dimensions":[],"minimum_row_count":1},"citation":{"required":false},"file":{"required":false},"sandbox":{"required":true,"status":"SUCCEEDED","runtime_verified":true,"container_destroyed":true,"operation":"correlation"}}}
+    },
+    {
+      "id": "P5C05",
+      "kind": "FILE_DB",
+      "question": "把授权CSV完整数据与数据库区域收入比较，验证文件签名、数据库结果签名和差异值，支持取消。",
+      "route": "COMPLEX_ANALYSIS",
+      "attachment": {
+        "path": "backend/tests/fixtures/v13_phase5_file_db.csv",
+        "mime_type": "text/csv"
+      },
+      "steps": [
+        {"ordinal":1,"role":"PlannerAgent","tool":null,"stage":"PLAN"},
+        {"ordinal":2,"role":"DataAnalystAgent","tool":null,"stage":"FILE_PARSE_GUARD"},
+        {"ordinal":3,"role":"DataAnalystAgent","tool":"QUERY_DATA","stage":"DATABASE"},
+        {"ordinal":4,"role":"VerificationAgent","tool":"VERIFY_RESULT","stage":"VERIFY_FILE_DB_SIGNATURES"},
+        {"ordinal":5,"role":"InsightAgent","tool":"GENERATE_CHART","stage":"CHART"},
+        {"ordinal":6,"role":"InsightAgent","tool":"GENERATE_INSIGHT","stage":"INSIGHT"}
+      ],
+      "expected":{"max_steps":8,"max_tool_calls":12,"model_calls_max":3,"max_latency_ms":30000,"max_cost_cny":0.20,"cancel_terminal":"run.cancelled","verification_required":true,"accuracy_metric":"file_db_difference_accuracy","accuracy_min":0.95,"stale_answer_count":0,"file_signature_required":true,"expected_evidence":{"result":{"result_semantic":"VALUE","oracle_status":"PASSED","required_metrics":["revenue","cost","difference"],"required_dimensions":["region"],"minimum_row_count":1},"citation":{"required":false},"file":{"required":true,"sha256":"56f70a1be361d0f4353096783cd6319d2e3bc7d6115298c06acee33827fac308","row_count":4,"columns":["month","region","revenue","cost"],"revenue_sum":4430,"cost_sum":2970},"sandbox":{"required":false}}}
+    }
+  ]
+}

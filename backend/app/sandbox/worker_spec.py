@@ -19,7 +19,9 @@ class DockerWorkerSpec:
             "name": f"chatbi_sandbox_{job_id}",
             "command": command,
             "detach": True,
+            "use_config_proxy": False,
             "network_disabled": True,
+            "network_mode": "none",
             "read_only": True,
             "user": self.user,
             "working_dir": "/workspace",
@@ -54,7 +56,12 @@ class DockerWorkerSpec:
         forbidden = {"volumes", "mounts", "ports", "devices", "privileged"}
         if forbidden & set(kwargs):
             raise ValueError("worker spec contains a forbidden host capability")
-        if not kwargs.get("network_disabled") or not kwargs.get("read_only"):
+        if (
+            kwargs.get("use_config_proxy") is not False
+            or not kwargs.get("network_disabled")
+            or kwargs.get("network_mode") != "none"
+            or not kwargs.get("read_only")
+        ):
             raise ValueError("worker network/root filesystem is not isolated")
         if kwargs.get("user") in {None, "", "0", "root", "0:0"}:
             raise ValueError("worker must run as a non-root user")
