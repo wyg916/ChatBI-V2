@@ -374,7 +374,14 @@ class DeterministicTestProvider(ModelProviderAdapter, Nl2SqlEngine):
 
     @staticmethod
     def _require_resolvable_intent(*, question: str, context: QueryContext) -> None:
-        if _contains(question, ["怎么样", "哪个最好", "把它", "那个维度", "前一段", "后一段"]):
+        explicit_analysis_axis = _contains(question, [
+            "按月", "每月", "月份", "月度", "趋势", "环比", "同比",
+            "按地区", "按区域", "按客户", "按产品", "按品类", "按状态",
+        ])
+        if (
+            _contains(question, ["怎么样", "哪个最好", "把它", "那个维度", "前一段", "后一段"])
+            and not explicit_analysis_axis
+        ):
             raise ValueError("SEMANTIC_CLARIFICATION_REQUIRED")
         known_text = " ".join(
             str(value)

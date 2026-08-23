@@ -234,6 +234,16 @@ def test_phase5_level0_unresolved_intents_fail_closed(question: str) -> None:
         DeterministicTestProvider().plan(question=question, context=semantic_context())
 
 
+def test_phase5_level0_explicit_follow_up_suggestion_remains_resolvable() -> None:
+    plan = DeterministicTestProvider().plan(
+        question="销售额 按月查看趋势怎么样？",
+        context=semantic_context(),
+    )
+
+    assert plan.metrics == ["revenue"]
+    assert plan.dimensions == ["month"]
+
+
 @pytest.mark.parametrize("question", ["综合分析利润并结合成本口径给出经营洞察", "综合分析季度利润并解释利润与成本定义"])
 def test_phase5_level0_profit_analysis_remains_resolvable(question: str) -> None:
     plan = DeterministicTestProvider().plan(question=question, context=semantic_context())
