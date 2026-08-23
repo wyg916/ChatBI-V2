@@ -66,7 +66,10 @@ def _publish(
     root: Path,
     directory: str,
     *,
-    tested_sha: str,
+    tested_sha: str | None,
+    finalized_sha: str,
+    source_execution_tested_shas: list[str],
+    same_sha_execution_evidence: bool,
     status: str,
     title: str,
     facts: dict[str, Any],
@@ -78,6 +81,9 @@ def _publish(
         "schema_version": "chatbi-v1.3-phase5-level0-gate-summary-v1",
         "generated_at": generated_at,
         "tested_sha": tested_sha,
+        "finalized_sha": finalized_sha,
+        "source_execution_tested_shas": source_execution_tested_shas,
+        "same_sha_execution_evidence": same_sha_execution_evidence,
         "gate": directory,
         "status": status,
         "facts": facts,
@@ -99,7 +105,9 @@ def _publish(
     _write(summary_path, (
         f"# {title}\n\n"
         f"Status: **{status}**  \n"
-        f"Tested SHA: `{tested_sha}`\n\n"
+        f"Tested SHA: `{tested_sha or 'NOT_SAME_SHA_CERTIFIED'}`  \n"
+        f"Evidence finalized SHA: `{finalized_sha}`  \n"
+        f"Same-SHA execution evidence: `{same_sha_execution_evidence}`\n\n"
         f"{note}\n\n## Facts\n\n{fact_lines}\n\n## Source evidence\n\n{source_lines}\n"
     ))
     receipt = {
@@ -107,6 +115,8 @@ def _publish(
         "gate": directory,
         "status": status,
         "tested_sha": tested_sha,
+        "finalized_sha": finalized_sha,
+        "same_sha_execution_evidence": same_sha_execution_evidence,
         "result_sha256": _sha256(result_path),
         "summary_sha256": _sha256(summary_path),
     }
@@ -121,7 +131,7 @@ def main() -> int:
     root = args.root.resolve()
     repo = args.repo.resolve()
     (root / "SHA256SUMS").mkdir(parents=True, exist_ok=True)
-    tested_sha = _git(repo, "rev-parse", "HEAD")
+    finalized_sha = _git(repo, "rev-parse", "HEAD")
 
     data_path = root / "Data100" / "data100-level0-pass.json"
     complex_path = root / "Complex5" / "weird50-complex5-level0-pass.json"
@@ -146,6 +156,16 @@ def main() -> int:
     cold = [_read_json(path) for path in cold_paths]
     browser = _junit(browser_path)
     backend = _junit(backend_path)
+
+    source_execution_tested_shas = sorted({
+        str(payload.get("tested_sha"))
+        for payload in (data, complex_result, load, fault)
+        if payload.get("tested_sha")
+    })
+    same_sha_execution_evidence = (
+        source_execution_tested_shas == [finalized_sha]
+    )
+    tested_sha = finalized_sha if same_sha_execution_evidence else None
 
     data_core = data["core_data100"]
     load_metrics = load["metrics"]
@@ -203,21 +223,32 @@ def main() -> int:
     dirty = bool(_git(repo, "status", "--porcelain"))
     upstream = _git(repo, "rev-parse", "@{u}")
     ahead_behind = _git(repo, "rev-list", "--left-right", "--count", "@{u}...HEAD")
-    definitions["Git"] = dict(status="PASS" if not dirty else "FAIL", title="Local Git state", facts={"local_sha": tested_sha, "upstream_sha": upstream, "ahead_behind": ahead_behind, "worktree_clean": not dirty}, sources=[_source(root, "Runtime/backend-pytest-final.xml")], note="This records local state only and does not certify remote CI.")
+    definitions["Git"] = dict(status="PASS" if not dirty else "FAIL", title="Local Git state", facts={"local_sha": finalized_sha, "upstream_sha": upstream, "ahead_behind": ahead_behind, "worktree_clean": not dirty}, sources=[_source(root, "Runtime/backend-pytest-final.xml")], note="This records local state only and does not certify remote CI.")
     definitions["Remote_CI"] = dict(status="NOT_RUN", title="Remote same-SHA CI status", facts={"remote_push": "NOT_RUN", "same_sha_ci": "NOT_RUN"}, sources=[_source(root, "Runtime/backend-pytest-final.xml")], note="No final-candidate push or paid certification was authorized while Level 0 blockers remain.")
     definitions["Final_Summary"] = dict(status="FAIL", title="Phase 5 Level 0 blocker remediation summary", facts={
         "backend": backend, "browser": browser,
         "controls": {"actionable": control["total_actionable_controls"], "tested": control["total_tested_controls"], "coverage": control["visible_actionable_control_coverage"]},
         "load_host_cpu_p99": resources["host_cpu_percent"]["p99"],
         "scanned_pdf_targeted_real": "NOT_RUN", "paid_provider_calls": 0,
-    }, sources=[_source(root, "Runtime/backend-pytest-final.xml"), _source(root, "Browser/full-89-level0-pass.xml"), _source(root, "Control_Acceptance_Matrix/visible-control-inventory.json"), _source(root, "Concurrency/load-20x15-level0-rerun.json")], note="Phase 5 remains blocked by the uncertified control matrix and host CPU P99. Level 1 and Level 2 are not allowed.")
+    }, sources=[_source(root, "Runtime/backend-pytest-final.xml"), _source(root, "Browser/full-89-level0-pass.xml"), _source(root, "Control_Acceptance_Matrix/visible-control-inventory.json"), _source(root, "Concurrency/load-20x15-level0-rerun.json")], note="Phase 5 remains blocked by the uncertified control matrix, host CPU P99, and absence of same-SHA execution evidence. Level 1 and Level 2 are not allowed.")
 
     for directory, definition in definitions.items():
-        _publish(root, directory, tested_sha=tested_sha, **definition)
+        _publish(
+            root,
+            directory,
+            tested_sha=tested_sha,
+            finalized_sha=finalized_sha,
+            source_execution_tested_shas=source_execution_tested_shas,
+            same_sha_execution_evidence=same_sha_execution_evidence,
+            **definition,
+        )
 
     print(json.dumps({
         "status": "PASS",
         "tested_sha": tested_sha,
+        "finalized_sha": finalized_sha,
+        "source_execution_tested_shas": source_execution_tested_shas,
+        "same_sha_execution_evidence": same_sha_execution_evidence,
         "published_gate_count": len(definitions),
         "phase5_gate_certified": False,
     }, ensure_ascii=False, sort_keys=True))
