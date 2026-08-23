@@ -272,7 +272,8 @@ def public_message_parts(message: ChatMessage) -> list[dict[str, Any]]:
 
 
 def extract_slots(question: str, previous: dict | None = None) -> tuple[dict, str]:
-    state = dict(previous or {})
+    prior_state = dict(previous or {})
+    state = dict(prior_state)
     regions = re.findall(r"华北|华东|华南|华中|西部", question)
     previous_regions = list(state.get("regions", []))
     if regions:
@@ -373,15 +374,15 @@ def extract_slots(question: str, previous: dict | None = None) -> tuple[dict, st
             inherited.append(str(state["granularity"]))
     dimension_labels = {"region": "按地区", "customer": "按客户", "product": "按产品", "status": "按状态", "month": "按月"}
     if re.search(r"继续|再看|再按|换成|那.+呢|基于|上一轮|刚才|前面", question):
-        for dimension in state.get("dimensions", []):
+        for dimension in prior_state.get("dimensions", []):
             label = dimension_labels.get(str(dimension), str(dimension))
             if label not in question and label not in inherited:
                 inherited.append(label)
-        if state.get("customer") and str(state["customer"]) not in question:
-            inherited.append(f"客户 {state['customer']}")
-        if state.get("product") and str(state["product"]) not in question:
-            inherited.append(f"产品 {state['product']}")
-        for item in state.get("filters", []):
+        if prior_state.get("customer") and str(prior_state["customer"]) not in question:
+            inherited.append(f"客户 {prior_state['customer']}")
+        if prior_state.get("product") and str(prior_state["product"]) not in question:
+            inherited.append(f"产品 {prior_state['product']}")
+        for item in prior_state.get("filters", []):
             if str(item) not in inherited:
                 inherited.append(str(item))
     if references:

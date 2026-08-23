@@ -11,6 +11,7 @@ from app.query.contracts import (
     ExecutionResult,
     ExpectedResult,
     GuardResult,
+    LinkedObject,
     QueryContext,
     SecurityPolicy,
 )
@@ -153,6 +154,90 @@ def test_day4_planner_supports_growth_ratio_null_and_date_boundaries(dialect):
     assert "WHERE month" in yoy.generated_sql
     guarded = SqlGuard().validate(yoy.generated_sql, dialect=dialect, policy=policy())
     assert guarded.allowed is True, guarded.issues
+
+
+def test_phase5_level0_planner_supports_multi_metric_dates_extremes_and_filters() -> None:
+    context = semantic_context().model_copy(update={
+        "candidate_columns": [
+            LinkedObject(
+                object_type="column", object_id="product-name", name="product_name", label="产品名称",
+                qualified_name="products.product_name", score=1.0, evidence=["exact:储能柜"],
+            ),
+            LinkedObject(
+                object_type="column", object_id="customer-type", name="customer_type", label="客户类型",
+                qualified_name="customers.customer_type", score=1.0, evidence=["exact:企业"],
+            ),
+        ],
+    })
+    provider = DeterministicTestProvider()
+
+    day = provider.plan(question="只统计2026年1月1日当天的订单量、收入和成本", context=context)
+    assert day.metrics == ["order_count", "revenue", "cost"]
+    assert day.time_range.start == "2026-01-01"
+    assert day.time_range.end_exclusive == "2026-01-02"
+
+    cross_month = provider.plan(
+        question="统计2026年1月31日至2月2日跨月三天的订单量、收入和成本", context=context,
+    )
+    assert cross_month.time_range.start == "2026-01-31"
+    assert cross_month.time_range.end_exclusive == "2026-02-03"
+
+    extreme = provider.plan(
+        question="找出单笔收入最大的一张订单，若并列取订单编号最小者", context=context,
+    )
+    assert extreme.dimensions == ["order_id"]
+    assert "ORDER BY o.revenue DESC, o.order_id ASC" in extreme.generated_sql
+    assert "LIMIT 1" in extreme.generated_sql
+
+    filtered = provider.plan(
+        question="2026年2月储能柜订单的订单量、收入和成本", context=context,
+    )
+    assert any(item.field == "products.product_name" and item.value == "储能柜" for item in filtered.filters)
+    assert "p.product_name = '储能柜'" in filtered.generated_sql
+
+    regional = provider.plan(
+        question="2026年第一季度华东已支付订单的订单量、收入和成本", context=context,
+    )
+    assert not any(item.field == "products.product_name" for item in regional.filters)
+
+    customer = provider.plan(question="统计企业客户的已支付订单量、收入和成本", context=context)
+    assert customer.dimensions == []
+    assert any(item.field == "customers.customer_type" and item.value == "企业" for item in customer.filters)
+    assert "JOIN demo_business.customers" in customer.generated_sql
+
+    ranged = provider.plan(
+        question="退款且单笔收入大于等于1000小于2000的订单量、收入和成本", context=context,
+    )
+    assert ranged.metrics == ["order_count", "revenue", "cost"]
+
+    fragment_category = provider.plan(
+        question="2026 Q2 充电设备 品类 订单量 收入 成本", context=context,
+    )
+    assert fragment_category.dimensions == ["category"]
+    assert any(item.field == "products.category" and item.value == "充电设备" for item in fragment_category.filters)
+
+    filtered_category = provider.plan(
+        question="汇总西部的软件与终端品类订单量、收入和成本", context=context,
+    )
+    assert filtered_category.dimensions == []
+    assert any(item.field == "products.category" and item.value == "软件与终端" for item in filtered_category.filters)
+    assert "o.revenue >= 1000" in ranged.generated_sql
+    assert "o.revenue < 2000" in ranged.generated_sql
+
+
+@pytest.mark.parametrize(
+    "question",
+    ["收入怎么样？", "哪个最好？", "把它按那个维度分一下", "统计全部订单的量子利润", "按地区展示碳梦指数"],
+)
+def test_phase5_level0_unresolved_intents_fail_closed(question: str) -> None:
+    with pytest.raises(ValueError, match="SEMANTIC_"):
+        DeterministicTestProvider().plan(question=question, context=semantic_context())
+
+
+@pytest.mark.parametrize("question", ["综合分析利润并结合成本口径给出经营洞察", "综合分析季度利润并解释利润与成本定义"])
+def test_phase5_level0_profit_analysis_remains_resolvable(question: str) -> None:
+    plan = DeterministicTestProvider().plan(question=question, context=semantic_context())
+    assert "profit" in plan.metrics
 
 
 @pytest.mark.parametrize(

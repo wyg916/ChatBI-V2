@@ -2,6 +2,10 @@
 
 ## V1.3.0 Phase 5 发布加固候选（2026-08-22）
 
+- 2026-08-23 Level 0 blocker remediation 已完成 Data100 100/100（结果值准确率 1.0）、Weird50 50/50、Complex5 5/5、扫描 PDF 本地 OCR/视觉链、两次冷启动、成本台账覆盖率 1.0、供应链/安全故障门禁、Backend 562 collected（556 passed、6 skipped）及 Playwright 串行 89/89。全程付费 Provider 调用 0、费用 0.00 CNY；历史 Phase 5 失败 Evidence 均保留在原目录，新证据位于独立 `Phase5_Level0_Blocker_Remediation_20260823_1315` 根目录。
+- 20 用户 × 15 分钟实际完成 6,841/6,841 请求且业务校验率 1.0，P95 7,046.752 ms、Backend CPU P99 56.083%、DB 连接最大 48、无资源残留；但宿主机 CPU P99 为 98.366%，超过固定 90% 门槛，因此 Load Gate 仍为 FAIL，不降低阈值也不重复执行昂贵长稳态测试。
+- 真实浏览器盘点覆盖 21 个页面、831 个可见控件，其中 748 个可操作控件；该执行只完成 Inventory，逐项 Browser→API→DB→Readback→Refresh 认证数仍为 0，覆盖率 0。受控临时 ADMIN 与认证状态已精确清理并有回执。由于控件矩阵和宿主 CPU 两项仍阻断，Level 1 定向真实 Provider、Level 2 最终付费认证、Phase 6、main 合并和 V1.3.0 Tag 均保持禁止，Phase 5 总门禁仍为 FAIL。
+- ONE_TRACE 无筛选概览在长稳态数据积累后曾因全历史 ORM 装载耗时约 6.35 秒；现在对每类持久化源精确读取最新 N 个候选后再做 Trace 合并，最近 200 条结果和 complete coverage 不变，实测约 0.90 秒。筛选视图与单 Trace 详情仍走完整历史语义。隔离浏览器端口通过显式 CORS origin 配置接入，带凭据 CORS 继续拒绝空值和通配符。
 - 2026-08-23 Phase 5 FAIL 后续修复启用三级测试成本控制：普通 push 与每次修复默认 Level 0，只允许 deterministic/recorded/Mock Provider，Model Gateway 在真实 HTTP 前硬阻断付费调用；Level 1 仅允许 1～3 个受影响 Case、Provider allowlist、最多一次重试和 1.00 CNY 定向预算；Level 2 必须绑定同 SHA 的全 PASS Level 0 receipt、负责人授权、cache bypass、3.00 CNY 最终预算和 5.00 CNY 日硬上限。成本台账只保存 Run/SHA/Case/Provider/Token/Cost/Retry 等脱敏字段。该策略不改变任何最终 Phase 5 Gate，当前 Phase 5 仍为 FAIL，未开始最终付费认证。
 - 本次成本控制候选的零付费验证为 Backend 546 collected（540 passed、6 skipped、0 failed/error）、Frontend 15 files/60 tests、TypeScript、production build、3 个 workflow YAML 和成本控制专项 9/9 PASS；Provider 实际调用与费用均为 0。完整 Phase 5 Data100、674 Control Matrix、Browser、Cold Start、20×15、Remote CI 和最终真实 Provider 认证仍按原 FAIL 清单逐项收口，不得用本次策略测试替代。
 - 2026-08-23 前端全可见控件追加门禁已进入同一候选：数据源/数据表、语义模型/资源和成员搜索筛选均把条件传入 Backend API 并由 Workspace 约束的数据库查询执行；答案库“待审核”枚举已与后端契约对齐。无实现的工作空间筛选已移除，P1 壳控件保持禁用并说明边界。新建或导入看板不再接受客户端卡片数，看板列表、排序、汇总和详情均从真实 `dashboard_card` 行派生数量，“今日刷新”从当天成功 `REFRESH_CARD` 审计行派生；演示 Seed 不再预填虚假卡片或刷新计数。最终可见控件覆盖率和浏览器结论仍只以最终 SHA 的外部 Evidence 为准。

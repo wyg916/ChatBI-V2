@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import base64
+import hashlib
 import io
 import json
 import os
@@ -11,10 +12,12 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Any, Mapping, Protocol
 from uuid import uuid4
 
 from PIL import Image, ImageDraw, ImageFont
+from pypdf import PdfReader, PdfWriter
 
 from app.core.config import get_settings
 from app.file_multimodal.comparison import compare_image_with_database
@@ -154,10 +157,22 @@ def _scanned_pdf() -> bytes:
             page.close()
             page = rotated
         pages.append(page)
-    output = io.BytesIO()
-    pages[0].save(output, format="PDF", save_all=True, append_images=pages[1:], resolution=144.0)
+    pillow_output = io.BytesIO()
+    pages[0].save(pillow_output, format="PDF", save_all=True, append_images=pages[1:], resolution=144.0)
     for page in pages:
         page.close()
+    # Pillow embeds the current timestamp. Normalize metadata through pypdf so
+    # Level0 recordings can be bound to one reproducible file SHA-256.
+    reader = PdfReader(io.BytesIO(pillow_output.getvalue()))
+    writer = PdfWriter()
+    for page in reader.pages:
+        writer.add_page(page)
+    writer.add_metadata({
+        "/Producer": "ChatBI V1.3 deterministic scan fixture",
+        "/CreationDate": "D:20260823000000+08'00'",
+    })
+    output = io.BytesIO()
+    writer.write(output)
     return output.getvalue()
 
 
@@ -582,6 +597,144 @@ def run_multimodal_suite(
     return payload
 
 
+def run_scanned_pdf_level0(
+    *,
+    manifest_path: Path = _DEFAULT_MANIFEST,
+    fixture_path: Path,
+) -> dict[str, Any]:
+    """Run the production render -> local OCR -> governed recorded Vision path."""
+    from app.core.config import Settings, get_settings as cached_settings
+    from app.model_gateway.configuration import ResolvedProvider
+    from app.services import chat as chat_module
+    from app.services.chat import ChatService
+
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    case = next((item for item in manifest.get("cases") or [] if item.get("id") == "M10"), None)
+    if case is None:
+        raise ValueError("SCANNED_PDF_CASE_MISSING")
+    expected = case["expected"]
+    question = "识别扫描件的页数、旋转页、最终值所在页和最终值。"
+    pdf = _scanned_pdf()
+    source_sha256 = hashlib.sha256(pdf).hexdigest()
+    destination_fixture = fixture_path.expanduser().resolve()
+    if not destination_fixture.is_file():
+        raise ValueError("LEVEL0_VISION_FIXTURE_MISSING")
+
+    old_fixture_env = os.environ.get("CHATBI_LEVEL0_VISION_FIXTURE_PATH")
+    os.environ["CHATBI_LEVEL0_VISION_FIXTURE_PATH"] = str(destination_fixture)
+    cached_settings.cache_clear()
+    with tempfile.TemporaryDirectory(prefix="chatbi-phase5-scanned-pdf-") as directory:
+        pdf_path = Path(directory) / "synthetic-scan.pdf"
+        pdf_path.write_bytes(pdf)
+        item = SimpleNamespace(
+            id="ATT-PHASE5-SCANNED-PDF",
+            workspace_id=_WORKSPACE_ID,
+            user_id="LEVEL0-LOCAL",
+            filename=pdf_path.name,
+            kind="SCANNED_PDF",
+            mime_type="application/pdf",
+            sha256=source_sha256,
+        )
+        provider = ResolvedProvider(
+            provider_id="mimo",
+            display_name="MiMo",
+            base_url="https://level0-provider-call-must-be-blocked.invalid/v1",
+            api_key="level0-not-a-real-key",
+            model_name="mimo-v2.5",
+            auth_header="Authorization",
+            auth_prefix="Bearer ",
+            max_tokens_field="max_tokens",
+            request_options={},
+        )
+        settings = Settings(
+            _env_file=None,
+            vision_model_provider="mimo",
+            general_model_provider="mimo",
+            level0_vision_fixture_path=str(destination_fixture),
+        )
+        gateway = ModelGateway(settings, provider_overrides={"mimo": provider})
+        original_attachment_path = chat_module.attachment_path
+        chat_module.attachment_path = lambda _item: pdf_path
+        try:
+            answer, resolved_provider, model, streamed, model_trace, evidence = ChatService(gateway)._vision_answer(
+                question,
+                [item],
+                [],
+                request_context=RequestContext(
+                    request_id="PHASE5-SCANNED-PDF-LEVEL0",
+                    trace_id="TRACE-PHASE5-SCANNED-PDF-LEVEL0",
+                    workspace_id=_WORKSPACE_ID,
+                    user_id="LEVEL0-LOCAL",
+                    route="MULTIMODAL_QUERY",
+                    question=question,
+                ),
+                complexity_score=25,
+            )
+        finally:
+            chat_module.attachment_path = original_attachment_path
+            if old_fixture_env is None:
+                os.environ.pop("CHATBI_LEVEL0_VISION_FIXTURE_PATH", None)
+            else:
+                os.environ["CHATBI_LEVEL0_VISION_FIXTURE_PATH"] = old_fixture_env
+            cached_settings.cache_clear()
+
+    visual = evidence[0] if evidence else {}
+    ocr = ((visual.get("metadata") or {}).get("local_ocr") or [])
+    claims = {
+        str(value.get("claim")): value.get("value")
+        for value in visual.get("claims") or []
+        if isinstance(value, dict)
+    }
+    checks = {
+        "pdf_page_render": (visual.get("metadata") or {}).get("pages") == [1, 2, 3],
+        "ocr_page_coverage": [value.get("page") for value in ocr] == [1, 2, 3],
+        "ocr_text_evidence": all(value.get("sanitized_text") for value in ocr),
+        "rotated_page_recovered": any(
+            value.get("page") == int(expected["rotated_page"])
+            and int(value.get("rotation_degrees") or 0) in {90, 270}
+            for value in ocr
+        ),
+        "page_locator_from_ocr": any(
+            value.get("page") == int(expected["page_locator"])
+            and str(expected["value"]) in str(value.get("sanitized_text") or "")
+            for value in ocr
+        ),
+        "existing_gateway_recorded": resolved_provider == "recorded" and model_trace.get("recorded_fixture") is True,
+        "answer_guard": bool(answer) and visual.get("injection_detected") is False,
+        "claims_verified": claims == {
+            "页数": expected["pages"],
+            "旋转页": expected["rotated_page"],
+            "最终值所在页": expected["page_locator"],
+            "最终值": expected["value"],
+        },
+        "provider_network_calls": model_trace.get("paid_provider_calls") == 0,
+        "streamed": streamed is False,
+    }
+    passed = all(checks.values())
+    payload = {
+        "schema_version": "chatbi-v1.3-level0-scanned-pdf-local-v1",
+        "generated_at": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
+        "execution_mode": "level0_recorded",
+        "selected_case_ids": ["M10"],
+        "status": "PASS" if passed else "FAIL",
+        "score": "TARGETED_1/1" if passed else "NOT_ACHIEVED",
+        "source_sha256": source_sha256,
+        "question_sha256": hashlib.sha256(question.encode("utf-8")).hexdigest(),
+        "recording_fixture_sha256": hashlib.sha256(destination_fixture.read_bytes()).hexdigest(),
+        "pipeline": ["PDF_PAGE_RENDER", "LOCAL_OCR_TEXT_EVIDENCE", "STRUCTURED_EVIDENCE", "EXISTING_VISION_MODEL_GATEWAY", "ANSWER_GUARD"],
+        "checks": checks,
+        "ocr_evidence": ocr,
+        "visual_evidence_signature": visual.get("signature"),
+        "model_trace": model_trace,
+        "paid_provider_calls": 0,
+        "paid_provider_cost_cny": 0.0,
+        "raw_media_persisted": False,
+        "secrets_exposed": False,
+    }
+    payload["evidence_signature"] = canonical_sha256(payload)
+    return payload
+
+
 def write_report(payload: Mapping[str, Any], output: Path) -> Path:
     destination = output.expanduser().resolve()
     destination.parent.mkdir(parents=True, exist_ok=True)
@@ -602,11 +755,32 @@ def _arguments() -> argparse.Namespace:
     parser.add_argument("--manifest", type=Path, default=_DEFAULT_MANIFEST)
     parser.add_argument("--output", type=Path, help="Optional JSON output path, including outside this repository.")
     parser.add_argument("--case-id", action="append", choices=tuple(f"M{number:02d}" for number in range(1, 11)))
+    parser.add_argument("--level0-local-scanned", action="store_true")
+    parser.add_argument(
+        "--fixture-path",
+        type=Path,
+        default=_ROOT / "evaluation" / "fixtures" / "v13-phase5-level0-vision-recordings.json",
+    )
     return parser.parse_args()
 
 
 def main() -> int:
     arguments = _arguments()
+    if arguments.level0_local_scanned:
+        if arguments.case_id and arguments.case_id != ["M10"]:
+            raise SystemExit("LEVEL0_LOCAL_SCANNED_SUPPORTS_ONLY_M10")
+        os.environ["CHATBI_TEST_COST_CONTROL"] = "YES"
+        os.environ["CHATBI_TEST_EXECUTION_LEVEL"] = "LEVEL0"
+        os.environ["CHATBI_PAID_TEST_AUTHORIZED"] = "NO"
+        os.environ["CHATBI_TEST_AFFECTED_PATH"] = "scanned_pdf"
+        payload = run_scanned_pdf_level0(
+            manifest_path=arguments.manifest,
+            fixture_path=arguments.fixture_path,
+        )
+        if arguments.output:
+            write_report(payload, arguments.output)
+        print(json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True))
+        return 0 if payload["status"] == "PASS" else 1
     controller = TestCostController()
     try:
         configuration = controller.validate_configuration()

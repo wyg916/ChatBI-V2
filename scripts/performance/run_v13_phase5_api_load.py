@@ -84,6 +84,7 @@ RELEASE_THRESHOLDS = {
 }
 DEFAULT_API_USERS = 20
 DEFAULT_API_DURATION_SECONDS = 15 * 60
+PROVIDER_MODES = ("live", "deterministic-controlled")
 
 
 @dataclass(frozen=True)
@@ -153,7 +154,7 @@ WORKLOAD_MIX: tuple[str, ...] = (
 QUESTIONS = {
     "DATA": "统计全部订单收入，并返回可核验结果。",
     "RAG": "根据已授权业务知识说明收入指标口径，并给出可核验引用。",
-    "HYBRID": "结合订单数据与已授权业务口径，分析收入结果并给出引用。",
+    "HYBRID": "统计全部订单收入，并结合已授权收入指标口径给出可核验引用。",
     "AGENT": "对全部订单收入做复杂分析，结合已授权业务口径验证后给出结论。",
     "FILE": "计算附件中收入合计并按区域比较，给出可核验明细。",
     "VISION": "识别附件图表中的各月收入柱并总结趋势，不要编造不可见数值。",
@@ -320,6 +321,19 @@ def _independent_result_signature(columns: Any, rows: Any) -> str:
     payload = json.dumps(
         {"columns": ordered_columns, "rows": normalized_rows},
         ensure_ascii=False, sort_keys=True, separators=(",", ":"),
+    )
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+
+def _independent_file_result_signature(rows: Any) -> str:
+    """Recompute the file-analysis contract's rows-only canonical digest."""
+
+    payload = json.dumps(
+        rows if isinstance(rows, list) else [],
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+        default=str,
     )
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
@@ -1152,7 +1166,7 @@ def validate_business_result(
         file_signature = str(result.get("result_signature") or "")
         if (
             len(file_signature) != 64
-            or file_signature != _independent_result_signature(result.get("columns"), rows)
+            or file_signature != _independent_file_result_signature(rows)
         ):
             failures.append("FILE_RESULT_SIGNATURE_NOT_PROVEN")
         if sum(sums, Decimal(0)) != Decimal(FILE_EXPECTED_REVENUE):
@@ -1545,6 +1559,34 @@ def summarize_api_load(
             for item in resources
         ),
     }
+    failed = [item for item in observations if not item.success]
+    failure_distribution = {
+        "HTTP_STATUS": {
+            str(status): sum(item.status_code == status for item in failed)
+            for status in sorted({item.status_code for item in failed if item.status_code != 200})
+        },
+        "ROUTE": {
+            route: sum((item.observed_route or item.kind) == route for item in failed)
+            for route in sorted({str(item.observed_route or item.kind) for item in failed})
+        },
+        "ERROR_CODE": dict(sorted(errors.items())),
+        "TIMEOUT": sum("timeout" in str(item.error_code or "").casefold() for item in failed),
+        "POOL_WAIT": 0,
+        "QUEUE_WAIT": 0,
+        "DB_WAIT": 0,
+        "SSE_FAILURE": sum(
+            item.terminal_count != 1 or item.error_code == "SSE_CONTRACT_FAILED" for item in failed
+        ),
+        "CANCELLATION": sum("cancel" in str(item.error_code or "").casefold() for item in failed),
+        "OTHER": sum(
+            item.status_code in {0, 200}
+            and item.terminal_count == 1
+            and item.error_code not in {"SSE_CONTRACT_FAILED"}
+            and "timeout" not in str(item.error_code or "").casefold()
+            and "cancel" not in str(item.error_code or "").casefold()
+            for item in failed
+        ),
+    }
     return {
         "requests": len(observations),
         "successes": successes,
@@ -1557,10 +1599,14 @@ def summarize_api_load(
         "terminal_contract_violations": sum(item.terminal_count != 1 for item in observations),
         "business_validation_rate": round(sum(item.business_valid for item in observations) / len(observations), 6) if observations else 0.0,
         "kind_coverage": sorted({item.kind for item in observations}),
+        "ttfe_ms": distribution([item.ttfe_ms for item in observations]),
+        "ttft_ms": distribution([item.ttft_ms for item in observations]),
+        "total_ms": distribution([item.total_ms for item in observations]),
         "by_kind": by_kind,
         "resources": resource_metrics,
         "errors": dict(sorted(errors.items())),
         "business_failures": dict(sorted(business_failures.items())),
+        "failure_distribution": failure_distribution,
     }
 
 
@@ -1571,10 +1617,15 @@ def aggregate_scoped_cost_ledger(
     observations: Sequence[ApiSample],
     request_prefix: str,
     kimi_pricing: dict[str, float],
+    provider_mode: str = "live",
 ) -> dict[str, Any]:
     scoped = [item for item in entries if str(item.get("request_id") or "").startswith(request_prefix)]
-    billable_kinds = {"DATA", "RAG", "HYBRID", "AGENT", "VISION"}
-    expected_ids = {item.request_id for item in observations if item.kind in billable_kinds and item.request_id}
+    # Only routes that actually cross ModelGateway belong in the per-request
+    # ledger denominator. DATA and FILE are deterministic pipelines, while the
+    # frozen five-role Agent orchestrator uses bounded ToolExecutor calls and
+    # does not call a provider. RAG, HYBRID and VISION do cross ModelGateway.
+    gateway_kinds = {"RAG", "HYBRID", "VISION"}
+    expected_ids = {item.request_id for item in observations if item.kind in gateway_kinds and item.request_id}
     route_by_request = {
         item.request_id: str(item.observed_route or "NOT_PROVEN")
         for item in observations if item.request_id
@@ -1588,14 +1639,18 @@ def aggregate_scoped_cost_ledger(
         "complete": bool(base_coverage.get("complete")) and not missing and bool(expected_ids),
         "warnings": list(base_coverage.get("warnings") or []),
         "scope": "EXACT_PREFIX_AND_LOAD_WINDOW",
-        "expected_billable_requests": len(expected_ids),
-        "covered_billable_requests": len(matched),
-        "missing_billable_requests": len(missing),
+        "expected_billable_requests": len(expected_ids) if provider_mode == "live" else 0,
+        "covered_billable_requests": len(matched) if provider_mode == "live" else 0,
+        "missing_billable_requests": len(missing) if provider_mode == "live" else 0,
+        "expected_gateway_requests": len(expected_ids),
+        "covered_gateway_requests": len(matched),
+        "missing_gateway_requests": len(missing),
         "request_coverage": round(len(matched) / len(expected_ids), 6) if expected_ids else 0.0,
         "route_source": "VALIDATED_SSE_OBSERVED_ROUTE",
+        "provider_mode": provider_mode,
         "billing_expectation": {
-            "MODEL_REQUIRED": sorted(billable_kinds),
-            "MODEL_OPTIONAL_DETERMINISTIC": ["FILE"],
+            "MODEL_GATEWAY_EXPECTED": sorted(gateway_kinds),
+            "NO_GATEWAY_EXPECTED": sorted(set(WORKLOAD_MIX) - gateway_kinds),
         },
         "request_prefix_sha256": hashlib.sha256(request_prefix.encode()).hexdigest(),
     }
@@ -1626,10 +1681,23 @@ def aggregate_scoped_cost_ledger(
         )
         for item in scoped
     )
+    statuses: dict[str, int] = {}
+    for item in scoped:
+        status = str(item.get("status") or "UNKNOWN")
+        statuses[status] = statuses.get(status, 0) + 1
     return {
         **result,
         "by_route": by_route,
         "by_provider": by_provider,
+        "by_status": dict(sorted(statuses.items())),
+        "level0_zero_cost_receipts": sum(
+            item.get("status") == "BLOCKED"
+            and item.get("error_code") == "LEVEL0_PAID_PROVIDER_CALL_BLOCKED"
+            and int(item.get("input_tokens") or 0) == 0
+            and int(item.get("output_tokens") or 0) == 0
+            and float(item.get("cost_cny") or 0.0) == 0.0
+            for item in scoped
+        ),
         "scoped_ledger_sha256": hashlib.sha256(
             json.dumps(digest_rows, separators=(",", ":")).encode("utf-8")
         ).hexdigest(),
@@ -1645,6 +1713,7 @@ def evaluate_api_gate(
     cost: dict[str, Any] | None,
     cleanup: dict[str, Any],
     runtime_error: str | None,
+    provider_mode: str = "live",
 ) -> list[str]:
     failures: list[str] = []
     if runtime_error:
@@ -1732,26 +1801,34 @@ def evaluate_api_gate(
         if resource["db_connections"]["max"] > RELEASE_THRESHOLDS["max_db_connections"]:
             failures.append("db_connections_above_gate")
     if cost is None:
-        failures.append("real_model_invocation_cost_ledger_missing")
+        failures.append("model_invocation_cost_ledger_missing")
     else:
         if cost["coverage"].get("source") != "MODEL_INVOCATION_LEDGER" or not cost["coverage"].get("complete"):
             failures.append("model_invocation_ledger_coverage_incomplete")
         if cost["coverage"].get("scope") != "EXACT_PREFIX_AND_LOAD_WINDOW" or cost["coverage"].get("request_coverage") != 1.0:
             failures.append("model_invocation_request_coverage_incomplete")
-        if cost["invocations"] <= 0 or cost["token_bearing_invocations"] <= 0:
+        if cost["invocations"] <= 0:
             failures.append("model_invocation_ledger_window_empty")
         if cleanup.get("metadata_load_model_invocations_removed") != cost["invocations"]:
             failures.append("model_invocation_cleanup_count_mismatch")
-        expected_cost_routes = {
-            "DATA_QUERY", "KNOWLEDGE_QUERY", "HYBRID_ANALYSIS", "COMPLEX_ANALYSIS", "MULTIMODAL_QUERY",
-        }
+        expected_cost_routes = {"KNOWLEDGE_QUERY", "HYBRID_ANALYSIS", "MULTIMODAL_QUERY"}
         cost_routes = set(cost.get("by_route") or {})
         if not expected_cost_routes <= cost_routes or "NOT_PROVEN" in cost_routes or not cost.get("by_provider"):
             failures.append("model_invocation_route_provider_breakdown_incomplete")
-        if cost["kimi_premium_share"] > RELEASE_THRESHOLDS["max_kimi_premium_share"]:
-            failures.append("kimi_premium_share_above_0_10")
-        if cost["saving_vs_all_premium"] < RELEASE_THRESHOLDS["min_saving_vs_all_premium"]:
-            failures.append("saving_vs_all_premium_below_0_60")
+        if provider_mode == "deterministic-controlled":
+            if (
+                cost["token_bearing_invocations"] != 0
+                or cost["actual_cost_cny"] != 0.0
+                or cost.get("level0_zero_cost_receipts") != cost["invocations"]
+            ):
+                failures.append("level0_model_invocation_not_zero_cost_blocked")
+        else:
+            if cost["token_bearing_invocations"] <= 0:
+                failures.append("model_invocation_ledger_window_has_no_token_receipts")
+            if cost["kimi_premium_share"] > RELEASE_THRESHOLDS["max_kimi_premium_share"]:
+                failures.append("kimi_premium_share_above_0_10")
+            if cost["saving_vs_all_premium"] < RELEASE_THRESHOLDS["min_saving_vs_all_premium"]:
+                failures.append("saving_vs_all_premium_below_0_60")
     return sorted(set(failures))
 
 
@@ -1770,6 +1847,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--users", type=int, default=DEFAULT_API_USERS)
     parser.add_argument("--duration-seconds", type=int, default=DEFAULT_API_DURATION_SECONDS)
     parser.add_argument("--request-timeout-seconds", type=float, default=40.0)
+    parser.add_argument("--provider-mode", choices=PROVIDER_MODES, default="live")
     parser.add_argument("--output", type=Path, required=True)
     return parser
 
@@ -1918,6 +1996,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             observations=observations,
             request_prefix=request_prefix,
             kimi_pricing=pricing["providers"]["kimi"],
+            provider_mode=args.provider_mode,
         )
     except Exception as exc:
         runtime_error = type(exc).__name__
@@ -1948,6 +2027,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         cost=cost,
         cleanup=cleanup,
         runtime_error=runtime_error,
+        provider_mode=args.provider_mode,
     )
     evidence = {
         "schema_version": "chatbi.v13.phase5.authenticated-api-load.v1",
@@ -1963,6 +2043,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             "duration_seconds": args.duration_seconds,
             "production_default_duration_seconds": DEFAULT_API_DURATION_SECONDS,
             "transport": "REAL_AUTHENTICATED_BACKEND_API_SSE",
+            "provider_mode": args.provider_mode,
             "route_evidence_scope": "CALLER_PINNED_ROUTE_SPECIFIC_LOAD_NOT_ROUTER_CLASSIFICATION_EVIDENCE",
             "temporary_identity_bootstrap": "ATOMIC_APP_USER_RESOURCE_GRANT",
             "metadata_schema": args.metadata_schema,

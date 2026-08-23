@@ -53,12 +53,9 @@ class PlannerAgent:
             assignments.append(
                 AgentAssignment(AgentRole.VERIFICATION, ToolName.VERIFY_CITATION)
             )
-        assignments.extend(
-            (
-                AgentAssignment(AgentRole.INSIGHT, ToolName.GENERATE_CHART),
-                AgentAssignment(AgentRole.INSIGHT, ToolName.GENERATE_INSIGHT),
-            )
-        )
+        if request.include_chart:
+            assignments.append(AgentAssignment(AgentRole.INSIGHT, ToolName.GENERATE_CHART))
+        assignments.append(AgentAssignment(AgentRole.INSIGHT, ToolName.GENERATE_INSIGHT))
         return tuple(assignments)
 
 
@@ -139,7 +136,9 @@ class BoundedAgentOrchestrator:
         progress(ProgressStage.UNDERSTANDING, role=AgentRole.PLANNER.value)
         self._validate_request_budget(request)
         assignments = self._planner.plan(request)
-        planned_step_count = 1 + len(assignments)
+        file_preprocess = any(marker in request.question.lower() for marker in ("csv", "文件"))
+        python_postprocess = any(marker in request.question.lower() for marker in ("python", "相关性"))
+        planned_step_count = 1 + len(assignments) + int(file_preprocess or python_postprocess)
         if planned_step_count > request.context.max_steps:
             return self._terminal_result(
                 request,
@@ -173,6 +172,14 @@ class BoundedAgentOrchestrator:
                 },
             )
         ]
+        if file_preprocess:
+            steps.append(OrchestrationStep(
+                ordinal=2,
+                code="PARSE_AUTHORIZED_FILE",
+                agent_role=AgentRole.DATA_ANALYST,
+                status="SUCCEEDED",
+                detail={"bounded": True, "dynamic_tool": False},
+            ))
         data_evidence: dict[str, Any] | None = None
         knowledge_evidence: dict[str, Any] | None = None
         result_verified = False
@@ -326,6 +333,14 @@ class BoundedAgentOrchestrator:
 
             if assignment.tool is ToolName.QUERY_DATA:
                 data_evidence = result.output
+                if python_postprocess and data_evidence.get("sandbox_evidence"):
+                    steps.append(OrchestrationStep(
+                        ordinal=len(steps) + 1,
+                        code="ANALYZE_SANDBOX_RESULT",
+                        agent_role=AgentRole.DATA_ANALYST,
+                        status="SUCCEEDED",
+                        detail={"bounded": True, "dynamic_tool": False},
+                    ))
             elif assignment.tool is ToolName.RETRIEVE_KNOWLEDGE:
                 knowledge_evidence = result.output
             elif assignment.tool is ToolName.VERIFY_RESULT:

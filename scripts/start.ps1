@@ -13,7 +13,14 @@ $frontendHealth = "http://127.0.0.1:${frontendPort}/"
 $ragHealth = "http://127.0.0.1:${ragPort}/health"
 
 if (-not (Test-Path -LiteralPath (Join-Path $projectRoot '.env'))) {
-  throw 'Missing local .env. Run scripts/bootstrap-local-databases.ps1 first.'
+  $requiredEnvironment = @(
+    'CHATBI_META_PASSWORD', 'CHATBI_DATASOURCE_SECRET_KEY', 'CHATBI_RAG_SHARED_SECRET',
+    'CHATBI_BOOTSTRAP_ADMIN_PASSWORD', 'CHATBI_BOOTSTRAP_ANALYST_PASSWORD'
+  )
+  $missingEnvironment = @($requiredEnvironment | Where-Object { -not [Environment]::GetEnvironmentVariable($_, 'Process') })
+  if ($missingEnvironment.Count -gt 0) {
+    throw 'Missing local .env and required process environment. Run scripts/bootstrap-local-databases.ps1 first.'
+  }
 }
 foreach ($port in 5432, 3306) {
   if (-not (Test-NetConnection -ComputerName '127.0.0.1' -Port $port -InformationLevel Quiet)) {

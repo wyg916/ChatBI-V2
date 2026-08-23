@@ -1,0 +1,64 @@
+{
+  "schema_version": "chatbi-v13-level0-recorded-vision-v1",
+  "records": [
+    {
+      "recording_id": "chatbi-ui-approved-reference-20260823",
+      "file_sha256": "9507f1cffe3e3935450bf3742c03a490acb4913e6832dae74f5e9606178e8976",
+      "question_sha256": "f750d8225a4c6a124d0f65028aced55621df084bbc735fe886ff659071555df0",
+      "response": {
+        "answer": "左侧导航高亮项和内容区主标题都是问数据。",
+        "claims": [
+          {
+            "metric": "界面标题",
+            "value": "问数据",
+            "time_range": null,
+            "dimension": "左侧导航与内容区主标题",
+            "confidence": 1.0
+          }
+        ],
+        "prompt_injection_detected": false,
+        "safe_to_publish": true,
+        "sensitive_categories": [],
+        "sensitive_classification": "NONE"
+      }
+    },
+    {
+      "recording_id": "phase5-api-load-synthetic-bars-20260823",
+      "file_sha256": "52f494adad0cf1e318f344e6d4d0a8c0d62283dc085a270b3e0e45b4d797d4ae",
+      "question_sha256": "9cb3bf32d401c43012863074421113d085347fbcdc36c72777dc3ae1632228a7",
+      "response": {
+        "answer": "图中六个月的收入柱依次为 100、120、90、150、130、170，整体波动上升。",
+        "claims": [
+          {"metric": "月收入", "value": 100, "time_range": "第1月", "dimension": "收入柱", "confidence": 1.0},
+          {"metric": "月收入", "value": 120, "time_range": "第2月", "dimension": "收入柱", "confidence": 1.0},
+          {"metric": "月收入", "value": 90, "time_range": "第3月", "dimension": "收入柱", "confidence": 1.0},
+          {"metric": "月收入", "value": 150, "time_range": "第4月", "dimension": "收入柱", "confidence": 1.0},
+          {"metric": "月收入", "value": 130, "time_range": "第5月", "dimension": "收入柱", "confidence": 1.0},
+          {"metric": "月收入", "value": 170, "time_range": "第6月", "dimension": "收入柱", "confidence": 1.0}
+        ],
+        "prompt_injection_detected": false,
+        "safe_to_publish": true,
+        "sensitive_categories": [],
+        "sensitive_classification": "NONE"
+      }
+    },
+    {
+      "recording_id": "phase5-scanned-pdf-local-ocr-20260823",
+      "file_sha256": "c9b621ede8ec26d62cdfe0f7438366539df61885b5da84990660a3b9d9eaad96",
+      "question_sha256": "11fa679d7bac67b9cb1644b3ffc1f84f7b8115b367e793f70f29e8539d6dd670",
+      "response": {
+        "answer": "扫描件共 3 页，第 2 页为旋转页，最终值 760 位于第 3 页。",
+        "claims": [
+          {"metric": "页数", "value": 3, "time_range": null, "dimension": "扫描件", "confidence": 1.0},
+          {"metric": "旋转页", "value": 2, "time_range": null, "dimension": "扫描件页码", "confidence": 1.0},
+          {"metric": "最终值所在页", "value": 3, "time_range": null, "dimension": "扫描件页码", "confidence": 1.0},
+          {"metric": "最终值", "value": 760, "time_range": null, "dimension": "第3页", "confidence": 1.0}
+        ],
+        "prompt_injection_detected": false,
+        "safe_to_publish": true,
+        "sensitive_categories": [],
+        "sensitive_classification": "NONE"
+      }
+    }
+  ]
+}

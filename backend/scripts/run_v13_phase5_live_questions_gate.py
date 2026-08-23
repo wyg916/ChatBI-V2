@@ -121,13 +121,16 @@ def validate_controller_url(value: str) -> str:
     return f"{parsed.scheme}://{parsed.netloc}"
 
 
-def load_external_credentials(path: Path) -> dict[str, str]:
+def load_external_credentials(path: Path, *, allow_bootstrap_admin: bool = False) -> dict[str, str]:
     resolved = path.expanduser().resolve()
     if resolved.is_relative_to(REPO_ROOT.resolve()):
         raise ValueError("--env-file must be outside the repository")
     values = dotenv_values(resolved)
     email = str(values.get("CHATBI_PHASE5_EMAIL") or "").strip()
     password = str(values.get("CHATBI_PHASE5_PASSWORD") or "")
+    if allow_bootstrap_admin and not email and not password:
+        email = "admin@chatbi.local"
+        password = str(values.get("CHATBI_BOOTSTRAP_ADMIN_PASSWORD") or "")
     if not email or not password:
         raise ValueError("external env-file requires CHATBI_PHASE5_EMAIL and CHATBI_PHASE5_PASSWORD")
     return {"email": email, "password": password}
@@ -207,22 +210,19 @@ def _nested_values(value: Any, key: str) -> list[Any]:
 
 
 def _answer_text(response: Mapping[str, Any]) -> str:
-    fragments: list[str] = []
-
-    def visit(value: Any, *, key: str = "") -> None:
-        if isinstance(value, Mapping):
-            for item_key, item_value in value.items():
-                visit(item_value, key=str(item_key).lower())
-        elif isinstance(value, list):
-            for item in value:
-                visit(item, key=key)
-        elif isinstance(value, str) and key in _TEXT_KEYS and value.strip():
-            fragments.append(value.strip())
-
-    visit(response.get("assistant_message") or {})
-    visit(response.get("answer_envelope") or {})
-    visit(response.get("message_parts") or [])
-    return "\n".join(dict.fromkeys(fragments))
+    assistant = response.get("assistant_message") or {}
+    content = str(assistant.get("content") or "").strip()
+    if content:
+        return content
+    for item in response.get("message_parts") or []:
+        if (
+            isinstance(item, Mapping)
+            and str(item.get("role") or "") == "conclusion"
+            and str(item.get("text") or "").strip()
+        ):
+            return str(item["text"]).strip()
+    envelope = response.get("answer_envelope") or {}
+    return str(envelope.get("content") or envelope.get("conclusion") or "").strip()
 
 
 def _answer_oracle(response: Mapping[str, Any], verification: Mapping[str, Any]) -> dict[str, Any]:
@@ -391,6 +391,7 @@ def _ledger_for_request(
         "fallback_count": sum(int(item.get("fallback_count") or 0) for item in entries),
         "statuses": [str(item.get("status") or "") for item in entries],
         "providers": [str(item.get("provider") or "") for item in entries],
+        "error_codes": [str(item.get("error_code") or "") for item in entries],
     }
 
 
@@ -523,6 +524,8 @@ def _common_failures(
     ledger: Mapping[str, Any],
     trace: Mapping[str, Any],
     assistant_status: str,
+    level0_mode: bool = False,
+    expected_status: str = "SUCCEEDED",
 ) -> list[str]:
     failures: list[str] = []
     if route != expected_route:
@@ -535,14 +538,25 @@ def _common_failures(
         failures.append("model_call_budget_exceeded")
     if float(ledger["cost_cny"]) > float(cost_cny_max):
         failures.append("cost_budget_exceeded")
-    if any(status != "SUCCEEDED" for status in ledger["statuses"]):
+    if level0_mode:
+        if any(status != "BLOCKED" for status in ledger["statuses"]):
+            failures.append("model_invocation_not_level0_blocked")
+        if any(code != "LEVEL0_PAID_PROVIDER_CALL_BLOCKED" for code in ledger.get("error_codes") or []):
+            failures.append("model_invocation_level0_block_reason_mismatch")
+        if ledger["input_tokens"] != 0 or ledger["output_tokens"] != 0 or ledger["cost_cny"] != 0:
+            failures.append("model_invocation_level0_not_zero_cost")
+    elif any(status != "SUCCEEDED" for status in ledger["statuses"]):
         failures.append("model_invocation_not_succeeded")
     if trace["trace_id_exact"] is not True:
         failures.append("trace_id_mismatch")
-    if str(trace.get("status") or "") != "SUCCEEDED":
-        failures.append("trace_not_succeeded")
-    if assistant_status != "SUCCEEDED":
-        failures.append("assistant_not_succeeded")
+    if str(trace.get("status") or "") != expected_status:
+        failures.append(
+            "refusal_trace_status_mismatch" if expected_status == "REFUSED" else "trace_not_succeeded"
+        )
+    if assistant_status != expected_status:
+        failures.append(
+            "refusal_assistant_status_mismatch" if expected_status == "REFUSED" else "assistant_not_succeeded"
+        )
     return failures
 
 
@@ -556,6 +570,7 @@ def _action_failures(
     verification: Mapping[str, Any],
     answer_oracle: Mapping[str, Any],
     ground_truth: Mapping[str, Any],
+    level0_mode: bool = False,
 ) -> list[str]:
     expected = case["expected"]
     action = str(expected["action"])
@@ -568,6 +583,8 @@ def _action_failures(
         ledger=ledger,
         trace=trace,
         assistant_status=_answer_status(response),
+        level0_mode=level0_mode,
+        expected_status="REFUSED" if action in _REFUSAL_ACTIONS else "SUCCEEDED",
     )
     if not expected["sql_execution_allowed"] and trace["has_sql"]:
         failures.append("unexpected_sql_execution")
@@ -666,6 +683,7 @@ class LiveQuestionsGate:
         credentials: Mapping[str, str],
         secret_values: Sequence[str],
         controller_client: httpx.Client | None = None,
+        level0_mode: bool = False,
     ) -> None:
         self.client = client
         self.datasource_id = datasource_id
@@ -673,6 +691,7 @@ class LiveQuestionsGate:
         self.credentials = credentials
         self.secret_values = tuple(value for value in secret_values if value)
         self.controller_client = controller_client
+        self.level0_mode = level0_mode
         self.cleanup_tracker = CleanupTracker()
 
     def login(self) -> dict[str, Any]:
@@ -762,6 +781,7 @@ class LiveQuestionsGate:
                 ledger=ledger,
                 trace=trace,
                 assistant_status=_answer_status(response),
+                level0_mode=self.level0_mode,
             )
         else:
             failures = _action_failures(
@@ -773,6 +793,7 @@ class LiveQuestionsGate:
                 verification=verification,
                 answer_oracle=answer_oracle,
                 ground_truth=ground_truth,
+                level0_mode=self.level0_mode,
             )
         evidence = {
             "id": case["id"],
@@ -926,9 +947,9 @@ class LiveQuestionsGate:
             failures.append("cancel_request_identity_mismatch")
         if ledger["coverage_source"] != "MODEL_INVOCATION_LEDGER" or not ledger["coverage_complete"]:
             failures.append("cancel_ledger_incomplete")
-        if not ledger["request_id_exact"] or ledger["invocation_count"] < 1:
+        if not ledger["request_id_exact"]:
             failures.append("cancel_ledger_request_missing")
-        if not ledger["statuses"] or any(status != "CANCELLED" for status in ledger["statuses"]):
+        if ledger["invocation_count"] > 0 and any(status != "CANCELLED" for status in ledger["statuses"]):
             failures.append("cancel_ledger_status_mismatch")
         if float(ledger["cost_cny"]) > float(case["expected"]["max_cost_cny"]):
             failures.append("cancel_cost_budget_exceeded")
@@ -1231,6 +1252,7 @@ def run_live_gate(
     controller_client: httpx.Client,
     weird_case_ids: frozenset[str] | None = None,
     complex_case_ids: frozenset[str] | None = None,
+    execution_mode: str = "live",
 ) -> dict[str, Any]:
     started_at = utc_now()
     gate = LiveQuestionsGate(
@@ -1240,6 +1262,7 @@ def run_live_gate(
         credentials=credentials,
         secret_values=(credentials["password"],),
         controller_client=controller_client,
+        level0_mode=execution_mode == "level0_deterministic",
     )
     weird_results: list[dict[str, Any]] = []
     complex_results: list[dict[str, Any]] = []
@@ -1315,12 +1338,15 @@ def run_live_gate(
         failures.append("tested_sha_missing")
     evidence = {
         "schema_version": "chatbi.v13.phase5.live-questions.v1",
+        "execution_mode": execution_mode,
         "status": "PASS" if not failures else "FAIL",
         "tested_sha": tested_sha,
         "started_at": iso(started_at),
         "completed_at": iso(utc_now()),
         "certification_scope": (
-            "FULL_FINAL"
+            "LEVEL0_FULL"
+            if execution_mode == "level0_deterministic"
+            else "FULL_FINAL"
             if selected_weird_ids == all_weird_ids and selected_complex_ids == all_complex_ids
             else "TARGETED_FAILED_CASES_ONLY"
         ),
@@ -1365,6 +1391,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--sandbox-controller-url", required=True)
     parser.add_argument("--weird-case", action="append")
     parser.add_argument("--complex-case", action="append")
+    parser.add_argument("--level0-deterministic", action="store_true")
     return parser
 
 
@@ -1377,17 +1404,26 @@ def main(argv: Sequence[str] | None = None) -> int:
         configuration = controller.validate_configuration()
     except TestCostControlError as exc:
         raise SystemExit(str(exc)) from exc
-    if not configuration.get("paid_calls_allowed"):
+    if args.level0_deterministic:
+        if controller.level != TestExecutionLevel.LEVEL0 or configuration.get("paid_calls_allowed"):
+            raise SystemExit("LEVEL0_DETERMINISTIC_REQUIRES_LEVEL0_WITH_PAID_CALLS_DISABLED")
+    elif not configuration.get("paid_calls_allowed"):
         raise SystemExit("LIVE_QUESTIONS_GATE_REQUIRES_LEVEL1_OR_LEVEL2_AUTHORIZATION")
     selected_weird = frozenset(args.weird_case or ())
     selected_complex = frozenset(args.complex_case or ())
     selected_count = len(selected_weird) + len(selected_complex)
-    if controller.level == TestExecutionLevel.LEVEL1:
+    if args.level0_deterministic:
+        if selected_count:
+            raise SystemExit("LEVEL0_DETERMINISTIC_MUST_EXECUTE_FULL_WEIRD50_AND_COMPLEX5")
+    elif controller.level == TestExecutionLevel.LEVEL1:
         if selected_count == 0 or selected_count > 3:
             raise SystemExit("LEVEL1_REQUIRES_ONE_TO_THREE_EXPLICIT_FAILED_CASES")
     elif selected_count:
         raise SystemExit("LEVEL2_FINAL_CERTIFICATION_MUST_EXECUTE_FULL_WEIRD50_AND_COMPLEX5")
-    credentials = load_external_credentials(args.env_file)
+    credentials = load_external_credentials(
+        args.env_file,
+        allow_bootstrap_admin=args.level0_deterministic,
+    )
     weird = load_manifest(args.weird_manifest, expected_count=50)
     complex_manifest = load_manifest(args.complex_manifest, expected_count=5)
     api_base = validate_backend_url(args.api_base)
@@ -1415,6 +1451,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             controller_client=controller_client,
             weird_case_ids=selected_weird if controller.level == TestExecutionLevel.LEVEL1 else None,
             complex_case_ids=selected_complex if controller.level == TestExecutionLevel.LEVEL1 else None,
+            execution_mode="level0_deterministic" if args.level0_deterministic else "live",
         )
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps(evidence, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")

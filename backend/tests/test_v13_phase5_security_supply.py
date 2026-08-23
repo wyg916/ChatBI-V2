@@ -399,6 +399,8 @@ def test_release_license_aliases_and_policy_cover_real_venv_metadata(sbom):
         "PSF": "PSF-2.0",
         "PSFL": "PSF-2.0",
         "LGPL": "LGPL-2.1-or-later",
+        "3-Clause BSD License": "BSD-3-Clause",
+        "BSD 3-Clause": "BSD-3-Clause",
         "BSD-3-Clause, Apache-2.0, dependency licenses": (
             "BSD-3-Clause AND Apache-2.0"
         ),

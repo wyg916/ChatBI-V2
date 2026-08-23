@@ -10,6 +10,7 @@ from app.model_gateway.configuration import ResolvedProvider
 from app.model_gateway.contracts import ModelCapability, ModelRequest, RequestContext
 from app.model_gateway.ledger import bind_model_invocation_session
 from app.model_gateway.service import ModelGateway, ModelUnavailable
+from app.model_gateway.test_cost_control import TestCostControlError as CostControlError
 from app.models import AppUser, ModelInvocation, Workspace
 
 
@@ -152,6 +153,56 @@ def test_model_gateway_records_each_provider_attempt_including_retry(db_session)
     assert rows[0].error_code == "HTTP_503"
     assert {row.request_id for row in rows} == {"REQ-ledger-retry"}
     assert all(row.conversation_id == "conversation-retry" for row in rows)
+
+
+def test_level0_blocked_provider_attempt_is_recorded_without_payload(db_session, monkeypatch):
+    workspace = Workspace(name="Level0 Blocked Ledger Workspace")
+    db_session.add(workspace)
+    db_session.flush()
+    user = AppUser(
+        workspace_id=workspace.id,
+        email="level0-ledger@example.invalid",
+        display_name="Level0 Ledger User",
+        role="ADMIN",
+        status="ACTIVE",
+    )
+    db_session.add(user)
+    db_session.flush()
+    monkeypatch.setenv("CHATBI_TEST_COST_CONTROL", "YES")
+    monkeypatch.setenv("CHATBI_TEST_EXECUTION_LEVEL", "LEVEL0")
+    monkeypatch.setenv("CHATBI_PAID_TEST_AUTHORIZED", "NO")
+
+    gateway = ModelGateway(
+        Settings(_env_file=None),
+        provider_overrides={"mimo": _provider()},
+        sleeper=lambda _: None,
+    )
+    context = RequestContext(
+        request_id="REQ-level0-blocked",
+        trace_id="TRACE-level0-blocked",
+        conversation_id="conversation-level0",
+        route="KNOWLEDGE_QUERY",
+        workspace_id=workspace.id,
+        user_id=user.id,
+    )
+    request = ModelRequest(
+        capability=ModelCapability.GENERAL,
+        requested_alias="mimo",
+        messages=({"role": "user", "content": "never-persist-level0-prompt"},),
+    )
+    with bind_model_invocation_session(db_session):
+        with pytest.raises(CostControlError, match="LEVEL0_PAID_PROVIDER_CALL_BLOCKED"):
+            gateway.execute(request, context)
+    db_session.commit()
+
+    row = db_session.query(ModelInvocation).one()
+    assert row.status == "BLOCKED"
+    assert row.error_code == "LEVEL0_PAID_PROVIDER_CALL_BLOCKED"
+    assert row.provider == "mimo"
+    assert row.request_id == "REQ-level0-blocked"
+    assert (row.input_tokens, row.cached_input_tokens, row.output_tokens, row.cost_cny) == (0, 0, 0, 0.0)
+    assert not hasattr(row, "prompt")
+    assert not hasattr(row, "content")
 
 
 def test_stream_cancellation_is_recorded_without_prompt_or_partial_content(db_session):

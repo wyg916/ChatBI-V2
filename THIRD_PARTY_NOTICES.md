@@ -25,6 +25,8 @@ Phase 3 adds two deliberately narrow third-party runtime boundaries plus one sep
 | PandasAI | `bbbb771d31062d81f6fa19bafb40620d5cbe48f4` | `pandasai/sandbox/sandbox.py`, Git blob `6f31f9dfd3dbd023c7f82a1533bb3c577efd19fd` | MIT Expat | The inherited upstream `Sandbox.execute` delegates to ChatBI's disposable hardened Docker worker. Selected file SHA-256: `a6d4934cffc70d8a325071d8ab94b12ec0ded9043cdc01e9ba3a4d1f64d210c6`. |
 | Owner-authorized Legacy RAG | `b2573a9dc1881a54581c5c556fb4a8c34046f9c3` | `backend/app/knowledge/indexer.py`, `reranker.py`, `security.py` | Owner-attested internal reuse; external provenance audit not required | Three byte-identical Git blobs provide the real deterministic index/vector, BM25/RRF/rerank and prompt-injection runtime. ChatBI retains HMAC identity, Workspace/RBAC/ACL, Citation, the single Model Gateway, Answer Guard, Trace/SSE and all data models. Checksums and rollback are locked in `backend/vendor/legacy_energy_rag/.../LOCK.json`. |
 | pypdfium2 | `5.13.0` | published Python package and bundled PDFium binary | BSD-3-Clause / Apache-2.0 plus dependency notices | Bounded scanned-PDF pages are rendered to clean PNG before the existing Vision preprocessing and Model Gateway. |
+| RapidOCR | `3.9.2` | published Python package with bundled PP-OCRv6 models | Apache-2.0; OCR model copyright retained by Baidu | Bounded rendered scan pages are converted to page-located, confidence-scored and hash-bound local text evidence before the existing Vision/Model Gateway. Package wheel SHA-256: `04d6b8d151f823d930bd91910555f57bea897c0c44fa6794267b94cf9c1ef9a0`. |
+| ONNX Runtime | `1.29.0` | published CPU inference runtime | MIT | Executes RapidOCR's bundled ONNX models locally; no OCR page or extracted text leaves the machine before the existing governed model boundary. |
 | Docker SDK for Python | `7.1.0` | published Python package | Apache-2.0 | Host-side control API for creating and synchronously destroying the isolated worker; never installed inside or exposed to the worker. |
 
 The retained license and provenance records live in `packages/dbgpt-runtime-adapter/` and `packages/pandasai-selected-runtime/`. The worker runs non-root with no host mount, no database/model credential, no external network, a read-only root filesystem, dropped capabilities, no-new-privileges, bounded tmpfs, CPU/RAM/PID/time/file/output limits, and mandatory synchronous removal. Missing dependency, wrong provenance or unavailable Docker fails closed and produces zero verified runtime calls.
@@ -136,6 +138,8 @@ ChatBI V2 itself is released under Apache License 2.0. Direct dependencies are c
 | PyArrow, python-multipart | Apache-2.0 |
 | pypdf | BSD-3-Clause |
 | Pillow | MIT-CMU |
+| RapidOCR | Apache-2.0 |
+| ONNX Runtime | MIT |
 | React, React DOM, React Router, TanStack Query, react-markdown, remark-gfm, rehype-sanitize, Testing Library, jsdom, Vite, Vitest | MIT |
 | TypeScript, Playwright, Apache ECharts | Apache-2.0 |
 | pip-audit (release audit tooling only) | Apache-2.0 |

@@ -3,6 +3,7 @@ import { adminStorageState } from './e2e/auth';
 
 const webBase = process.env.CHATBI_WEB_BASE ?? 'http://127.0.0.1:5173';
 const webPort = new URL(webBase).port || '5173';
+const storageState = process.env.CHATBI_E2E_STORAGE_STATE ?? adminStorageState;
 
 export default defineConfig({
   testDir: './e2e',
@@ -16,7 +17,7 @@ export default defineConfig({
     baseURL: webBase,
     browserName: 'chromium',
     viewport: { width: 1440, height: 900 },
-    storageState: adminStorageState,
+    storageState,
     trace: 'retain-on-failure',
   },
   webServer: {

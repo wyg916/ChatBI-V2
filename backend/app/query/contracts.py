@@ -218,6 +218,8 @@ class QueryResponse(BaseModel):
     oracle: dict[str, Any]
     chart_spec: dict[str, Any]
     narrative: dict[str, Any]
+    result_evidence: dict[str, Any] = Field(default_factory=dict)
+    answer_claims: list[dict[str, Any]] = Field(default_factory=list)
     summary: str
     kpis: list[dict[str, Any]]
     recommended_questions: list[str]

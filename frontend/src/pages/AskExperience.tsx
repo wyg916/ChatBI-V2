@@ -425,8 +425,8 @@ export function AskPage({ results = false }: { results?: boolean }) {
   useEffect(() => {
     const messageArea = messageAreaRef.current;
     if (!isAtBottom || !messageArea) return;
-    if (typeof messageArea.scrollTo === 'function') messageArea.scrollTo({ top: messageArea.scrollHeight, behavior: 'smooth' });
-    else messageArea.scrollTop = messageArea.scrollHeight;
+    if (typeof messageArea.scrollTo === 'function') messageArea.scrollTo({ top: messageArea.scrollHeight, behavior: 'auto' });
+    messageArea.scrollTop = messageArea.scrollHeight;
   }, [detail?.messages.length, pendingTurn?.content, pendingTurn?.stage, isAtBottom]);
 
   async function sendMessage(value = draft) {
@@ -767,7 +767,10 @@ export function AskPage({ results = false }: { results?: boolean }) {
         {!isAtBottom && <button className="back-to-latest" type="button" onClick={() => {
           setIsAtBottom(true);
           const node = messageAreaRef.current;
-          if (node && typeof node.scrollTo === 'function') node.scrollTo({ top: node.scrollHeight, behavior: 'smooth' });
+          if (node) {
+            if (typeof node.scrollTo === 'function') node.scrollTo({ top: node.scrollHeight, behavior: 'auto' });
+            node.scrollTop = node.scrollHeight;
+          }
         }}>回到最新消息 ↓</button>}
 
         <div className="chat-composer-zone">

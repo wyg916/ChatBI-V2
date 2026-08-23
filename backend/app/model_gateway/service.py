@@ -24,7 +24,7 @@ from app.model_gateway.contracts import (
 )
 from app.model_gateway.policy import RoutingPolicy
 from app.model_gateway.ledger import record_model_invocation
-from app.model_gateway.test_cost_control import PaidTestAttempt, TestCostController
+from app.model_gateway.test_cost_control import PaidTestAttempt, TestCostControlError, TestCostController
 
 
 class ModelUnavailable(RuntimeError):
@@ -298,6 +298,21 @@ class ModelGateway:
                         circuit_state=self._circuits.snapshot(provider.provider_id)["state"],
                     )
                     return result
+                except TestCostControlError as exc:
+                    record_model_invocation(
+                        context,
+                        request,
+                        response=None,
+                        provider=provider.provider_id,
+                        model=provider.model_name,
+                        status="BLOCKED",
+                        latency_ms=round((perf_counter() - attempt_started) * 1000),
+                        fallback_count=fallback_count,
+                        retry_count=attempt,
+                        error_code=str(exc),
+                        circuit_state=self._circuits.snapshot(provider.provider_id)["state"],
+                    )
+                    raise
                 except httpx.HTTPError as exc:
                     status = exc.response.status_code if isinstance(exc, httpx.HTTPStatusError) else "transport"
                     error_code = f"HTTP_{status}" if isinstance(status, int) else type(exc).__name__
@@ -533,6 +548,21 @@ class ModelGateway:
                         circuit_state=self._circuits.snapshot(provider.provider_id)["state"],
                     )
                     return
+                except TestCostControlError as exc:
+                    record_model_invocation(
+                        context,
+                        request,
+                        response=None,
+                        provider=provider.provider_id,
+                        model=provider.model_name,
+                        status="BLOCKED",
+                        latency_ms=round((perf_counter() - attempt_started) * 1000),
+                        fallback_count=fallback_count,
+                        retry_count=attempt,
+                        error_code=str(exc),
+                        circuit_state=self._circuits.snapshot(provider.provider_id)["state"],
+                    )
+                    raise
                 except httpx.HTTPError as exc:
                     if emitted:
                         self.test_cost_control.complete_attempt(

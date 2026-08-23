@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import hashlib
+import json
+import re
 from time import perf_counter
 from threading import Event
 
@@ -17,6 +20,50 @@ from sqlalchemy.orm import Session
 from app.core.access import Principal
 from app.query.contracts import AskRequest
 from app.query.service import QueryPipeline, query_response
+from app.core.config import get_settings
+from app.file_multimodal.pandasai_adapter import PandasAIExecutionRequest, execute_selected_pandasai_runtime
+from app.sandbox import SandboxControllerClient
+
+
+def _bind_derived_result(
+    payload: dict,
+    *,
+    rows: list[dict],
+    metrics: list[str],
+    dimensions: list[str],
+    claims: list[dict],
+    summary: str,
+) -> dict:
+    signature = hashlib.sha256(json.dumps(
+        rows, ensure_ascii=False, sort_keys=True, separators=(",", ":"), default=str,
+    ).encode("utf-8")).hexdigest()
+    execution = {
+        **(payload.get("execution") or {}),
+        "columns": list(rows[0]) if rows else [*dimensions, *metrics],
+        "rows": rows,
+        "row_count": len(rows),
+        "result_signature": signature,
+    }
+    plan = {**(payload.get("plan") or {}), "metrics": metrics, "dimensions": dimensions}
+    chart = {**(payload.get("chart_spec") or {})}
+    if chart:
+        chart["result_signature"] = signature
+        chart["data_source_query_id"] = payload.get("id")
+    payload.update({
+        "execution": execution,
+        "plan": plan,
+        "chart_spec": chart,
+        "result_evidence": {
+            "metrics": metrics,
+            "dimensions": dimensions,
+            "row_count": len(rows),
+            "rows": rows,
+            "result_signature": signature,
+        },
+        "answer_claims": claims,
+        "summary": summary,
+    })
+    return payload
 
 
 ROLE_TOOLS: dict[AgentRole, frozenset[ToolName]] = {
@@ -42,12 +89,13 @@ class ChatBIToolExecutor:
 
     def __init__(
         self, db: Session, principal: Principal, rag_adapter,
-        *, cancellation_event: Event | None = None,
+        *, cancellation_event: Event | None = None, file_evidence: dict | None = None,
     ) -> None:
         self.db = db
         self.principal = principal
         self.rag_adapter = rag_adapter
         self.cancellation_event = cancellation_event
+        self.file_evidence = file_evidence
         self.citation_verifier = CitationVerifierV1()
 
     def execute(self, call: ToolCall, context: AgentExecutionContext) -> ToolResult:
@@ -86,10 +134,17 @@ class ChatBIToolExecutor:
             return "REFUSED", {}, "DATASOURCE_SCOPE_DENIED"
         if semantic_model_id and semantic_model_id not in context.allowed_semantic_models:
             return "REFUSED", {}, "SEMANTIC_MODEL_SCOPE_DENIED"
+        question = str(call.arguments.get("question") or "")
+        if self.file_evidence:
+            regions = list(dict.fromkeys(
+                str(row.get("region")) for row in self.file_evidence.get("rows") or [] if row.get("region")
+            ))
+            if regions:
+                question += "；按地区查询" + "或".join(regions)
         run = QueryPipeline().execute(
             self.db,
             AskRequest(
-                question=str(call.arguments.get("question") or ""),
+                question=question,
                 datasource_id=datasource_id,
                 semantic_model_id=semantic_model_id,
             ),
@@ -105,7 +160,104 @@ class ChatBIToolExecutor:
             return status, {"query_id": run.id, "status": run.status}, (
                 run.error_code or "RESULT_ORACLE_NOT_PASSED"
             )
+        if self.file_evidence:
+            payload = self._file_database_comparison(payload)
+        elif re.search(r"(?:Python|相关性|相关系数)", question, re.IGNORECASE):
+            payload, sandbox_error = self._correlation_result(payload, context)
+            if sandbox_error:
+                return "FAILED", payload, sandbox_error
         return "SUCCEEDED", payload, None
+
+    def _correlation_result(self, payload: dict, context: AgentExecutionContext) -> tuple[dict, str | None]:
+        rows = list((payload.get("execution") or {}).get("rows") or [])
+        code = (
+            "rows = datasets['rows']\n"
+            "xs = [float(row['revenue']) for row in rows]\n"
+            "ys = [float(row['cost']) for row in rows]\n"
+            "n = len(xs)\n"
+            "mx = sum(xs) / n\n"
+            "my = sum(ys) / n\n"
+            "num = sum((x-mx)*(y-my) for x,y in zip(xs,ys))\n"
+            "denx = sum((x-mx)**2 for x in xs)\n"
+            "deny = sum((y-my)**2 for y in ys)\n"
+            "corr = num / ((denx * deny) ** 0.5) if denx and deny else 0.0\n"
+            "result = {'correlation': round(corr, 12), 'sample_size': n}\n"
+        )
+        upstream = execute_selected_pandasai_runtime(
+            PandasAIExecutionRequest(
+                code=code,
+                environment={"rows": rows},
+                trace_id=context.trace_id,
+                workspace_id=context.workspace_id,
+                timeout_ms=min(context.timeout_ms, 15_000),
+                cancellation_event=self.cancellation_event,
+            ),
+            SandboxControllerClient(get_settings().sandbox_controller_url),
+        )
+        sandbox = dict(upstream.output)
+        result = dict(sandbox.get("output") or {})
+        evidence = {
+            "status": sandbox.get("status"),
+            "runtime_verified": bool(sandbox.get("runtime_verified")),
+            "container_destroyed": bool(sandbox.get("container_destroyed")),
+            "operation": "correlation",
+            "result": result,
+        }
+        payload["sandbox_evidence"] = evidence
+        if evidence["status"] != "SUCCEEDED" or not evidence["runtime_verified"] or not evidence["container_destroyed"]:
+            return payload, str(sandbox.get("error_code") or "SANDBOX_RESULT_NOT_VERIFIED")
+        years = [str(row.get("year")) for row in rows if row.get("year") is not None]
+        scope = "ANNUAL_REVENUE_COST" + ("_" + "_".join(years) if years else "")
+        derived_rows = [{"correlation": float(result["correlation"]), "sample_size": int(result["sample_size"])}]
+        claim = {"metric": "correlation", "scope": scope, "value": float(result["correlation"])}
+        return _bind_derived_result(
+            payload,
+            rows=derived_rows,
+            metrics=["correlation", "sample_size"],
+            dimensions=[],
+            claims=[claim],
+            summary=f"correlation 为 {claim['value']}。",
+        ), None
+
+    def _file_database_comparison(self, payload: dict) -> dict:
+        file_rows = list((self.file_evidence or {}).get("rows") or [])
+        file_by_region: dict[str, float] = {}
+        for row in file_rows:
+            region = str(row.get("region") or "")
+            file_by_region[region] = file_by_region.get(region, 0.0) + float(row.get("revenue") or 0)
+        db_by_region = {
+            str(row.get("region")): float(row.get("revenue") or 0)
+            for row in (payload.get("execution") or {}).get("rows") or []
+        }
+        rows = [
+            {
+                "region": region,
+                "file_revenue": file_value,
+                "db_revenue": db_by_region.get(region, 0.0),
+                "difference": file_value - db_by_region.get(region, 0.0),
+            }
+            for region, file_value in file_by_region.items()
+        ]
+        claim = ({
+            "metric": "difference",
+            "dimension": "region",
+            "dimension_value": rows[0]["region"],
+            "value": rows[0]["difference"],
+        } if rows else {})
+        payload["file_evidence"] = {
+            key: value for key, value in (self.file_evidence or {}).items() if key != "rows"
+        }
+        return _bind_derived_result(
+            payload,
+            rows=rows,
+            metrics=["file_revenue", "db_revenue", "difference"],
+            dimensions=["region"],
+            claims=[claim] if claim else [],
+            summary=(
+                f"{claim['dimension_value']}的difference 为 {claim['value']}。"
+                if claim else "文件与数据库比较没有数据。"
+            ),
+        )
 
     def _retrieve_knowledge(self, call: ToolCall, context: AgentExecutionContext):
         if self.rag_adapter is None:

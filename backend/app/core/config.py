@@ -67,6 +67,7 @@ class Settings(BaseSettings):
     agent_max_replan: int = 2
     agent_max_depth: int = 2
     agent_token_budget: int = 6000
+    sandbox_controller_url: str = "http://sandbox-controller:8765"
     bootstrap_admin_password: SecretStr = SecretStr("")
     bootstrap_analyst_password: SecretStr = SecretStr("")
     session_cookie_name: str = "chatbi_session"
@@ -75,6 +76,7 @@ class Settings(BaseSettings):
     session_cookie_secure: bool = False
     login_max_failures: int = 8
     login_window_minutes: int = 15
+    cors_allow_origins: str = "http://localhost:5173,http://127.0.0.1:5173"
     attachment_storage_dir: str = str(Path(gettempdir()) / "chatbi-v2-attachments")
     attachment_max_bytes: int = 25 * 1024 * 1024
     attachment_max_rows: int = 100_000
@@ -84,11 +86,23 @@ class Settings(BaseSettings):
     general_model_provider: str = "auto"
     vision_model_provider: str = "auto"
     vision_model_name: str = ""
+    level0_vision_fixture_path: str = ""
     model_budget_mode: Literal["economy", "balanced", "quality"] = "balanced"
 
     @property
     def agent_route_allowlist(self) -> frozenset[str]:
         return frozenset(item.strip() for item in self.agent_allowed_routes.split(",") if item.strip())
+
+    @property
+    def cors_origin_allowlist(self) -> tuple[str, ...]:
+        origins = tuple(
+            origin.strip().rstrip("/")
+            for origin in self.cors_allow_origins.split(",")
+            if origin.strip()
+        )
+        if not origins or "*" in origins:
+            raise ValueError("credentialed CORS requires explicit origins")
+        return origins
 
     model_config = SettingsConfigDict(
         env_file=".env",

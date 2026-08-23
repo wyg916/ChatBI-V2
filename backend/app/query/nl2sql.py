@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import re
 from abc import ABC, abstractmethod
+from calendar import monthrange
 from datetime import date, timedelta
 from typing import Any
 
@@ -50,8 +51,43 @@ def _contains(question: str, values: list[str]) -> bool:
 
 
 def _time_range(question: str, now: date) -> QueryTimeRange | None:
+    full_dates = list(re.finditer(r"(20\d{2})\s*年\s*(1[0-2]|0?[1-9])\s*月\s*(3[01]|[12]?\d)\s*日", question))
+    if full_dates:
+        first = full_dates[0]
+        start = date(int(first.group(1)), int(first.group(2)), int(first.group(3)))
+        range_tail = question[first.end():]
+        short_end = re.search(
+            r"至\s*(?:(20\d{2})\s*年\s*)?(1[0-2]|0?[1-9])\s*月\s*(3[01]|[12]?\d)\s*日",
+            range_tail,
+        )
+        if short_end:
+            end_year = int(short_end.group(1)) if short_end.group(1) else start.year
+            end_month = int(short_end.group(2))
+            if short_end.group(1) is None and end_month < start.month:
+                end_year += 1
+            end = date(end_year, end_month, int(short_end.group(3))) + timedelta(days=1)
+            return QueryTimeRange(kind="EXPLICIT_DATE_RANGE", start=start.isoformat(), end_exclusive=end.isoformat())
+        if "之后" in range_tail:
+            end = date(start.year + (1 if start.month == 12 else 0), 1 if start.month == 12 else start.month + 1, 1)
+            return QueryTimeRange(kind="DATE_THROUGH_MONTH_END", start=start.isoformat(), end_exclusive=end.isoformat())
+        return QueryTimeRange(
+            kind="NATURAL_DAY", start=start.isoformat(), end_exclusive=(start + timedelta(days=1)).isoformat(),
+        )
+
     year_match = re.search(r"(20\d{2})\s*年", question)
     year = int(year_match.group(1)) if year_match else now.year
+    last_day_match = re.search(r"(?:(20\d{2})\s*年)?\s*(1[0-2]|0?[1-9])\s*月(?:的)?最后一天", question)
+    if last_day_match:
+        last_day_year = int(last_day_match.group(1)) if last_day_match.group(1) else year
+        last_day_month = int(last_day_match.group(2))
+        start = date(last_day_year, last_day_month, monthrange(last_day_year, last_day_month)[1])
+        return QueryTimeRange(
+            kind="NATURAL_MONTH_LAST_DAY",
+            start=start.isoformat(),
+            end_exclusive=(start + timedelta(days=1)).isoformat(),
+        )
+    if _contains(question, ["按自然年", "按年", "逐年", "年份", "年度"]) and len(re.findall(r"20\d{2}", question)) > 1:
+        return None
     month_match = re.search(r"(?:(20\d{2})\s*年)?\s*(1[0-2]|0?[1-9])\s*月", question)
     if month_match:
         month_year = int(month_match.group(1)) if month_match.group(1) else year
@@ -126,6 +162,8 @@ class DeterministicTestProvider(ModelProviderAdapter, Nl2SqlEngine):
                 confidence=0.45, warnings=["Direct SQL request requires full AST authorization"],
             )
 
+        self._require_resolvable_intent(question=question, context=context)
+
         metric_defs = {item["name"]: item for item in context.metrics}
         term_targets: dict[str, str] = {}
         for term in context.business_terms:
@@ -134,14 +172,28 @@ class DeterministicTestProvider(ModelProviderAdapter, Nl2SqlEngine):
                 for token in [term["term"], *term.get("synonyms", [])]:
                     term_targets[str(token).lower()] = mapped.split(".", 1)[1]
 
-        metrics: list[str] = []
+        metric_positions: dict[str, tuple[int, int]] = {}
         lowered = question.lower()
+        metric_text = re.sub(
+            r"按[^，,。；;]*?(?:升序|降序)(?:排列)?",
+            "",
+            lowered,
+        )
         for token, metric_name in sorted(term_targets.items(), key=lambda pair: (-len(pair[0]), pair[0])):
-            if token and token in lowered and metric_name in metric_defs and metric_name not in metrics:
-                metrics.append(metric_name)
+            position = metric_text.rfind(token)
+            if token and position >= 0 and metric_name in metric_defs:
+                candidate = (position, -len(token))
+                if metric_name not in metric_positions or candidate < metric_positions[metric_name]:
+                    metric_positions[metric_name] = candidate
         for name, definition in metric_defs.items():
-            if _contains(question, [name, definition.get("label", ""), definition.get("description", "")]) and name not in metrics:
-                metrics.append(name)
+            for token in [name, definition.get("label", ""), definition.get("description", "")]:
+                normalized = str(token or "").lower()
+                position = metric_text.rfind(normalized) if normalized else -1
+                if position >= 0:
+                    candidate = (position, -len(normalized))
+                    if name not in metric_positions or candidate < metric_positions[name]:
+                        metric_positions[name] = candidate
+        metrics = sorted(metric_positions, key=lambda item: (*metric_positions[item], item))
         if _contains(question, ["环比", "月环比"]):
             metrics = ["revenue", "revenue_mom"]
         elif _contains(question, ["同比", "年同比"]):
@@ -157,7 +209,15 @@ class DeterministicTestProvider(ModelProviderAdapter, Nl2SqlEngine):
             metrics = ["distinct_order_count"]
         elif _contains(question, ["客单价", "平均订单金额"]):
             metrics = ["avg_order_value"]
+        elif _contains(question, ["最大购买数量", "最高购买数量", "最大订购数量"]) and _contains(
+            question, ["订单数", "订单量", "多少单"],
+        ):
+            metrics = ["max_quantity", "order_count"]
         else:
+            if re.search(r"收入.*减.*成本.*利润", question):
+                metrics = ["profit"]
+            elif _contains(question, ["订单值", "订单数据"]) and not metrics:
+                metrics = ["order_count", "revenue", "cost"]
             if _contains(question, ["利润", "毛利"]) and "profit" not in metrics:
                 metrics.append("profit")
             if not metrics:
@@ -171,6 +231,8 @@ class DeterministicTestProvider(ModelProviderAdapter, Nl2SqlEngine):
             ("customer", ["客户", "用户", "customer"]),
             ("customer_type", ["客户类型", "用户类型"]),
             ("status", ["状态", "status"]),
+            ("order_id", ["订单编号", "订单号", "订单的编号"]),
+            ("year", ["按自然年", "逐年", "年度"]),
         ]
         for name, aliases in dimension_aliases:
             if name == "customer" and _contains(question, ["客户类型", "用户类型"]):
@@ -184,6 +246,8 @@ class DeterministicTestProvider(ModelProviderAdapter, Nl2SqlEngine):
         range_value = _time_range(question, context.now.date())
         if _contains(question, ["趋势", "每月", "按月", "月度", "月份", "环比", "同比"]):
             dimensions.append("month")
+        if _contains(question, ["空结果", "订单明细", "订单列表"]) and _contains(question, ["查询", "返回", "列出"]):
+            dimensions.append("order_id")
         dimensions = list(dict.fromkeys(dimensions))
 
         filters: list[QueryFilter] = []
@@ -196,19 +260,82 @@ class DeterministicTestProvider(ModelProviderAdapter, Nl2SqlEngine):
         for region in ["华北", "华东", "华南", "西部", "华中"]:
             if region in question:
                 filters.append(QueryFilter(field="regions.region_name", operator="=", value=region))
+        if (
+            not any(item.field == "regions.region_name" for item in filters)
+            and not _contains(question, ["各地区", "各区域", "按地区", "按区域", "所有地区", "所有区域", "每个地区", "每个区域", "不同地区", "不同区域"])
+        ):
+            unknown_regions = re.findall(
+                r"(?:[，,。；;\s]|有|在|查|看)([\u4e00-\u9fffA-Za-z0-9_-]{1,12})(?:区域|地区)",
+                question,
+            )
+            if unknown_regions and unknown_regions[-1] not in {"各", "按", "所有", "每个", "不同"}:
+                filters.append(QueryFilter(
+                    field="regions.region_name", operator="=", value=unknown_regions[-1],
+                ))
+        unknown_store = re.search(r"(?:20\d{2}\s*年)?([\u4e00-\u9fffA-Za-z0-9_-]{1,12})门店", question)
+        if unknown_store and not any(item.field == "regions.region_name" for item in filters):
+            store_name = re.sub(r"^(?:查|看|统计|分析|查询)", "", unknown_store.group(1))
+            filters.append(QueryFilter(
+                field="regions.region_name", operator="=", value=f"{store_name}门店",
+            ))
         for category in ["充电设备", "储能设备", "软件与终端", "服务"]:
             if category in question:
                 filters.append(QueryFilter(field="products.category", operator="=", value=category))
 
-        metric_order = ["revenue", "cost", "profit", "order_count", "avg_order_value"] + [
-            item["name"] for item in context.metrics
-        ] + [
-            "revenue_share", "profit_margin", "distinct_order_count", "revenue_mom", "revenue_yoy",
-        ]
-        order_index: dict[str, int] = {}
-        for name in metric_order:
-            order_index.setdefault(name, len(order_index))
-        metrics.sort(key=lambda item: (order_index.get(item, len(order_index)), item))
+        customer_types = self._linked_exact_values(context, question, "customers.customer_type")
+        if not customer_types and "customer_type" in context.security_policy.allowed_columns.get("customers", []):
+            customer_type_match = re.search(r"(?:统计|汇总|核对)([\u4e00-\u9fff]{1,8})客户(?:的)?", question)
+            if customer_type_match:
+                customer_types = [customer_type_match.group(1)]
+        if customer_types:
+            filters.append(QueryFilter(field="customers.customer_type", operator="=", value=customer_types[0]))
+            if not _contains(question, ["按客户类型", "按用户类型"]):
+                dimensions = [item for item in dimensions if item not in {"customer", "customer_type"}]
+        product_names = self._linked_exact_values(context, question, "products.product_name")
+        if not product_names and "product_name" in context.security_policy.allowed_columns.get("products", []):
+            product_scope = re.sub(r"20\d{2}\s*年", "", question)
+            product_scope = re.sub(r"第?[一二三四1234]\s*季度|\d{1,2}\s*月", "", product_scope)
+            product_name_match = re.search(r"([\u4e00-\u9fffA-Za-z0-9_-]{2,20})订单(?:的)?订单量", product_scope)
+            if product_name_match:
+                candidate = product_name_match.group(1)
+                filter_markers = [
+                    "华北", "华东", "华南", "西部", "华中", "已支付", "支付成功", "退款", "已退款",
+                    "企业客户", "个人客户", "渠道客户",
+                ]
+                if not any(marker in candidate for marker in filter_markers):
+                    product_names = [candidate]
+        if product_names:
+            filters.append(QueryFilter(field="products.product_name", operator="=", value=product_names[0]))
+            if not _contains(question, ["按产品", "按商品"]):
+                dimensions = [item for item in dimensions if item != "product"]
+        revenue_range = re.search(
+            r"(?:收入|营收|销售额).*?大于等于\s*(\d+(?:\.\d+)?)\s*.*?小于\s*(\d+(?:\.\d+)?)",
+            question,
+        )
+        if revenue_range:
+            filters.append(QueryFilter(
+                field="orders.revenue",
+                operator="RANGE",
+                value=f"[{revenue_range.group(1)},{revenue_range.group(2)})",
+            ))
+        region_filters = [item for item in filters if item.field == "regions.region_name"]
+        if len(region_filters) > 1 and _contains(question, ["或", "或者", "任一"]):
+            filters = [item for item in filters if item.field != "regions.region_name"]
+            filters.append(QueryFilter(
+                field="regions.region_name",
+                operator="IN",
+                value=[str(item.value) for item in region_filters],
+            ))
+        standalone_category_dimension = re.search(
+            r"(?:^|[\s，,；;])(?:品类|类别)(?:$|[\s，,；;])",
+            question,
+        ) is not None
+        if (
+            any(item.field == "products.category" for item in filters)
+            and not standalone_category_dimension
+            and not _contains(question, ["按品类", "按类别", "分品类", "分类型"])
+        ):
+            dimensions = [item for item in dimensions if item != "category"]
 
         sql, selected_tables, selected_columns, selected_entities, joins, group_by, order_by = self._render_sql(
             context=context, metrics=metrics, dimensions=dimensions, filters=filters,
@@ -217,7 +344,7 @@ class DeterministicTestProvider(ModelProviderAdapter, Nl2SqlEngine):
         warning = []
         known_metrics = set(metric_defs) | {
             "profit", "avg_order_value", "revenue_share", "profit_margin",
-            "distinct_order_count", "revenue_mom", "revenue_yoy",
+            "distinct_order_count", "revenue_mom", "revenue_yoy", "max_quantity",
         }
         if any(metric not in known_metrics for metric in metrics):
             warning.append("One or more metrics use local derived definitions")
@@ -231,6 +358,41 @@ class DeterministicTestProvider(ModelProviderAdapter, Nl2SqlEngine):
             generated_sql=sql, confidence=confidence, warnings=warning,
         )
 
+    @staticmethod
+    def _linked_exact_values(context: QueryContext, question: str, qualified_name: str) -> list[str]:
+        values: list[str] = []
+        for candidate in context.candidate_columns:
+            if str(candidate.qualified_name or "").lower() != qualified_name:
+                continue
+            for evidence in candidate.evidence:
+                if not evidence.startswith("exact:"):
+                    continue
+                value = evidence.split(":", 1)[1]
+                if value in question and value.lower() not in {candidate.name.lower(), candidate.label.lower()}:
+                    values.append(value)
+        return list(dict.fromkeys(values))
+
+    @staticmethod
+    def _require_resolvable_intent(*, question: str, context: QueryContext) -> None:
+        if _contains(question, ["怎么样", "哪个最好", "把它", "那个维度", "前一段", "后一段"]):
+            raise ValueError("SEMANTIC_CLARIFICATION_REQUIRED")
+        known_text = " ".join(
+            str(value)
+            for item in [*context.metrics, *context.business_terms]
+            for value in item.values()
+        ).lower()
+        if "指数" in question and "指数" not in known_text:
+            raise ValueError("SEMANTIC_UNKNOWN_METRIC")
+        if "价值" in question and "价值" not in known_text:
+            raise ValueError("SEMANTIC_UNKNOWN_METRIC")
+        compound_profit = re.search(r"([\u4e00-\u9fff]{2})利润(?!率)", question)
+        if compound_profit and compound_profit.group(1) not in {
+            "订单", "后的", "总计", "累计", "分析", "季度", "年度", "月度", "总体", "全部",
+        }:
+            profit_index = compound_profit.end(1)
+            if question[profit_index - 1:profit_index] not in {"和", "及", "与", "、", "的"}:
+                raise ValueError("SEMANTIC_UNKNOWN_METRIC")
+
     def _render_sql(
         self, *, context: QueryContext, metrics: list[str], dimensions: list[str], filters: list[QueryFilter],
         time_range: QueryTimeRange | None, limit: int, question: str,
@@ -240,6 +402,52 @@ class DeterministicTestProvider(ModelProviderAdapter, Nl2SqlEngine):
 
         def table(name: str) -> str:
             return f"{schema}.{name}" if schema and dialect == "postgresql" else name
+
+        if metrics == ["max_quantity", "order_count"]:
+            sql = "\n".join([
+                f"WITH maximum AS (SELECT MAX(o.quantity) AS max_quantity FROM {table('orders')} o)",
+                "SELECT maximum.max_quantity, COUNT(o.order_id) AS order_count",
+                f"FROM {table('orders')} o",
+                "CROSS JOIN maximum",
+                "WHERE o.quantity = maximum.max_quantity",
+                "GROUP BY maximum.max_quantity",
+                f"LIMIT {limit}",
+            ])
+            return (
+                sql, ["orders"], ["orders.quantity", "orders.order_id"], ["orders"], [],
+                ["maximum.max_quantity"], [],
+            )
+
+        if dimensions == ["order_id"] and len(metrics) == 1 and metrics[0] in {"revenue", "cost"}:
+            metric = metrics[0]
+            where_parts: list[str] = []
+            if time_range and time_range.start and time_range.end_exclusive:
+                literal = "DATE " if dialect == "postgresql" else ""
+                where_parts.extend([
+                    f"o.order_date >= {literal}'{time_range.start}'",
+                    f"o.order_date < {literal}'{time_range.end_exclusive}'",
+                ])
+            is_extreme = _contains(question, ["最大", "最高", "最小", "最低"])
+            maximum_positions = [question.find(token) for token in ("最大", "最高") if token in question]
+            minimum_positions = [question.find(token) for token in ("最小", "最低") if token in question]
+            first_maximum = min(maximum_positions, default=len(question) + 1)
+            first_minimum = min(minimum_positions, default=len(question) + 1)
+            descending = first_maximum < first_minimum
+            lines = [f"SELECT o.order_id, o.{metric} AS {metric}", f"FROM {table('orders')} o"]
+            if where_parts:
+                lines.append("WHERE " + "\n  AND ".join(where_parts))
+            lines.append(
+                f"ORDER BY o.{metric} {'DESC' if descending else 'ASC'}, o.order_id ASC"
+                if is_extreme else "ORDER BY o.order_id ASC"
+            )
+            lines.append(f"LIMIT {1 if is_extreme else limit}")
+            selected_columns = ["orders.order_id", f"orders.{metric}"]
+            if time_range:
+                selected_columns.append("orders.order_date")
+            return (
+                "\n".join(lines), ["orders"], selected_columns, ["orders"], [], [],
+                [f"o.{metric} {'DESC' if descending else 'ASC'}", "o.order_id ASC"] if is_extreme else ["o.order_id ASC"],
+            )
 
         growth_metric = next((item for item in metrics if item in {"revenue_mom", "revenue_yoy"}), None)
         if growth_metric:
@@ -290,6 +498,17 @@ class DeterministicTestProvider(ModelProviderAdapter, Nl2SqlEngine):
                 None,
                 None,
             ),
+            "order_id": (
+                "o.order_id AS order_id", "o.order_id", "orders.order_id",
+                "o.order_id", "orders.order_id",
+            ),
+            "year": (
+                "EXTRACT(YEAR FROM o.order_date)::integer AS year" if dialect == "postgresql" else "YEAR(o.order_date) AS year",
+                "EXTRACT(YEAR FROM o.order_date)" if dialect == "postgresql" else "YEAR(o.order_date)",
+                "orders.order_date",
+                None,
+                None,
+            ),
         }
         select_parts: list[str] = []
         group_parts: list[str] = []
@@ -332,7 +551,9 @@ class DeterministicTestProvider(ModelProviderAdapter, Nl2SqlEngine):
             selected_entities.append("products")
             join_lines.append(f"JOIN {table('products')} p ON p.product_id = o.product_id")
             joins.append({"left": "orders.product_id", "right": "products.product_id", "type": "INNER"})
-        if any(item in dimensions for item in ("customer", "customer_type")):
+        if any(item in dimensions for item in ("customer", "customer_type")) or any(
+            item.field.startswith("customers.") for item in filters
+        ):
             selected_tables.append("customers")
             selected_entities.append("customers")
             join_lines.append(f"JOIN {table('customers')} c ON c.customer_id = o.customer_id")
@@ -344,6 +565,17 @@ class DeterministicTestProvider(ModelProviderAdapter, Nl2SqlEngine):
             column = item.field.split(".")[1]
             if item.operator.upper() in {"IS", "IS NOT"} and item.value is None:
                 where_parts.append(f"{alias}.{column} {item.operator.upper()} NULL")
+            elif item.operator.upper() == "IN" and isinstance(item.value, list):
+                values = ", ".join(f"'{str(value).replace(chr(39), chr(39) * 2)}'" for value in item.value)
+                where_parts.append(f"{alias}.{column} IN ({values})")
+            elif item.operator.upper() == "RANGE":
+                bounds = re.fullmatch(r"\[([^,]+),([^\)]+)\)", str(item.value))
+                if not bounds:
+                    raise ValueError("INVALID_RANGE_FILTER")
+                where_parts.extend([
+                    f"{alias}.{column} >= {bounds.group(1)}",
+                    f"{alias}.{column} < {bounds.group(2)}",
+                ])
             else:
                 escaped = str(item.value).replace("'", "''")
                 where_parts.append(f"{alias}.{column} {item.operator} '{escaped}'")
@@ -361,7 +593,7 @@ class DeterministicTestProvider(ModelProviderAdapter, Nl2SqlEngine):
             selected_columns.append("orders.order_date")
 
         descending = not _contains(question, ["最低", "最少", "升序"])
-        metric_alias = metrics[0] if metrics else "revenue"
+        metric_alias = "revenue" if len(metrics) > 1 and "revenue" in metrics else (metrics[0] if metrics else "revenue")
         order_parts = (
             [f"{metric_alias} {'DESC' if descending else 'ASC'}", *stable_order_parts]
             if dimensions else []
@@ -372,6 +604,8 @@ class DeterministicTestProvider(ModelProviderAdapter, Nl2SqlEngine):
                 + ([f"{metric_alias} DESC"] if len(dimensions) > 1 else [])
                 + stable_order_parts
             )
+        elif "year" in dimensions:
+            order_parts = ["year ASC"]
 
         lines = ["SELECT", "  " + ",\n  ".join(select_parts), f"FROM {table('orders')} o"]
         lines.extend(join_lines)
@@ -379,6 +613,10 @@ class DeterministicTestProvider(ModelProviderAdapter, Nl2SqlEngine):
             lines.append("WHERE " + "\n  AND ".join(where_parts))
         if group_parts:
             lines.append("GROUP BY " + ", ".join(group_parts))
+        elif metrics and any(metric not in {"order_count", "distinct_order_count"} for metric in metrics):
+            # SUM/AVG over an empty input otherwise returns one synthetic NULL row,
+            # which is not an evidence row and must not be presented as data.
+            lines.append("HAVING COUNT(*) > 0")
         if order_parts:
             lines.append("ORDER BY " + ", ".join(order_parts))
         lines.append(f"LIMIT {limit}")

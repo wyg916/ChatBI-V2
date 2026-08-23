@@ -26,6 +26,7 @@ from scripts.performance.run_v13_phase5_api_load import (  # noqa: E402
     ResourceSample,
     UserRuntime,
     WORKLOAD_MIX,
+    _independent_file_result_signature,
     _independent_result_signature,
     _sse_observation,
     aggregate_scoped_cost_ledger,
@@ -302,7 +303,7 @@ def test_file_business_validation_reads_real_nested_result_contract() -> None:
                     "columns": ["region", "revenue_sum"],
                     "rows": rows,
                     "exact_for_full_file": True,
-                    "result_signature": _independent_result_signature(["region", "revenue_sum"], rows),
+                    "result_signature": _independent_file_result_signature(rows),
                 },
             }},
         }},
@@ -439,8 +440,8 @@ def _passing_cost() -> dict:
             "complete": True,
             "warnings": [],
             "scope": "EXACT_PREFIX_AND_LOAD_WINDOW",
-            "expected_billable_requests": 85,
-            "covered_billable_requests": 85,
+            "expected_billable_requests": 35,
+            "covered_billable_requests": 35,
             "missing_billable_requests": 0,
             "request_coverage": 1.0,
         },
@@ -453,8 +454,7 @@ def _passing_cost() -> dict:
         "all_premium_cost_cny": 4.0,
         "saving_vs_all_premium": 0.75,
         "by_route": {
-            "DATA_QUERY": {}, "KNOWLEDGE_QUERY": {}, "HYBRID_ANALYSIS": {},
-            "COMPLEX_ANALYSIS": {}, "MULTIMODAL_QUERY": {},
+            "KNOWLEDGE_QUERY": {}, "HYBRID_ANALYSIS": {}, "MULTIMODAL_QUERY": {},
         },
         "by_provider": {"mimo": {}, "kimi": {}},
     }
@@ -508,10 +508,9 @@ def test_api_metrics_have_p50_p95_p99_for_every_route_and_resource() -> None:
 
 def test_cost_coverage_is_recomputed_after_exact_prefix_scope_with_route_provider_breakdown() -> None:
     observations = _passing_samples()
-    billable = [item for item in observations if item.kind != "FILE"]
+    billable = [item for item in observations if item.kind in {"RAG", "HYBRID", "VISION"}]
     route_map = {
-        "DATA": "DATA_QUERY", "RAG": "KNOWLEDGE_QUERY",
-        "HYBRID": "HYBRID_ANALYSIS", "AGENT": "COMPLEX_ANALYSIS",
+        "RAG": "KNOWLEDGE_QUERY", "HYBRID": "HYBRID_ANALYSIS",
         "VISION": "MULTIMODAL_QUERY",
     }
     entries = [
@@ -544,15 +543,69 @@ def test_cost_coverage_is_recomputed_after_exact_prefix_scope_with_route_provide
         kimi_pricing={"cached_input": 1.1, "uncached_input": 6.5, "output": 27.0},
     )
 
-    assert result["invocations"] == len(billable) == 85
+    assert result["invocations"] == len(billable) == 35
     assert result["coverage"]["scope"] == "EXACT_PREFIX_AND_LOAD_WINDOW"
-    assert result["coverage"]["expected_billable_requests"] == 85
-    assert result["coverage"]["covered_billable_requests"] == 85
+    assert result["coverage"]["expected_billable_requests"] == 35
+    assert result["coverage"]["covered_billable_requests"] == 35
     assert result["coverage"]["missing_billable_requests"] == 0
     assert result["coverage"]["request_coverage"] == 1.0
     assert result["coverage"]["route_source"] == "VALIDATED_SSE_OBSERVED_ROUTE"
     assert set(result["by_route"]) == set(route_map.values())
     assert set(result["by_provider"]) == {"mimo", "kimi"}
+
+
+def test_level0_cost_coverage_uses_zero_cost_block_receipts_for_actual_gateway_paths() -> None:
+    observations = _passing_samples()
+    gateway_rows = [item for item in observations if item.kind in {"RAG", "HYBRID", "VISION"}]
+    entries = [{
+        "request_id": sample.request_id,
+        "provider": "mimo",
+        "route": sample.observed_route,
+        "status": "BLOCKED",
+        "error_code": "LEVEL0_PAID_PROVIDER_CALL_BLOCKED",
+        "input_tokens": 0,
+        "cached_input_tokens": 0,
+        "output_tokens": 0,
+        "cost_cny": 0.0,
+    } for sample in gateway_rows]
+
+    result = aggregate_scoped_cost_ledger(
+        entries,
+        base_coverage={"source": "MODEL_INVOCATION_LEDGER", "complete": True, "warnings": []},
+        observations=observations,
+        request_prefix="phase5api-0123456789ab-",
+        kimi_pricing={"cached_input": 1.1, "uncached_input": 6.5, "output": 27.0},
+        provider_mode="deterministic-controlled",
+    )
+
+    assert result["coverage"]["expected_billable_requests"] == 0
+    assert result["coverage"]["expected_gateway_requests"] == len(gateway_rows)
+    assert result["coverage"]["request_coverage"] == 1.0
+    assert result["level0_zero_cost_receipts"] == result["invocations"] == len(gateway_rows)
+    assert result["token_bearing_invocations"] == 0
+    assert result["actual_cost_cny"] == 0.0
+    assert result["by_status"] == {"BLOCKED": len(gateway_rows)}
+
+    metrics = summarize_api_load(
+        observations,
+        _passing_resources() * 300,
+        elapsed_seconds=900.0,
+        configured_users=20,
+    )
+    cleanup = {
+        **_passing_cleanup(),
+        "metadata_load_model_invocations_removed": len(gateway_rows),
+    }
+    assert evaluate_api_gate(
+        users=20,
+        duration_seconds=900,
+        metrics=metrics,
+        core_data=_passing_core_data(),
+        cost=result,
+        cleanup=cleanup,
+        runtime_error=None,
+        provider_mode="deterministic-controlled",
+    ) == []
 
 
 def test_api_gate_requires_20x15m_all_six_routes_resources_real_ledger_and_cleanup() -> None:

@@ -54,6 +54,9 @@ def _primary_value(result: dict[str, Any], rows: list[dict[str, Any]]) -> Any:
 def classify_result_semantic(status: str, response_payload: dict[str, Any]) -> ResultSemantic:
     if status not in SUCCESS_STATUSES:
         return ResultSemantic.FAILED
+    explicit = str(response_payload.get("result_semantic") or "").strip().upper()
+    if explicit in {item.value for item in ResultSemantic}:
+        return ResultSemantic(explicit)
     query = _find_query_payload(response_payload)
     file_analysis = _find_file_result(response_payload)
     if query is not None:
@@ -120,7 +123,9 @@ def _semantic_text(semantic: ResultSemantic, answer: str) -> str:
     if semantic is ResultSemantic.ZERO:
         return "当前条件下结果为 0。"
     if semantic is ResultSemantic.NO_ROWS:
-        return "当前条件下没有匹配记录，并不代表指标为 0。"
+        if "请补充" in answer or "请明确" in answer:
+            return answer
+        return "当前条件下没有数据或匹配记录，并不代表指标为 0。"
     if semantic is ResultSemantic.NULL_VALUE:
         return "查询到记录，但指标字段为空。"
     if semantic is ResultSemantic.FAILED:

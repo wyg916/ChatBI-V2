@@ -54,6 +54,31 @@ class QueryExecutor:
         return cls._semaphore
 
     @staticmethod
+    def _acquire_slot(
+        semaphore: threading.BoundedSemaphore,
+        *,
+        timeout_ms: int,
+        cancellation_event: threading.Event | None = None,
+    ) -> tuple[bool, bool]:
+        """Wait for bounded query capacity without ignoring cancellation.
+
+        A transiently full execution pool is backpressure, not an immediate
+        query failure.  Keep the wait bounded by the same request-level timeout
+        and poll cancellation so disconnected streaming clients do not remain
+        queued until the full deadline.
+        """
+
+        deadline = time.perf_counter() + max(0, timeout_ms) / 1000
+        while True:
+            if cancellation_event is not None and cancellation_event.is_set():
+                return False, True
+            remaining = deadline - time.perf_counter()
+            if remaining <= 0:
+                return False, False
+            if semaphore.acquire(timeout=min(0.05, remaining)):
+                return True, False
+
+    @staticmethod
     def _prepare_postgres_transaction(connection: Any, datasource: DataSource, timeout_ms: int) -> None:
         """Apply the read-only boundary and the datasource's approved schema.
 
@@ -86,11 +111,22 @@ class QueryExecutor:
                 error_message="Query was cancelled before execution",
             )
         semaphore = self._limit_semaphore()
-        if not semaphore.acquire(blocking=False):
+        acquired, cancelled = self._acquire_slot(
+            semaphore,
+            timeout_ms=timeout_ms,
+            cancellation_event=cancellation_event,
+        )
+        if not acquired:
+            if cancelled:
+                return ExecutionResult(
+                    status="FAILED", datasource_id=datasource.id, dialect=datasource.type,
+                    normalized_sql=normalized_sql, error_code="QUERY_CANCELLED",
+                    error_message="Query was cancelled while waiting for execution capacity",
+                )
             return ExecutionResult(
                 status="CONCURRENCY_LIMIT", datasource_id=datasource.id, dialect=datasource.type,
                 normalized_sql=normalized_sql, error_code="QUERY_CONCURRENCY_LIMIT",
-                error_message="The query concurrency limit has been reached",
+                error_message="Timed out while waiting for query execution capacity",
             )
         started = time.perf_counter()
         engine = None
@@ -178,11 +214,12 @@ class QueryExecutor:
     ) -> ExecutionResult:
         """Explain a statement only after the caller has passed it through SqlGuard."""
         semaphore = self._limit_semaphore()
-        if not semaphore.acquire(blocking=False):
+        acquired, _ = self._acquire_slot(semaphore, timeout_ms=timeout_ms)
+        if not acquired:
             return ExecutionResult(
                 status="CONCURRENCY_LIMIT", datasource_id=datasource.id, dialect=datasource.type,
                 normalized_sql=normalized_sql, error_code="QUERY_CONCURRENCY_LIMIT",
-                error_message="The query concurrency limit has been reached",
+                error_message="Timed out while waiting for query execution capacity",
             )
         started = time.perf_counter()
         engine = None

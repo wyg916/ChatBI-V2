@@ -337,9 +337,17 @@ def _artifact_count(payload: dict[str, Any]) -> int:
     )
 
 
-def _collect_trace_records(db: Session, workspace_id: str) -> dict[str, dict[str, Any]]:
+def _collect_trace_records(
+    db: Session,
+    workspace_id: str,
+    *,
+    candidate_limit: int | None = None,
+) -> dict[str, dict[str, Any]]:
     records: dict[str, dict[str, Any]] = {}
-    query_runs = list(db.scalars(select(QueryRun).where(QueryRun.workspace_id == workspace_id)))
+    query_runs_query = select(QueryRun).where(QueryRun.workspace_id == workspace_id)
+    if candidate_limit is not None:
+        query_runs_query = query_runs_query.order_by(QueryRun.created_at.desc()).limit(candidate_limit)
+    query_runs = list(db.scalars(query_runs_query))
     query_by_id = {run.id: run for run in query_runs}
     events = list(db.scalars(
         select(QueryAuditEvent).where(QueryAuditEvent.query_run_id.in_(list(query_by_id))).order_by(QueryAuditEvent.created_at)
@@ -381,10 +389,13 @@ def _collect_trace_records(db: Session, workspace_id: str) -> dict[str, dict[str
                 metadata=_safe_metadata(details),
             )
 
-    messages = list(db.scalars(select(ChatMessage).where(
+    messages_query = select(ChatMessage).where(
         ChatMessage.workspace_id == workspace_id,
         ChatMessage.role == "assistant",
-    )))
+    )
+    if candidate_limit is not None:
+        messages_query = messages_query.order_by(ChatMessage.created_at.desc()).limit(candidate_limit)
+    messages = list(db.scalars(messages_query))
     for message in messages:
         payload = message.trace_payload or {}
         trace_id = str(payload.get("trace_id") or payload.get("run_id") or message.id)
@@ -437,7 +448,10 @@ def _collect_trace_records(db: Session, workspace_id: str) -> dict[str, dict[str
                 },
             )
 
-    orchestration_runs = list(db.scalars(select(OrchestrationRun).where(OrchestrationRun.workspace_id == workspace_id)))
+    orchestration_query = select(OrchestrationRun).where(OrchestrationRun.workspace_id == workspace_id)
+    if candidate_limit is not None:
+        orchestration_query = orchestration_query.order_by(OrchestrationRun.created_at.desc()).limit(candidate_limit)
+    orchestration_runs = list(db.scalars(orchestration_query))
     orchestration_ids = [run.id for run in orchestration_runs]
     steps = list(db.scalars(select(OrchestrationStep).where(
         OrchestrationStep.orchestration_run_id.in_(orchestration_ids)
@@ -471,7 +485,10 @@ def _collect_trace_records(db: Session, workspace_id: str) -> dict[str, dict[str
         for call in calls_by_run.get(run.id, []):
             record["tools"].add(call.tool_name)
 
-    for run in db.scalars(select(KnowledgeRetrievalRun).where(KnowledgeRetrievalRun.workspace_id == workspace_id)):
+    knowledge_query = select(KnowledgeRetrievalRun).where(KnowledgeRetrievalRun.workspace_id == workspace_id)
+    if candidate_limit is not None:
+        knowledge_query = knowledge_query.order_by(KnowledgeRetrievalRun.created_at.desc()).limit(candidate_limit)
+    for run in db.scalars(knowledge_query):
         record = _trace_record(records, run.trace_id, run.workspace_id, run.created_at)
         record["user_id"] = run.user_id or record["user_id"]
         record["has_rag"] = True
@@ -518,7 +535,17 @@ def trace_dashboard(
     status: str | None = None,
     limit: int = 200,
 ) -> dict[str, Any]:
-    records = _collect_trace_records(db, workspace_id)
+    # The unfiltered dashboard needs only the newest ``limit`` traces.  A trace
+    # outside the newest N rows of every persisted source cannot enter the
+    # newest N union, so bounding each source preserves the exact result while
+    # avoiding full-history ORM hydration after load tests.  Filtered views and
+    # trace detail retain the complete-history path.
+    unfiltered = all(value is None for value in (from_at, to_at, user_id, route, status))
+    records = _collect_trace_records(
+        db,
+        workspace_id,
+        candidate_limit=limit if unfiltered else None,
+    )
     items: list[dict[str, Any]] = []
     stage_level = False
     for record in records.values():

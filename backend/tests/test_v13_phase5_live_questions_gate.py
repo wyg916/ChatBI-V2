@@ -45,6 +45,12 @@ def test_live_gate_requires_loopback_backend_and_external_secret_file(tmp_path: 
         "email": "phase5@example.invalid",
         "password": "external-test-only",
     }
+    bootstrap = tmp_path / "bootstrap.env"
+    bootstrap.write_text("CHATBI_BOOTSTRAP_ADMIN_PASSWORD=level0-only\n", encoding="utf-8")
+    assert load_external_credentials(bootstrap, allow_bootstrap_admin=True) == {
+        "email": "admin@chatbi.local",
+        "password": "level0-only",
+    }
     with pytest.raises(ValueError, match="outside the repository"):
         load_external_credentials(REPO_ROOT / ".env")
 
@@ -317,6 +323,11 @@ def test_live_gate_executes_all_real_http_contracts_auto_routes_weird_and_cleans
             expected = case["expected"]
             route = expected["route"]
             action = expected["action"]
+            execution_status = (
+                "REFUSED"
+                if action in {"REFUSE", "REFUSE_INJECTION", "REFUSE_SQL_INJECTION", "REFUSE_UNAUTHORIZED", "REFUSE_UNBOUNDED"}
+                else "SUCCEEDED"
+            )
             has_sql = bool(expected["sql_execution_allowed"])
             invocation_count = 0 if expected["model_calls_max"] == 0 else 1
             semantic = "NO_ROWS" if action == "EMPTY_RESULT_NO_FABRICATION" else (
@@ -358,6 +369,7 @@ def test_live_gate_executes_all_real_http_contracts_auto_routes_weird_and_cleans
             assert payload["route"] == case["route"]
             state["complex_chat_payloads"].append(payload)
             route = case["route"]
+            execution_status = "SUCCEEDED"
             has_sql = True
             invocation_count = 1
             semantic = "VALUE"
@@ -424,10 +436,10 @@ def test_live_gate_executes_all_real_http_contracts_auto_routes_weird_and_cleans
         state["conversation_request"][conversation_id] = {
             "request_id": request_id,
             "invocation_count": invocation_count,
-            "status": "SUCCEEDED",
+            "status": execution_status,
         }
         state["traces"][trace_id] = {
-            "has_sql": has_sql, "tools": tools, "route": route, "status": "SUCCEEDED"
+            "has_sql": has_sql, "tools": tools, "route": route, "status": execution_status
         }
         body = {
             "conversation": {"id": conversation_id},
@@ -435,7 +447,7 @@ def test_live_gate_executes_all_real_http_contracts_auto_routes_weird_and_cleans
             "assistant_message": {
                 "id": f"assistant-{request_id}",
                 "route": route,
-                "status": "SUCCEEDED",
+                "status": execution_status,
                 "content": answer_text,
                 "trace_payload": {"trace_id": trace_id},
                 "response_payload": {"analysis": {"primary": primary}},

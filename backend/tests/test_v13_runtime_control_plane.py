@@ -16,12 +16,18 @@ from app.model_gateway import (
     ModelUnavailable,
     RequestContext,
 )
+from app.model_gateway.test_cost_control import TestCostControlError as CostControlError
 from app.streaming import StreamEventFactory
 
 
 class _ForbiddenGateway:
     def classify(self, *_args, **_kwargs):
         raise AssertionError("L0 route must not call a model")
+
+
+class _Level0BlockedGateway:
+    def classify(self, *_args, **_kwargs):
+        raise CostControlError("LEVEL0_PAID_PROVIDER_CALL_BLOCKED")
 
 
 def _context(**updates) -> RequestContext:
@@ -37,6 +43,23 @@ def _context(**updates) -> RequestContext:
     }
     values.update(updates)
     return RequestContext(**values)
+
+
+def test_credentialed_cors_uses_explicit_configured_origins():
+    settings = Settings(
+        _env_file=None,
+        cors_allow_origins="http://127.0.0.1:5173,http://127.0.0.1:5177/",
+    )
+    assert settings.cors_origin_allowlist == (
+        "http://127.0.0.1:5173",
+        "http://127.0.0.1:5177",
+    )
+
+
+@pytest.mark.parametrize("origins", ["", "*"])
+def test_credentialed_cors_rejects_empty_or_wildcard_origins(origins):
+    with pytest.raises(ValueError, match="explicit origins"):
+        Settings(_env_file=None, cors_allow_origins=origins).cors_origin_allowlist
 
 
 def test_date_question_is_l0_model_none():
@@ -70,6 +93,13 @@ def test_unrelated_revenue_phrase_does_not_fall_into_data_query():
     assert decision.route.value == "GENERAL_CHAT"
     assert decision.reason == "NON_DATA_CONTEXT_L0"
     assert decision.needs_sql is False
+
+
+def test_unknown_intent_fails_safe_when_level0_blocks_model_router():
+    decision = QuestionRouter(_Level0BlockedGateway()).decide("请处理这个不明确请求")
+    assert decision.route.value == "GENERAL_CHAT"
+    assert decision.reason == "INTENT_MODEL_UNAVAILABLE_SAFE_GENERAL"
+    assert decision.model_required is False
 
 
 def test_request_cache_key_isolated_by_conversation_permission_and_context():

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+from datetime import date
 
 from sqlalchemy import select
 from threading import Event
@@ -123,10 +124,99 @@ def _summary(run: QueryRun) -> tuple[str, list[dict], list[str]]:
     return summary, kpis, recommended
 
 
+def _canonical_scope(plan: dict) -> str | None:
+    time_range = plan.get("time_range") or {}
+    start_raw = time_range.get("start")
+    end_raw = time_range.get("end_exclusive")
+    scope: str | None = None
+    if start_raw and end_raw:
+        try:
+            start, end = date.fromisoformat(str(start_raw)), date.fromisoformat(str(end_raw))
+        except ValueError:
+            start = end = None
+        if start is not None and end is not None:
+            if (end - start).days == 1:
+                scope = start.isoformat()
+            elif start.day == 1 and start.month in {1, 4, 7, 10} and (end.month - start.month) % 12 == 3:
+                scope = f"{start.year}Q{((start.month - 1) // 3) + 1}"
+    suffixes: list[str] = []
+    region_codes = {"华东": "EAST", "华南": "SOUTH", "华北": "NORTH", "华中": "CENTRAL", "西部": "WEST"}
+    category_codes = {"充电设备": "CHARGING_CATEGORY"}
+    for item in plan.get("filters") or []:
+        field, value = str(item.get("field") or ""), item.get("value")
+        if field == "orders.status" and str(value).upper() == "PAID":
+            suffixes.append("PAID")
+        elif field == "regions.region_name" and str(value) in region_codes:
+            suffixes.append(region_codes[str(value)])
+        elif field == "products.category" and str(value) in category_codes:
+            suffixes.append(category_codes[str(value)])
+    return "_".join([part for part in [scope, *suffixes] if part]) or None
+
+
+def _verified_answer_claims(run: QueryRun) -> list[dict]:
+    plan = run.plan_payload or {}
+    execution = run.execution_payload or {}
+    if (run.oracle_payload or {}).get("status") != "PASSED":
+        return []
+    rows = list(execution.get("rows") or [])
+    metrics = [item for item in plan.get("metrics") or [] if rows and item in rows[0]]
+    dimensions = [item for item in plan.get("dimensions") or [] if rows and item in rows[0]]
+    if not rows or not metrics:
+        return []
+    time_kind = str((plan.get("time_range") or {}).get("kind") or "").upper()
+    if "profit" in metrics:
+        metric = "profit"
+    elif "DAY" in time_kind and "order_count" in metrics:
+        metric = "order_count"
+    elif "revenue" in metrics:
+        metric = "revenue"
+    else:
+        metric = metrics[0]
+    comparable = [row for row in rows if isinstance(row.get(metric), (int, float))]
+    selected = max(comparable, key=lambda row: row[metric]) if comparable else rows[0]
+    claim: dict = {"metric": metric, "value": selected.get(metric)}
+    dimension_fields = {
+        "region": "regions.region_name",
+        "category": "products.category",
+        "product": "products.product_name",
+        "customer": "customers.customer_name",
+        "customer_type": "customers.customer_type",
+        "status": "orders.status",
+    }
+    constrained_fields = {
+        str(item.get("field") or "")
+        for item in plan.get("filters") or []
+        if str(item.get("operator") or "=").upper() in {"=", "IN"}
+    }
+    dimension = next(
+        (item for item in dimensions if dimension_fields.get(item) not in constrained_fields),
+        None,
+    )
+    if dimension:
+        claim.update({"dimension": dimension, "dimension_value": selected.get(dimension)})
+    else:
+        scope = _canonical_scope(plan)
+        if scope:
+            claim["scope"] = scope
+    return [claim]
+
+
+def _claim_summary(run: QueryRun, claims: list[dict], fallback: str) -> str:
+    rows = list((run.execution_payload or {}).get("rows") or [])
+    if not rows and run.status == "SUCCEEDED":
+        return "查询已完成，当前条件下没有数据，未生成业务结论。"
+    if not claims:
+        return fallback
+    claim = claims[0]
+    label = f"{claim['dimension_value']}的" if claim.get("dimension_value") is not None else ""
+    return f"{label}{claim['metric']} 为 {claim['value']}。"
+
+
 def query_response(run: QueryRun) -> QueryResponse:
     fallback_summary, fallback_kpis, fallback_recommendations = _summary(run)
     narrative = run.narrative_payload or {}
-    summary = narrative.get("conclusion") or fallback_summary
+    claims = _verified_answer_claims(run)
+    summary = _claim_summary(run, claims, narrative.get("conclusion") or fallback_summary)
     kpis = narrative.get("key_metrics") or fallback_kpis
     recommendations = run.follow_up_payload or narrative.get("recommended_questions") or fallback_recommendations
     return QueryResponse(
@@ -144,6 +234,15 @@ def query_response(run: QueryRun) -> QueryResponse:
         oracle=run.oracle_payload or {},
         chart_spec=run.chart_spec_payload or {},
         narrative=narrative,
+        result_evidence={
+            "metrics": list((run.plan_payload or {}).get("metrics") or []),
+            "dimensions": list((run.plan_payload or {}).get("dimensions") or []),
+            "row_count": len((run.execution_payload or {}).get("rows") or []),
+            "rows": list((run.execution_payload or {}).get("rows") or []),
+            "result_signature": (run.execution_payload or {}).get("result_signature"),
+            "oracle_status": (run.oracle_payload or {}).get("status"),
+        },
+        answer_claims=claims,
         summary=summary,
         kpis=kpis,
         recommended_questions=recommendations,

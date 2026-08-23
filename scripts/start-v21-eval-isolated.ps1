@@ -2,7 +2,9 @@ param(
   [Parameter(Mandatory = $true)][string]$SourceEnv,
   [string]$Schema = 'chatbi_eval_feedback_v21',
   [int]$BackendPort = 18080,
-  [string]$Python = 'python'
+  [string]$Python = 'python',
+  [ValidateSet('deterministic', 'auto')][string]$ModelProvider = 'deterministic',
+  [string]$EvidenceRoot = ''
 )
 
 $ErrorActionPreference = 'Stop'
@@ -23,7 +25,17 @@ if (-not $values['CHATBI_META_PASSWORD']) { throw 'CHATBI_META_PASSWORD is missi
 $encodedPassword = [System.Uri]::EscapeDataString($values['CHATBI_META_PASSWORD'])
 $baseUrl = "postgresql+psycopg://chatbi_app:${encodedPassword}@127.0.0.1:5432/chatbi_v2"
 $env:CHATBI_DATABASE_URL = $baseUrl
-$env:PYTHONPATH = $backendRoot
+$packagePaths = @(
+  $backendRoot,
+  (Join-Path $projectRoot 'packages\agent-contracts\src'),
+  (Join-Path $projectRoot 'packages\agent-orchestrator\src'),
+  (Join-Path $projectRoot 'packages\prompt-registry\src'),
+  (Join-Path $projectRoot 'packages\rag-adapter\src'),
+  (Join-Path $projectRoot 'packages\rag-contracts\src'),
+  (Join-Path $projectRoot 'packages\dbgpt-runtime-adapter\src'),
+  (Join-Path $projectRoot 'packages\pandasai-selected-runtime\src')
+)
+$env:PYTHONPATH = $packagePaths -join [System.IO.Path]::PathSeparator
 & $Python (Join-Path $backendRoot 'scripts\prepare_eval_schema.py') --schema $Schema
 if ($LASTEXITCODE -ne 0) { throw 'Isolated schema preparation failed' }
 
@@ -36,8 +48,18 @@ try {
   Pop-Location
 }
 $env:CHATBI_SEED_DEMO_SEMANTIC_MODEL = 'true'
-$stdout = Join-Path $projectRoot "backend-v21-$BackendPort.stdout.log"
-$stderr = Join-Path $projectRoot "backend-v21-$BackendPort.stderr.log"
+$env:CHATBI_MODEL_PROVIDER = $ModelProvider
+if ($ModelProvider -eq 'deterministic') {
+  $env:CHATBI_GENERAL_MODEL_PROVIDER = 'deterministic'
+  $env:CHATBI_TEST_COST_CONTROL = 'YES'
+  $env:CHATBI_TEST_EXECUTION_LEVEL = 'LEVEL0'
+  $env:CHATBI_LEVEL0_VISION_FIXTURE_PATH = Join-Path $projectRoot 'evaluation\fixtures\v13-phase5-level0-vision-recordings.json'
+  $env:CHATBI_PAID_GATE_AUTHORIZED = 'NO'
+}
+$logRoot = if ($EvidenceRoot) { $EvidenceRoot } else { $projectRoot }
+New-Item -ItemType Directory -Path $logRoot -Force | Out-Null
+$stdout = Join-Path $logRoot "backend-v21-$BackendPort.stdout.log"
+$stderr = Join-Path $logRoot "backend-v21-$BackendPort.stderr.log"
 $process = Start-Process -FilePath $Python -ArgumentList @('-m', 'uvicorn', 'app.main:app', '--host', '127.0.0.1', '--port', "$BackendPort") -WorkingDirectory $backendRoot -RedirectStandardOutput $stdout -RedirectStandardError $stderr -WindowStyle Hidden -PassThru
 
 $ready = $false

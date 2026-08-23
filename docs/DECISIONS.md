@@ -1,5 +1,11 @@
 # Architecture Decisions
 
+## ADR-056：ONE_TRACE 最近页下推候选上限，带凭据 CORS 只接受显式来源
+
+ONE_TRACE 无筛选概览只需要按创建时间返回最近 N 个 Trace。若一条记录不在任何持久化根源各自最新 N 条内，它不可能进入这些根源并集的最新 N 条，因此 QueryRun、Assistant Message、OrchestrationRun 与 KnowledgeRetrievalRun 可以分别在数据库层按 `created_at DESC LIMIT N` 读取，再复用既有合并、阶段和脱敏逻辑。该优化不截断带时间、用户、路由或状态筛选的查询，也不改变单 Trace 详情的全历史收集；Release Evidence 必须同时记录返回数量、coverage 和真实响应时间，不能只用 UI 加载占位掩盖慢查询。
+
+本机并行项目可能占用默认前端端口，发布和隔离 E2E 因此允许通过 `CHATBI_CORS_ALLOW_ORIGINS` 提供逗号分隔的精确 Origin。默认仍只有 `localhost:5173` 与 `127.0.0.1:5173`；启用 Cookie 凭据时空列表和 `*` 一律拒绝。该配置只解决明确 Origin 的浏览器 API 边界，不授权任意跨域、前端直连数据库或把认证状态写入 Evidence。
+
 ## ADR-055：可见筛选必须进入数据库查询，派生计数不得由客户端声明
 
 Phase 5 全可见控件门禁要求 Search、Filter、Sort 的用户条件进入 Backend API，并在当前 Workspace、用户和 RBAC 边界内形成真实数据库查询；浏览器对已经取回的全量产品数据做本地过滤不能作为该门禁的实现。为保持概览统计不被当前筛选污染，前端可以并行读取无条件汇总与有条件列表，但两者都只能来自 Backend API。没有本版本实现的控件必须移除或显式禁用并说明边界，不得保留可点击但无动作的外观。

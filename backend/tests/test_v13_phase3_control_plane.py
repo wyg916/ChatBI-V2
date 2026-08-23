@@ -14,6 +14,7 @@ from fastapi import HTTPException
 import app.services.chat as chat_module
 from app.integration.question_router import QuestionRouter
 from app.file_multimodal.contracts import canonical_sha256
+from app.file_multimodal.ocr import OcrPageEvidence
 from app.model_gateway import RequestContext
 from app.services.chat import ChatService, _operation_spans, _render_scanned_pdf
 from chatbi_agent_contracts import QuestionRoute
@@ -165,11 +166,25 @@ def test_scanned_pdf_enters_same_preprocess_and_vision_gateway(monkeypatch, tmp_
     path.write_bytes(_blank_pdf())
     item = _attachment(path, kind="SCANNED_PDF", mime_type="application/pdf", sha256="b" * 64)
     monkeypatch.setattr(chat_module, "attachment_path", lambda _item: path)
+    monkeypatch.setattr(chat_module, "extract_scanned_pdf_ocr", lambda _pages: (OcrPageEvidence(
+        page=1,
+        text="KPI 100",
+        line_count=1,
+        mean_confidence=0.99,
+        min_confidence=0.99,
+        rotation_degrees=0,
+        image_sha256="c" * 64,
+        text_sha256="d" * 64,
+    ),))
     gateway = _VisionGateway()
     result = ChatService(gateway)._vision_answer(
         "识别扫描件", [item], [], request_context=_context(), complexity_score=25
     )
     assert result[5][0]["metadata"]["pages"] == [1]
+    assert result[5][0]["metadata"]["local_ocr"][0]["page"] == 1
+    assert result[5][0]["metadata"]["local_ocr"][0]["text_sha256"] == "d" * 64
+    assert "LOCAL_OCR_EVIDENCE_JSON" in gateway.kwargs["user"]
+    assert "KPI 100" in gateway.kwargs["user"]
     assert gateway.kwargs["image_data_urls"][0].startswith("data:image/png;base64,")
 
 

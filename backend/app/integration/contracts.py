@@ -16,6 +16,7 @@ class AnalysisRequest(BaseModel):
     semantic_model_id: str | None = None
     row_limit: int | None = Field(default=None, ge=1, le=500)
     idempotency_key: str | None = Field(default=None, min_length=8, max_length=128)
+    file_evidence: dict[str, Any] | None = None
 
 
 class AnalysisResponse(BaseModel):

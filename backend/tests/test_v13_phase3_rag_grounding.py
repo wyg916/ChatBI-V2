@@ -113,6 +113,7 @@ def test_citation_evidence_calls_the_single_model_gateway_then_answer_guard():
         "factual_units": 1,
         "citation_accuracy": 1.0,
         "prompt_injection_evidence_used": 0,
+        "no_evidence": False,
     }
 
 

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from concurrent.futures import ThreadPoolExecutor
+from datetime import datetime, timezone
 from queue import Empty, Queue
 from time import perf_counter
 from uuid import uuid4
@@ -13,7 +14,7 @@ from sqlalchemy.orm import Session
 from app.core.access import Principal, get_conversation_principal, record_audit, require_permission
 from app.core.config import get_settings
 from app.db.session import SessionLocal, get_db
-from app.models import Attachment, ChatMessage, Conversation
+from app.models import Attachment, ChatMessage, Conversation, OrchestrationProfile, OrchestrationRun
 from app.model_gateway.ledger import bind_model_invocation_session
 from app.schemas.chat import (
     ChatRequest,
@@ -56,6 +57,42 @@ def _cleanup_cancelled_messages(conversation_id: str, client_message_id: str) ->
             cleanup_db.delete(assistant)
         cleanup_db.delete(user_message)
         cleanup_db.commit()
+
+
+def _persist_cancelled_run(data: ChatRequest, principal: Principal, trace_id: str) -> None:
+    """Persist a non-model cancellation receipt without retaining chat content."""
+    with SessionLocal() as receipt_db:
+        existing = receipt_db.scalar(select(OrchestrationRun).where(
+            OrchestrationRun.workspace_id == principal.workspace_id,
+            OrchestrationRun.trace_id == trace_id,
+        ))
+        now = datetime.now(timezone.utc)
+        if existing is not None:
+            existing.status = "CANCELLED"
+            existing.error_code = "RUN_CANCELLED"
+            existing.trace_complete = True
+            existing.finished_at = now
+            receipt_db.commit()
+            return
+        profile = receipt_db.scalar(select(OrchestrationProfile).where(
+            OrchestrationProfile.workspace_id == principal.workspace_id,
+            OrchestrationProfile.code == "chatbi-v1-complex-analysis",
+        ))
+        receipt_db.add(OrchestrationRun(
+            workspace_id=principal.workspace_id,
+            profile_id=profile.id if profile else None,
+            user_id=principal.user_id,
+            route=data.route.value if data.route else "AUTO",
+            status="CANCELLED",
+            trace_id=trace_id,
+            idempotency_key=data.client_message_id,
+            request_payload={"cancelled_before_completion": True},
+            result_payload={"status": "CANCELLED", "trace_id": trace_id},
+            error_code="RUN_CANCELLED",
+            trace_complete=True,
+            finished_at=now,
+        ))
+        receipt_db.commit()
 
 
 def _stream_principal(
@@ -197,6 +234,7 @@ def chat_stream(
                 lifecycle.checkpoint()
                 events.put(("result", result.model_dump(mode="json")))
         except StreamCancelled:
+            _persist_cancelled_run(data, principal, run_id)
             _cleanup_cancelled_messages(data.conversation_id, data.client_message_id)
             events.put(("cancelled", {"code": "RUN_CANCELLED", "message": "请求已取消。", "retryable": True}))
         except Exception as exc:

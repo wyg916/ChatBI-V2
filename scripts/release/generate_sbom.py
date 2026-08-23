@@ -36,6 +36,8 @@ def _normalise_license(raw: str, classifiers: list[str], name: str) -> str:
         "apache license 2.0": "Apache-2.0",
         "apache software license": "Apache-2.0",
         "bsd": "BSD-3-Clause",
+        "3-clause bsd license": "BSD-3-Clause",
+        "bsd 3-clause": "BSD-3-Clause",
         "dual license": "BSD-3-Clause OR Apache-2.0",
         "lgpl": "LGPL-2.1-or-later",
         "gnu lesser general public license v3 (lgplv3)": "LGPL-3.0-only",

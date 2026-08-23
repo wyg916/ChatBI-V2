@@ -92,6 +92,7 @@ class OrchestrationRequest(BaseModel):
     datasource_id: str | None = None
     semantic_model_id: str | None = None
     include_knowledge: bool = True
+    include_chart: bool = True
     idempotency_key: str = Field(min_length=8, max_length=128)
     prompt_versions: dict[str, str] = Field(default_factory=dict)
 
