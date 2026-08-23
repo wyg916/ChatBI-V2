@@ -152,6 +152,8 @@ def test_api_load_defaults_remain_20_users_for_15_minutes(tmp_path: Path) -> Non
     ])
     assert args.users == DEFAULT_API_USERS == 20
     assert args.duration_seconds == DEFAULT_API_DURATION_SECONDS == 900
+    assert args.idle_baseline_seconds == 300
+    assert args.load_generator_cpu_count == 2
 
 
 def test_fixtures_are_reproducible_real_csv_and_png() -> None:
@@ -653,6 +655,34 @@ def test_api_gate_requires_20x15m_all_six_routes_resources_real_ledger_and_clean
     }.issubset(failures)
     assert RELEASE_THRESHOLDS["max_kimi_premium_share"] == 0.10
     assert RELEASE_THRESHOLDS["min_saving_vs_all_premium"] == 0.60
+
+
+def test_api_gate_requires_five_minute_idle_attribution_and_load_generator_partition() -> None:
+    metrics = summarize_api_load(
+        _passing_samples(),
+        _passing_resources() * 300,
+        elapsed_seconds=900.0,
+        configured_users=20,
+    )
+    failures = evaluate_api_gate(
+        users=20,
+        duration_seconds=900,
+        metrics=metrics,
+        core_data=_passing_core_data(),
+        cost=_passing_cost(),
+        cleanup=_passing_cleanup(),
+        runtime_error=None,
+        cpu_attribution={
+            "idle_baseline": {"actual_seconds": 299.0},
+            "load": {"sample_count": 449},
+            "load_generator_separation": {"status": "UNAVAILABLE"},
+        },
+    )
+    assert {
+        "idle_cpu_baseline_below_5_minutes",
+        "cpu_attribution_coverage_below_half_duration",
+        "load_generator_resource_separation_not_applied",
+    }.issubset(failures)
 
 
 def test_cleanup_deletes_and_verifies_every_attachment_conversation_and_session() -> None:

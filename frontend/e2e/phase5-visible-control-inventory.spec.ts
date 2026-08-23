@@ -10,7 +10,7 @@ const outputPath = resolve(
     ?? 'test-results/phase5-visible-control-inventory.json',
 );
 
-type Resource = { id: string; name?: string };
+type Resource = { id: string; name?: string; type?: string };
 type PageTarget = { page: string; route: string };
 type ControlRecord = {
   page: string;
@@ -21,6 +21,13 @@ type ControlRecord = {
   tag: string;
   role: string;
   test_id: string | null;
+  selector_index: number;
+  locator: string;
+  href: string | null;
+  aria_label: string | null;
+  input_type: string | null;
+  option_values: string[];
+  identity_ordinal: number;
   visible_state: 'VISIBLE';
   enabled_state: 'ENABLED' | 'DISABLED';
   required_role: 'ADMIN';
@@ -49,20 +56,27 @@ async function targets(request: APIRequestContext): Promise<PageTarget[]> {
   expect(sources.length, 'control inventory requires a datasource').toBeGreaterThan(0);
   expect(models.length, 'control inventory requires a semantic model').toBeGreaterThan(0);
   expect(dashboards.length, 'control inventory requires a dashboard').toBeGreaterThan(0);
-  const primaryModel = models.find((item) => item.name === '新能源经营分析') ?? models[0];
+  const primarySource = sources.find((item) => item.type === 'postgresql') ?? sources[0];
+  const preferredModelName = process.env.CHATBI_CONTROL_MODEL_NAME;
+  const preferredDashboardName = process.env.CHATBI_CONTROL_DASHBOARD_NAME;
+  const primaryModel = models.find((item) => item.name === preferredModelName)
+    ?? models.find((item) => item.name === '新能源经营分析')
+    ?? models[0];
+  const primaryDashboard = dashboards.find((item) => item.name === preferredDashboardName)
+    ?? dashboards[0];
   return [
     { page: '登录页', route: '/login' },
     { page: '问数据-会话状态', route: '/' },
     { page: '问数据-空状态', route: '/?new=1' },
     { page: '问数据-分析结果', route: `/ask/results?q=${encodeURIComponent('统计全部订单收入')}` },
     { page: '数据源列表', route: '/datasources' },
-    { page: '数据源详情', route: `/datasources/${sources[0].id}` },
-    { page: '数据工作台', route: `/datasources/${sources[0].id}/workspace` },
+    { page: '数据源详情', route: `/datasources/${primarySource.id}` },
+    { page: '数据工作台', route: `/datasources/${primarySource.id}/workspace` },
     { page: '语义模型列表', route: '/semantic-models' },
     { page: '语义模型编辑器', route: `/semantic-models/${primaryModel.id}` },
     { page: '答案库', route: '/answers' },
     { page: '看板列表', route: '/dashboards' },
-    { page: '看板详情', route: `/dashboards/${dashboards[0].id}` },
+    { page: '看板详情', route: `/dashboards/${primaryDashboard.id}` },
     { page: '评测中心', route: '/evaluation' },
     { page: '评测反馈与Verified SQL', route: '/evaluation?view=feedback' },
     { page: '评测用例详情', route: '/evaluation/G01' },
@@ -82,7 +96,7 @@ const selector = [
 ].join(',');
 
 async function scan(page: Page, target: PageTarget, surface: string): Promise<ControlRecord[]> {
-  const raw = await page.locator(selector).evaluateAll((elements) => elements.flatMap((element, index) => {
+  const candidates = await page.locator(selector).evaluateAll((elements) => elements.flatMap((element, index) => {
     const node = element as HTMLElement;
     const style = getComputedStyle(node);
     const rect = node.getBoundingClientRect();
@@ -102,7 +116,7 @@ async function scan(page: Page, target: PageTarget, surface: string): Promise<Co
       || input.value
       || ''
     ).replace(/\s+/g, ' ').trim().slice(0, 240);
-    const disabled = input.disabled || node.getAttribute('aria-disabled') === 'true';
+    const disabled = input.disabled || input.readOnly || node.getAttribute('aria-disabled') === 'true';
     let controlType = 'BUTTON';
     if (tag === 'a' || role === 'link') controlType = 'LINK_ACTION';
     else if (role === 'tab') controlType = 'TAB';
@@ -114,9 +128,26 @@ async function scan(page: Page, target: PageTarget, surface: string): Promise<Co
     else if (type === 'radio' || role === 'radio') controlType = 'RADIO';
     else if (tag === 'input' || tag === 'textarea' || node.isContentEditable) controlType = 'INPUT';
     else if (role === 'button' && !['button', 'input'].includes(tag)) controlType = 'ICON_BUTTON';
-    return [{ index, tag, role, type, text, disabled, controlType, testId: node.dataset.testid ?? null }];
+    return [{
+      index,
+      tag,
+      role,
+      type,
+      text,
+      disabled,
+      controlType,
+      testId: node.dataset.testid ?? null,
+      href: node instanceof HTMLAnchorElement ? node.getAttribute('href') : null,
+      ariaLabel: node.getAttribute('aria-label'),
+      optionValues: node instanceof HTMLSelectElement
+        ? Array.from(node.options).map((option) => option.value)
+        : [],
+    }];
   }));
+  const visibility = await Promise.all(candidates.map((item) => page.locator(selector).nth(item.index).isVisible()));
+  const raw = candidates.filter((_item, index) => visibility[index]);
 
+  const identityOrdinals = new Map<string, number>();
   return raw.map((item) => {
     const identity = `${target.route}|${surface}|${item.index}|${item.tag}|${item.role}|${item.text}`;
     const controlId = `CTL-${createHash('sha256').update(identity).digest('hex').slice(0, 16)}`;
@@ -125,6 +156,9 @@ async function scan(page: Page, target: PageTarget, surface: string): Promise<Co
         : item.controlType === 'UPLOAD' ? 'UPLOAD_FILE'
           : item.controlType === 'CHECKBOX' || item.controlType === 'RADIO' || item.controlType === 'TOGGLE'
             ? 'TOGGLE_STATE' : 'CLICK';
+    const ordinalKey = [item.tag, item.role, item.text, item.href ?? '', item.ariaLabel ?? ''].join('|');
+    const identityOrdinal = identityOrdinals.get(ordinalKey) ?? 0;
+    identityOrdinals.set(ordinalKey, identityOrdinal + 1);
     return {
       page: target.page,
       route: target.route,
@@ -134,6 +168,15 @@ async function scan(page: Page, target: PageTarget, surface: string): Promise<Co
       tag: item.tag,
       role: item.role,
       test_id: item.testId,
+      selector_index: item.index,
+      locator: item.testId
+        ? `[data-testid="${item.testId}"]`
+        : `${selector} >> nth=${item.index}`,
+      href: item.href,
+      aria_label: item.ariaLabel,
+      input_type: item.type || null,
+      option_values: item.optionValues,
+      identity_ordinal: identityOrdinal,
       visible_state: 'VISIBLE',
       enabled_state: item.disabled ? 'DISABLED' : 'ENABLED',
       required_role: 'ADMIN',

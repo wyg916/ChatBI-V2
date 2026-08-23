@@ -1,5 +1,11 @@
 # Architecture Decisions
 
+## ADR-057：控件认证以浏览器真实可见性为边界，负载 CPU 以进程分类和资源分区归因
+
+可见控件 Inventory 不能只依赖 `display` / `visibility` 和几何矩形；关闭的 `details` 子树可能仍返回几何信息，但 Playwright 不允许用户交互。Inventory 因此对每个候选元素调用浏览器级真实可见性，只对当前页面状态中用户实际可见且启用的控件签发 receipt。执行时用稳定 `data-testid` / `href` 或控件身份与同名序号重新定位，不把动态时间文案或全局 nth 当作持久身份。写控件必须证明 DB 指纹变化、API 回读和刷新；纯 UI/导航/剪贴板/下载控件必须给出对应的可观察结果，不得用空泛 N/A 跳过。
+
+Host CPU 超门槛不能直接归因为 Backend。正式 20 用户负载先采集至少 300 秒 Idle Baseline，再在不降低 90% Host CPU P99 固定门槛的前提下，对 Backend、PostgreSQL、Sandbox、Docker VM、Load Generator、Browser 和 Other 进程分类取样。单机环境中 Load Generator 固定到独立 2 核 CPU 亲和集，并在 Evidence 中保留其独立 P50/P95/P99；这是资源分区和可观测归因，不是从 Host CPU 门禁中扣除负载器成本。
+
 ## ADR-056：ONE_TRACE 最近页下推候选上限，带凭据 CORS 只接受显式来源
 
 ONE_TRACE 无筛选概览只需要按创建时间返回最近 N 个 Trace。若一条记录不在任何持久化根源各自最新 N 条内，它不可能进入这些根源并集的最新 N 条，因此 QueryRun、Assistant Message、OrchestrationRun 与 KnowledgeRetrievalRun 可以分别在数据库层按 `created_at DESC LIMIT N` 读取，再复用既有合并、阶段和脱敏逻辑。该优化不截断带时间、用户、路由或状态筛选的查询，也不改变单 Trace 详情的全历史收集；Release Evidence 必须同时记录返回数量、coverage 和真实响应时间，不能只用 UI 加载占位掩盖慢查询。

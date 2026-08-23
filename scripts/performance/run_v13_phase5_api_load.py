@@ -34,6 +34,8 @@ from sqlalchemy.orm import Session
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 BACKEND_ROOT = REPO_ROOT / "backend"
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
 if str(BACKEND_ROOT) not in sys.path:
     sys.path.insert(0, str(BACKEND_ROOT))
 
@@ -60,6 +62,12 @@ from app.models import (  # noqa: E402
 )
 from app.services.attachments import attachment_path  # noqa: E402
 from app.services.governance import cost_ledger_entries  # noqa: E402
+from scripts.performance.cpu_attribution import (  # noqa: E402
+    ProcessAttributionProbe,
+    collect_idle_baseline,
+    configure_load_generator_affinity,
+    summarize_attribution,
+)
 
 
 _TERMINAL_EVENTS = {"run.completed", "run.failed", "run.cancelled"}
@@ -70,6 +78,7 @@ DEFAULT_CORE_DATA_MANIFEST = REPO_ROOT / "evaluation" / "golden" / "v13-phase5-d
 RELEASE_THRESHOLDS = {
     "min_users": 20,
     "min_duration_seconds": 900,
+    "min_idle_baseline_seconds": 300,
     "min_success_rate": 1.0,
     "max_ttfe_p95_ms": 1_000.0,
     "max_ttft_p95_ms": 15_000.0,
@@ -1714,6 +1723,7 @@ def evaluate_api_gate(
     cleanup: dict[str, Any],
     runtime_error: str | None,
     provider_mode: str = "live",
+    cpu_attribution: dict[str, Any] | None = None,
 ) -> list[str]:
     failures: list[str] = []
     if runtime_error:
@@ -1722,6 +1732,15 @@ def evaluate_api_gate(
         failures.append("authenticated_users_below_20")
     if duration_seconds < RELEASE_THRESHOLDS["min_duration_seconds"]:
         failures.append("duration_below_15_minutes")
+    if cpu_attribution is not None:
+        idle = cpu_attribution.get("idle_baseline") or {}
+        if float(idle.get("actual_seconds") or 0.0) < RELEASE_THRESHOLDS["min_idle_baseline_seconds"]:
+            failures.append("idle_cpu_baseline_below_5_minutes")
+        load = cpu_attribution.get("load") or {}
+        if int(load.get("sample_count") or 0) < math.ceil(float(duration_seconds) / 2):
+            failures.append("cpu_attribution_coverage_below_half_duration")
+        if (cpu_attribution.get("load_generator_separation") or {}).get("status") != "APPLIED":
+            failures.append("load_generator_resource_separation_not_applied")
     if core_data is None:
         failures.append("backend_core_data100_missing")
     elif (
@@ -1846,6 +1865,8 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--backend-pid", type=int, required=True)
     parser.add_argument("--users", type=int, default=DEFAULT_API_USERS)
     parser.add_argument("--duration-seconds", type=int, default=DEFAULT_API_DURATION_SECONDS)
+    parser.add_argument("--idle-baseline-seconds", type=int, default=300)
+    parser.add_argument("--load-generator-cpu-count", type=int, default=2)
     parser.add_argument("--request-timeout-seconds", type=float, default=40.0)
     parser.add_argument("--provider-mode", choices=PROVIDER_MODES, default="live")
     parser.add_argument("--output", type=Path, required=True)
@@ -1863,10 +1884,14 @@ def main(argv: Sequence[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     if not args.database_url:
         raise SystemExit("--database-url or CHATBI_PHASE5_DATABASE_URL is required")
-    if args.users <= 0 or args.duration_seconds <= 0 or args.request_timeout_seconds <= 0:
+    if (
+        args.users <= 0 or args.duration_seconds <= 0 or args.request_timeout_seconds <= 0
+        or args.idle_baseline_seconds < 0 or args.load_generator_cpu_count <= 0
+    ):
         raise SystemExit("users, duration and request timeout must be positive")
     base_url = validate_backend_url(args.base_url)
     validate_local_postgres_url(args.database_url)
+    load_generator_separation = configure_load_generator_affinity(args.load_generator_cpu_count)
     request_prefix = f"phase5api-{hashlib.sha256(f'{time.time_ns()}:{os.getpid()}'.encode()).hexdigest()[:12]}-"
     base_password = os.getenv(args.base_password_env, "")
     if not base_password:
@@ -1887,6 +1912,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     cost: dict[str, Any] | None = None
     core_data: dict[str, Any] | None = None
     runtime_error: str | None = None
+    cpu_attribution: dict[str, Any] | None = None
     cleanup = {
         "attachment_delete_204": 0,
         "attachment_absence_404": 0,
@@ -1956,11 +1982,22 @@ def main(argv: Sequence[str] | None = None) -> int:
         host_probe = SystemProbe()
         process_probe = BackendProcessProbe(args.backend_pid)
         db_probe = DatabaseConnectionProbe(args.database_url, metadata_schema=args.metadata_schema)
+        attribution_probe = ProcessAttributionProbe(
+            backend_pid=args.backend_pid,
+            load_generator_pid=os.getpid(),
+        )
+        idle_raw = collect_idle_baseline(
+            duration_seconds=args.idle_baseline_seconds,
+            host_probe=SystemProbe(),
+            attribution_probe=attribution_probe,
+        )
+        load_attribution_samples: list[dict[str, Any]] = []
 
         def sample_resources() -> ResourceSample:
             host_cpu, host_ram = host_probe.sample()
             backend_cpu, backend_rss = process_probe.sample()
             db_total, db_active = db_probe.sample()
+            load_attribution_samples.append(attribution_probe.sample())
             return ResourceSample(host_cpu, host_ram, backend_cpu, backend_rss, db_total, db_active)
 
         load_started_at = _utc_now()
@@ -1982,6 +2019,29 @@ def main(argv: Sequence[str] | None = None) -> int:
             elapsed_seconds=elapsed,
             configured_users=args.users,
         )
+        cpu_attribution = {
+            "schema_version": "chatbi.v13.phase5.cpu-attribution.v1",
+            "idle_baseline": {
+                "requested_seconds": idle_raw["requested_seconds"],
+                "actual_seconds": idle_raw["actual_seconds"],
+                "host_cpu_percent": distribution(idle_raw["host_cpu_values"]),
+                "host_ram_percent": distribution(idle_raw["host_ram_values"]),
+                **summarize_attribution(idle_raw["process_samples"], distribution),
+            },
+            "load": summarize_attribution(load_attribution_samples, distribution),
+            "load_generator_separation": load_generator_separation,
+            "category_contract": {
+                "backend_cpu": "backend",
+                "postgres_cpu": "postgres",
+                "sandbox_cpu": "sandbox",
+                "docker_vm_cpu": "docker_vm",
+                "load_generator_cpu": "load_generator",
+                "browser_cpu": "browser",
+                "other_top_processes_cpu": "other",
+            },
+            "paid_provider_calls": 0 if args.provider_mode == "deterministic-controlled" else None,
+            "secrets_exposed": False,
+        }
         with Session(metadata.engine) as session:
             entries, coverage = cost_ledger_entries(
                 session,
@@ -2028,6 +2088,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         cleanup=cleanup,
         runtime_error=runtime_error,
         provider_mode=args.provider_mode,
+        cpu_attribution=cpu_attribution,
     )
     evidence = {
         "schema_version": "chatbi.v13.phase5.authenticated-api-load.v1",
@@ -2041,6 +2102,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         "config": {
             "users": args.users,
             "duration_seconds": args.duration_seconds,
+            "idle_baseline_seconds": args.idle_baseline_seconds,
+            "load_generator_cpu_count": args.load_generator_cpu_count,
             "production_default_duration_seconds": DEFAULT_API_DURATION_SECONDS,
             "transport": "REAL_AUTHENTICATED_BACKEND_API_SSE",
             "provider_mode": args.provider_mode,
@@ -2078,6 +2141,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         "core_data100": core_data,
         "fixtures": {**fixture_hashes, "generated_outside_repository": True},
         "metrics": metrics,
+        "cpu_attribution": cpu_attribution,
         "cost_ledger": cost,
         "cleanup": cleanup,
         "failures": failures,

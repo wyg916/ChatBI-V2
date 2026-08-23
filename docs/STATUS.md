@@ -2,6 +2,7 @@
 
 ## V1.3.0 Phase 5 发布加固候选（2026-08-22）
 
+- 2026-08-23 Level 0 最终 Blocker 收口候选已加入真实可见控件逐项认证和 CPU 归因：Inventory 以 Playwright 真实可见性排除折叠区内隐藏控件，每个可操作控件生成独立 Browser/API/DB/Readback/Refresh receipt；20×15 负载新增 5 分钟 Idle Baseline、Backend/PostgreSQL/Sandbox/Docker VM/Load Generator/Browser/Other 进程分类及 Load Generator 2 核 CPU 亲和性隔离。提交前专项 23/23、Frontend 60/60 和 production build 已通过；Level 0 总结论仍只能由冻结后同一 SHA 的外部全量 Evidence 决定，本条不预先宣称 PASS。
 - 2026-08-23 Level 0 blocker remediation 已完成 Data100 100/100（结果值准确率 1.0）、Weird50 50/50、Complex5 5/5、扫描 PDF 本地 OCR/视觉链、两次冷启动、成本台账覆盖率 1.0、供应链/安全故障门禁、Backend 562 collected（556 passed、6 skipped）及 Playwright 串行 89/89。全程付费 Provider 调用 0、费用 0.00 CNY；历史 Phase 5 失败 Evidence 均保留在原目录，新证据位于独立 `Phase5_Level0_Blocker_Remediation_20260823_1315` 根目录。
 - 20 用户 × 15 分钟实际完成 6,841/6,841 请求且业务校验率 1.0，P95 7,046.752 ms、Backend CPU P99 56.083%、DB 连接最大 48、无资源残留；但宿主机 CPU P99 为 98.366%，超过固定 90% 门槛，因此 Load Gate 仍为 FAIL，不降低阈值也不重复执行昂贵长稳态测试。
 - 真实浏览器盘点覆盖 21 个页面、831 个可见控件，其中 748 个可操作控件；该执行只完成 Inventory，逐项 Browser→API→DB→Readback→Refresh 认证数仍为 0，覆盖率 0。受控临时 ADMIN 与认证状态已精确清理并有回执。由于控件矩阵和宿主 CPU 两项仍阻断，Level 1 定向真实 Provider、Level 2 最终付费认证、Phase 6、main 合并和 V1.3.0 Tag 均保持禁止，Phase 5 总门禁仍为 FAIL。
