@@ -370,6 +370,52 @@ def test_agent_orchestrator_formally_routes_through_selected_awel_runtime():
     assert "sql" not in str(awel_payload).lower()
 
 
+def test_selected_runtime_loader_reuses_verified_immutable_runtime(monkeypatch):
+    import chatbi_dbgpt_runtime.runtime as runtime_module
+
+    calls = {"distribution": 0, "import": 0}
+
+    class Distribution:
+        version = runtime_module.UPSTREAM_PACKAGE_VERSION
+
+        @staticmethod
+        def read_text(name):
+            assert name == "direct_url.json"
+            return json.dumps({
+                "url": runtime_module.UPSTREAM_ARCHIVE_URL,
+                "subdirectory": "packages/dbgpt-core",
+                "archive_info": {
+                    "hashes": {"sha256": runtime_module.UPSTREAM_ARCHIVE_SHA256}
+                },
+            })
+
+    class Awel:
+        DAG = type("DAG", (), {})
+        MapOperator = type("MapOperator", (), {})
+
+    def distribution(name):
+        assert name == "dbgpt"
+        calls["distribution"] += 1
+        return Distribution()
+
+    def load_module(name):
+        assert name == "dbgpt.core.awel"
+        calls["import"] += 1
+        return Awel
+
+    monkeypatch.setattr(runtime_module.metadata, "distribution", distribution)
+    monkeypatch.setattr(runtime_module, "import_module", load_module)
+    runtime_module._load_selected_runtime.cache_clear()
+    try:
+        first = runtime_module._load_selected_runtime()
+        second = runtime_module._load_selected_runtime()
+    finally:
+        runtime_module._load_selected_runtime.cache_clear()
+
+    assert first is second
+    assert calls == {"distribution": 1, "import": 1}
+
+
 def test_agent_orchestrator_missing_selected_runtime_returns_failed_not_fallback():
     def unavailable():
         raise DbgptRuntimeUnavailable("missing")

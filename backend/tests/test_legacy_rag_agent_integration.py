@@ -144,11 +144,16 @@ def test_legacy_rag_adapter_carries_identity_and_verifies_workspace_echo():
         )
 
     transport = httpx.MockTransport(handler)
+
+    def client_factory(**kwargs):
+        observed["client_kwargs"] = dict(kwargs)
+        return httpx.Client(transport=transport, **kwargs)
+
     adapter = LegacyRagAdapter(
         base_url="http://legacy.internal",
         bearer_token="test-token",
         shared_secret="rag-test-secret",
-        client_factory=lambda **kwargs: httpx.Client(transport=transport, **kwargs),
+        client_factory=client_factory,
     )
     result = adapter.retrieve(RagRequest(query="收入定义", scenario_id="charging_ops", context=rag_context()))
     assert result.status == "SUCCEEDED"
@@ -157,6 +162,7 @@ def test_legacy_rag_adapter_carries_identity_and_verifies_workspace_echo():
     assert observed["headers"]["authorization"] == "Bearer test-token"
     assert observed["headers"]["x-chatbi-signature"]
     assert observed["headers"]["x-chatbi-timestamp"]
+    assert observed["client_kwargs"]["verify"] is False
     assert observed["body"]["trace_id"] == "TRACE-12345678"
     assert observed["body"]["chatbi_context"] == {
         "workspace_id": "workspace-a",
@@ -170,6 +176,24 @@ def test_legacy_rag_adapter_carries_identity_and_verifies_workspace_echo():
         "max_steps": 8,
         "token_budget": 1000,
     }
+
+
+def test_live_rag_keeps_tls_verification_enabled_for_https():
+    observed = {}
+    transport = httpx.MockTransport(
+        lambda request: httpx.Response(200, request=request, json={"status": "ok"})
+    )
+
+    def client_factory(**kwargs):
+        observed.update(kwargs)
+        return httpx.Client(transport=transport, **kwargs)
+
+    adapter = LegacyRagAdapter(
+        base_url="https://legacy.internal",
+        client_factory=client_factory,
+    )
+    assert adapter.health() is True
+    assert observed["verify"] is True
 
 
 def test_legacy_rag_adapter_fails_closed_without_workspace_echo():

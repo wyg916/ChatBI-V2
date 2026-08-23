@@ -115,6 +115,10 @@ class LiveRagAdapter:
                     timeout=remaining if cancellation_event is None else min(1.0, remaining),
                     follow_redirects=False,
                     trust_env=False,
+                    # HTTP has no TLS to verify. Avoid constructing an unused
+                    # default SSL context for every loopback bridge request,
+                    # while preserving certificate verification for HTTPS.
+                    verify=self.base_url.startswith("https://"),
                 ) as client:
                     response = client.post(self.endpoint, content=body_bytes, headers=headers)
                     if response.status_code >= 500 and attempt + 1 < max_attempts:
@@ -168,6 +172,7 @@ class LiveRagAdapter:
                 timeout=timeout_ms / 1000,
                 follow_redirects=False,
                 trust_env=False,
+                verify=self.base_url.startswith("https://"),
             ) as client:
                 response = client.get("/health")
                 return response.status_code == 200 and response.json().get("status") == "ok"

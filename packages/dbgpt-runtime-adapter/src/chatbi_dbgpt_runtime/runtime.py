@@ -7,6 +7,7 @@ import re
 import threading
 import time
 from dataclasses import dataclass
+from functools import lru_cache
 from importlib import import_module, metadata
 from typing import Any, Callable, Mapping, Protocol
 
@@ -115,6 +116,7 @@ class RuntimeLoader(Protocol):
     def __call__(self) -> _LoadedRuntime: ...
 
 
+@lru_cache(maxsize=1)
 def _load_selected_runtime() -> _LoadedRuntime:
     try:
         distribution = metadata.distribution("dbgpt")
