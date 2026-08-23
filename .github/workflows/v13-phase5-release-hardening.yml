@@ -29,6 +29,10 @@ concurrency:
   cancel-in-progress: false
 
 env:
+  CHATBI_TEST_COST_CONTROL: "YES"
+  CHATBI_TEST_EXECUTION_LEVEL: "LEVEL0"
+  CHATBI_PAID_GATE_AUTHORIZED: "NO"
+  CHATBI_MODEL_PROVIDER: deterministic
   PYTHONPATH: >-
     backend:packages/agent-contracts/src:packages/agent-orchestrator/src:packages/prompt-registry/src:packages/rag-adapter/src:packages/rag-contracts/src:packages/dbgpt-runtime-adapter/src:packages/pandasai-selected-runtime/src
 
@@ -73,7 +77,13 @@ jobs:
             backend/tests/test_v13_phase5_security_supply.py \
             backend/tests/test_v13_phase5_runtime_metadata_hardening.py \
             backend/tests/test_v13_phase5_remote_ci_certificate.py \
+            backend/tests/test_v13_phase5_test_cost_control.py \
             -q --junitxml docs/evidence/v1.3/phase5-ci/phase5-junit.xml
+          python scripts/phase5-test-cost-control.py plan \
+            --level LEVEL0 \
+            --sha "${GITHUB_SHA}" \
+            --estimated-cost-cny 0 \
+            --output docs/evidence/v1.3/phase5-ci/test-cost-control.json
           python backend/scripts/run_v13_phase5_fault_regression_gate.py \
             --contract-only \
             --output docs/evidence/v1.3/phase5-ci/fault-contract.json

@@ -27,6 +27,12 @@ on:
 permissions:
   contents: read
 
+env:
+  CHATBI_TEST_COST_CONTROL: "YES"
+  CHATBI_TEST_EXECUTION_LEVEL: "LEVEL0"
+  CHATBI_PAID_GATE_AUTHORIZED: "NO"
+  CHATBI_MODEL_PROVIDER: deterministic
+
 concurrency:
   group: v13-phase4-${{ github.ref }}
   cancel-in-progress: false

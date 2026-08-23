@@ -18,6 +18,8 @@ from uuid import uuid4
 import httpx
 from dotenv import dotenv_values
 
+from app.model_gateway.test_cost_control import TestCostControlError, TestCostController, TestExecutionLevel
+
 
 BACKEND_ROOT = Path(__file__).resolve().parents[1]
 REPO_ROOT = BACKEND_ROOT.parent
@@ -1227,6 +1229,8 @@ def run_live_gate(
     semantic_model_id: str,
     credentials: Mapping[str, str],
     controller_client: httpx.Client,
+    weird_case_ids: frozenset[str] | None = None,
+    complex_case_ids: frozenset[str] | None = None,
 ) -> dict[str, Any]:
     started_at = utc_now()
     gate = LiveQuestionsGate(
@@ -1239,6 +1243,17 @@ def run_live_gate(
     )
     weird_results: list[dict[str, Any]] = []
     complex_results: list[dict[str, Any]] = []
+    all_weird_ids = {str(case["id"]) for case in weird_manifest["cases"]}
+    all_complex_ids = {str(case["id"]) for case in complex_manifest["cases"]}
+    selected_weird_ids = all_weird_ids if weird_case_ids is None else set(weird_case_ids)
+    selected_complex_ids = all_complex_ids if complex_case_ids is None else set(complex_case_ids)
+    unknown_weird = selected_weird_ids - all_weird_ids
+    unknown_complex = selected_complex_ids - all_complex_ids
+    if unknown_weird or unknown_complex:
+        raise LiveGateError(
+            "UNKNOWN_CASE_SELECTION:"
+            + ",".join(sorted(unknown_weird | unknown_complex))
+        )
     runtime_error: str | None = None
     auth: dict[str, Any] = {}
     try:
@@ -1246,6 +1261,8 @@ def run_live_gate(
         if not auth["authenticated"]:
             raise LiveGateError("AUTHENTICATION_NOT_CONFIRMED")
         for case in weird_manifest["cases"]:
+            if str(case["id"]) not in selected_weird_ids:
+                continue
             action = str((case.get("expected") or {}).get("action") or "")
             contract = (weird_manifest.get("answer_contracts") or {}).get(action)
             truth = (weird_manifest.get("case_ground_truth") or {}).get(str(case["id"]))
@@ -1266,6 +1283,8 @@ def run_live_gate(
             }
             weird_results.append(gate.run_question(executable_case, explicit_route=False))
         for case in complex_manifest["cases"]:
+            if str(case["id"]) not in selected_complex_ids:
+                continue
             evidence = gate.run_question(case, explicit_route=True)
             failures = gate.validate_complex(case, evidence)
             cancel = gate.cancel_probe(case)
@@ -1285,9 +1304,9 @@ def run_live_gate(
     ]
     if runtime_error:
         failures.append(f"runtime:{runtime_error}")
-    if len(weird_results) != 50:
+    if len(weird_results) != len(selected_weird_ids):
         failures.append("weird_case_execution_incomplete")
-    if len(complex_results) != 5:
+    if len(complex_results) != len(selected_complex_ids):
         failures.append("complex_case_execution_incomplete")
     if not cleanup["verified"]:
         failures.append("cleanup_not_verified")
@@ -1300,6 +1319,13 @@ def run_live_gate(
         "tested_sha": tested_sha,
         "started_at": iso(started_at),
         "completed_at": iso(utc_now()),
+        "certification_scope": (
+            "FULL_FINAL"
+            if selected_weird_ids == all_weird_ids and selected_complex_ids == all_complex_ids
+            else "TARGETED_FAILED_CASES_ONLY"
+        ),
+        "selected_weird_case_ids": sorted(selected_weird_ids),
+        "selected_complex_case_ids": sorted(selected_complex_ids),
         "authentication": auth,
         "manifests": {
             "weird_50_sha256": sha256_bytes(json.dumps(weird_manifest, ensure_ascii=False, sort_keys=True).encode("utf-8")),
@@ -1337,6 +1363,8 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--timeout-seconds", type=float, default=60.0)
     parser.add_argument("--sandbox-controller-url", required=True)
+    parser.add_argument("--weird-case", action="append")
+    parser.add_argument("--complex-case", action="append")
     return parser
 
 
@@ -1344,6 +1372,21 @@ def main(argv: Sequence[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     if args.timeout_seconds <= 0:
         raise SystemExit("--timeout-seconds must be positive")
+    controller = TestCostController()
+    try:
+        configuration = controller.validate_configuration()
+    except TestCostControlError as exc:
+        raise SystemExit(str(exc)) from exc
+    if not configuration.get("paid_calls_allowed"):
+        raise SystemExit("LIVE_QUESTIONS_GATE_REQUIRES_LEVEL1_OR_LEVEL2_AUTHORIZATION")
+    selected_weird = frozenset(args.weird_case or ())
+    selected_complex = frozenset(args.complex_case or ())
+    selected_count = len(selected_weird) + len(selected_complex)
+    if controller.level == TestExecutionLevel.LEVEL1:
+        if selected_count == 0 or selected_count > 3:
+            raise SystemExit("LEVEL1_REQUIRES_ONE_TO_THREE_EXPLICIT_FAILED_CASES")
+    elif selected_count:
+        raise SystemExit("LEVEL2_FINAL_CERTIFICATION_MUST_EXECUTE_FULL_WEIRD50_AND_COMPLEX5")
     credentials = load_external_credentials(args.env_file)
     weird = load_manifest(args.weird_manifest, expected_count=50)
     complex_manifest = load_manifest(args.complex_manifest, expected_count=5)
@@ -1370,6 +1413,8 @@ def main(argv: Sequence[str] | None = None) -> int:
             semantic_model_id=args.semantic_model_id,
             credentials=credentials,
             controller_client=controller_client,
+            weird_case_ids=selected_weird if controller.level == TestExecutionLevel.LEVEL1 else None,
+            complex_case_ids=selected_complex if controller.level == TestExecutionLevel.LEVEL1 else None,
         )
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps(evidence, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")

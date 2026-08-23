@@ -1,0 +1,50 @@
+{
+  "schema_version": "chatbi-v1.3-phase5-test-cost-control-v1",
+  "budgets_cny": {
+    "normal_fix_iteration": 0.5,
+    "targeted_live_regression": 1.0,
+    "pre_final_live": 1.5,
+    "final_certification": 3.0,
+    "daily_hard_cap": 5.0
+  },
+  "limits": {
+    "level1_max_real_provider_requests": 30,
+    "level2_max_real_provider_requests": 1000,
+    "provider_max_retry": 1,
+    "default_max_output_tokens": 512,
+    "complex_max_output_tokens": 1024
+  },
+  "paid_providers": ["mimo", "deepseek", "kimi"],
+  "level1_affected_paths": [
+    "model_gateway",
+    "provider_adapter",
+    "prompt",
+    "routing",
+    "vision",
+    "agent",
+    "scanned_pdf",
+    "complex",
+    "premium"
+  ],
+  "kimi_level1_paths": ["vision", "scanned_pdf", "complex", "premium"],
+  "required_level0_gates": [
+    "backend",
+    "frontend",
+    "typecheck",
+    "build",
+    "data100_deterministic",
+    "weird50_deterministic",
+    "complex5_non_paid",
+    "multimodal10_non_paid",
+    "control_matrix",
+    "browser",
+    "cold_start",
+    "concurrency",
+    "migration",
+    "security",
+    "phase1_regression",
+    "phase2_regression",
+    "phase3_regression",
+    "phase4_regression"
+  ]
+}

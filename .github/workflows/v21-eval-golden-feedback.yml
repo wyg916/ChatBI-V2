@@ -44,6 +44,11 @@ concurrency:
   group: v13-ibm-official-${{ github.ref }}
   cancel-in-progress: false
 
+env:
+  CHATBI_TEST_COST_CONTROL: "YES"
+  CHATBI_TEST_EXECUTION_LEVEL: "LEVEL0"
+  CHATBI_PAID_GATE_AUTHORIZED: "NO"
+
 jobs:
   deterministic-gate:
     runs-on: ubuntu-latest

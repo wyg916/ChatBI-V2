@@ -2,6 +2,8 @@
 
 ## V1.3.0 Phase 5 发布加固候选（2026-08-22）
 
+- 2026-08-23 Phase 5 FAIL 后续修复启用三级测试成本控制：普通 push 与每次修复默认 Level 0，只允许 deterministic/recorded/Mock Provider，Model Gateway 在真实 HTTP 前硬阻断付费调用；Level 1 仅允许 1～3 个受影响 Case、Provider allowlist、最多一次重试和 1.00 CNY 定向预算；Level 2 必须绑定同 SHA 的全 PASS Level 0 receipt、负责人授权、cache bypass、3.00 CNY 最终预算和 5.00 CNY 日硬上限。成本台账只保存 Run/SHA/Case/Provider/Token/Cost/Retry 等脱敏字段。该策略不改变任何最终 Phase 5 Gate，当前 Phase 5 仍为 FAIL，未开始最终付费认证。
+- 本次成本控制候选的零付费验证为 Backend 546 collected（540 passed、6 skipped、0 failed/error）、Frontend 15 files/60 tests、TypeScript、production build、3 个 workflow YAML 和成本控制专项 9/9 PASS；Provider 实际调用与费用均为 0。完整 Phase 5 Data100、674 Control Matrix、Browser、Cold Start、20×15、Remote CI 和最终真实 Provider 认证仍按原 FAIL 清单逐项收口，不得用本次策略测试替代。
 - 2026-08-23 前端全可见控件追加门禁已进入同一候选：数据源/数据表、语义模型/资源和成员搜索筛选均把条件传入 Backend API 并由 Workspace 约束的数据库查询执行；答案库“待审核”枚举已与后端契约对齐。无实现的工作空间筛选已移除，P1 壳控件保持禁用并说明边界。新建或导入看板不再接受客户端卡片数，看板列表、排序、汇总和详情均从真实 `dashboard_card` 行派生数量，“今日刷新”从当天成功 `REFRESH_CARD` 审计行派生；演示 Seed 不再预填虚假卡片或刷新计数。最终可见控件覆盖率和浏览器结论仍只以最终 SHA 的外部 Evidence 为准。
 - Phase 5 以 `89bdc12936be0555bdad8a85f06932fb7dc476ee` 为唯一 Phase 4 基线，在短期分支 `codex/v1.3.0-release-hardening-full-gate` 只做测试、Evidence、性能、安全、故障恢复、依赖兼容和发布工程加固；不启动 Phase 6，不修改 `main`，不创建 V1.3.0 Tag 或正式 Release。
 - Sandbox Controller 不再直接持有 Host Docker Socket。唯一持有只读 socket bind 的 restricted proxy 只接受固定 worker 镜像、命令、non-root 用户、无网络、只读根文件系统、能力清空、no-new-privileges、确定资源上限和所有权标签的有状态 Docker API 子集；未知字段、Host namespace、任意容器或 Docker 管理请求一律拒绝。最终风险关闭仍须由同一候选 SHA 的真实 worker/cancel/destroy 与负向攻击实跑证明。

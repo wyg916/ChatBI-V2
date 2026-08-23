@@ -597,6 +597,9 @@ def test_live_gate_executes_all_real_http_contracts_auto_routes_weird_and_cleans
         )
 
     assert evidence["status"] == "PASS", evidence["failures"]
+    assert evidence["certification_scope"] == "FULL_FINAL"
+    assert len(evidence["selected_weird_case_ids"]) == 50
+    assert len(evidence["selected_complex_case_ids"]) == 5
     assert evidence["weird_50"]["executed"] == evidence["weird_50"]["passed"] == 50
     assert evidence["weird_50"]["automatic_route_count"] == 50
     assert evidence["complex_5"]["executed"] == evidence["complex_5"]["passed"] == 5

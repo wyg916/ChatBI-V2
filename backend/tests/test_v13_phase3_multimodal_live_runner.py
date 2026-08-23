@@ -90,3 +90,20 @@ def test_only_live_execution_can_emit_overall_pass():
     )
     assert report["score"] != "10/10"
     assert report["status"] != "PASS"
+
+
+def test_targeted_multimodal_case_is_labeled_non_final():
+    calls: list[tuple[str, str]] = []
+    report = run_multimodal_suite(
+        _gateway(calls),
+        execution_mode="unit_mock",
+        generated_at="2026-08-23T00:00:00Z",
+        selected_case_ids=frozenset({"M10"}),
+    )
+
+    assert report["status"] == "TEST_PASS"
+    assert report["certification_scope"] == "TARGETED_CASES_ONLY"
+    assert report["selected_case_ids"] == ["M10"]
+    assert report["score"] == "NOT_ACHIEVED"
+    assert report["passed"] == report["total"] == 1
+    assert calls == [("M10", "https://api.moonshot.cn/v1/chat/completions")]

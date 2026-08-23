@@ -28,6 +28,7 @@ from app.file_multimodal.contracts import (
 from app.file_multimodal.parsers import parse_attachment
 from app.file_multimodal.vision import PreparedImage, build_vision_request, preprocess_image
 from app.model_gateway import BudgetMode, ModelGateway, RequestContext
+from app.model_gateway.test_cost_control import TestCostControlError, TestCostController, TestExecutionLevel
 
 
 _SCRIPT_PATH = Path(__file__).resolve()
@@ -501,16 +502,22 @@ def run_multimodal_suite(
     manifest_path: Path = _DEFAULT_MANIFEST,
     execution_mode: str = "unit_mock",
     generated_at: str | None = None,
+    selected_case_ids: frozenset[str] | None = None,
 ) -> dict[str, Any]:
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     cases = manifest.get("cases") or []
     if [item.get("id") for item in cases] != [f"M{number:02d}" for number in range(1, 11)]:
         raise ValueError("MULTIMODAL_10_MANIFEST_MISMATCH")
+    selected = selected_case_ids or frozenset(str(item["id"]) for item in cases)
+    unknown = selected - {str(item["id"]) for item in cases}
+    if unknown:
+        raise ValueError("UNKNOWN_MULTIMODAL_CASE_SELECTION:" + ",".join(sorted(unknown)))
+    cases = [item for item in cases if str(item["id"]) in selected]
 
     results: list[dict[str, Any]] = []
     for item in cases:
         case_id = str(item["id"])
-        max_attempts = (3 if case_id == "M10" else 2) if execution_mode == "live" else 1
+        max_attempts = 2 if execution_mode == "live" else 1
         result: dict[str, Any] | None = None
         for attempt in range(1, max_attempts + 1):
             try:
@@ -546,8 +553,10 @@ def run_multimodal_suite(
         results.append(result)
 
     passed_count = sum(item["status"] == "PASS" for item in results)
-    all_real_passes = execution_mode == "live" and passed_count == 10 and len(results) == 10
-    status = "PASS" if all_real_passes else ("TEST_PASS" if execution_mode == "unit_mock" and passed_count == 10 else "FAIL")
+    full_scope = len(selected) == 10
+    all_real_passes = execution_mode == "live" and passed_count == len(results) and bool(results)
+    all_mock_passes = execution_mode == "unit_mock" and passed_count == len(results) and bool(results)
+    status = "PASS" if all_real_passes else ("TEST_PASS" if all_mock_passes else "FAIL")
     payload = {
         "schema_version": "chatbi-v1.3-live-multimodal-evidence-v1",
         "generated_at": generated_at or datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
@@ -561,7 +570,11 @@ def run_multimodal_suite(
         "configured_provider_ids": sorted(gateway.providers),
         "passed": passed_count,
         "total": len(results),
-        "score": "10/10" if all_real_passes else "NOT_ACHIEVED",
+        "certification_scope": "FULL_FINAL" if full_scope else "TARGETED_CASES_ONLY",
+        "selected_case_ids": sorted(selected),
+        "score": "10/10" if all_real_passes and full_scope else (
+            f"TARGETED_{passed_count}/{len(results)}" if all_real_passes else "NOT_ACHIEVED"
+        ),
         "status": status,
         "results": results,
     }
@@ -588,13 +601,32 @@ def _arguments() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Run live ChatBI V1.3 Multimodal 10 evidence cases.")
     parser.add_argument("--manifest", type=Path, default=_DEFAULT_MANIFEST)
     parser.add_argument("--output", type=Path, help="Optional JSON output path, including outside this repository.")
+    parser.add_argument("--case-id", action="append", choices=tuple(f"M{number:02d}" for number in range(1, 11)))
     return parser.parse_args()
 
 
 def main() -> int:
     arguments = _arguments()
+    controller = TestCostController()
+    try:
+        configuration = controller.validate_configuration()
+    except TestCostControlError as exc:
+        raise SystemExit(str(exc)) from exc
+    if not configuration.get("paid_calls_allowed"):
+        raise SystemExit("LIVE_MULTIMODAL_REQUIRES_LEVEL1_OR_LEVEL2_AUTHORIZATION")
+    selected = frozenset(arguments.case_id or ())
+    if controller.level == TestExecutionLevel.LEVEL1:
+        if not selected or len(selected) > 3:
+            raise SystemExit("LEVEL1_MULTIMODAL_REQUIRES_ONE_TO_THREE_EXPLICIT_CASES")
+    elif selected:
+        raise SystemExit("LEVEL2_FINAL_MULTIMODAL_CERTIFICATION_MUST_EXECUTE_ALL_TEN_CASES")
     gateway = ModelGateway(get_settings())
-    payload = run_multimodal_suite(gateway, manifest_path=arguments.manifest, execution_mode="live")
+    payload = run_multimodal_suite(
+        gateway,
+        manifest_path=arguments.manifest,
+        execution_mode="live",
+        selected_case_ids=selected or None,
+    )
     if arguments.output:
         write_report(payload, arguments.output)
     print(json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True))

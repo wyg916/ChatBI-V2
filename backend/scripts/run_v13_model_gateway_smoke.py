@@ -1,17 +1,59 @@
 from __future__ import annotations
 
+import argparse
 import json
+import os
+import tempfile
 from datetime import datetime, timezone
+from pathlib import Path
 from uuid import uuid4
 
 from app.core.config import get_settings
 from app.model_gateway import BudgetMode, ModelCapability, ModelGateway, ModelRequest, RequestContext
+from app.model_gateway.test_cost_control import TestCostControlError, TestCostController, TestExecutionLevel
+
+
+def _arguments() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description="Run an authorized targeted or final Provider connectivity smoke")
+    parser.add_argument("--provider", action="append", choices=("mimo", "deepseek", "kimi"))
+    parser.add_argument("--output", type=Path, required=True)
+    return parser.parse_args()
+
+
+def _write_evidence(path: Path, payload: dict[str, object]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    descriptor, temporary = tempfile.mkstemp(prefix=f".{path.name}.", suffix=".tmp", dir=path.parent)
+    try:
+        with os.fdopen(descriptor, "w", encoding="utf-8", newline="\n") as handle:
+            json.dump(payload, handle, ensure_ascii=False, indent=2, sort_keys=True)
+            handle.write("\n")
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.replace(temporary, path)
+    finally:
+        if os.path.exists(temporary):
+            os.unlink(temporary)
 
 
 def main() -> int:
+    arguments = _arguments()
+    controller = TestCostController()
+    try:
+        configuration = controller.validate_configuration()
+    except TestCostControlError as exc:
+        raise SystemExit(str(exc)) from exc
+    if not configuration.get("paid_calls_allowed"):
+        raise SystemExit("REAL_PROVIDER_SMOKE_REQUIRES_LEVEL1_OR_LEVEL2_AUTHORIZATION")
+    providers = tuple(arguments.provider or ())
+    if controller.level == TestExecutionLevel.LEVEL1 and not providers:
+        raise SystemExit("LEVEL1_REQUIRES_EXPLICIT_TARGET_PROVIDER")
+    if controller.level == TestExecutionLevel.LEVEL2 and providers:
+        raise SystemExit("LEVEL2_FINAL_PROVIDER_SMOKE_MUST_EXECUTE_ALL_THREE_PROVIDERS")
+    providers = providers or ("mimo", "deepseek", "kimi")
     settings = get_settings()
     results = []
-    for provider in ("mimo", "deepseek", "kimi"):
+    cost_control_failure: str | None = None
+    for provider in providers:
         gateway = ModelGateway(settings)
         try:
             response = gateway.execute(
@@ -44,6 +86,15 @@ def main() -> int:
                 "retry_count": response.retry_count,
                 "reasoning_observed": response.reasoning_observed,
             })
+        except TestCostControlError as exc:
+            results.append({
+                "provider": provider,
+                "status": "FAIL",
+                "error_type": type(exc).__name__,
+                "error": str(exc),
+            })
+            cost_control_failure = str(exc)
+            break
         except Exception as exc:  # Deliberately reports the real provider failure class/status only.
             results.append({
                 "provider": provider,
@@ -54,12 +105,17 @@ def main() -> int:
     payload = {
         "schema_version": "1.0",
         "generated_at": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
+        "tested_sha": configuration["tested_sha"],
+        "test_execution_level": controller.level.value,
         "test": "V1.3 canonical ModelGateway live non-stream smoke",
         "secrets_exposed": False,
         "authorization_headers_exposed": False,
+        "cost_control_failure": cost_control_failure,
+        "paid_test_summary": controller.summary(),
         "results": results,
         "status": "PASS" if all(item["status"] == "PASS" for item in results) else "FAIL",
     }
+    _write_evidence(arguments.output, payload)
     print(json.dumps(payload, ensure_ascii=False, indent=2))
     return 0 if payload["status"] == "PASS" else 1
 

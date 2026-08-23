@@ -299,3 +299,11 @@ Conversation、Project、Share 与 Batch 均为 Backend 持久化资源并由 Wo
 Model Gateway 每次 Provider 尝试都向请求事务绑定的 append-only `ModelInvocation` 台账追加 allowlist 元数据，包括成功、失败、重试和取消；不得保存提示词、回答正文、凭据或媒体。事务绑定必须位于同一业务调用栈，不能跨 FastAPI 同步 yield dependency 的 AnyIO Context 进入/退出边界。Cost Dashboard 只按当前 Workspace 汇总并支持时间、用户、会话、路由、Provider 和 Model 筛选；ONE_TRACE 使用真实阶段时间与 completion receipt，显示阶段、耗时、状态、Provider/Model、Tool、SQL、错误和 Artifact 能力，不伪造模型内部时间线。
 
 Feedback 采用 `OPEN → IN_REVIEW → ACCEPTED/REJECTED` 有限状态机。ACCEPTED 候选必须重新进入 QueryPipeline 的 SQL Guard、只读执行和 Result Oracle，并把 Reviewer、问题模式、数据源、语义模型/version、SQL SHA-256、结果签名和 Attestation 固定为 Verified SQL 版本；Replay 仍重走同一安全链，不能把历史通过当成当前正确。PostgreSQL EXPLAIN 与执行在同一只读事务策略下设置经过引用的数据源 schema `search_path`，使允许的未限定表名与 Guard/Oracle 语义一致，而不扩大跨 schema 访问范围。
+
+## ADR-048：Phase 5 修复采用三级测试成本控制，最终阈值保持不变
+
+Phase 5 FAIL 后的普通修复默认只运行 Level 0：真实 Backend/API、本机 PostgreSQL/MySQL、SSE、RAG/Agent/File 编排、浏览器、Control Matrix、10M 和 20×15 分钟负载继续执行，但 Provider 使用 deterministic、recorded response 或显式 MockTransport，付费调用必须为 0。普通 push workflow 显式设置 Level 0；唯一 Model Gateway 网络边界在 HTTP 发出前阻断未授权真实 Provider，因此 CI 没有 Provider Key 也不会因错误路由产生费用。
+
+Level 1 只用于实际修改 Model Gateway、Provider Adapter、Prompt、Routing、Vision 或 Agent 模型调用后的 1～3 个定向 Case，要求负责人授权、完整 SHA、Run/Case/Gate、Provider allowlist、外部成本台账和不超过 1.00 CNY 的默认硬预算；默认优先 MiMo，DeepSeek 只在能力或被改适配路径需要时显式选择，Kimi 只服务明确 Premium/Vision/Complex 范围。Level 2 只允许最终候选 SHA，在同 SHA Level 0 全门禁 PASS、cache bypass、明确最终认证标志和 3.00 CNY/日 5.00 CNY 硬上限下执行一次完整认证。Level 1 定向 PASS、录制缓存或确定性结果都不能冒充 Level 2。
+
+测试 Provider 输出默认限制为 512 tokens，Complex/Agent 最多 1024；最多一次重试，402/认证错误立即失败。每次真实尝试在外部 SQLite 台账预留预算并记录 Run、SHA、Case、Gate、Provider、Model、Token、Cost、Retry、状态和安全错误码，不保存 Prompt、正文、媒体、密钥或数据库凭据。完整执行规范见 `docs/testing/V1_3_PHASE5_COST_CONTROLLED_TEST_STRATEGY.md`。
