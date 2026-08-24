@@ -22,6 +22,7 @@ const metadataSchema = process.env.CHATBI_PHASE5_METADATA_SCHEMA ?? '';
 const python = process.env.CHATBI_PYTHON ?? 'python';
 const runToken = process.env.CHATBI_CONTROL_RUN_TOKEN ?? 'control-run';
 const datasourceId = process.env.CHATBI_CONTROL_DATASOURCE_ID ?? '';
+const targetSet = process.env.CHATBI_CONTROL_TARGET_SET ?? '';
 const requestedControlIds = new Set(
   (process.env.CHATBI_CONTROL_IDS ?? '').split(',').map((item) => item.trim()).filter(Boolean),
 );
@@ -36,6 +37,8 @@ type ControlRecord = {
   page: string;
   route: string;
   control_id: string;
+  logical_control_id?: string;
+  logical_key?: string;
   control_text: string;
   control_type: 'BUTTON' | 'LINK_ACTION' | 'INPUT' | 'DROPDOWN_ACTION' | 'UPLOAD' | 'TAB' | 'CHECKBOX' | 'TOGGLE' | 'RADIO' | 'ICON_BUTTON' | 'MENU_ITEM';
   tag: string;
@@ -52,9 +55,15 @@ type ControlRecord = {
   enabled_state: 'ENABLED' | 'DISABLED';
   required_role: 'ADMIN';
   action: string;
+  dom_instance_count?: number;
+  resource_type?: string | null;
+  resource_id?: string | null;
+  target_case?: string;
 };
 
 type Inventory = {
+  schema_version?: string;
+  control_discovery_rule_hash?: string;
   inventory_sha256: string;
   total_visible_controls: number;
   total_actionable_controls: number;
@@ -69,6 +78,8 @@ type ExplicitNotApplicable = { status: 'NOT_APPLICABLE_WITH_EXPLICIT_REASON'; re
 type ControlReceipt = {
   SCHEMA_VERSION: 'chatbi.v13.phase5.control-receipt.v2';
   CONTROL_ID: string;
+  LOGICAL_CONTROL_ID: string;
+  DOM_INSTANCE_COUNT: number;
   PAGE: string;
   ROUTE: string;
   ROLE: 'ADMIN';
@@ -97,6 +108,21 @@ type ActionResult = {
   expectedResult: string;
   observable: string;
   cleanup?: () => Promise<void>;
+};
+
+type DynamicResourceType = 'TRACE' | 'CONVERSATION' | 'QUERY_RUN' | 'EVAL_RUN' | 'ARTIFACT' | 'SHARE';
+type DynamicTraceFixture = {
+  resource_id: string;
+  resource_type: 'TRACE';
+  created_at: string;
+  owning_workspace: string;
+  owning_user: string;
+  conversation_id: string;
+  db_before: DbSnapshot;
+  db_after_create: DbSnapshot;
+  create_api_statuses: number[];
+  provider: string;
+  cleanup_status?: 'PASS';
 };
 
 function sha256(value: string | Buffer): string {
@@ -131,6 +157,7 @@ async function list(request: APIRequestContext, path: string): Promise<any[]> {
 
 function mutationGroup(control: ControlRecord): string | null {
   const text = control.control_text;
+  if (control.resource_type === 'TRACE') return 'trace';
   if (control.page === '登录页' && text === '登录 ChatBI Studio') return 'auth';
   if (text === '退出登录') return 'auth';
   if (control.page.startsWith('问数据')) {
@@ -174,9 +201,101 @@ function dbSnapshot(group: string, workspaceId: string): DbSnapshot {
   return JSON.parse(result.stdout) as DbSnapshot;
 }
 
+class DynamicResourceFixtureManager {
+  static readonly supportedResourceTypes: readonly DynamicResourceType[] = [
+    'TRACE', 'CONVERSATION', 'QUERY_RUN', 'EVAL_RUN', 'ARTIFACT', 'SHARE',
+  ];
+
+  constructor(
+    private readonly request: APIRequestContext,
+    private readonly workspaceId: string,
+    private readonly userId: string,
+  ) {}
+
+  async create(resourceType: DynamicResourceType, caseId: string): Promise<DynamicTraceFixture> {
+    if (resourceType !== 'TRACE') {
+      throw new Error(`Dynamic fixture generation is not implemented for ${resourceType}`);
+    }
+    const dbBefore = dbSnapshot('trace', this.workspaceId);
+    const conversationResponse = await this.request.post(`${apiBase}/conversations`, {
+      data: { title: `Phase5 TRACE ${runToken} ${caseId}` },
+    });
+    expect(conversationResponse.status(), `${caseId} create conversation`).toBe(201);
+    const conversation = await conversationResponse.json();
+    const messageId = `p5-${runToken}-${caseId}-${Date.now()}`.slice(0, 120);
+    const chatResponse = await this.request.post(`${apiBase}/chat`, {
+      data: {
+        conversation_id: conversation.id,
+        client_message_id: messageId,
+        content: '今天是几号？',
+        attachment_ids: [],
+      },
+      timeout: 30_000,
+    });
+    expect(chatResponse.status(), `${caseId} create deterministic trace`).toBe(201);
+    const chat = await chatResponse.json();
+    const tracePayload = chat.assistant_message?.trace_payload ?? {};
+    const traceId = String(tracePayload.trace_id ?? '');
+    expect(traceId, `${caseId} trace identity`).toMatch(/^TRACE-/);
+    expect(tracePayload.model_provider, `${caseId} provider must be deterministic`).toBe('none');
+    expect(tracePayload.model_name, `${caseId} model must be deterministic`).toBe('none');
+    const indexResponse = await this.request.get(`${apiBase}/governance/traces?limit=200`);
+    expect(indexResponse.status(), `${caseId} bounded trace index readback`).toBe(200);
+    const index = await indexResponse.json();
+    const currentTrace = index.items.find((item: any) => item.trace_id === traceId);
+    expect(currentTrace, `${caseId} current trace in bounded index`).toBeTruthy();
+    expect(String(currentTrace.workspace_id)).toBe(this.workspaceId);
+    expect(String(currentTrace.user_id)).toBe(this.userId);
+    const dbAfterCreate = dbSnapshot('trace', this.workspaceId);
+    expect(dbAfterCreate.fingerprint, `${caseId} trace persisted in database`).not.toBe(dbBefore.fingerprint);
+    return {
+      resource_id: traceId,
+      resource_type: 'TRACE',
+      created_at: String(currentTrace.started_at),
+      owning_workspace: String(currentTrace.workspace_id),
+      owning_user: String(currentTrace.user_id),
+      conversation_id: String(conversation.id),
+      db_before: dbBefore,
+      db_after_create: dbAfterCreate,
+      create_api_statuses: [conversationResponse.status(), chatResponse.status(), indexResponse.status()],
+      provider: 'none',
+    };
+  }
+
+  bind(control: ControlRecord, fixture: DynamicTraceFixture): ControlRecord {
+    return {
+      ...control,
+      control_text: '查看 TRACE 详情',
+      locator: `[data-logical-control="governance.trace.open-detail"][data-resource-id=${JSON.stringify(fixture.resource_id)}]`,
+      resource_type: fixture.resource_type,
+      resource_id: fixture.resource_id,
+      aria_label: '查看 TRACE 详情',
+      identity_ordinal: 0,
+    };
+  }
+
+  async cleanup(fixture: DynamicTraceFixture): Promise<Record<string, unknown>> {
+    const response = await this.request.delete(`${apiBase}/conversations/${fixture.conversation_id}`);
+    expect([204, 404], `${fixture.resource_id} exact conversation cleanup`).toContain(response.status());
+    const conversation = await this.request.get(`${apiBase}/conversations/${fixture.conversation_id}`);
+    expect(conversation.status(), `${fixture.resource_id} owning conversation removed after cleanup`).toBe(404);
+    const dbAfterCleanup = dbSnapshot('trace', this.workspaceId);
+    expect(dbAfterCleanup.fingerprint, `${fixture.resource_id} database cleanup`).toBe(fixture.db_before.fingerprint);
+    fixture.cleanup_status = 'PASS';
+    return {
+      status: 'PASS',
+      delete_http_status: response.status(),
+      conversation_readback_http_status: conversation.status(),
+      db_restored_to_baseline: true,
+    };
+  }
+}
+
 async function apiReadback(request: APIRequestContext, control: ControlRecord): Promise<ApiReadback[]> {
   const paths: string[] = [];
-  if (control.page === '登录页' || control.control_text === '退出登录') paths.push('/auth/me');
+  if (control.resource_type === 'TRACE' && control.resource_id) {
+    paths.push('/governance/traces?limit=200');
+  } else if (control.page === '登录页' || control.control_text === '退出登录') paths.push('/auth/me');
   else if (control.page.startsWith('问数据')) paths.push('/conversations?state=all', '/projects?state=all');
   else if (control.page.startsWith('数据源')) {
     const id = control.route.match(/^\/datasources\/([^/?]+)/)?.[1];
@@ -194,6 +313,10 @@ async function apiReadback(request: APIRequestContext, control: ControlRecord): 
   for (const path of paths) {
     const response = await request.get(`${apiBase}${path}`);
     const body = await response.text();
+    if (control.resource_type === 'TRACE' && control.resource_id) {
+      const payload = JSON.parse(body);
+      expect(payload.items.some((item: any) => item.trace_id === control.resource_id), `${control.control_id} current trace index readback`).toBe(true);
+    }
     receipts.push({ method: 'GET', path, status: response.status(), body_sha256: sha256(body) });
   }
   return receipts;
@@ -257,6 +380,14 @@ async function preparePage(page: Page, request: APIRequestContext, control: Cont
 }
 
 async function locateControl(page: Page, control: ControlRecord): Promise<Locator> {
+  if (control.resource_type && control.resource_id) {
+    const resourceLocator = page.locator(control.locator);
+    await expect(resourceLocator, `${control.control_id} current dynamic resource`).toHaveCount(1);
+    await expect(resourceLocator, `${control.control_id} locator`).toBeVisible({ timeout: 10_000 });
+    await expect(resourceLocator, `${control.control_id} enabled`).toBeEnabled();
+    await resourceLocator.scrollIntoViewIfNeeded();
+    return resourceLocator;
+  }
   const matchingIndexes = async () => {
     const candidates = await page.locator(selector).evaluateAll((elements, expected) => elements.flatMap((element, index) => {
       const node = element as HTMLElement;
@@ -411,6 +542,19 @@ async function createSemantic(page: Page, control: ControlRecord): Promise<Actio
 
 async function performAction(page: Page, control: ControlRecord, locator: Locator, testInfo: TestInfo): Promise<ActionResult> {
   const text = control.control_text;
+  if (control.resource_type === 'TRACE' && control.resource_id) {
+    const response = page.waitForResponse((item) => (
+      item.request().method() === 'GET'
+      && new URL(item.url()).pathname.endsWith(`/api/v1/governance/traces/${control.resource_id}`)
+    ));
+    await locator.click();
+    expect((await response).status(), `${control.control_id} current trace detail`).toBe(200);
+    await expect(page.getByRole('heading', { name: 'Trace 阶段详情' })).toBeVisible();
+    return {
+      expectedResult: 'CURRENT_TRACE_API_DB_UI',
+      observable: `current trace selected sha256=${sha256(control.resource_id)}`,
+    };
+  }
   if (control.page === '登录页' && text === '登录 ChatBI Studio') {
     await page.getByLabel('账号或电子名').fill(adminCredentials.email);
     await page.getByLabel('密码').fill(adminCredentials.password);
@@ -670,6 +814,49 @@ function executionRank(control: ControlRecord): number {
   return 60;
 }
 
+function previousOneTraceForty(inventory: Inventory): ControlRecord[] {
+  const controls = inventory.controls.filter((item) => (
+    item.page === '治理中心-ONE_TRACE' && item.enabled_state === 'ENABLED'
+  ));
+  const descriptors: Array<{ kind: 'href' | 'text'; value: string }> = [
+    { kind: 'href', value: '/' },
+    { kind: 'href', value: '/datasources' },
+    { kind: 'href', value: '/semantic-models' },
+    { kind: 'href', value: '/answers' },
+    { kind: 'href', value: '/dashboards' },
+    { kind: 'href', value: '/evaluation' },
+    { kind: 'href', value: '/settings/models' },
+    { kind: 'href', value: '/settings/security' },
+    { kind: 'text', value: '退出登录' },
+    { kind: 'text', value: '模型配置' },
+    { kind: 'text', value: '成本与用量' },
+    { kind: 'text', value: 'ONE_TRACE' },
+    { kind: 'text', value: '模型治理' },
+    { kind: 'text', value: '评测治理' },
+  ];
+  const stable = descriptors.map((descriptor, index) => {
+    const candidates = controls.filter((item) => descriptor.kind === 'href'
+      ? item.href === descriptor.value
+      : item.control_text === descriptor.value);
+    expect(candidates, `prior ONE_TRACE control ${descriptor.kind}=${descriptor.value}`).toHaveLength(1);
+    return { ...candidates[0], target_case: `PRIOR_ONE_TRACE_${String(index + 1).padStart(2, '0')}` };
+  });
+  const trace = controls.find((item) => item.resource_type === 'TRACE'
+    || item.logical_key === 'declared:governance.trace.open-detail');
+  expect(trace, 'logical TRACE row control').toBeTruthy();
+  const dynamicTraceCases = Array.from({ length: 26 }, (_item, index) => ({
+    ...trace!,
+    control_id: `CTL-T40-TRACE-${String(index + 1).padStart(2, '0')}-${trace!.logical_control_id?.slice(-6) ?? 'logical'}`,
+    logical_control_id: trace!.logical_control_id ?? trace!.control_id,
+    resource_type: 'TRACE',
+    resource_id: null,
+    target_case: `PRIOR_ONE_TRACE_${String(index + 15).padStart(2, '0')}`,
+  }));
+  const result = [...stable, ...dynamicTraceCases];
+  expect(result, 'exact prior ONE_TRACE 40 case slots').toHaveLength(40);
+  return result;
+}
+
 test('Phase5 control certification runner emits one real receipt per actionable control', async ({ page }, testInfo) => {
   test.setTimeout(3_600_000);
   const request = page.context().request;
@@ -683,15 +870,19 @@ test('Phase5 control certification runner emits one real receipt per actionable 
   const allActionableControls = inventory.controls
     .filter((item) => item.enabled_state === 'ENABLED')
   expect(allActionableControls).toHaveLength(inventory.total_actionable_controls);
-  const controls = allActionableControls
-    .filter((item) => requestedControlIds.size === 0 || requestedControlIds.has(item.control_id))
-    .sort((left, right) => executionRank(left) - executionRank(right) || left.route.localeCompare(right.route) || left.selector_index - right.selector_index);
+  const controls = targetSet === 'PRIOR_ONE_TRACE_40'
+    ? previousOneTraceForty(inventory)
+    : allActionableControls
+      .filter((item) => requestedControlIds.size === 0 || requestedControlIds.has(item.control_id))
+      .sort((left, right) => executionRank(left) - executionRank(right) || left.route.localeCompare(right.route) || left.selector_index - right.selector_index);
   if (requestedControlIds.size) expect(controls).toHaveLength(requestedControlIds.size);
   expect(new Set(controls.map((item) => item.control_id)).size).toBe(controls.length);
 
   await ensureAuthenticated(page);
   const me = await responseJson(await request.get(`${apiBase}/auth/me`));
   const workspaceId = String(me.user.workspace_id);
+  const userId = String(me.user.id);
+  const fixtureManager = new DynamicResourceFixtureManager(request, workspaceId, userId);
   let activeEvents: NetworkEvent[] | null = null;
   page.on('response', (response) => {
     if (!activeEvents) return;
@@ -701,8 +892,9 @@ test('Phase5 control certification runner emits one real receipt per actionable 
   });
 
   const receipts: ControlReceipt[] = [];
-  for (const [index, control] of controls.entries()) {
-    await test.step(`${index + 1}/${controls.length} ${control.control_id} ${control.page} ${control.control_text}`, async () => {
+  for (const [index, inventoryControl] of controls.entries()) {
+    await test.step(`${index + 1}/${controls.length} ${inventoryControl.control_id} ${inventoryControl.page} ${inventoryControl.control_text}`, async () => {
+      let control = inventoryControl;
       const group = mutationGroup(control);
       const notApplicable = {
         status: 'NOT_APPLICABLE_WITH_EXPLICIT_REASON' as const,
@@ -711,6 +903,8 @@ test('Phase5 control certification runner emits one real receipt per actionable 
       const receipt: ControlReceipt = {
         SCHEMA_VERSION: 'chatbi.v13.phase5.control-receipt.v2',
         CONTROL_ID: control.control_id,
+        LOGICAL_CONTROL_ID: control.logical_control_id ?? control.control_id,
+        DOM_INSTANCE_COUNT: control.dom_instance_count ?? 1,
         PAGE: control.page,
         ROUTE: control.route,
         ROLE: 'ADMIN',
@@ -735,13 +929,30 @@ test('Phase5 control certification runner emits one real receipt per actionable 
         PAID_PROVIDER_COST_CNY: 0,
       };
       let cleanup: (() => Promise<void>) | undefined;
+      let dynamicFixture: DynamicTraceFixture | undefined;
       try {
+        if (control.resource_type === 'TRACE') {
+          dynamicFixture = await fixtureManager.create('TRACE', control.target_case ?? control.control_id);
+          control = fixtureManager.bind(control, dynamicFixture);
+          receipt.LOCATOR = control.locator;
+          receipt.DB_BEFORE = dynamicFixture.db_before;
+          receipt.DB_AFTER = dynamicFixture.db_after_create;
+          receipt.EVIDENCE.dynamic_resource_fixture = {
+            resource_id: dynamicFixture.resource_id,
+            resource_type: dynamicFixture.resource_type,
+            created_at: dynamicFixture.created_at,
+            owning_workspace: dynamicFixture.owning_workspace,
+            owning_user: dynamicFixture.owning_user,
+            provider: dynamicFixture.provider,
+            create_api_statuses: dynamicFixture.create_api_statuses,
+          };
+        }
         await preparePage(page, request, control);
         const locator = await locateControl(page, control);
         receipt.VISIBLE = await locator.isVisible();
         receipt.ENABLED = await locator.isEnabled();
         const beforeDom = await domReceipt(page);
-        if (group) receipt.DB_BEFORE = dbSnapshot(group, workspaceId);
+        if (group && !dynamicFixture) receipt.DB_BEFORE = dbSnapshot(group, workspaceId);
         activeEvents = [];
         const action = await performAction(page, control, locator, testInfo);
         cleanup = action.cleanup;
@@ -753,9 +964,12 @@ test('Phase5 control certification runner emits one real receipt per actionable 
         receipt.NETWORK_REQUEST = networkRequests;
         receipt.HTTP_STATUS = [...new Set(events.flatMap((item) => item.status === null ? [] : [item.status]))].sort((a, b) => a - b);
         receipt.EXPECTED_RESULT = action.expectedResult;
-        if (group) {
+        if (group && !dynamicFixture) {
           receipt.DB_AFTER = dbSnapshot(group, workspaceId);
           expect((receipt.DB_BEFORE as DbSnapshot).fingerprint, `${control.control_id} DB state changed`).not.toBe((receipt.DB_AFTER as DbSnapshot).fingerprint);
+        } else if (dynamicFixture) {
+          expect((receipt.DB_BEFORE as DbSnapshot).fingerprint, `${control.control_id} trace fixture DB state changed`)
+            .not.toBe((receipt.DB_AFTER as DbSnapshot).fingerprint);
         }
         const apiReads = await apiReadback(request, control);
         receipt.API_READBACK = apiReads;
@@ -813,6 +1027,15 @@ test('Phase5 control certification runner emits one real receipt per actionable 
           action_observable: action.observable,
           network_event_count: events.length,
         };
+        if (dynamicFixture) {
+          const fixtureToCleanup = dynamicFixture;
+          dynamicFixture = undefined;
+          const cleanupEvidence = await fixtureManager.cleanup(fixtureToCleanup);
+          receipt.EVIDENCE.dynamic_resource_fixture = {
+            ...(receipt.EVIDENCE.dynamic_resource_fixture as Record<string, unknown>),
+            cleanup: cleanupEvidence,
+          };
+        }
         receipt.FINAL_STATUS = 'PASS';
       } catch (error) {
         activeEvents = null;
@@ -820,6 +1043,19 @@ test('Phase5 control certification runner emits one real receipt per actionable 
         receipt.FINAL_STATUS = 'FAIL';
       } finally {
         if (cleanup) await cleanup().catch(() => undefined);
+        if (dynamicFixture) {
+          try {
+            const cleanupEvidence = await fixtureManager.cleanup(dynamicFixture);
+            receipt.EVIDENCE.dynamic_resource_fixture = {
+              ...(receipt.EVIDENCE.dynamic_resource_fixture as Record<string, unknown>),
+              cleanup: cleanupEvidence,
+            };
+          } catch (cleanupError) {
+            const message = cleanupError instanceof Error ? cleanupError.message : String(cleanupError);
+            receipt.FAIL_REASON = [receipt.FAIL_REASON, `DYNAMIC_RESOURCE_CLEANUP_FAILED:${message}`].filter(Boolean).join('; ');
+            receipt.FINAL_STATUS = 'FAIL';
+          }
+        }
         if (control.page.startsWith('问数据')) await ensureAuthenticated(page).then(() => resetChatFixtures(request)).catch(() => undefined);
         if (control.control_text === '退出登录') await ensureAuthenticated(page).catch(() => undefined);
         const receiptPath = resolve(outputRoot, 'receipts', `${control.control_id}.json`);
@@ -846,7 +1082,10 @@ test('Phase5 control certification runner emits one real receipt per actionable 
     schema_version: 'chatbi.v13.phase5.control-certification-manifest.v2',
     status: failed.length === 0 && noops.length === 0 && incompleteEvidence.length === 0 ? 'PASS' : 'FAIL',
     inventory_sha256: inventory.inventory_sha256,
-    certification_scope: requestedControlIds.size ? 'TARGETED_PREFLIGHT' : 'FULL_INVENTORY',
+    control_inventory_schema_version: inventory.schema_version ?? null,
+    control_discovery_rule_hash: inventory.control_discovery_rule_hash ?? null,
+    certification_scope: targetSet || requestedControlIds.size ? 'TARGETED_PREFLIGHT' : 'FULL_INVENTORY',
+    target_set: targetSet || null,
     total_visible_controls: inventory.total_visible_controls,
     total_actionable_controls: controls.length,
     total_tested_controls: receipts.length,
@@ -857,6 +1096,14 @@ test('Phase5 control certification runner emits one real receipt per actionable 
     noop_control_count: noops.length,
     broken_control_count: failed.length,
     fake_success_count: incompleteEvidence.length,
+    trace_control_stale_id_failures: failed.filter((item) => item.TYPE === 'BUTTON'
+      && item.ROUTE === '/settings/models?view=trace').length,
+    dynamic_resource_fixture_manager: {
+      supported_resource_types: DynamicResourceFixtureManager.supportedResourceTypes,
+      exercised_resource_types: receipts.some((item) => (
+        (item.EVIDENCE.dynamic_resource_fixture as any)?.resource_type === 'TRACE'
+      )) ? ['TRACE'] : [],
+    },
     db_persistence_gate: mutationReceipts.every((item) => item.FINAL_STATUS === 'PASS') ? 'PASS' : 'FAIL',
     refresh_persistence_rate: receipts.length ? refreshPassed / receipts.length : 0,
     control_matrix_paid_provider_calls: 0,

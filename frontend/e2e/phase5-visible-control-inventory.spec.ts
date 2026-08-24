@@ -10,12 +10,42 @@ const outputPath = resolve(
     ?? 'test-results/phase5-visible-control-inventory.json',
 );
 
+const CONTROL_INVENTORY_SCHEMA_VERSION = 'chatbi.v13.phase5.logical-control-inventory.v2';
+const CONTROL_DISCOVERY_RULES = {
+  schema_version: CONTROL_INVENTORY_SCHEMA_VERSION,
+  visible: 'Computed display is not none, visibility is not hidden, opacity is non-zero, the bounding box is positive, and Playwright reports visible.',
+  actionable: 'At least one visible DOM instance of the logical control is enabled and is not readonly or aria-disabled.',
+  disabled: 'A visible logical control whose every visible DOM instance is disabled, readonly, or aria-disabled.',
+  duplicate: 'Visible DOM instances with the same route, state surface, and declared or semantic logical key are one logical control.',
+  responsive_clone: 'Desktop/mobile clones share one logical control; hidden clones are excluded and visible clones increment DOM_INSTANCE_COUNT.',
+  hidden_dom: 'Display-none, visibility-hidden, opacity-zero, zero-area, and Playwright-hidden nodes are excluded from logical and actionable counts.',
+  role_specific: 'Inventory is captured under the declared authenticated role; REQUIRED_ROLE records that role and role-specific surfaces remain separate.',
+  state_specific: 'A control exposed only in a distinct activated surface uses that surface in its logical identity.',
+  menu_item: 'A menu item is counted only when its menu surface is activated and visible; closed-menu DOM is hidden and excluded.',
+  row_template: 'Repeated table-row instances with one declared data-logical-control are one logical control and increment DOM_INSTANCE_COUNT.',
+  portal_modal_clone: 'A portal/modal shadow instance with the same route, state surface, and logical key is a clone, not a new logical control.',
+  virtualized_row_control: 'Observed viewport rows contribute DOM instances; resource IDs never form LOGICAL_CONTROL_ID.',
+  dynamic_resource: 'Dynamic rows declare data-logical-control, data-resource-type, and data-resource-id; only the first two affect logical identity.',
+} as const;
+const CONTROL_DISCOVERY_RULE_HASH = createHash('sha256')
+  .update(JSON.stringify(CONTROL_DISCOVERY_RULES))
+  .digest('hex');
+
 type Resource = { id: string; name?: string; type?: string };
 type PageTarget = { page: string; route: string };
+type DomInstance = {
+  selector_index: number;
+  locator: string;
+  control_text: string;
+  enabled: boolean;
+  resource_id: string | null;
+};
 type ControlRecord = {
   page: string;
   route: string;
   control_id: string;
+  logical_control_id: string;
+  logical_key: string;
   control_text: string;
   control_type: string;
   tag: string;
@@ -27,7 +57,7 @@ type ControlRecord = {
   aria_label: string | null;
   input_type: string | null;
   option_values: string[];
-  identity_ordinal: number;
+  identity_ordinal: 0;
   visible_state: 'VISIBLE';
   enabled_state: 'ENABLED' | 'DISABLED';
   required_role: 'ADMIN';
@@ -38,6 +68,13 @@ type ControlRecord = {
   persistence_required: 'NOT_YET_MAPPED';
   current_status: 'INVENTORIED_NOT_FUNCTIONALLY_CERTIFIED';
   surface: string;
+  dom_instance_count: number;
+  disabled_dom_instance_count: number;
+  resource_type: string | null;
+  resource_instance_count: number;
+  dynamic_resource: boolean;
+  clone_classification: 'NONE' | 'RESPONSIVE_OR_PORTAL_CLONE' | 'ROW_TEMPLATE_OR_VIRTUALIZED_RESOURCE_INSTANCES';
+  dom_instances: DomInstance[];
 };
 
 async function list(request: APIRequestContext, path: string): Promise<Resource[]> {
@@ -95,16 +132,28 @@ const selector = [
   '[role="switch"]', '[role="checkbox"]', '[role="radio"]', '[contenteditable="true"]',
 ].join(',');
 
-async function scan(page: Page, target: PageTarget, surface: string): Promise<ControlRecord[]> {
-  const candidates = await page.locator(selector).evaluateAll((elements) => elements.flatMap((element, index) => {
+function attributeLocator(attribute: string, value: string): string {
+  return `[${attribute}=${JSON.stringify(value)}]`;
+}
+
+function actionFor(controlType: string): string {
+  if (controlType === 'INPUT') return 'ENTER_VALUE';
+  if (controlType === 'DROPDOWN_ACTION') return 'SELECT_OPTION';
+  if (controlType === 'UPLOAD') return 'UPLOAD_FILE';
+  if (['CHECKBOX', 'RADIO', 'TOGGLE'].includes(controlType)) return 'TOGGLE_STATE';
+  return 'CLICK';
+}
+
+async function scan(page: Page, target: PageTarget, surface: string): Promise<{
+  controls: ControlRecord[];
+  hiddenDomInstances: number;
+  visibleDomInstances: number;
+}> {
+  const candidates = await page.locator(selector).evaluateAll((elements) => elements.map((element, index) => {
     const node = element as HTMLElement;
+    const input = node as HTMLInputElement;
     const style = getComputedStyle(node);
     const rect = node.getBoundingClientRect();
-    if (
-      style.display === 'none' || style.visibility === 'hidden' || Number(style.opacity) === 0
-      || rect.width <= 0 || rect.height <= 0
-    ) return [];
-    const input = node as HTMLInputElement;
     const tag = node.tagName.toLowerCase();
     const role = node.getAttribute('role') ?? '';
     const type = input.type ?? '';
@@ -128,7 +177,7 @@ async function scan(page: Page, target: PageTarget, surface: string): Promise<Co
     else if (type === 'radio' || role === 'radio') controlType = 'RADIO';
     else if (tag === 'input' || tag === 'textarea' || node.isContentEditable) controlType = 'INPUT';
     else if (role === 'button' && !['button', 'input'].includes(tag)) controlType = 'ICON_BUTTON';
-    return [{
+    return {
       index,
       tag,
       role,
@@ -137,64 +186,123 @@ async function scan(page: Page, target: PageTarget, surface: string): Promise<Co
       disabled,
       controlType,
       testId: node.dataset.testid ?? null,
+      logicalControl: node.dataset.logicalControl ?? null,
+      resourceType: node.dataset.resourceType ?? null,
+      resourceId: node.dataset.resourceId ?? null,
       href: node instanceof HTMLAnchorElement ? node.getAttribute('href') : null,
       ariaLabel: node.getAttribute('aria-label'),
       optionValues: node instanceof HTMLSelectElement
         ? Array.from(node.options).map((option) => option.value)
         : [],
-    }];
+      styleVisible: !(
+        style.display === 'none' || style.visibility === 'hidden' || Number(style.opacity) === 0
+        || rect.width <= 0 || rect.height <= 0
+      ),
+    };
   }));
-  const visibility = await Promise.all(candidates.map((item) => page.locator(selector).nth(item.index).isVisible()));
-  const raw = candidates.filter((_item, index) => visibility[index]);
-
-  const identityOrdinals = new Map<string, number>();
-  return raw.map((item) => {
-    const identity = `${target.route}|${surface}|${item.index}|${item.tag}|${item.role}|${item.text}`;
-    const controlId = `CTL-${createHash('sha256').update(identity).digest('hex').slice(0, 16)}`;
-    const action = item.controlType === 'INPUT' ? 'ENTER_VALUE'
-      : item.controlType === 'DROPDOWN_ACTION' ? 'SELECT_OPTION'
-        : item.controlType === 'UPLOAD' ? 'UPLOAD_FILE'
-          : item.controlType === 'CHECKBOX' || item.controlType === 'RADIO' || item.controlType === 'TOGGLE'
-            ? 'TOGGLE_STATE' : 'CLICK';
-    const ordinalKey = [item.tag, item.role, item.text, item.href ?? '', item.ariaLabel ?? ''].join('|');
-    const identityOrdinal = identityOrdinals.get(ordinalKey) ?? 0;
-    identityOrdinals.set(ordinalKey, identityOrdinal + 1);
-    return {
+  const playwrightVisibility = await Promise.all(
+    candidates.map((item) => page.locator(selector).nth(item.index).isVisible()),
+  );
+  const visible = candidates.filter((item, index) => item.styleVisible && playwrightVisibility[index]);
+  const grouped = new Map<string, ControlRecord>();
+  const resourceIds = new Map<string, Set<string>>();
+  for (const item of visible) {
+    const semanticKey = item.logicalControl
+      ? `declared:${item.logicalControl}`
+      : [
+        'semantic', item.tag, item.role, item.controlType, item.testId ?? '', item.href ?? '',
+        item.ariaLabel ?? '', item.text, item.type,
+      ].join('|');
+    const identity = `${target.route}|${surface}|ADMIN|${semanticKey}`;
+    const logicalControlId = `CTL-${createHash('sha256').update(identity).digest('hex').slice(0, 16)}`;
+    const locator = item.logicalControl
+      ? attributeLocator('data-logical-control', item.logicalControl)
+      : item.testId
+        ? attributeLocator('data-testid', item.testId)
+        : `${selector} >> nth=${item.index}`;
+    const domInstance: DomInstance = {
+      selector_index: item.index,
+      locator: item.resourceId
+        ? `${locator}${attributeLocator('data-resource-id', item.resourceId)}`
+        : locator,
+      control_text: item.text || `[${item.controlType.toLowerCase()}]`,
+      enabled: !item.disabled,
+      resource_id: item.resourceId,
+    };
+    const existing = grouped.get(logicalControlId);
+    if (existing) {
+      existing.dom_instances.push(domInstance);
+      existing.dom_instance_count += 1;
+      if (item.disabled) existing.disabled_dom_instance_count += 1;
+      if (!item.disabled) existing.enabled_state = 'ENABLED';
+      if (item.resourceId) resourceIds.get(logicalControlId)!.add(item.resourceId);
+      continue;
+    }
+    resourceIds.set(logicalControlId, new Set(item.resourceId ? [item.resourceId] : []));
+    grouped.set(logicalControlId, {
       page: target.page,
       route: target.route,
-      control_id: controlId,
-      control_text: item.text || `[${item.controlType.toLowerCase()}-${item.index}]`,
+      control_id: logicalControlId,
+      logical_control_id: logicalControlId,
+      logical_key: semanticKey,
+      control_text: item.text || `[${item.controlType.toLowerCase()}]`,
       control_type: item.controlType,
       tag: item.tag,
       role: item.role,
       test_id: item.testId,
       selector_index: item.index,
-      locator: item.testId
-        ? `[data-testid="${item.testId}"]`
-        : `${selector} >> nth=${item.index}`,
+      locator,
       href: item.href,
       aria_label: item.ariaLabel,
       input_type: item.type || null,
       option_values: item.optionValues,
-      identity_ordinal: identityOrdinal,
+      identity_ordinal: 0,
       visible_state: 'VISIBLE',
       enabled_state: item.disabled ? 'DISABLED' : 'ENABLED',
       required_role: 'ADMIN',
-      action,
+      action: actionFor(item.controlType),
       expected_result: 'REQUIRES_CONTROL_SPECIFIC_ACCEPTANCE_MAPPING',
       backend_api: 'NOT_YET_MAPPED',
       database_effect: 'NOT_YET_MAPPED',
       persistence_required: 'NOT_YET_MAPPED',
       current_status: 'INVENTORIED_NOT_FUNCTIONALLY_CERTIFIED',
       surface,
-    } satisfies ControlRecord;
-  });
+      dom_instance_count: 1,
+      disabled_dom_instance_count: item.disabled ? 1 : 0,
+      resource_type: item.resourceType,
+      resource_instance_count: item.resourceId ? 1 : 0,
+      dynamic_resource: Boolean(item.resourceType),
+      clone_classification: 'NONE',
+      dom_instances: [domInstance],
+    });
+  }
+  const controls = [...grouped.values()];
+  for (const control of controls) {
+    control.resource_instance_count = resourceIds.get(control.logical_control_id)?.size ?? 0;
+    control.clone_classification = control.dom_instance_count === 1
+      ? 'NONE'
+      : control.dynamic_resource
+        ? 'ROW_TEMPLATE_OR_VIRTUALIZED_RESOURCE_INSTANCES'
+        : 'RESPONSIVE_OR_PORTAL_CLONE';
+  }
+  return {
+    controls,
+    hiddenDomInstances: candidates.length - visible.length,
+    visibleDomInstances: visible.length,
+  };
 }
 
-test('Phase5 real-browser visible control inventory', async ({ page, request }) => {
+test('Phase5 real-browser logical control inventory', async ({ page, request }) => {
   test.setTimeout(300_000);
   const inventory: ControlRecord[] = [];
-  const pageRows: Array<{ page: string; route: string; visible_controls: number; enabled_controls: number }> = [];
+  const pageRows: Array<{
+    page: string;
+    route: string;
+    visible_logical_controls: number;
+    actionable_logical_controls: number;
+    visible_dom_instances: number;
+    hidden_dom_instances: number;
+  }> = [];
   for (const target of await targets(request)) {
     const response = await page.goto(target.route);
     expect(response?.status(), `${target.page} direct navigation`).toBe(200);
@@ -205,18 +313,37 @@ test('Phase5 real-browser visible control inventory', async ({ page, request }) 
     } else {
       expect(actualPath, `${target.page} must be authenticated instead of redirecting to login`).not.toBe('/login');
     }
-    const rows = await scan(page, target, 'BASE_PAGE');
-    inventory.push(...rows);
+    const result = await scan(page, target, 'BASE_PAGE');
+    inventory.push(...result.controls);
     pageRows.push({
       page: target.page,
       route: target.route,
-      visible_controls: rows.length,
-      enabled_controls: rows.filter((item) => item.enabled_state === 'ENABLED').length,
+      visible_logical_controls: result.controls.length,
+      actionable_logical_controls: result.controls.filter((item) => item.enabled_state === 'ENABLED').length,
+      visible_dom_instances: result.visibleDomInstances,
+      hidden_dom_instances: result.hiddenDomInstances,
     });
   }
-  const serializedInventory = JSON.stringify(inventory);
+  const identityProjection = inventory.map((item) => ({
+    logical_control_id: item.logical_control_id,
+    page: item.page,
+    route: item.route,
+    logical_key: item.logical_key,
+    control_type: item.control_type,
+    control_text: item.control_text,
+    href: item.href,
+    aria_label: item.aria_label,
+    enabled_state: item.enabled_state,
+    required_role: item.required_role,
+    action: item.action,
+    surface: item.surface,
+    resource_type: item.resource_type,
+  }));
+  const serializedInventory = JSON.stringify(identityProjection);
   const payload = {
-    schema_version: 'chatbi.v13.phase5.visible-control-inventory.v1',
+    schema_version: CONTROL_INVENTORY_SCHEMA_VERSION,
+    control_discovery_rule_hash: CONTROL_DISCOVERY_RULE_HASH,
+    control_count_definitions: CONTROL_DISCOVERY_RULES,
     status: 'INVENTORY_COMPLETE_ACCEPTANCE_NOT_CERTIFIED',
     generated_at: new Date().toISOString(),
     browser: 'chromium',
@@ -225,6 +352,11 @@ test('Phase5 real-browser visible control inventory', async ({ page, request }) 
     page_count: pageRows.length,
     total_visible_controls: inventory.length,
     total_actionable_controls: inventory.filter((item) => item.enabled_state === 'ENABLED').length,
+    total_visible_logical_controls: inventory.length,
+    total_actionable_logical_controls: inventory.filter((item) => item.enabled_state === 'ENABLED').length,
+    total_visible_dom_instances: inventory.reduce((sum, item) => sum + item.dom_instance_count, 0),
+    total_hidden_dom_instances: pageRows.reduce((sum, item) => sum + item.hidden_dom_instances, 0),
+    total_duplicate_dom_instances: inventory.reduce((sum, item) => sum + Math.max(0, item.dom_instance_count - 1), 0),
     total_tested_controls: 0,
     visible_actionable_control_coverage: 0,
     applicable_control_pass_rate: null,
@@ -232,13 +364,22 @@ test('Phase5 real-browser visible control inventory', async ({ page, request }) 
     broken_control_count: null,
     fake_success_count: null,
     paid_provider_calls: 0,
-    acceptance_note: 'Inventory is not functional acceptance; each enabled control still requires Browser-API-DB-readback-refresh evidence.',
+    historical_counts: {
+      prior_actionable_early_rule: 391,
+      prior_visible_dom_inventory: 901,
+      prior_actionable_dom_inventory: 819,
+      explanation: '391 and 819 were DOM-instance counts produced by evolving v1 discovery. V2 is a logical-control count: hidden nodes are excluded and responsive, portal, row-template, virtualized-resource, and repeated dynamic-resource instances are deduplicated by LOGICAL_CONTROL_ID while DOM_INSTANCE_COUNT remains observable.',
+    },
+    acceptance_note: 'Inventory is not functional acceptance; each enabled logical control still requires Browser-API-DB-readback-refresh evidence.',
     pages: pageRows,
     inventory_sha256: createHash('sha256').update(serializedInventory).digest('hex'),
+    dom_snapshot_sha256: createHash('sha256').update(JSON.stringify(inventory)).digest('hex'),
     controls: inventory,
   };
   mkdirSync(dirname(outputPath), { recursive: true });
   writeFileSync(outputPath, `${JSON.stringify(payload, null, 2)}\n`, 'utf8');
   expect(pageRows).toHaveLength(21);
   expect(inventory.length).toBeGreaterThan(0);
+  expect(new Set(inventory.map((item) => item.logical_control_id)).size).toBe(inventory.length);
+  expect(CONTROL_DISCOVERY_RULE_HASH).toMatch(/^[0-9a-f]{64}$/);
 });

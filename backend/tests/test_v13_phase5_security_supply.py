@@ -320,6 +320,7 @@ def test_supply_integrity_secret_actions_notices_and_deprecations(gate):
     assert dependencies["failures"] == []
     assert dependencies["direct_sqlbot_calls"] == 0
     assert dependencies["pip_check_returncode"] == 0
+    assert dependencies["release_wheel_pins"] == ["wheel==0.46.2"]
     assert dependencies["selected_dbgpt_aiohttp_requirements"] == ["aiohttp==3.14.3"]
     assert actions["failures"] == []
     assert actions["node20_action_uses"] == 0
@@ -327,6 +328,20 @@ def test_supply_integrity_secret_actions_notices_and_deprecations(gate):
     assert notices["sqlbot_runtime_calls"] == 0
     assert deprecations["failures"] == []
     assert deprecations["starlette_httpx2_bridge"] == "PINNED"
+
+
+def test_release_runtime_has_one_authoritative_patched_wheel_pin():
+    hardening = (ROOT / "backend" / "requirements-runtime-hardening.txt").read_text(encoding="utf-8")
+    entries = [
+        line.strip() for line in hardening.splitlines()
+        if line.strip() and not line.lstrip().startswith("#")
+    ]
+    assert [entry for entry in entries if entry.lower().startswith("wheel==")] == ["wheel==0.46.2"]
+    dockerfile = (ROOT / "backend" / "Dockerfile").read_text(encoding="utf-8")
+    assert "pip install --no-cache-dir --upgrade -r requirements-runtime-hardening.txt" in dockerfile
+    for workflow_name in ("v13-phase5-release-hardening.yml", "v21-eval-golden-feedback.yml"):
+        workflow = (ROOT / ".github" / "workflows" / workflow_name).read_text(encoding="utf-8")
+        assert "pip install --upgrade -r backend/requirements-runtime-hardening.txt" in workflow
 
 
 def test_secret_fixture_exception_is_credential_scoped_and_cannot_hide_real_secret(gate):

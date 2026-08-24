@@ -29,6 +29,10 @@ TABLE_GROUPS: dict[str, tuple[str, ...]] = {
     "answers": ("verified_answer", "answer_version"),
     "dashboards": ("dashboard", "dashboard_card"),
     "evaluation": ("evaluation_run", "evaluation_case_result"),
+    "trace": (
+        "conversation", "chat_message", "query_run", "model_invocation",
+        "orchestration_run", "knowledge_retrieval_run",
+    ),
 }
 
 # Only non-secret state participates in fingerprints. In particular, password,

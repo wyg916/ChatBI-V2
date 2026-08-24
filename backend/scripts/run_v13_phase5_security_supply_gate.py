@@ -542,6 +542,7 @@ def dependency_integrity(policy: dict[str, Any]) -> dict[str, Any]:
     )
     entry_count = 0
     dependency_names: set[str] = set()
+    hardening_entries = _requirement_entries(ROOT / "backend" / "requirements-runtime-hardening.txt")
     for path in requirement_files:
         for entry in _requirement_entries(path):
             entry_count += 1
@@ -590,6 +591,9 @@ def dependency_integrity(policy: dict[str, Any]) -> dict[str, Any]:
                 direct_sqlbot_calls += 1
     if forbidden & dependency_names or direct_sqlbot_calls:
         failures.append("SQLBot exception boundary was violated")
+    wheel_pins = [entry for entry in hardening_entries if entry.lower().startswith("wheel==")]
+    if wheel_pins != ["wheel==0.46.2"]:
+        failures.append("release runtime wheel is not pinned exactly once to 0.46.2")
     pip_check = subprocess.run(
         [sys.executable, "-m", "pip", "check"],
         cwd=ROOT,
@@ -617,6 +621,7 @@ def dependency_integrity(policy: dict[str, Any]) -> dict[str, Any]:
         "npm_missing_license": missing_license,
         "direct_sqlbot_calls": direct_sqlbot_calls,
         "pip_check_returncode": pip_check.returncode,
+        "release_wheel_pins": wheel_pins,
         "selected_dbgpt_aiohttp_requirements": aiohttp_requirements,
         "failures": failures,
     }
