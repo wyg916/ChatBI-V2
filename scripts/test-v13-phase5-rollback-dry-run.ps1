@@ -196,9 +196,9 @@ try {
     '.dockerignore', '.env.example', 'backend', 'docker-compose.yml', 'evaluation',
     'frontend', 'packages', 'sandbox_runtime', 'scripts'
   )
-  & git -C $projectRoot archive --format=tar --output=$candidateArchive $CandidateSha -- @runtimePaths
+  & git -C $projectRoot -c core.autocrlf=false archive --format=tar --output=$candidateArchive $CandidateSha -- @runtimePaths
   if($LASTEXITCODE -ne 0) { throw 'Candidate archive failed' }
-  & git -C $projectRoot archive --format=tar --output=$rollbackArchive $RollbackSha -- @runtimePaths
+  & git -C $projectRoot -c core.autocrlf=false archive --format=tar --output=$rollbackArchive $RollbackSha -- @runtimePaths
   if($LASTEXITCODE -ne 0) { throw 'Rollback archive failed' }
   & $Python (Join-Path $projectRoot 'scripts\extract_git_archive.py') $candidateArchive $candidateRoot
   if($LASTEXITCODE -ne 0) { throw 'Candidate extraction failed' }
