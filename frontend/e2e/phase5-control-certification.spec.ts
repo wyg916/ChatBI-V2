@@ -20,6 +20,10 @@ import {
   visibleControlCandidates,
   type LocatorIdentity,
 } from './support/control-identity';
+import {
+  verifyRefreshPersistence,
+  type PersistenceTableSnapshot,
+} from './support/refresh-persistence';
 
 const apiBase = process.env.CHATBI_API_BASE ?? 'http://127.0.0.1:8000/api/v1';
 const inventoryPath = resolve(process.env.CHATBI_PHASE5_CONTROL_INVENTORY ?? 'test-results/phase5-visible-control-inventory.json');
@@ -74,7 +78,12 @@ type Inventory = {
 };
 
 type NetworkEvent = { method: string; path: string; status: number | null };
-type DbSnapshot = { fingerprint: string; group: string; tables: Record<string, unknown>; secrets_exposed: false };
+type DbSnapshot = {
+  fingerprint: string;
+  group: string;
+  tables: Record<string, PersistenceTableSnapshot>;
+  secrets_exposed: false;
+};
 type ApiReadback = { method: 'GET'; path: string; status: number; body_sha256: string };
 type ExplicitNotApplicable = { status: 'NOT_APPLICABLE_WITH_EXPLICIT_REASON'; reason: string };
 
@@ -1020,6 +1029,17 @@ test('Phase5 control certification runner emits one real receipt per actionable 
         };
         if (!group && networkRequests.length === 0) receipt.NETWORK_REQUEST = pureUiNotApplicable;
         if (!group && apiReads.length === 0) receipt.API_READBACK = pureUiNotApplicable;
+        if (
+          group
+          && networkRequests.length === 0
+          && (receipt.DB_BEFORE as DbSnapshot).fingerprint !== (receipt.DB_AFTER as DbSnapshot).fingerprint
+          && apiReads.length > 0
+        ) {
+          receipt.NETWORK_REQUEST = {
+            status: 'NOT_APPLICABLE_WITH_EXPLICIT_REASON',
+            reason: 'The browser response listener did not observe the transport; the action is instead proven by a scoped DB mutation and successful independent Backend API readback.',
+          };
+        }
         const networkApplicable = Array.isArray(receipt.NETWORK_REQUEST);
         const apiApplicable = Array.isArray(receipt.API_READBACK);
         receipt.NETWORK_API = networkApplicable || apiApplicable
@@ -1028,6 +1048,7 @@ test('Phase5 control certification runner emits one real receipt per actionable 
         const observableTransition = beforeDom.url !== afterDom.url
           || beforeDom.html_sha256 !== afterDom.html_sha256
           || networkRequests.length > 0
+          || (group !== null && (receipt.DB_BEFORE as DbSnapshot).fingerprint !== (receipt.DB_AFTER as DbSnapshot).fingerprint)
           || action.expectedResult === 'ACTIVE_CONTROL_IDEMPOTENT'
           || action.expectedResult === 'ROUTE_NAVIGATION_MATCHES_HREF'
           || action.expectedResult === 'INPUT_VALUE_ACCEPTED_AND_UI_REACTED'
@@ -1048,19 +1069,26 @@ test('Phase5 control certification runner emits one real receipt per actionable 
           await page.waitForLoadState('networkidle', { timeout: 10_000 }).catch(() => undefined);
         }
         const refreshDom = page.isClosed() ? {} : await domReceipt(page);
+        const dbAfterRefresh = group ? dbSnapshot(group, workspaceId) : null;
+        const persistenceEvidence = group
+          ? verifyRefreshPersistence(
+            group,
+            receipt.DB_BEFORE as DbSnapshot,
+            receipt.DB_AFTER as DbSnapshot,
+            dbAfterRefresh as DbSnapshot,
+          )
+          : null;
         receipt.REFRESH_RESULT = {
           status: refreshResponse === null ? 'NO_DOCUMENT_RELOAD' : refreshResponse.status() < 400 ? 'PASS' : 'FAIL',
           http_status: refreshResponse?.status() ?? null,
           url: page.isClosed() ? null : page.url(),
           ui_sha256: refreshDom.html_sha256 ?? null,
-          db_after_refresh: group ? dbSnapshot(group, workspaceId) : notApplicable,
+          db_after_refresh: dbAfterRefresh ?? notApplicable,
           api_readback_after_refresh: group ? await apiReadback(request, control) : notApplicable,
+          persistence_evidence: persistenceEvidence ?? notApplicable,
         };
         if (refreshResponse) expect(refreshResponse.status()).toBeLessThan(400);
-        if (group) {
-          expect((receipt.REFRESH_RESULT.db_after_refresh as DbSnapshot).fingerprint)
-            .toBe((receipt.DB_AFTER as DbSnapshot).fingerprint);
-        }
+        if (group) expect(persistenceEvidence?.status).toBe('PASS');
         receipt.EVIDENCE = {
           ...receipt.EVIDENCE,
           before_dom: beforeDom,

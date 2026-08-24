@@ -109,11 +109,24 @@ def snapshot(
                     f"FROM {quoted_table}{where}"
                 )
                 row = connection.execute(statement, parameters).mappings().one()
+                identity_column = "id" if "id" in column_names else selected[0]
+                quoted_identity = preparer.quote(identity_column)
+                identity_statement = text(
+                    "SELECT COALESCE(array_agg(md5(COALESCE("
+                    f"{quoted_identity}::text, '<NULL>')) ORDER BY md5(COALESCE("
+                    f"{quoted_identity}::text, '<NULL>'))), ARRAY[]::text[]) AS identity_digests "
+                    f"FROM {quoted_table}{where}"
+                )
+                identity_digests = list(
+                    connection.execute(identity_statement, parameters).scalar_one()
+                )
                 table_receipts[table_name] = {
                     "status": "PRESENT",
                     "row_count": int(row["row_count"]),
                     "state_digest": str(row["state_digest"]),
                     "fingerprint_columns": selected,
+                    "identity_column": identity_column,
+                    "identity_digests": identity_digests,
                     "workspace_scoped": bool(where),
                 }
         payload = {

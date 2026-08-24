@@ -1,5 +1,11 @@
 # Architecture Decisions
 
+## ADR-060：刷新持久化按同步精确状态与异步行身份保存分别证明
+
+控件认证不能把刷新后“整个业务组的聚合状态必须与动作后即时状态字节级相等”作为所有操作的共同持久化定义。Ask 结果路由带查询参数时，刷新会按产品契约再次执行确定性查询并追加 Conversation、Message 与 QueryRun；Evaluation Run 也允许从 RUNNING 异步收敛为终态。这些新增或终态更新不代表原动作数据丢失。DB probe 因此为每张受控表输出基于主键的脱敏 identity digest 集合。普通同步 mutation group 继续要求动作后与刷新后精确 fingerprint 相等；仅 Chat 与 Evaluation 允许异步收敛，但必须证明动作后每一个行身份在刷新后仍存在、所有表行数不下降、变化表非空且缺失 identity digest 为 0。该例外不允许删除后重建、减少行数或只比较 HTTP 200。
+
+浏览器 response listener 不是唯一事实源。若页面事件监听没有捕获 transport，只有同时存在 workspace-scoped DB before/after 实质变化与成功的独立 Backend API readback 时，`NETWORK_REQUEST` 才可写显式 `NOT_APPLICABLE_WITH_EXPLICIT_REASON`；否则仍为 incomplete evidence/fake success。DB 变化本身计入可观察 transition，但不能替代刷新后的身份保存证明。
+
 ## ADR-059：控件逻辑身份与展示和值分离，并绑定可复现 Control Universe
 
 Phase 5 控件认证把 `DISPLAY_LABEL`、`LOGICAL_CONTROL_ID`、`LOCATOR_IDENTITY` 与 `MUTABLE_VALUE` 作为不同字段。输入、搜索、密码和可编辑控件的定位身份禁止引用当前 value 或当前可编辑文本；定位优先使用 route、role、tag/type、稳定属性、表单/容器作用域和同一稳定作用域内的 ordinal。展示标签可以随业务状态变化，但不得进入逻辑 Inventory Hash。回归必须覆盖空值、输入后、清空后、预填充、密码、搜索、重复空输入、同 placeholder 不同表单、动态 placeholder 与 disabled 状态，并证明每个阶段逻辑 ID 不变、精确重定位候选数为 1、`mutable_value_used=false`。
