@@ -14,6 +14,12 @@ import {
 } from '@playwright/test';
 
 import { adminCredentials } from './auth';
+import {
+  CONTROL_SELECTOR,
+  locatorIdentityKey,
+  visibleControlCandidates,
+  type LocatorIdentity,
+} from './support/control-identity';
 
 const apiBase = process.env.CHATBI_API_BASE ?? 'http://127.0.0.1:8000/api/v1';
 const inventoryPath = resolve(process.env.CHATBI_PHASE5_CONTROL_INVENTORY ?? 'test-results/phase5-visible-control-inventory.json');
@@ -27,18 +33,13 @@ const requestedControlIds = new Set(
   (process.env.CHATBI_CONTROL_IDS ?? '').split(',').map((item) => item.trim()).filter(Boolean),
 );
 
-const selector = [
-  'button', 'a[href]', 'input:not([type="hidden"])', 'textarea', 'select',
-  '[role="button"]', '[role="link"]', '[role="tab"]', '[role="menuitem"]',
-  '[role="switch"]', '[role="checkbox"]', '[role="radio"]', '[contenteditable="true"]',
-].join(',');
-
 type ControlRecord = {
   page: string;
   route: string;
   control_id: string;
   logical_control_id?: string;
   logical_key?: string;
+  display_label?: string;
   control_text: string;
   control_type: 'BUTTON' | 'LINK_ACTION' | 'INPUT' | 'DROPDOWN_ACTION' | 'UPLOAD' | 'TAB' | 'CHECKBOX' | 'TOGGLE' | 'RADIO' | 'ICON_BUTTON' | 'MENU_ITEM';
   tag: string;
@@ -48,6 +49,7 @@ type ControlRecord = {
   locator: string;
   href: string | null;
   aria_label: string | null;
+  locator_identity?: LocatorIdentity | null;
   input_type: string | null;
   option_values: string[];
   identity_ordinal?: number;
@@ -64,6 +66,7 @@ type ControlRecord = {
 type Inventory = {
   schema_version?: string;
   control_discovery_rule_hash?: string;
+  control_universe_hash?: string;
   inventory_sha256: string;
   total_visible_controls: number;
   total_actionable_controls: number;
@@ -85,6 +88,11 @@ type ControlReceipt = {
   ROLE: 'ADMIN';
   TYPE: string;
   LOCATOR: string;
+  LOCATOR_STRATEGY: string;
+  LOCATOR_CANDIDATE_COUNT: number;
+  LOCATOR_IDENTITY: LocatorIdentity | null;
+  DISPLAY_LABEL: string;
+  MUTABLE_VALUE_USED_IN_IDENTITY: false;
   VISIBLE: boolean;
   ENABLED: boolean;
   ACTION: string;
@@ -108,6 +116,13 @@ type ActionResult = {
   expectedResult: string;
   observable: string;
   cleanup?: () => Promise<void>;
+};
+
+type LocatedControl = {
+  locator: Locator;
+  strategy: 'DYNAMIC_RESOURCE_EXACT' | 'STABLE_LOCATOR_IDENTITY' | 'LEGACY_ANCHOR_TO_STABLE_IDENTITY' | 'LEGACY_STABLE_DISPLAY';
+  candidateCount: number;
+  identity: LocatorIdentity | null;
 };
 
 type DynamicResourceType = 'TRACE' | 'CONVERSATION' | 'QUERY_RUN' | 'EVAL_RUN' | 'ARTIFACT' | 'SHARE';
@@ -379,46 +394,62 @@ async function preparePage(page: Page, request: APIRequestContext, control: Cont
   }
 }
 
-async function locateControl(page: Page, control: ControlRecord): Promise<Locator> {
+async function locateControl(page: Page, control: ControlRecord): Promise<LocatedControl> {
   if (control.resource_type && control.resource_id) {
     const resourceLocator = page.locator(control.locator);
     await expect(resourceLocator, `${control.control_id} current dynamic resource`).toHaveCount(1);
     await expect(resourceLocator, `${control.control_id} locator`).toBeVisible({ timeout: 10_000 });
     await expect(resourceLocator, `${control.control_id} enabled`).toBeEnabled();
     await resourceLocator.scrollIntoViewIfNeeded();
-    return resourceLocator;
+    return { locator: resourceLocator, strategy: 'DYNAMIC_RESOURCE_EXACT', candidateCount: 1, identity: null };
+  }
+  const identityCandidates = async () => visibleControlCandidates(page);
+  if (control.locator_identity) {
+    const candidates = await identityCandidates();
+    const expected = locatorIdentityKey(control.locator_identity);
+    const matches = candidates.filter((item) => locatorIdentityKey(item.locator_identity) === expected);
+    expect(matches, `${control.control_id} stable identity candidates`).toHaveLength(1);
+    const locator = page.locator(CONTROL_SELECTOR).nth(matches[0].selector_index);
+    await expect(locator, `${control.control_id} stable locator`).toBeVisible({ timeout: 10_000 });
+    await expect(locator, `${control.control_id} enabled`).toBeEnabled();
+    await locator.scrollIntoViewIfNeeded();
+    return {
+      locator,
+      strategy: 'STABLE_LOCATOR_IDENTITY',
+      candidateCount: matches.length,
+      identity: control.locator_identity,
+    };
+  }
+  const legacyInputSentinel = control.control_type === 'INPUT' && /^\[[a-z_-]+\]$/i.test(control.control_text);
+  if (legacyInputSentinel) {
+    const candidates = await identityCandidates();
+    const anchor = candidates.find((item) => item.selector_index === control.selector_index);
+    expect(anchor, `${control.control_id} legacy snapshot anchor`).toBeTruthy();
+    expect(anchor!.tag, `${control.control_id} legacy anchor tag`).toBe(control.tag);
+    if (control.input_type) expect(anchor!.input_type, `${control.control_id} legacy anchor input type`).toBe(control.input_type);
+    const anchorIdentity = locatorIdentityKey(anchor!.locator_identity);
+    const matches = candidates.filter((item) => locatorIdentityKey(item.locator_identity) === anchorIdentity);
+    expect(matches, `${control.control_id} legacy anchor stable identity candidates`).toHaveLength(1);
+    const locator = page.locator(CONTROL_SELECTOR).nth(matches[0].selector_index);
+    await expect(locator, `${control.control_id} legacy stable locator`).toBeVisible({ timeout: 10_000 });
+    await expect(locator, `${control.control_id} enabled`).toBeEnabled();
+    await locator.scrollIntoViewIfNeeded();
+    return {
+      locator,
+      strategy: 'LEGACY_ANCHOR_TO_STABLE_IDENTITY',
+      candidateCount: matches.length,
+      identity: anchor!.locator_identity,
+    };
   }
   const matchingIndexes = async () => {
-    const candidates = await page.locator(selector).evaluateAll((elements, expected) => elements.flatMap((element, index) => {
-      const node = element as HTMLElement;
-      const input = node as HTMLInputElement;
-      const text = (
-        node.getAttribute('aria-label')
-        || node.getAttribute('title')
-        || node.textContent
-        || input.placeholder
-        || input.value
-        || ''
-      ).replace(/\s+/g, ' ').trim().slice(0, 240);
-      if (
-        node.tagName.toLowerCase() !== expected.tag
-        || (node.getAttribute('role') ?? '') !== expected.role
-        || (expected.testId === null && text !== expected.text)
-        || (expected.testId !== null && node.dataset.testid !== expected.testId)
-        || (expected.href !== null && node.getAttribute('href') !== expected.href)
-        || (expected.ariaLabel !== null && node.getAttribute('aria-label') !== expected.ariaLabel)
-      ) return [];
-      return [index];
-    }), {
-      tag: control.tag,
-      role: control.role,
-      text: control.control_text,
-      testId: control.test_id,
-      href: control.href,
-      ariaLabel: control.aria_label,
-    });
-    const visibility = await Promise.all(candidates.map((index) => page.locator(selector).nth(index).isVisible()));
-    return candidates.filter((_index, index) => visibility[index]);
+    const candidates = await identityCandidates();
+    return candidates.filter((item) => (
+      item.tag === control.tag
+      && item.role === control.role
+      && (control.test_id === null ? item.display_label === control.control_text : item.test_id === control.test_id)
+      && (control.href === null || item.href === control.href)
+      && (control.aria_label === null || item.aria_label === control.aria_label)
+    )).map((item) => item.selector_index);
   };
   const fallbackIdentity = /^\[[a-z_-]+-\d+\]$/i.test(control.control_text);
   let indexes = fallbackIdentity ? [control.selector_index] : await matchingIndexes();
@@ -429,12 +460,12 @@ async function locateControl(page: Page, control: ControlRecord): Promise<Locato
     indexes = fallbackIdentity ? [control.selector_index] : await matchingIndexes();
   }
   expect(indexes.length, `${control.control_id} identity candidates`).toBeGreaterThan(ordinal);
-  const locator = page.locator(selector).nth(indexes[ordinal]);
+  const locator = page.locator(CONTROL_SELECTOR).nth(indexes[ordinal]);
   await expect(locator, `${control.control_id} locator`).toBeVisible({ timeout: 10_000 });
   await expect(locator, `${control.control_id} enabled`).toBeEnabled();
   expect(await locator.evaluate((node) => node.tagName.toLowerCase())).toBe(control.tag);
   await locator.scrollIntoViewIfNeeded();
-  return locator;
+  return { locator, strategy: 'LEGACY_STABLE_DISPLAY', candidateCount: indexes.length, identity: null };
 }
 
 function fixtureFile(kind: 'answer' | 'dashboard' | 'semantic', control: ControlRecord): string {
@@ -863,6 +894,7 @@ test('Phase5 control certification runner emits one real receipt per actionable 
   const inventory = JSON.parse(readFileSync(inventoryPath, 'utf8')) as Inventory;
   const identityCounts = new Map<string, number>();
   for (const control of inventory.controls) {
+    if (control.locator_identity) continue;
     const key = [control.page, control.route, control.tag, control.role, control.control_text, control.href ?? '', control.aria_label ?? ''].join('|');
     control.identity_ordinal = identityCounts.get(key) ?? 0;
     identityCounts.set(key, control.identity_ordinal + 1);
@@ -910,6 +942,11 @@ test('Phase5 control certification runner emits one real receipt per actionable 
         ROLE: 'ADMIN',
         TYPE: control.control_type,
         LOCATOR: control.locator,
+        LOCATOR_STRATEGY: 'PENDING',
+        LOCATOR_CANDIDATE_COUNT: 0,
+        LOCATOR_IDENTITY: control.locator_identity ?? null,
+        DISPLAY_LABEL: control.display_label ?? control.control_text,
+        MUTABLE_VALUE_USED_IN_IDENTITY: false,
         VISIBLE: false,
         ENABLED: false,
         ACTION: control.action,
@@ -948,7 +985,11 @@ test('Phase5 control certification runner emits one real receipt per actionable 
           };
         }
         await preparePage(page, request, control);
-        const locator = await locateControl(page, control);
+        const located = await locateControl(page, control);
+        const locator = located.locator;
+        receipt.LOCATOR_STRATEGY = located.strategy;
+        receipt.LOCATOR_CANDIDATE_COUNT = located.candidateCount;
+        receipt.LOCATOR_IDENTITY = located.identity;
         receipt.VISIBLE = await locator.isVisible();
         receipt.ENABLED = await locator.isEnabled();
         const beforeDom = await domReceipt(page);
@@ -1084,6 +1125,7 @@ test('Phase5 control certification runner emits one real receipt per actionable 
     inventory_sha256: inventory.inventory_sha256,
     control_inventory_schema_version: inventory.schema_version ?? null,
     control_discovery_rule_hash: inventory.control_discovery_rule_hash ?? null,
+    control_universe_hash: inventory.control_universe_hash ?? null,
     certification_scope: targetSet || requestedControlIds.size ? 'TARGETED_PREFLIGHT' : 'FULL_INVENTORY',
     target_set: targetSet || null,
     total_visible_controls: inventory.total_visible_controls,
@@ -1098,6 +1140,7 @@ test('Phase5 control certification runner emits one real receipt per actionable 
     fake_success_count: incompleteEvidence.length,
     trace_control_stale_id_failures: failed.filter((item) => item.TYPE === 'BUTTON'
       && item.ROUTE === '/settings/models?view=trace').length,
+    input_identity_failures: failed.filter((item) => item.TYPE === 'INPUT').length,
     dynamic_resource_fixture_manager: {
       supported_resource_types: DynamicResourceFixtureManager.supportedResourceTypes,
       exercised_resource_types: receipts.some((item) => (

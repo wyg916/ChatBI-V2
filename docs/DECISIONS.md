@@ -1,5 +1,11 @@
 # Architecture Decisions
 
+## ADR-059：控件逻辑身份与展示和值分离，并绑定可复现 Control Universe
+
+Phase 5 控件认证把 `DISPLAY_LABEL`、`LOGICAL_CONTROL_ID`、`LOCATOR_IDENTITY` 与 `MUTABLE_VALUE` 作为不同字段。输入、搜索、密码和可编辑控件的定位身份禁止引用当前 value 或当前可编辑文本；定位优先使用 route、role、tag/type、稳定属性、表单/容器作用域和同一稳定作用域内的 ordinal。展示标签可以随业务状态变化，但不得进入逻辑 Inventory Hash。回归必须覆盖空值、输入后、清空后、预填充、密码、搜索、重复空输入、同 placeholder 不同表单、动态 placeholder 与 disabled 状态，并证明每个阶段逻辑 ID 不变、精确重定位候选数为 1、`mutable_value_used=false`。
+
+控件数量只有在同一 Control Universe 下才可比较。正式盘点因此签名 routes、roles、viewports、feature flags、workspace、test user、seed version/hash、菜单/Tab/Modal/Drawer 展开规则、动态资源准备、认证模式、动态状态重置与应用地址；每次发现同时输出 Universe Hash 和逻辑 Inventory Hash。隔离 Schema 中在各动态页面采集前后清理测试产生的会话、归档与项目状态，历史 Trace 表格行允许增加但通过稳定逻辑身份去重。两次独立发现必须具有相同 Universe Hash、Inventory Hash、可见数和可操作数，才允许冻结候选；原始 DOM 实例数不得冒充逻辑控件数。
+
 ## ADR-058：RapidOCR 发布镜像显式提供 GUI OpenCV 原生运行库
 
 V1.3 固定的 `rapidocr==3.9.2` 声明依赖 `opencv-python`，其 Linux wheel 在导入时动态链接 GLib、XCB 与 OpenGL。`python:3.11-slim` 默认不含这些库，单元测试或 Windows 主机通过不能证明发布容器可执行扫描 PDF OCR。Backend 发布镜像因此显式安装 `libgl1`、`libglib2.0-0`、`libxcb1`，并在同一 layer 清理 apt 索引；发布 Gate 必须在实际构建镜像中导入 RapidOCR/OpenCV并执行 M10 本地扫描 PDF。不得用同时安装 `opencv-python` 与 `opencv-python-headless` 的文件覆盖方式规避依赖，因为两个 distribution 共享 `cv2` 包且会使供应链状态含混。
