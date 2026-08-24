@@ -24,6 +24,16 @@ _RESPONSES = {
 }
 
 
+def test_backend_image_installs_rapidocr_native_runtime_dependencies():
+    dockerfile = (Path(__file__).resolve().parents[2] / "backend" / "Dockerfile").read_text(
+        encoding="utf-8"
+    )
+    normalized = " ".join(dockerfile.split())
+    for package in ("libgl1", "libglib2.0-0", "libxcb1"):
+        assert package in normalized
+    assert "rm -rf /var/lib/apt/lists/*" in normalized
+
+
 def _gateway(calls: list[tuple[str, str]]) -> ModelGateway:
     def handler(request: httpx.Request) -> httpx.Response:
         body = json.loads(request.content)

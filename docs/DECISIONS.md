@@ -1,5 +1,9 @@
 # Architecture Decisions
 
+## ADR-058：RapidOCR 发布镜像显式提供 GUI OpenCV 原生运行库
+
+V1.3 固定的 `rapidocr==3.9.2` 声明依赖 `opencv-python`，其 Linux wheel 在导入时动态链接 GLib、XCB 与 OpenGL。`python:3.11-slim` 默认不含这些库，单元测试或 Windows 主机通过不能证明发布容器可执行扫描 PDF OCR。Backend 发布镜像因此显式安装 `libgl1`、`libglib2.0-0`、`libxcb1`，并在同一 layer 清理 apt 索引；发布 Gate 必须在实际构建镜像中导入 RapidOCR/OpenCV并执行 M10 本地扫描 PDF。不得用同时安装 `opencv-python` 与 `opencv-python-headless` 的文件覆盖方式规避依赖，因为两个 distribution 共享 `cv2` 包且会使供应链状态含混。
+
 ## ADR-057：控件认证以浏览器真实可见性为边界，负载 CPU 以进程分类和资源分区归因
 
 可见控件 Inventory 不能只依赖 `display` / `visibility` 和几何矩形；关闭的 `details` 子树可能仍返回几何信息，但 Playwright 不允许用户交互。Inventory 因此对每个候选元素调用浏览器级真实可见性，只对当前页面状态中用户实际可见且启用的控件签发 receipt。执行时用稳定 `data-testid` / `href` 或控件身份与同名序号重新定位，不把动态时间文案或全局 nth 当作持久身份。写控件必须证明 DB 指纹变化、API 回读和刷新；纯 UI/导航/剪贴板/下载控件必须给出对应的可观察结果，不得用空泛 N/A 跳过。
