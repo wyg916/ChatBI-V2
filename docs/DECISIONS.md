@@ -319,3 +319,11 @@ Phase 5 FAIL 后的普通修复默认只运行 Level 0：真实 Backend/API、�
 Level 1 只用于实际修改 Model Gateway、Provider Adapter、Prompt、Routing、Vision 或 Agent 模型调用后的 1～3 个定向 Case，要求负责人授权、完整 SHA、Run/Case/Gate、Provider allowlist、外部成本台账和不超过 1.00 CNY 的默认硬预算；默认优先 MiMo，DeepSeek 只在能力或被改适配路径需要时显式选择，Kimi 只服务明确 Premium/Vision/Complex 范围。Level 2 只允许最终候选 SHA，在同 SHA Level 0 全门禁 PASS、cache bypass、明确最终认证标志和 3.00 CNY/日 5.00 CNY 硬上限下执行一次完整认证。Level 1 定向 PASS、录制缓存或确定性结果都不能冒充 Level 2。
 
 测试 Provider 输出默认限制为 512 tokens，Complex/Agent 最多 1024；最多一次重试，402/认证错误立即失败。每次真实尝试在外部 SQLite 台账预留预算并记录 Run、SHA、Case、Gate、Provider、Model、Token、Cost、Retry、状态和安全错误码，不保存 Prompt、正文、媒体、密钥或数据库凭据。完整执行规范见 `docs/testing/V1_3_PHASE5_COST_CONTROLLED_TEST_STRATEGY.md`。
+
+## ADR-049：Phase 5 Successor 只保留一个业务 SQL Gateway，并以外部 exact-SHA 清单执行回滚
+
+Dashboard 的固定聚合 SQL 不再通过 Connector 的 `read_rows` 旁路执行。所有业务数据查询统一复用 Data Workspace 的 `execute_sql` 与唯一 `QueryExecutor`，继续经过 SQL AST Guard、只读事务、超时、并发、行限、结果签名、`SqlWorkspaceRun`、Audit 和 Trace。Dashboard 的服务端固定 SQL 只能使用代码内版本化的最小表/列策略；永久静态 Gate 限定该策略只有一个调用点，并对 QueryExecutor 类数、Connector 直接读取及原始连接执行入口执行明确 allowlist。元数据库 ORM 查询、连接测试和 Schema 元数据同步不被误归类为业务数据 SQL Gateway。
+
+Phase 5 测试成本治理以 Backend 唯一 Model Gateway 为强制预留点。Level1 和 Level2 都必须先读取同 SHA 的完整 Level0 receipt；每次付费尝试绑定 Git/Backend SHA、配置哈希、Prompt 版本、必要性、稳定 Case、Provider/Model、Token/费用、重试/回退及日累计。共享 SQLite 台账使用原子事务阻断跨 runner 换路径、重复首调、预算越界和第二次 Level2；Level0 的小额异常只能由负责人显式授权且上限 0.50 CNY，普通 push 永远保持 0。
+
+包含最终 SHA 的发布清单不能在其自身 Git commit 中自引用，因此 tracked 文档只冻结生成规则；successor 提交 clean 后，由外部 manifest 绑定 final/rollback SHA、镜像 digest、配置/Compose hash、迁移 head/target 与 exact commands。回滚演练从两个 exact SHA 的 Git archive 构建隔离五服务环境，只创建和删除 run-specific PostgreSQL Schema/Compose 项目，验证候选与旧版 API、浏览器和业务数据 fingerprint。Phase 5 没有新增迁移，`20260822_0012 → 20260822_0012` 明确记录为无需 downgrade；不得操作生产、删除本机业务数据库、重写历史或用清单替代真实 dry-run Evidence。

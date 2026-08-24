@@ -606,6 +606,7 @@ def test_live_gate_executes_all_real_http_contracts_auto_routes_weird_and_cleans
             semantic_model_id="semantic-phase5",
             credentials={"email": "phase5@example.invalid", "password": "external-test-only"},
             controller_client=client,
+            tested_sha="a" * 40,
         )
 
     assert evidence["status"] == "PASS", evidence["failures"]

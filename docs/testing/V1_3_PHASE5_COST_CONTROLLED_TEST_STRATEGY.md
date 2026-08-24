@@ -24,6 +24,7 @@ Model Gateway 是唯一 Provider HTTP 边界。启用测试成本控制时，Lev
 - Provider 模式：确定性或录制响应。
 - 真实 Backend/API/PostgreSQL/MySQL/SSE/RAG/Agent/File 编排继续执行。
 - 付费 Provider 调用：0。
+- 只有负责人显式授权、声明必要性且确定性测试不足时，才可设置 `CHATBI_LEVEL0_PAID_EXCEPTION=YES`；该异常最多 0.50 CNY，普通 push 永远不设置。
 - 20×15 分钟负载与最终小规模真实 Provider Load Smoke 是两个独立 Gate，互不替代。
 
 生成 Level 0 计划：
@@ -44,12 +45,15 @@ python scripts/phase5-test-cost-control.py plan `
 
 - `CHATBI_PAID_GATE_AUTHORIZED=YES`；
 - 完整 `CHATBI_TEST_SHA`；
-- `TEST_RUN_ID`、单个 `CASE_ID`、Gate、受影响路径；
+- `TEST_RUN_ID`、逐请求稳定 `CASE_ID`、Gate、受影响路径；
 - 明确 Provider allowlist；
-- 外部 SQLite 成本台账路径；
+- Backend 管理的共享 SQLite 台账根目录；调用方不得选择或更换 ledger 文件；
+- `NECESSITY_DECLARATION=YES` 与可审计的 `DETERMINISTIC_INSUFFICIENT_REASON`；
+- 与候选一致的 `BACKEND_SHA`、Backend 计算的 `CONFIG_HASH` 和 `PROMPT_VERSION`；
+- 与候选 SHA 一致且所有完整 Level 0 Gate 均 PASS 的 `CHATBI_LEVEL0_RECEIPT`；
 - 不超过预算分类的硬上限。
 
-Level 1 最多 30 次真实请求，每次 runner 只允许选择 1～3 个受影响 Case。Kimi 只允许 Vision、scanned PDF、Complex 或明确 Premium 范围。三 Provider Smoke 必须显式传 `--provider`，不能默认并行跑三家；Multimodal 必须显式传 `--case-id`；Weird/Complex runner 必须显式传 `--weird-case` 或 `--complex-case`。
+Level 1 最多 30 次真实请求，每次 runner 只允许选择 1～3 个受影响 Case。Kimi 只允许 Vision、scanned PDF、Complex 或明确 Premium 范围。三 Provider Smoke 必须显式传 `--provider`，不能默认并行跑三家；Multimodal 必须显式传 `--case-id`；Complex runner 必须显式传 `--complex-case`。Weird50 始终属于免费确定性层，不允许付费执行。
 
 示例：只复验 scanned PDF：
 
@@ -58,6 +62,7 @@ $env:CHATBI_TEST_COST_CONTROL='YES'
 $env:CHATBI_TEST_EXECUTION_LEVEL='LEVEL1'
 $env:CHATBI_PAID_GATE_AUTHORIZED='YES'
 $env:CHATBI_TEST_SHA='<FULL_SHA>'
+$env:CHATBI_BACKEND_SHA='<FULL_SHA>'
 $env:CHATBI_TEST_RUN_ID='phase5-scanned-pdf-001'
 $env:CHATBI_TEST_CASE_ID='M10'
 $env:CHATBI_TEST_GATE='multimodal10'
@@ -65,7 +70,11 @@ $env:CHATBI_TEST_AFFECTED_PATH='scanned_pdf'
 $env:CHATBI_TEST_ALLOWED_PROVIDERS='kimi'
 $env:CHATBI_TEST_BUDGET_CLASS='targeted_live_regression'
 $env:CHATBI_TEST_BUDGET_CNY='1.00'
-$env:CHATBI_TEST_COST_LEDGER_PATH='E:\ChatBI_V2_Evidence\V1.3.0\Phase5_Cost_Control\paid-tests.sqlite3'
+$env:CHATBI_TEST_COST_LEDGER_ROOT='E:\ChatBI_V2_Evidence\V1.3.0\Phase5_Cost_Control'
+$env:CHATBI_LEVEL0_RECEIPT='E:\ChatBI_V2_Evidence\V1.3.0\Phase5_Cost_Control\level0-receipt.json'
+$env:CHATBI_TEST_NECESSITY_DECLARATION='YES'
+$env:CHATBI_TEST_DETERMINISTIC_INSUFFICIENT_REASON='录制响应不能证明该候选 SHA 的真实 Kimi scanned-PDF 路径。'
+$env:CHATBI_PROMPT_VERSION='chatbi-visual-evidence-v1'
 python backend/scripts/run_v13_multimodal_live.py --case-id M10 --output '<TARGETED_EVIDENCE_PATH>'
 ```
 
@@ -81,24 +90,27 @@ python backend/scripts/run_v13_multimodal_live.py --case-id M10 --output '<TARGE
 - `CHATBI_LEVEL0_RECEIPT` 可读、SHA 一致、全部必选 Gate 为 PASS；
 - `final_certification` 预算不超过 3.00 CNY，日总预算不超过 5.00 CNY。
 
-Level 2 runner 拒绝 Case 过滤，确保最终 Multimodal10、Weird50/Complex5 和三 Provider 认证保持完整。Level 1 的定向 PASS 不会被提升为 Level 2 PASS。
+Level 2 runner 拒绝 Case 过滤，确保最终 Multimodal10、Complex5、三 Provider 与必要 AI E2E 认证保持完整。Weird50 继续使用同 SHA 的免费确定性证据，不进入付费 Level 2。Level 1 的定向 PASS 不会被提升为 Level 2 PASS。
 
 ## 3. Token、重试与预算
 
 - 普通测试输出上限 512 tokens；Complex/Agent 上限 1024 tokens。
 - 测试环境最多重试 1 次，即最多 2 次总尝试。
 - 402、401、403 等不可恢复错误不重试；429、可恢复 Transport/5xx 最多一次受控 backoff。
-- 默认预算：普通修复 0.50 CNY、定向真实回归 1.00 CNY、预最终 1.50 CNY、最终认证 3.00 CNY、单日硬上限 5.00 CNY。
+- 硬上限：Level0 默认 0、必要异常 0.50 CNY；Level1 1.50 CNY；Level2 3.00 CNY；单日 5.00 CNY。Level1 不能选择 Level2 的预算分类。
 - 预计成本、Run 累计保守成本或日累计成本越界时，在网络调用前返回 `TEST_BUDGET_EXCEEDED`。
 
 ## 4. 成本台账
 
-每一次获准的真实 Provider 尝试先在外部 SQLite 台账中预留预算，完成后只记录以下脱敏字段：
+每一次获准的真实 Provider 尝试先在 Backend 权威、单一共享的 SQLite 台账中原子预留预算。台账用 `DUPLICATE_KEY` 阻断相同 SHA/Level/Gate/Case/Provider/Model/Prompt 请求的重复首调，用独立状态表保证每个最终 SHA 最多一次 Level2；唯一 Model Gateway 负责全部重试，Suite 不得再叠加重试。完成后只记录以下脱敏字段：
 
 ```text
-TEST_RUN_ID, SHA, CASE_ID, GATE, PROVIDER, MODEL,
+TEST_RUN_ID, CASE_ID, TEST_LEVEL, NECESSITY_DECLARATION,
+DETERMINISTIC_INSUFFICIENT_REASON, GIT_SHA, BACKEND_SHA,
+CONFIG_HASH, PROMPT_VERSION, PROVIDER, MODEL,
 INPUT_TOKENS, CACHED_INPUT_TOKENS, OUTPUT_TOKENS,
-COST_CNY, RETRY_COUNT, STATUS, ERROR_CODE
+COST_CNY, RETRY_COUNT, FALLBACK_COUNT, DUPLICATE_KEY,
+DAILY_COST_BEFORE, DAILY_COST_AFTER, STATUS, ERROR_CODE
 ```
 
 不保存 Prompt、模型正文、图片、Key、Authorization Header 或数据库凭据。`summary` 子命令按 Provider 和 Gate 聚合真实费用。失败尝试仍保留预算预留，避免以 402/超时产生的未知计费绕过硬上限。
@@ -115,7 +127,7 @@ COST_CNY, RETRY_COUNT, STATUS, ERROR_CODE
 
 ## 7. 当前修复顺序
 
-1. 零付费：Data100、674 控件矩阵、持久化、Conversation Delete、Browser、Cold Start、Load Infrastructure。
+1. 零付费：Data100、391 控件矩阵、持久化、Conversation Delete、Browser、Cold Start、Load Infrastructure。
 2. 基本零付费：Weird50、Complex deterministic、安全、Phase 1～4 deterministic regression。
 3. 定向真实模型：单个 Complex 失败 Case、M10 scanned PDF、受影响 Provider Smoke。
 4. 最终候选：完整确定性回归 PASS 后，只执行一次完整真实 Provider 认证。

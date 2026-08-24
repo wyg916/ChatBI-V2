@@ -68,21 +68,31 @@ def main() -> int:
                     max_output_tokens=32,
                 ),
                 RequestContext(
-                    request_id=f"SMOKE-{provider}-{uuid4()}",
+                    request_id=f"SMOKE-{provider}",
                     trace_id=f"TRACE-SMOKE-{provider}-{uuid4()}",
                     question="provider connectivity probe",
                     budget_mode=BudgetMode.QUALITY,
                 ),
             )
+            expected_model = gateway.providers[provider].model_name
+            exact_provider = response.resolved_provider == provider
+            exact_model = response.resolved_model == expected_model
+            no_fallback = response.fallback_used is False and response.fallback_count == 0
+            exact_probe = response.content.strip() == "CHATBI_SMOKE_OK"
             results.append({
                 "provider": provider,
-                "status": "PASS" if response.content.strip() else "FAIL",
+                "status": "PASS" if exact_provider and exact_model and no_fallback and exact_probe else "FAIL",
+                "expected_model": expected_model,
                 "resolved_provider": response.resolved_provider,
                 "resolved_model": response.resolved_model,
+                "exact_provider": exact_provider,
+                "exact_model": exact_model,
+                "exact_probe": exact_probe,
                 "usage": response.usage.model_dump(mode="json"),
                 "cost_cny": response.cost_cny,
                 "latency_ms": response.latency_ms,
                 "fallback_used": response.fallback_used,
+                "fallback_count": response.fallback_count,
                 "retry_count": response.retry_count,
                 "reasoning_observed": response.reasoning_observed,
             })
@@ -111,6 +121,7 @@ def main() -> int:
         "secrets_exposed": False,
         "authorization_headers_exposed": False,
         "cost_control_failure": cost_control_failure,
+        "backend_cost_control_identity": controller.runtime_identity(),
         "paid_test_summary": controller.summary(),
         "results": results,
         "status": "PASS" if all(item["status"] == "PASS" for item in results) else "FAIL",

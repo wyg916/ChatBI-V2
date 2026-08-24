@@ -64,9 +64,10 @@ type Inventory = {
 type NetworkEvent = { method: string; path: string; status: number | null };
 type DbSnapshot = { fingerprint: string; group: string; tables: Record<string, unknown>; secrets_exposed: false };
 type ApiReadback = { method: 'GET'; path: string; status: number; body_sha256: string };
+type ExplicitNotApplicable = { status: 'NOT_APPLICABLE_WITH_EXPLICIT_REASON'; reason: string };
 
 type ControlReceipt = {
-  SCHEMA_VERSION: 'chatbi.v13.phase5.control-receipt.v1';
+  SCHEMA_VERSION: 'chatbi.v13.phase5.control-receipt.v2';
   CONTROL_ID: string;
   PAGE: string;
   ROUTE: string;
@@ -77,12 +78,13 @@ type ControlReceipt = {
   ENABLED: boolean;
   ACTION: string;
   EXPECTED_RESULT: string;
-  NETWORK_REQUEST: string[];
+  NETWORK_REQUEST: string[] | ExplicitNotApplicable;
   HTTP_STATUS: number[];
   DB_EFFECT_TYPE: string;
-  DB_BEFORE: DbSnapshot | { status: 'NOT_APPLICABLE_WITH_EXPLICIT_REASON'; reason: string } | null;
-  DB_AFTER: DbSnapshot | { status: 'NOT_APPLICABLE_WITH_EXPLICIT_REASON'; reason: string } | null;
-  API_READBACK: ApiReadback[];
+  DB_BEFORE: DbSnapshot | ExplicitNotApplicable | null;
+  DB_AFTER: DbSnapshot | ExplicitNotApplicable | null;
+  API_READBACK: ApiReadback[] | ExplicitNotApplicable;
+  NETWORK_API: { status: 'APPLICABLE' | 'NOT_APPLICABLE_WITH_EXPLICIT_REASON'; reason: string };
   REFRESH_RESULT: Record<string, unknown>;
   FINAL_STATUS: 'PASS' | 'FAIL';
   FAIL_REASON: string | null;
@@ -707,7 +709,7 @@ test('Phase5 control certification runner emits one real receipt per actionable 
         reason: 'The control is a read-only navigation, filter, selection, local UI state, clipboard or download action.',
       };
       const receipt: ControlReceipt = {
-        SCHEMA_VERSION: 'chatbi.v13.phase5.control-receipt.v1',
+        SCHEMA_VERSION: 'chatbi.v13.phase5.control-receipt.v2',
         CONTROL_ID: control.control_id,
         PAGE: control.page,
         ROUTE: control.route,
@@ -724,6 +726,7 @@ test('Phase5 control certification runner emits one real receipt per actionable 
         DB_BEFORE: group ? null : notApplicable,
         DB_AFTER: group ? null : notApplicable,
         API_READBACK: [],
+        NETWORK_API: { status: 'APPLICABLE', reason: 'Pending control execution evidence.' },
         REFRESH_RESULT: {},
         FINAL_STATUS: 'FAIL',
         FAIL_REASON: null,
@@ -746,17 +749,30 @@ test('Phase5 control certification runner emits one real receipt per actionable 
         const afterDom = await domReceipt(page);
         const events = activeEvents;
         activeEvents = null;
-        receipt.NETWORK_REQUEST = [...new Set(events.map((item) => `${item.method} ${item.path}`))];
+        const networkRequests = [...new Set(events.map((item) => `${item.method} ${item.path}`))];
+        receipt.NETWORK_REQUEST = networkRequests;
         receipt.HTTP_STATUS = [...new Set(events.flatMap((item) => item.status === null ? [] : [item.status]))].sort((a, b) => a - b);
         receipt.EXPECTED_RESULT = action.expectedResult;
         if (group) {
           receipt.DB_AFTER = dbSnapshot(group, workspaceId);
           expect((receipt.DB_BEFORE as DbSnapshot).fingerprint, `${control.control_id} DB state changed`).not.toBe((receipt.DB_AFTER as DbSnapshot).fingerprint);
         }
-        receipt.API_READBACK = await apiReadback(request, control);
+        const apiReads = await apiReadback(request, control);
+        receipt.API_READBACK = apiReads;
+        const pureUiNotApplicable: ExplicitNotApplicable = {
+          status: 'NOT_APPLICABLE_WITH_EXPLICIT_REASON',
+          reason: 'This read-only or local UI control has no Backend API contract; DOM, URL or browser-local state is the acceptance source.',
+        };
+        if (!group && networkRequests.length === 0) receipt.NETWORK_REQUEST = pureUiNotApplicable;
+        if (!group && apiReads.length === 0) receipt.API_READBACK = pureUiNotApplicable;
+        const networkApplicable = Array.isArray(receipt.NETWORK_REQUEST);
+        const apiApplicable = Array.isArray(receipt.API_READBACK);
+        receipt.NETWORK_API = networkApplicable || apiApplicable
+          ? { status: 'APPLICABLE', reason: 'Network request or API readback evidence is attached.' }
+          : { status: 'NOT_APPLICABLE_WITH_EXPLICIT_REASON', reason: pureUiNotApplicable.reason };
         const observableTransition = beforeDom.url !== afterDom.url
           || beforeDom.html_sha256 !== afterDom.html_sha256
-          || receipt.NETWORK_REQUEST.length > 0
+          || networkRequests.length > 0
           || action.expectedResult === 'ACTIVE_CONTROL_IDEMPOTENT'
           || action.expectedResult === 'ROUTE_NAVIGATION_MATCHES_HREF'
           || action.expectedResult === 'INPUT_VALUE_ACCEPTED_AND_UI_REACTED'
@@ -782,8 +798,14 @@ test('Phase5 control certification runner emits one real receipt per actionable 
           http_status: refreshResponse?.status() ?? null,
           url: page.isClosed() ? null : page.url(),
           ui_sha256: refreshDom.html_sha256 ?? null,
+          db_after_refresh: group ? dbSnapshot(group, workspaceId) : notApplicable,
+          api_readback_after_refresh: group ? await apiReadback(request, control) : notApplicable,
         };
         if (refreshResponse) expect(refreshResponse.status()).toBeLessThan(400);
+        if (group) {
+          expect((receipt.REFRESH_RESULT.db_after_refresh as DbSnapshot).fingerprint)
+            .toBe((receipt.DB_AFTER as DbSnapshot).fingerprint);
+        }
         receipt.EVIDENCE = {
           ...receipt.EVIDENCE,
           before_dom: beforeDom,
@@ -815,9 +837,14 @@ test('Phase5 control certification runner emits one real receipt per actionable 
   const mutationReceipts = receipts.filter((item) => item.DB_EFFECT_TYPE.startsWith('APPLICABLE_'));
   const refreshPassed = receipts.filter((item) => item.REFRESH_RESULT.status === 'PASS').length;
   const serializedReceipts = JSON.stringify(receipts.map((item) => ({ id: item.CONTROL_ID, status: item.FINAL_STATUS })));
+  const incompleteEvidence = receipts.filter((item) => item.FINAL_STATUS === 'PASS' && (
+    (Array.isArray(item.NETWORK_REQUEST) && item.NETWORK_REQUEST.length === 0)
+    || (Array.isArray(item.API_READBACK) && item.API_READBACK.length === 0)
+    || item.NETWORK_API.reason.length === 0
+  ));
   const manifest = {
-    schema_version: 'chatbi.v13.phase5.control-certification-manifest.v1',
-    status: failed.length === 0 && noops.length === 0 ? 'PASS' : 'FAIL',
+    schema_version: 'chatbi.v13.phase5.control-certification-manifest.v2',
+    status: failed.length === 0 && noops.length === 0 && incompleteEvidence.length === 0 ? 'PASS' : 'FAIL',
     inventory_sha256: inventory.inventory_sha256,
     certification_scope: requestedControlIds.size ? 'TARGETED_PREFLIGHT' : 'FULL_INVENTORY',
     total_visible_controls: inventory.total_visible_controls,
@@ -829,13 +856,14 @@ test('Phase5 control certification runner emits one real receipt per actionable 
       : 1,
     noop_control_count: noops.length,
     broken_control_count: failed.length,
-    fake_success_count: 0,
+    fake_success_count: incompleteEvidence.length,
     db_persistence_gate: mutationReceipts.every((item) => item.FINAL_STATUS === 'PASS') ? 'PASS' : 'FAIL',
     refresh_persistence_rate: receipts.length ? refreshPassed / receipts.length : 0,
     control_matrix_paid_provider_calls: 0,
     paid_provider_cost_cny: 0,
     failed_control_ids: failed.map((item) => item.CONTROL_ID),
     noop_control_ids: noops.map((item) => item.CONTROL_ID),
+    incomplete_evidence_control_ids: incompleteEvidence.map((item) => item.CONTROL_ID),
     receipts_sha256: sha256(serializedReceipts),
   };
   atomicJson(resolve(outputRoot, 'control-certification-manifest.json'), manifest);

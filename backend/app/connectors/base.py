@@ -1,8 +1,5 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from typing import Any
-
-
 @dataclass
 class ColumnMetadata:
     name: str
@@ -48,7 +45,3 @@ class DataSourceConnector(ABC):
     @abstractmethod
     def sync_metadata(self) -> ConnectorMetadata:
         """Read catalog metadata without scanning business rows."""
-
-    @abstractmethod
-    def read_rows(self, statement: str, parameters: dict[str, Any] | None = None) -> list[dict[str, Any]]:
-        """Execute one server-owned read-only query and return mapping rows."""

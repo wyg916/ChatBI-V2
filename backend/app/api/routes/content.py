@@ -185,8 +185,8 @@ def get_dashboard_detail(
         raise HTTPException(status_code=404, detail="Dashboard not found")
     ensure_resource_access(db, principal, resource_type="DASHBOARD", resource_id=dashboard_id)
     try:
-        return dashboard_detail(db, dashboard)
-    except LookupError as exc:
+        return dashboard_detail(db, dashboard, principal)
+    except (LookupError, RuntimeError) as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
 
 

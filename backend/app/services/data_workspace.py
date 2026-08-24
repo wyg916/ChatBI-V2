@@ -140,8 +140,12 @@ def execute_sql(
     *,
     row_limit: int,
     operation: str = "EXECUTE",
+    trusted_policy: SecurityPolicy | None = None,
 ) -> SqlWorkspaceRun:
-    policy = security_policy(db, datasource.id, row_limit)
+    # ``trusted_policy`` is reserved for fixed server-owned product queries
+    # whose narrow allowlist is versioned in Backend code. User SQL always
+    # derives its policy from the synchronized datasource catalog.
+    policy = trusted_policy or security_policy(db, datasource.id, row_limit)
     guard = SqlGuard().validate(sql, dialect=datasource.type, policy=policy)
     run = SqlWorkspaceRun(
         workspace_id=principal.workspace_id or "", user_id=principal.user_id or "",

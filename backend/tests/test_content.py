@@ -98,7 +98,7 @@ def test_dashboard_detail_uses_backend_business_snapshot(client, db_session, mon
     seed_demo_semantic_model(db_session)
     dashboard = client.get("/api/v1/dashboards").json()["items"][0]
 
-    def snapshot(_, dashboard_model):
+    def snapshot(_, dashboard_model, __):
         return {
             "dashboard": dashboard_model,
             "data_as_of": "2026-08-17",

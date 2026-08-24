@@ -1,10 +1,25 @@
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 
 from sqlalchemy import case, func, or_, select
 from sqlalchemy.orm import Session
 
 from app.models import AnswerVersion, AuditEvent, Dashboard, DashboardCard, DataSource, QueryRun, VerifiedAnswer
-from app.services.datasources import build_connector
+from app.core.access import Principal
+from app.query.contracts import SecurityPolicy
+from app.services.data_workspace import execute_sql
+
+
+_DASHBOARD_READ_POLICY = SecurityPolicy(
+    row_limit=500,
+    timeout_ms=30_000,
+    allowed_schemas=["demo_business"],
+    allowed_tables=["daily_kpi", "orders", "regions"],
+    allowed_columns={
+        "daily_kpi": ["kpi_date", "revenue", "cost", "order_count", "charging_kwh", "region_id"],
+        "orders": ["customer_id", "order_date"],
+        "regions": ["region_id", "region_name"],
+    },
+)
 
 
 def answer_summary(db: Session, workspace_id: str | None = None) -> dict[str, int | float]:
@@ -175,7 +190,35 @@ def _percent_change(current: float, previous: float) -> float:
     return round((current - previous) / previous * 100, 1)
 
 
-def dashboard_detail(db: Session, dashboard: Dashboard) -> dict:
+def _dashboard_rows(
+    db: Session,
+    principal: Principal,
+    datasource: DataSource,
+    sql: str,
+    *,
+    operation: str,
+    require_rows: bool = False,
+) -> list[dict]:
+    """Delegate Dashboard business reads to the existing guarded SQL gateway."""
+
+    run = execute_sql(
+        db,
+        principal,
+        datasource,
+        sql,
+        row_limit=500,
+        operation=f"DASHBOARD_DETAIL_{operation}",
+        trusted_policy=_DASHBOARD_READ_POLICY,
+    )
+    if run.status != "SUCCEEDED":
+        raise RuntimeError(f"Dashboard query failed: {run.error_code or run.status}")
+    rows = list((run.execution_payload or {}).get("rows") or ())
+    if require_rows and not rows:
+        raise RuntimeError(f"Dashboard query returned no rows: {operation}")
+    return rows
+
+
+def dashboard_detail(db: Session, dashboard: Dashboard, principal: Principal) -> dict:
     datasource = db.scalar(
         select(DataSource)
         .where(DataSource.type == "postgresql", DataSource.name == "Demo PostgreSQL", DataSource.workspace_id == dashboard.workspace_id)
@@ -183,9 +226,8 @@ def dashboard_detail(db: Session, dashboard: Dashboard) -> dict:
     )
     if datasource is None:
         raise LookupError("Demo PostgreSQL datasource is not configured")
-    connector = build_connector(datasource)
 
-    summary = connector.read_rows("""
+    summary = _dashboard_rows(db, principal, datasource, """
         WITH bounds AS (SELECT max(kpi_date) AS max_date FROM demo_business.daily_kpi),
         current_period AS (
           SELECT sum(revenue) AS revenue, sum(revenue-cost) AS profit,
@@ -215,15 +257,15 @@ def dashboard_detail(db: Session, dashboard: Dashboard) -> dict:
                previous_period.profit AS previous_profit,
                active_customers.customers, previous_customers.customers AS previous_customers
         FROM bounds, current_period, previous_period, active_customers, previous_customers
-    """)[0]
-    trend = connector.read_rows("""
+    """, operation="SUMMARY", require_rows=True)[0]
+    trend = _dashboard_rows(db, principal, datasource, """
         WITH bounds AS (SELECT max(kpi_date) AS max_date FROM demo_business.daily_kpi)
         SELECT kpi_date, sum(revenue) AS revenue
         FROM demo_business.daily_kpi, bounds
         WHERE kpi_date BETWEEN max_date - interval '7 days' AND max_date
         GROUP BY kpi_date ORDER BY kpi_date
-    """)
-    regions = connector.read_rows("""
+    """, operation="TREND")
+    regions = _dashboard_rows(db, principal, datasource, """
         WITH bounds AS (SELECT max(kpi_date) AS max_date FROM demo_business.daily_kpi),
         current_period AS (
           SELECT region_id, sum(revenue) AS revenue, sum(revenue-cost) AS profit,
@@ -244,7 +286,9 @@ def dashboard_detail(db: Session, dashboard: Dashboard) -> dict:
         JOIN previous_period p USING (region_id)
         JOIN demo_business.regions r ON r.region_id = c.region_id
         ORDER BY c.revenue DESC
-    """)
+    """, operation="REGIONS")
+
+    max_date = date.fromisoformat(str(summary["max_date"]))
 
     revenue = _number(summary["revenue"])
     profit = _number(summary["profit"])
@@ -312,16 +356,16 @@ def dashboard_detail(db: Session, dashboard: Dashboard) -> dict:
                 AuditEvent.created_at >= datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0),
             )) or 0,
         ),
-        "data_as_of": summary["max_date"].isoformat(),
-        "range_start": (summary["max_date"] - timedelta(days=29)).isoformat(),
-        "range_end": summary["max_date"].isoformat(),
+        "data_as_of": max_date.isoformat(),
+        "range_start": (max_date - timedelta(days=29)).isoformat(),
+        "range_end": max_date.isoformat(),
         "kpis": [
             {"label": "总收入", "value": round(revenue, 2), "unit": "元", "change": _percent_change(revenue, previous_revenue)},
             {"label": "总利润", "value": round(profit, 2), "unit": "元", "change": _percent_change(profit, previous_profit)},
             {"label": "利润率", "value": margin, "unit": "%", "change": round(margin - previous_margin, 1), "change_unit": "pp"},
             {"label": "活跃客户", "value": customers, "unit": "个", "change": _percent_change(customers, previous_customers)},
         ],
-        "revenue_trend": [{"date": row["kpi_date"].isoformat(), "revenue": round(_number(row["revenue"]), 2)} for row in trend],
+        "revenue_trend": [{"date": str(row["kpi_date"]), "revenue": round(_number(row["revenue"]), 2)} for row in trend],
         "regions": region_rows,
         "insight": insight,
         "cards": cards,

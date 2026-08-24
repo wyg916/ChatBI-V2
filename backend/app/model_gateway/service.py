@@ -248,6 +248,7 @@ class ModelGateway:
                         estimated_cost_cny=self.policy.cost.estimate(provider.provider_id, request).cost_cny,
                         retry_count=attempt,
                         recorded_transport=self.transport is not None,
+                        fallback_count=fallback_count,
                     )
                     timeout = request.timeout_seconds or float(self.health_config["request_timeout_seconds"])
                     with httpx.Client(timeout=timeout, transport=self.transport) as client:
@@ -490,6 +491,7 @@ class ModelGateway:
                         estimated_cost_cny=self.policy.cost.estimate(provider.provider_id, request).cost_cny,
                         retry_count=attempt,
                         recorded_transport=self.transport is not None,
+                        fallback_count=fallback_count,
                     )
                     timeout = request.timeout_seconds or float(self.health_config["request_timeout_seconds"])
                     with httpx.Client(timeout=timeout, transport=self.transport) as client:

@@ -387,7 +387,7 @@ def _call_model(
         json_mode=True,
         vision=True,
         context=RequestContext(
-            request_id=f"LIVE-{scenario.case_id}-{uuid4()}",
+            request_id=f"LIVE-{scenario.case_id}",
             trace_id=request.trace_id,
             workspace_id=_WORKSPACE_ID,
             question=f"synthetic multimodal evaluation {scenario.case_id}",
@@ -532,7 +532,10 @@ def run_multimodal_suite(
     results: list[dict[str, Any]] = []
     for item in cases:
         case_id = str(item["id"])
-        max_attempts = 2 if execution_mode == "live" else 1
+        # ModelGateway owns the only bounded retry loop and records every paid
+        # attempt. A suite-level retry would multiply paid calls and overwrite
+        # the first failure evidence.
+        max_attempts = 1
         result: dict[str, Any] | None = None
         for attempt in range(1, max_attempts + 1):
             try:
@@ -801,6 +804,12 @@ def main() -> int:
         execution_mode="live",
         selected_case_ids=selected or None,
     )
+    payload["tested_sha"] = configuration["tested_sha"]
+    payload["backend_cost_control_identity"] = controller.runtime_identity()
+    payload["paid_test_summary"] = controller.summary()
+    payload["evidence_signature"] = canonical_sha256({
+        key: value for key, value in payload.items() if key != "evidence_signature"
+    })
     if arguments.output:
         write_report(payload, arguments.output)
     print(json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True))

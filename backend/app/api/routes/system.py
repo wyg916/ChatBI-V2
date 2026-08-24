@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends
 
 from app.core.access import require_permission
 from app.core.config import get_settings
+from app.model_gateway.test_cost_control import TestCostController
 from app.query.nl2sql import model_provider_catalog
 
 router = APIRouter(tags=["system"])
@@ -17,3 +18,10 @@ def version() -> dict[str, str]:
 def model_providers():
     """Return server-side provider status without exposing credentials."""
     return model_provider_catalog()
+
+
+@router.get("/test-cost-control-status", dependencies=[Depends(require_permission("settings.read"))])
+def test_cost_control_status() -> dict:
+    """Return the served process identity required by paid-test preflight."""
+
+    return TestCostController().runtime_identity()

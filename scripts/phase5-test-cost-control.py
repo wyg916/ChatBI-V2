@@ -46,6 +46,7 @@ def _base_environment(args: argparse.Namespace) -> dict[str, str]:
     optional = {
         "CHATBI_PAID_GATE_AUTHORIZED": getattr(args, "paid_gate_authorized", None),
         "CHATBI_TEST_SHA": getattr(args, "sha", None),
+        "CHATBI_BACKEND_SHA": getattr(args, "backend_sha", None),
         "CHATBI_TEST_FINAL_SHA": getattr(args, "final_sha", None),
         "CHATBI_TEST_RUN_ID": getattr(args, "test_run_id", None),
         "CHATBI_TEST_CASE_ID": getattr(args, "case_id", None),
@@ -54,7 +55,12 @@ def _base_environment(args: argparse.Namespace) -> dict[str, str]:
         "CHATBI_TEST_ALLOWED_PROVIDERS": getattr(args, "providers", None),
         "CHATBI_TEST_BUDGET_CLASS": getattr(args, "budget_class", None),
         "CHATBI_TEST_BUDGET_CNY": str(getattr(args, "budget_cny", "") or ""),
-        "CHATBI_TEST_COST_LEDGER_PATH": str(getattr(args, "ledger", "") or ""),
+        "CHATBI_TEST_COST_LEDGER_ROOT": str(getattr(args, "ledger_root", "") or ""),
+        "CHATBI_TEST_NECESSITY_DECLARATION": getattr(args, "necessity_declaration", None),
+        "CHATBI_TEST_DETERMINISTIC_INSUFFICIENT_REASON": getattr(args, "deterministic_insufficient_reason", None),
+        "CHATBI_CONFIG_HASH": getattr(args, "config_hash", None),
+        "CHATBI_PROMPT_VERSION": getattr(args, "prompt_version", None),
+        "CHATBI_LEVEL0_PAID_EXCEPTION": getattr(args, "level0_paid_exception", None),
         "CHATBI_FINAL_CERTIFICATION": getattr(args, "final_certification", None),
         "CHATBI_PAID_TEST_CACHE_BYPASS": getattr(args, "cache_bypass", None),
         "CHATBI_LEVEL0_RECEIPT": str(getattr(args, "level0_receipt", "") or ""),
@@ -100,7 +106,7 @@ def command_plan(args: argparse.Namespace) -> int:
             f"REASON=run_hard_cap_{float(configuration['run_budget_cny']):.2f}"
         )
     payload = {
-        "schema_version": "chatbi-v1.3-phase5-test-execution-plan-v1",
+        "schema_version": "chatbi-v1.3-phase5-test-execution-plan-v2",
         "tested_sha": tested_sha,
         **_strategy_fields(controller.level),
         **configuration,
@@ -111,7 +117,7 @@ def command_plan(args: argparse.Namespace) -> int:
         "mimo_test_cost_cny": 0.0,
         "deepseek_test_cost_cny": 0.0,
         "kimi_test_cost_cny": 0.0,
-        "duplicate_paid_tests_avoided": "ENFORCED_BY_LEVEL_AND_FAILED_CASE_SCOPE",
+        "duplicate_paid_tests_avoided": "ENFORCED_BY_SHARED_LEDGER_DUPLICATE_KEY",
         "budget_exceeded": False,
         "test_cost_control_gate": "PASS",
     }
@@ -158,28 +164,42 @@ def command_certify_level0(args: argparse.Namespace) -> int:
 
 def command_summary(args: argparse.Namespace) -> int:
     controller = TestCostController(environ=_base_environment(args))
+    cost_summary = controller.summary()
+    gate_pass = (
+        int(cost_summary.get("untracked_paid_calls", 0)) == 0
+        and int(cost_summary.get("unnecessary_duplicate_paid_calls", 0)) == 0
+        and int(cost_summary.get("unbounded_retry", 0)) == 0
+        and not bool(cost_summary.get("budget_exceeded"))
+        and int(cost_summary.get("level2_runs_per_sha", 0)) <= 1
+    )
     summary = {
-        "schema_version": "chatbi-v1.3-phase5-paid-test-cost-summary-v1",
+        "schema_version": "chatbi-v1.3-phase5-paid-test-cost-summary-v2",
         **_strategy_fields(controller.level),
-        **controller.summary(),
+        **cost_summary,
         "final_gate_thresholds_unchanged": True,
-        "test_cost_control_gate": "PASS",
+        "test_cost_control_gate": "PASS" if gate_pass else "FAIL",
     }
     if args.output:
         _atomic_json(args.output, summary)
     print(json.dumps(summary, ensure_ascii=False, sort_keys=True))
-    return 0
+    return 0 if gate_pass else 2
 
 
 def _paid_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--sha")
+    parser.add_argument("--backend-sha")
     parser.add_argument("--final-sha")
     parser.add_argument("--test-run-id")
     parser.add_argument("--case-id")
     parser.add_argument("--gate")
     parser.add_argument("--affected-path")
     parser.add_argument("--providers")
-    parser.add_argument("--ledger", type=Path)
+    parser.add_argument("--ledger-root", type=Path)
+    parser.add_argument("--necessity-declaration", default="NO")
+    parser.add_argument("--deterministic-insufficient-reason")
+    parser.add_argument("--config-hash")
+    parser.add_argument("--prompt-version")
+    parser.add_argument("--level0-paid-exception", default="NO")
     parser.add_argument("--budget-class")
     parser.add_argument("--budget-cny", type=float)
     parser.add_argument("--paid-gate-authorized", default="NO")

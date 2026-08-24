@@ -684,6 +684,7 @@ class LiveQuestionsGate:
         secret_values: Sequence[str],
         controller_client: httpx.Client | None = None,
         level0_mode: bool = False,
+        expected_cost_control_identity: Mapping[str, Any] | None = None,
     ) -> None:
         self.client = client
         self.datasource_id = datasource_id
@@ -692,6 +693,8 @@ class LiveQuestionsGate:
         self.secret_values = tuple(value for value in secret_values if value)
         self.controller_client = controller_client
         self.level0_mode = level0_mode
+        self.expected_cost_control_identity = dict(expected_cost_control_identity or {})
+        self.backend_cost_control_identity: dict[str, Any] | None = None
         self.cleanup_tracker = CleanupTracker()
 
     def login(self) -> dict[str, Any]:
@@ -703,10 +706,32 @@ class LiveQuestionsGate:
             json={"email": self.credentials["email"], "password": self.credentials["password"], "remember": False},
         )
         self.cleanup_tracker.authenticated = True
+        if self.expected_cost_control_identity:
+            actual_identity = _request_json(
+                self.client,
+                "GET",
+                "/test-cost-control-status",
+                expected={200},
+            )
+            required_identity_fields = (
+                "enabled", "level", "paid_calls_allowed", "tested_sha", "backend_sha",
+                "config_hash", "prompt_version", "ledger_identity", "test_run_id", "gate",
+            )
+            mismatches = [
+                name for name in required_identity_fields
+                if actual_identity.get(name) != self.expected_cost_control_identity.get(name)
+            ]
+            if mismatches:
+                raise LiveGateError("BACKEND_COST_CONTROL_IDENTITY_MISMATCH:" + ",".join(mismatches))
+            self.backend_cost_control_identity = {
+                name: actual_identity.get(name)
+                for name in (*required_identity_fields, "runtime_identity_sha256")
+            }
         evidence = {
             "authenticated": payload.get("authenticated") is True,
             "user_id_sha256": sha256_text(str((payload.get("user") or {}).get("id") or "")),
             "workspace_id_sha256": sha256_text(str((payload.get("user") or {}).get("workspace_id") or "")),
+            "backend_cost_control_identity": self.backend_cost_control_identity,
         }
         return evidence
 
@@ -1253,6 +1278,8 @@ def run_live_gate(
     weird_case_ids: frozenset[str] | None = None,
     complex_case_ids: frozenset[str] | None = None,
     execution_mode: str = "live",
+    expected_cost_control_identity: Mapping[str, Any] | None = None,
+    tested_sha: str | None = None,
 ) -> dict[str, Any]:
     started_at = utc_now()
     gate = LiveQuestionsGate(
@@ -1263,6 +1290,7 @@ def run_live_gate(
         secret_values=(credentials["password"],),
         controller_client=controller_client,
         level0_mode=execution_mode == "level0_deterministic",
+        expected_cost_control_identity=expected_cost_control_identity,
     )
     weird_results: list[dict[str, Any]] = []
     complex_results: list[dict[str, Any]] = []
@@ -1333,7 +1361,7 @@ def run_live_gate(
         failures.append("complex_case_execution_incomplete")
     if not cleanup["verified"]:
         failures.append("cleanup_not_verified")
-    tested_sha = git_sha()
+    tested_sha = tested_sha or git_sha()
     if tested_sha is None:
         failures.append("tested_sha_missing")
     evidence = {
@@ -1346,6 +1374,8 @@ def run_live_gate(
         "certification_scope": (
             "LEVEL0_FULL"
             if execution_mode == "level0_deterministic"
+            else "LEVEL2_COMPLEX5_REQUIRED_LIVE"
+            if not selected_weird_ids and selected_complex_ids == all_complex_ids
             else "FULL_FINAL"
             if selected_weird_ids == all_weird_ids and selected_complex_ids == all_complex_ids
             else "TARGETED_FAILED_CASES_ONLY"
@@ -1411,15 +1441,17 @@ def main(argv: Sequence[str] | None = None) -> int:
         raise SystemExit("LIVE_QUESTIONS_GATE_REQUIRES_LEVEL1_OR_LEVEL2_AUTHORIZATION")
     selected_weird = frozenset(args.weird_case or ())
     selected_complex = frozenset(args.complex_case or ())
-    selected_count = len(selected_weird) + len(selected_complex)
+    selected_count = len(selected_complex)
     if args.level0_deterministic:
         if selected_count:
             raise SystemExit("LEVEL0_DETERMINISTIC_MUST_EXECUTE_FULL_WEIRD50_AND_COMPLEX5")
     elif controller.level == TestExecutionLevel.LEVEL1:
+        if selected_weird:
+            raise SystemExit("PAID_WEIRD50_NOT_ALLOWED_USE_LEVEL0_DETERMINISTIC")
         if selected_count == 0 or selected_count > 3:
             raise SystemExit("LEVEL1_REQUIRES_ONE_TO_THREE_EXPLICIT_FAILED_CASES")
-    elif selected_count:
-        raise SystemExit("LEVEL2_FINAL_CERTIFICATION_MUST_EXECUTE_FULL_WEIRD50_AND_COMPLEX5")
+    elif selected_weird or selected_complex:
+        raise SystemExit("LEVEL2_FINAL_CERTIFICATION_DISALLOWS_CASE_FILTERS")
     credentials = load_external_credentials(
         args.env_file,
         allow_bootstrap_admin=args.level0_deterministic,
@@ -1449,9 +1481,16 @@ def main(argv: Sequence[str] | None = None) -> int:
             semantic_model_id=args.semantic_model_id,
             credentials=credentials,
             controller_client=controller_client,
-            weird_case_ids=selected_weird if controller.level == TestExecutionLevel.LEVEL1 else None,
+            weird_case_ids=(
+                selected_weird
+                if controller.level == TestExecutionLevel.LEVEL1
+                else frozenset()
+                if controller.level == TestExecutionLevel.LEVEL2
+                else None
+            ),
             complex_case_ids=selected_complex if controller.level == TestExecutionLevel.LEVEL1 else None,
             execution_mode="level0_deterministic" if args.level0_deterministic else "live",
+            expected_cost_control_identity=controller.runtime_identity(),
         )
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps(evidence, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
