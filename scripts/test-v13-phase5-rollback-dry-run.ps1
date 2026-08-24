@@ -90,7 +90,7 @@ function Read-LocalEnv {
 
 function Invoke-ComposeDown {
   param([string]$Root, [string]$Project)
-  if($Root -and $Project) {
+  if($Root -and $Project -and (Test-Path -LiteralPath (Join-Path $Root 'docker-compose.yml'))) {
     & docker compose --project-directory $Root -f (Join-Path $Root 'docker-compose.yml') -p $Project down --remove-orphans | Out-Null
     if($LASTEXITCODE -ne 0) { throw "Compose stop failed for $Project" }
   }
@@ -166,9 +166,13 @@ function Start-IsolatedVersion {
 try {
   $result.stage = 'PRECHECK_ARCHIVE'
   New-Item -ItemType Directory -Path $candidateRoot, $rollbackRoot -Force | Out-Null
-  & git -C $projectRoot archive --format=tar --output=$candidateArchive $CandidateSha
+  $runtimePaths = @(
+    '.dockerignore', '.env.example', 'backend', 'docker-compose.yml', 'evaluation',
+    'frontend', 'packages', 'sandbox_runtime', 'scripts'
+  )
+  & git -C $projectRoot archive --format=tar --output=$candidateArchive $CandidateSha -- @runtimePaths
   if($LASTEXITCODE -ne 0) { throw 'Candidate archive failed' }
-  & git -C $projectRoot archive --format=tar --output=$rollbackArchive $RollbackSha
+  & git -C $projectRoot archive --format=tar --output=$rollbackArchive $RollbackSha -- @runtimePaths
   if($LASTEXITCODE -ne 0) { throw 'Rollback archive failed' }
   & tar -xf $candidateArchive -C $candidateRoot
   if($LASTEXITCODE -ne 0) { throw 'Candidate extraction failed' }

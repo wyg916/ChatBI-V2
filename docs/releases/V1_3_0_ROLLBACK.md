@@ -19,7 +19,7 @@ Run only after the successor commit is clean:
 The script performs, in order:
 
 1. exact-SHA/clean-worktree/fast-forward ancestry precheck;
-2. archive of the candidate and `89bdc12936be0555bdad8a85f06932fb7dc476ee` into a guarded temporary directory;
+2. archive of the candidate and `89bdc12936be0555bdad8a85f06932fb7dc476ee` runtime/build paths into a guarded temporary directory (non-runtime design assets are excluded so Windows archive extraction is encoding-independent);
 3. creation of one run-specific PostgreSQL metadata schema;
 4. five-service candidate build/start and health, authenticated Dashboard API readback, browser navigation smoke, and migration-head verification;
 5. stopped-state candidate shutdown;

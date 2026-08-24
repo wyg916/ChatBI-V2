@@ -167,7 +167,7 @@ def main() -> int:
         ],
         "stop": ["docker compose -p <isolated-project> down --remove-orphans"],
         "rollback": [
-            f"git archive --format=tar --output=<temp>/rollback.tar {rollback_sha}",
+            f"git archive --format=tar --output=<temp>/rollback.tar {rollback_sha} -- <runtime-paths>",
             "tar -xf <temp>/rollback.tar -C <temp>/rollback",
         ],
         "migration": [
