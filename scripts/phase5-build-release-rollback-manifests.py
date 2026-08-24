@@ -168,7 +168,7 @@ def main() -> int:
         "stop": ["docker compose -p <isolated-project> down --remove-orphans"],
         "rollback": [
             f"git archive --format=tar --output=<temp>/rollback.tar {rollback_sha} -- <runtime-paths>",
-            "tar -xf <temp>/rollback.tar -C <temp>/rollback",
+            "python scripts/extract_git_archive.py <temp>/rollback.tar <temp>/rollback",
         ],
         "migration": [
             f"alembic current  # must equal {final_head}",

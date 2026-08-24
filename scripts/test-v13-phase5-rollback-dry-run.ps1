@@ -50,6 +50,7 @@ $activeProject = ''
 $activeRoot = ''
 $passed = $false
 $cleanup = $false
+$redactionValues = @()
 $result = [ordered]@{
   schema_version = 'chatbi.v13.phase5.rollback-dry-run.v1'
   timestamp = (Get-Date).ToUniversalTime().ToString('o')
@@ -70,6 +71,7 @@ $result = [ordered]@{
   data_consistency = 'NOT_RUN'
   temporary_schema_cleanup = 'NOT_RUN'
   temporary_source_cleanup = 'NOT_RUN'
+  compose_diagnostics = 'NOT_REQUIRED'
   real_project_data = 'PRESERVED_READ_ONLY'
   secrets_recorded = $false
   rollback_dry_run = 'FAIL'
@@ -94,6 +96,30 @@ function Invoke-ComposeDown {
     & docker compose --project-directory $Root -f (Join-Path $Root 'docker-compose.yml') -p $Project down --remove-orphans | Out-Null
     if($LASTEXITCODE -ne 0) { throw "Compose stop failed for $Project" }
   }
+}
+
+function Protect-DiagnosticText {
+  param([string]$Text)
+  $protected = $Text
+  foreach($value in $redactionValues) {
+    if($value) { $protected = $protected.Replace($value, '[REDACTED]') }
+  }
+  return $protected
+}
+
+function Save-ComposeDiagnostics {
+  param([string]$Root, [string]$Project, [string]$Label)
+  if(-not $Root -or -not $Project -or -not (Test-Path -LiteralPath (Join-Path $Root 'docker-compose.yml'))) {
+    return 'UNAVAILABLE'
+  }
+  $diagnosticPath = [System.IO.Path]::ChangeExtension($evidence, ".${Label}-compose.log")
+  $parent = Split-Path -Parent $diagnosticPath
+  New-Item -ItemType Directory -Path $parent -Force | Out-Null
+  $psOutput = (& docker compose --project-directory $Root -f (Join-Path $Root 'docker-compose.yml') -p $Project ps -a 2>&1 | Out-String)
+  $logOutput = (& docker compose --project-directory $Root -f (Join-Path $Root 'docker-compose.yml') -p $Project logs --no-color --timestamps 2>&1 | Out-String)
+  $combined = "COMPOSE_PS`r`n${psOutput}`r`nCOMPOSE_LOGS`r`n${logOutput}"
+  Protect-DiagnosticText -Text $combined | Set-Content -LiteralPath $diagnosticPath -Encoding utf8
+  return $diagnosticPath
 }
 
 function Wait-Endpoint {
@@ -174,15 +200,23 @@ try {
   if($LASTEXITCODE -ne 0) { throw 'Candidate archive failed' }
   & git -C $projectRoot archive --format=tar --output=$rollbackArchive $RollbackSha -- @runtimePaths
   if($LASTEXITCODE -ne 0) { throw 'Rollback archive failed' }
-  & tar -xf $candidateArchive -C $candidateRoot
+  & $Python (Join-Path $projectRoot 'scripts\extract_git_archive.py') $candidateArchive $candidateRoot
   if($LASTEXITCODE -ne 0) { throw 'Candidate extraction failed' }
-  & tar -xf $rollbackArchive -C $rollbackRoot
+  & $Python (Join-Path $projectRoot 'scripts\extract_git_archive.py') $rollbackArchive $rollbackRoot
   if($LASTEXITCODE -ne 0) { throw 'Rollback extraction failed' }
 
   $localEnv = Read-LocalEnv -Path $SourceEnv
   foreach($entry in $localEnv.GetEnumerator()) {
     [Environment]::SetEnvironmentVariable($entry.Key, $entry.Value, 'Process')
   }
+  $redactionValues = @()
+  foreach($entry in $localEnv.GetEnumerator()) {
+    if($entry.Key -match '(?i)(PASSWORD|SECRET|TOKEN|PRIVATE|CREDENTIAL)' -and $entry.Value -and $entry.Value.Length -ge 6) {
+      $redactionValues += $entry.Value
+      $redactionValues += [uri]::EscapeDataString($entry.Value)
+    }
+  }
+  $redactionValues = @($redactionValues | Sort-Object -Unique)
   if(-not $env:CHATBI_META_PASSWORD) { throw 'CHATBI_META_PASSWORD is missing' }
   if(-not $env:CHATBI_BOOTSTRAP_ADMIN_PASSWORD) { throw 'CHATBI_BOOTSTRAP_ADMIN_PASSWORD is missing' }
   $encodedPassword = [uri]::EscapeDataString($env:CHATBI_META_PASSWORD)
@@ -244,7 +278,13 @@ try {
   $passed = $true
 } catch {
   $result.error_type = $_.Exception.GetType().Name
-  $result.error_message = $_.Exception.Message
+  $result.error_message = Protect-DiagnosticText -Text $_.Exception.Message
+  try {
+    $label = if($result.stage -like 'ROLLBACK*') { 'rollback' } else { 'candidate' }
+    $result.compose_diagnostics = Save-ComposeDiagnostics -Root $activeRoot -Project $activeProject -Label $label
+  } catch {
+    $result.compose_diagnostics = 'CAPTURE_FAILED'
+  }
 } finally {
   try {
     if($activeProject -and $activeRoot) { Invoke-ComposeDown -Root $activeRoot -Project $activeProject }
