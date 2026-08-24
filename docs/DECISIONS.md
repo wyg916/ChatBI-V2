@@ -331,3 +331,9 @@ Dashboard 的固定聚合 SQL 不再通过 Connector 的 `read_rows` 旁路执�
 Phase 5 测试成本治理以 Backend 唯一 Model Gateway 为强制预留点。Level1 和 Level2 都必须先读取同 SHA 的完整 Level0 receipt；每次付费尝试绑定 Git/Backend SHA、配置哈希、Prompt 版本、必要性、稳定 Case、Provider/Model、Token/费用、重试/回退及日累计。共享 SQLite 台账使用原子事务阻断跨 runner 换路径、重复首调、预算越界和第二次 Level2；Level0 的小额异常只能由负责人显式授权且上限 0.50 CNY，普通 push 永远保持 0。
 
 包含最终 SHA 的发布清单不能在其自身 Git commit 中自引用，因此 tracked 文档只冻结生成规则；successor 提交 clean 后，由外部 manifest 绑定 final/rollback SHA、镜像 digest、配置/Compose hash、迁移 head/target 与 exact commands。回滚演练从两个 exact SHA 的 Git archive 构建隔离五服务环境，只创建和删除 run-specific PostgreSQL Schema/Compose 项目，验证候选与旧版 API、浏览器和业务数据 fingerprint。Phase 5 没有新增迁移，`20260822_0012 → 20260822_0012` 明确记录为无需 downgrade；不得操作生产、删除本机业务数据库、重写历史或用清单替代真实 dry-run Evidence。
+
+## ADR-050：分组查询只做可审计的无效排序归一化，Live Gate 从服务身份取得 exact SHA
+
+外部 Provider 生成的聚合 SQL 即使通过表、列、函数和只读 AST allowlist，也可能包含数据库无法执行的排序项，例如 `ORDER BY` 引用了既未投影、也未进入 `GROUP BY` 的稳定 ID。SQL Guard 在授权检查通过后，只允许删除这种无效排序项；投影表达式、投影别名、聚合表达式、序号以及已分组表达式必须原样保留。该归一化不得新增列、表、Join、Filter 或 Group，也不得修改选择行和聚合值；每个动作写入 `GuardResult.normalization_actions` 与 `SQL_GUARD` Audit，随后仍必须经过真实 EXPLAIN、只读执行、验证查询和 Result Oracle。合法 SQL 不产生 normalization action。
+
+Phase5 Live Runner 在 Level0/1/2 运行前已经通过唯一成本控制器验证 Backend SHA、Git SHA、配置、Prompt、Gate 和 Ledger Identity，因此 Evidence 的 `tested_sha` 应直接来自该验证后的 runtime identity。发布运行镜像可以继续不安装 Git；Runner 只有在没有合法运行时 SHA 时才允许回退读取 checkout Git，读取失败必须明确标记 `tested_sha_missing`，不得崩溃或用宿主 HEAD 冒充被测 Backend。

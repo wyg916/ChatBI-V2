@@ -398,6 +398,7 @@ class QueryPipeline:
             _audit(db, run, "SQL_GUARD", "PASS" if guard.allowed else "REJECTED", {
                 "statement_type": guard.statement_type,
                 "issue_codes": [item.code for item in guard.issues],
+                "normalization_actions": guard.normalization_actions,
             })
             if not guard.allowed:
                 run.status = "SECURITY_REJECTED"

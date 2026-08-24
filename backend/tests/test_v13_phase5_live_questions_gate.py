@@ -18,9 +18,16 @@ from scripts.run_v13_phase5_live_questions_gate import (
     load_external_credentials,
     load_manifest,
     run_live_gate,
+    runtime_tested_sha,
     validate_backend_url,
     validate_controller_url,
 )
+
+
+def test_runtime_tested_sha_uses_validated_service_identity_without_git():
+    assert runtime_tested_sha({"tested_sha": "A" * 40}) == "a" * 40
+    assert runtime_tested_sha({"tested_sha": "not-a-sha"}) is None
+    assert runtime_tested_sha({}) is None
 
 
 def test_live_gate_requires_loopback_backend_and_external_secret_file(tmp_path: Path):

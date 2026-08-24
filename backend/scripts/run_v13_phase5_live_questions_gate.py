@@ -59,6 +59,7 @@ _ASSERTION_MARKERS = (
     "increased", "decreased", "equals", " is ",
 )
 _NUMBER_TOKEN = re.compile(r"(?<![A-Za-z0-9])[+-]?\d[\d,]*(?:\.\d+)?")
+_FULL_SHA = re.compile(r"[0-9a-f]{40}")
 
 
 class LiveGateError(RuntimeError):
@@ -98,6 +99,11 @@ def git_sha() -> str | None:
     )
     value = completed.stdout.strip()
     return value if completed.returncode == 0 and len(value) == 40 else None
+
+
+def runtime_tested_sha(identity: Mapping[str, Any]) -> str | None:
+    value = str(identity.get("tested_sha") or "").strip().lower()
+    return value if _FULL_SHA.fullmatch(value) else None
 
 
 def validate_backend_url(value: str) -> str:
@@ -1460,6 +1466,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     complex_manifest = load_manifest(args.complex_manifest, expected_count=5)
     api_base = validate_backend_url(args.api_base)
     controller_base = validate_controller_url(args.sandbox_controller_url)
+    runtime_identity = controller.runtime_identity()
     with httpx.Client(
         base_url=api_base,
         timeout=httpx.Timeout(args.timeout_seconds),
@@ -1490,7 +1497,8 @@ def main(argv: Sequence[str] | None = None) -> int:
             ),
             complex_case_ids=selected_complex if controller.level == TestExecutionLevel.LEVEL1 else None,
             execution_mode="level0_deterministic" if args.level0_deterministic else "live",
-            expected_cost_control_identity=controller.runtime_identity(),
+            expected_cost_control_identity=runtime_identity,
+            tested_sha=runtime_tested_sha(runtime_identity),
         )
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps(evidence, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")

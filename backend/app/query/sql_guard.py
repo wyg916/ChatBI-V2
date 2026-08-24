@@ -24,6 +24,67 @@ _FORBIDDEN_FUNCTIONS = {
 _SYSTEM_SCHEMAS = {"information_schema", "pg_catalog", "mysql", "performance_schema", "sys"}
 
 
+def _expression_key(value: exp.Expression, *, dialect: str) -> str:
+    return value.sql(dialect=dialect, pretty=False, comments=False).casefold()
+
+
+def _normalize_grouped_order_terms(statement: exp.Select, *, dialect: str) -> list[str]:
+    """Drop root/subquery ORDER BY terms that grouped SQL cannot legally evaluate.
+
+    Provider SQL sometimes adds a stable identifier as a secondary sort key but
+    omits that identifier from GROUP BY. Removing only that invalid sort term
+    preserves the selected rows and aggregate values while allowing EXPLAIN to
+    validate the query. Authorized grouped expressions, select expressions,
+    aggregate expressions, aliases and ordinal positions remain untouched.
+    """
+
+    actions: list[str] = []
+    visited: set[int] = set()
+    for query in (statement, *statement.find_all(exp.Select)):
+        if id(query) in visited:
+            continue
+        visited.add(id(query))
+        group = query.args.get("group")
+        order = query.args.get("order")
+        if group is None or order is None:
+            continue
+
+        group_keys = {_expression_key(item, dialect=dialect) for item in group.expressions}
+        projection_keys: set[str] = set()
+        projection_aliases: set[str] = set()
+        for item in query.expressions:
+            projection = item.this if isinstance(item, exp.Alias) else item
+            projection_keys.add(_expression_key(projection, dialect=dialect))
+            if item.alias:
+                projection_aliases.add(item.alias.casefold())
+
+        retained: list[exp.Expression] = []
+        for ordered in order.expressions:
+            target = ordered.this
+            target_key = _expression_key(target, dialect=dialect)
+            ordinal = isinstance(target, exp.Literal) and target.is_int
+            alias = (
+                isinstance(target, exp.Column)
+                and not target.table
+                and target.name.casefold() in projection_aliases
+            )
+            aggregate = next(target.find_all(exp.AggFunc), None) is not None
+            if ordinal or alias or aggregate or target_key in group_keys or target_key in projection_keys:
+                retained.append(ordered)
+                continue
+            actions.append(f"DROP_UNGROUPED_ORDER_TERM:{target_key}")
+
+        if len(retained) == len(order.expressions):
+            continue
+        if retained:
+            normalized_order = order.copy()
+            normalized_order.set("expressions", retained)
+            query.set("order", normalized_order)
+        else:
+            query.set("order", None)
+    return actions
+
+
 class SqlGuard:
     def validate(self, sql: str, *, dialect: str, policy: SecurityPolicy) -> GuardResult:
         sqlglot_dialect = _DIALECT.get(dialect, dialect)
@@ -111,6 +172,7 @@ class SqlGuard:
                 tables=sorted(set(tables)), columns=sorted(set(columns)), issues=issues,
             )
 
+        normalization_actions = _normalize_grouped_order_terms(statement, dialect=sqlglot_dialect)
         requested_limit = policy.row_limit
         limit_node = statement.args.get("limit")
         if limit_node is not None and limit_node.expression is not None:
@@ -128,4 +190,5 @@ class SqlGuard:
             tables=sorted(set(tables)),
             columns=sorted(set(columns)),
             applied_limit=requested_limit,
+            normalization_actions=normalization_actions,
         )

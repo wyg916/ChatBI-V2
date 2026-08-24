@@ -117,6 +117,7 @@ class GuardResult(BaseModel):
     columns: list[str] = Field(default_factory=list)
     applied_limit: int | None = None
     issues: list[GuardIssue] = Field(default_factory=list)
+    normalization_actions: list[str] = Field(default_factory=list)
 
 
 class ExecutionResult(BaseModel):

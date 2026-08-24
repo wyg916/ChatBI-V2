@@ -60,6 +60,38 @@ def test_sql_guard_allows_authorized_select_and_caps_limit(dialect, sql):
     assert "LIMIT 100" in result.normalized_sql.upper()
 
 
+@pytest.mark.parametrize("dialect", ["postgresql", "mysql"])
+def test_sql_guard_drops_only_ungrouped_provider_order_term(dialect):
+    result = SqlGuard().validate(
+        "SELECT r.region_name AS region, COUNT(o.order_id) AS order_count, "
+        "SUM(o.revenue) AS revenue FROM demo_business.orders o "
+        "JOIN demo_business.regions r ON r.region_id = o.region_id "
+        "GROUP BY r.region_name ORDER BY revenue DESC, r.region_id ASC",
+        dialect=dialect,
+        policy=policy(),
+    )
+
+    assert result.allowed is True, result.issues
+    assert "ORDER BY revenue DESC" in result.normalized_sql
+    assert "r.region_id ASC" not in result.normalized_sql
+    assert result.normalization_actions == ["DROP_UNGROUPED_ORDER_TERM:r.region_id"]
+
+
+def test_sql_guard_keeps_order_term_that_is_grouped():
+    result = SqlGuard().validate(
+        "SELECT r.region_name AS region, COUNT(o.order_id) AS order_count, "
+        "SUM(o.revenue) AS revenue FROM demo_business.orders o "
+        "JOIN demo_business.regions r ON r.region_id = o.region_id "
+        "GROUP BY r.region_name, r.region_id ORDER BY revenue DESC, r.region_id ASC",
+        dialect="postgresql",
+        policy=policy(),
+    )
+
+    assert result.allowed is True, result.issues
+    assert "r.region_id ASC" in result.normalized_sql
+    assert result.normalization_actions == []
+
+
 def semantic_context(dialect: str = "postgresql") -> QueryContext:
     return QueryContext(
         workspace_id="w", workspace_name="Workspace", datasource_id="d", datasource_name="Demo",
