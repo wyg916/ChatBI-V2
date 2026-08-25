@@ -713,8 +713,10 @@ class ChatService:
             query_run_id=query_run_id,
             error_code=error_code,
         )
+        checkpoint()
         db.add(assistant)
         db.flush()
+        checkpoint()
         answer_envelope = build_answer_envelope(
             answer_id=assistant.id,
             conversation_id=conversation.id,
@@ -760,6 +762,7 @@ class ChatService:
             status="SUCCESS" if status in {"SUCCEEDED", "PARTIAL"} else status,
             details={"route": route.value, "error_code": error_code, "elapsed_ms": elapsed_ms},
         )
+        checkpoint()
         db.commit()
         db.refresh(user_message)
         db.refresh(assistant)

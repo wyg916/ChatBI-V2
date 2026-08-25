@@ -60,11 +60,13 @@ class StreamRegistry:
         *,
         conversation_id: str | None = None,
         client_message_id: str | None = None,
+        connection_open: bool = True,
     ) -> StreamLifecycle:
         lifecycle = StreamLifecycle(
             trace_id=trace_id,
             conversation_id=conversation_id,
             client_message_id=client_message_id,
+            connection_open=connection_open,
         )
         with self._lock:
             self._streams[trace_id] = lifecycle
@@ -111,6 +113,29 @@ class StreamRegistry:
                 return None
             lifecycle.cancel()
             return lifecycle
+
+    def cancel_conversation(self, conversation_id: str) -> tuple[StreamLifecycle, ...]:
+        with self._lock:
+            lifecycles = tuple(
+                item for item in self._streams.values()
+                if item.conversation_id == conversation_id and item.task_running
+            )
+            for lifecycle in lifecycles:
+                lifecycle.cancel()
+            return lifecycles
+
+    @staticmethod
+    def wait_for_terminal(
+        lifecycles: tuple[StreamLifecycle, ...],
+        *,
+        timeout_seconds: float,
+    ) -> bool:
+        deadline = monotonic() + max(0.0, timeout_seconds)
+        for lifecycle in lifecycles:
+            remaining = deadline - monotonic()
+            if remaining <= 0 or not lifecycle.task_done.wait(timeout=remaining):
+                return False
+        return True
 
     def snapshot(self) -> dict[str, object]:
         with self._lock:

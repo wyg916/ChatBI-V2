@@ -24,6 +24,7 @@ from app.model_gateway.contracts import (
 )
 from app.model_gateway.policy import RoutingPolicy
 from app.model_gateway.ledger import record_model_invocation
+from app.model_gateway.normalization import normalize_chat_completion, normalize_usage
 from app.model_gateway.test_cost_control import PaidTestAttempt, TestCostControlError, TestCostController
 
 
@@ -88,20 +89,6 @@ class _CircuitRegistry:
                 "state": "OPEN" if state.open_until > self.clock() else "CLOSED",
                 "consecutive_failures": state.consecutive_failures,
             }
-
-
-def _usage(payload: dict[str, Any] | None) -> ModelUsage:
-    if not payload:
-        return ModelUsage()
-    prompt = max(0, int(payload.get("prompt_tokens") or payload.get("input_tokens") or 0))
-    details = payload.get("prompt_tokens_details") or payload.get("input_tokens_details") or {}
-    cached = max(0, int(details.get("cached_tokens") or payload.get("cached_tokens") or 0))
-    output = max(0, int(payload.get("completion_tokens") or payload.get("output_tokens") or 0))
-    total = max(prompt + output, int(payload.get("total_tokens") or 0))
-    return ModelUsage(
-        input_tokens=prompt, cached_input_tokens=min(cached, prompt), output_tokens=output,
-        total_tokens=total, exact=True,
-    )
 
 
 class ModelGateway:
@@ -266,18 +253,13 @@ class ModelGateway:
                         )
                         response.raise_for_status()
                     body = response.json()
-                    choice = body["choices"][0]
-                    message = choice["message"]
-                    content = message.get("content") or ""
-                    tool_calls = tuple(message.get("tool_calls") or ())
-                    if not str(content).strip() and not tool_calls:
-                        raise ValueError("model returned empty content")
-                    usage = _usage(body.get("usage"))
+                    normalized = normalize_chat_completion(body)
+                    usage = normalized.usage
                     result = ModelResponse(
-                        content=str(content).strip(),
+                        content=normalized.content,
                         requested_alias=request.requested_alias,
                         resolved_provider=provider.provider_id,
-                        resolved_model=str(body.get("model") or provider.model_name),
+                        resolved_model=normalized.resolved_model or provider.model_name,
                         usage=usage,
                         cost_cny=self.policy.cost.calculate(
                             provider.provider_id,
@@ -289,9 +271,9 @@ class ModelGateway:
                         fallback_used=fallback_count > 0,
                         fallback_count=fallback_count,
                         retry_count=retries_total,
-                        finish_reason=choice.get("finish_reason"),
-                        tool_calls=tool_calls,
-                        reasoning_observed=bool(message.get("reasoning_content")),
+                        finish_reason=normalized.finish_reason,
+                        tool_calls=normalized.tool_calls,
+                        reasoning_observed=normalized.reasoning_observed,
                         pricing_version=self.policy.cost.version,
                     )
                     self._circuits.success(provider.provider_id)
@@ -530,7 +512,7 @@ class ModelGateway:
                                 decoded = json.loads(data)
                                 resolved_model = str(decoded.get("model") or resolved_model)
                                 if decoded.get("usage"):
-                                    usage = _usage(decoded["usage"])
+                                    usage = normalize_usage(decoded["usage"])
                                 choice = (decoded.get("choices") or [{}])[0]
                                 finish_reason = choice.get("finish_reason") or finish_reason
                                 delta = choice.get("delta") or {}

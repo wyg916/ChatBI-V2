@@ -271,7 +271,7 @@ def test_level1_reserves_and_records_complete_sanitized_cost_ledger(tmp_path: Pa
     assert summary["unbounded_retry"] == 0
     assert summary["daily_cost_before_cny"] == 0
     assert summary["daily_cost_after_cny"] == 0.05
-    assert summary["paid_ledger_schema_version"] == 2
+    assert summary["paid_ledger_schema_version"] == 3
     assert summary["trace_ids"] == ["TRACE-COST-CONTROL"]
     assert summary["request_ids"] == ["REQ-COST-CONTROL"]
     assert summary["latency_ms"] == [37]
@@ -423,35 +423,49 @@ def test_level2_requires_same_sha_complete_level0_receipt_and_cache_bypass(tmp_p
         _cost_controller(environment).validate_configuration()
 
 
-def test_owner_final_level_writes_final_ledger_identity_and_caps_calls_at_twelve(tmp_path: Path) -> None:
+def test_owner_final_level_enforces_execution_plan_provider_caps_and_vision_reservation(tmp_path: Path) -> None:
     controller = _cost_controller(_final_environment(tmp_path))
     configuration = controller.validate_configuration()
     assert configuration["level"] == "FINAL"
     assert configuration["run_budget_cny"] == 3.0
+    plan = configuration["final_provider_execution_plan"]
+    assert plan["total_real_provider_call_cap"] == 12
+    assert plan["provider_call_caps"] == {"mimo": 4, "deepseek": 4, "kimi": 4}
+    assert plan["kimi_reserved_vision"] == 3
 
-    for index in range(12):
-        attempt = controller.reserve_attempt(
-            provider="mimo",
-            model="mimo-test",
-            request=_request(),
-            context=RequestContext(
-                request_id=f"REQ-FINAL-{index}",
-                trace_id=f"TRACE-FINAL-{index}",
-            ),
-            estimated_cost_cny=0,
-            retry_count=0,
+    optional_context = RequestContext(
+        request_id="FINAL-KIMI-TEXT-OPTIONAL",
+        trace_id="TRACE-FINAL-KIMI-TEXT-OPTIONAL",
+        route="DATA_QUERY",
+    )
+    optional = controller.reserve_attempt(
+        provider="kimi", model="kimi-test", request=_request(alias="kimi"),
+        context=optional_context, estimated_cost_cny=0, retry_count=0,
+        recorded_transport=False,
+    )
+    assert optional is not None
+    with pytest.raises(CostControlError, match="FINAL_PROVIDER_RESERVED_CAPACITY_REQUIRED:kimi"):
+        controller.reserve_attempt(
+            provider="kimi", model="kimi-test", request=_request(alias="kimi"),
+            context=optional_context, estimated_cost_cny=0, retry_count=1,
             recorded_transport=False,
         )
-        assert attempt is not None
-    with pytest.raises(CostControlError, match="MAX_REAL_PROVIDER_REQUESTS_EXCEEDED"):
+
+    for case_id in ("LIVE-M04", "LIVE-M06", "LIVE-M10"):
+        assert controller.reserve_attempt(
+            provider="kimi", model="kimi-test", request=_request(alias="kimi"),
+            context=RequestContext(
+                request_id=case_id,
+                trace_id=f"TRACE-{case_id}",
+                route="MULTIMODAL_QUERY",
+            ),
+            estimated_cost_cny=0, retry_count=0, recorded_transport=False,
+        ) is not None
+    with pytest.raises(CostControlError, match="FINAL_PROVIDER_CALL_CAP_EXCEEDED:kimi"):
         controller.reserve_attempt(
-            provider="mimo",
-            model="mimo-test",
-            request=_request(),
-            context=RequestContext(request_id="REQ-FINAL-12", trace_id="TRACE-FINAL-12"),
-            estimated_cost_cny=0,
-            retry_count=0,
-            recorded_transport=False,
+            provider="kimi", model="kimi-test", request=_request(alias="kimi"),
+            context=optional_context,
+            estimated_cost_cny=0, retry_count=1, recorded_transport=False,
         )
 
     with sqlite3.connect(tmp_path / "phase5-paid-test-ledger.sqlite3") as connection:
@@ -524,7 +538,7 @@ def _zero_cost_response(provider: str, *, latency_ms: int, retry_count: int = 0,
     )
 
 
-def test_paid_ledger_v2_covers_success_failure_retry_fallback_and_premium_without_network(tmp_path: Path) -> None:
+def test_paid_ledger_v3_covers_success_failure_retry_fallback_and_premium_without_network(tmp_path: Path) -> None:
     environment = _level1_environment(
         tmp_path,
         CHATBI_TEST_ALLOWED_PROVIDERS="mimo,deepseek,kimi",
@@ -602,7 +616,7 @@ def test_paid_ledger_v2_covers_success_failure_retry_fallback_and_premium_withou
     summary = controller.summary()
     assert summary["paid_test_calls"] == 5
     assert summary["paid_test_cost_cny"] == 0
-    assert summary["paid_ledger_schema_version"] == 2
+    assert summary["paid_ledger_schema_version"] == 3
     assert summary["paid_ledger_required_field_completeness"] == 100.0
     assert {record["status"] for record in summary["ledger_records"]} == {"SUCCEEDED", "FAILED"}
     assert {record["error_code"] for record in summary["ledger_records"]} == {"NONE", "HTTP_500"}
@@ -612,6 +626,9 @@ def test_paid_ledger_v2_covers_success_failure_retry_fallback_and_premium_withou
     assert all(record["trace_id"].startswith("TRACE-") for record in summary["ledger_records"])
     assert all(record["request_id"].startswith("REQ-") for record in summary["ledger_records"])
     assert all(record["latency_ms"] > 0 for record in summary["ledger_records"])
+    assert summary["token_usage_unknown_calls"] == 1
+    assert summary["provider_reported_cost_unknown_calls"] == 5
+    assert summary["external_provider_total_billing"] == "UNKNOWN_PARTIAL"
 
 
 def test_model_gateway_supplies_runtime_identity_timing_and_premium_decision_to_ledger(tmp_path: Path) -> None:
@@ -718,5 +735,5 @@ def test_paid_ledger_v1_is_upgraded_without_destroying_historical_rows(tmp_path:
     ).fetchone()[0]
     connection.close()
     assert legacy == ("legacy-call", "legacy-call", 0.05, None)
-    assert schema_version == "2"
+    assert schema_version == "3"
     assert controller.summary()["paid_ledger_required_field_completeness"] == 100.0

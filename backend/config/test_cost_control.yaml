@@ -22,6 +22,7 @@
     "default_max_output_tokens": 512,
     "complex_max_output_tokens": 1024
   },
+  "final_provider_execution_plan": "final_provider_execution_plan.json",
   "paid_providers": ["mimo", "deepseek", "kimi"],
   "level1_affected_paths": [
     "model_gateway",

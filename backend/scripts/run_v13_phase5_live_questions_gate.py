@@ -791,7 +791,16 @@ class LiveQuestionsGate:
         if explicit_route:
             request_payload["route"] = str(case["route"])
         started = perf_counter()
-        response = _request_json(self.client, "POST", "/chat", expected={201}, json=request_payload)
+        try:
+            response = _request_json(self.client, "POST", "/chat", expected={201}, json=request_payload)
+        except httpx.TimeoutException as exc:
+            cancel = self.client.post(
+                "/chat/stream/cancel",
+                json={"conversation_id": conversation_id, "client_message_id": request_id},
+            )
+            if cancel.status_code != 202 or cancel.json().get("cancelled") is not True:
+                raise LiveGateError("CHAT_TIMEOUT_CANCELLATION_NOT_ACKNOWLEDGED") from exc
+            raise LiveGateError("CHAT_TIMEOUT_CANCELLED_AND_ACKNOWLEDGED") from exc
         http_total_ms = round((perf_counter() - started) * 1000, 3)
         serialized = json.dumps(response, ensure_ascii=False, sort_keys=True)
         if any(secret in serialized for secret in self.secret_values):

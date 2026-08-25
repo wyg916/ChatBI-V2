@@ -20,6 +20,7 @@ from app.model_gateway.configuration import (
 from app.model_gateway.contracts import BudgetMode, ModelCapability, ModelRequest, RequestContext
 from app.model_gateway.service import ModelGateway
 from app.query.contracts import QueryContext, QueryFilter, QueryTimeRange, SQLPlan
+from app.query.nl2sql_response import normalize_nl2sql_response
 
 
 class ModelProviderAdapter(ABC):
@@ -813,7 +814,7 @@ class OpenAICompatibleProvider(ModelProviderAdapter):
                 budget_mode=BudgetMode.QUALITY,
             ),
         )
-        plan = SQLPlan.model_validate_json(response.content)
+        plan = normalize_nl2sql_response(response.content)
         # Provider output is untrusted. Runtime identity and release-critical
         # context must come from the server-owned request, never model JSON.
         return plan.model_copy(update={
@@ -874,7 +875,7 @@ class GatewayNl2SqlProvider(ModelProviderAdapter):
                 budget_mode=BudgetMode(self.settings.model_budget_mode),
             ),
         )
-        plan = SQLPlan.model_validate_json(response.content)
+        plan = normalize_nl2sql_response(response.content)
         return plan.model_copy(update={
             "question": question, "dialect": context.dialect,
             "provider": response.resolved_provider,

@@ -9,6 +9,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime
 from enum import StrEnum
+from fnmatch import fnmatchcase
 from pathlib import Path
 from typing import Any, Mapping
 from uuid import uuid4
@@ -27,8 +28,9 @@ _CONFIG_FILES = (
     "model_capabilities.yaml",
     "model_pricing.yaml",
     "provider_health.yaml",
+    "final_provider_execution_plan.json",
 )
-_LEDGER_SCHEMA_VERSION = 2
+_LEDGER_SCHEMA_VERSION = 3
 _LEDGER_REQUIRED_FIELDS = (
     "ledger_id",
     "test_run_id",
@@ -49,7 +51,9 @@ _LEDGER_REQUIRED_FIELDS = (
     "input_tokens",
     "cached_input_tokens",
     "output_tokens",
+    "token_usage_status",
     "cost_cny",
+    "provider_reported_cost_status",
     "latency_ms",
     "retry_count",
     "fallback_count",
@@ -67,6 +71,10 @@ _LEDGER_V2_ADDITIONS = (
     ("cost_cny", "REAL NOT NULL DEFAULT 0"),
     ("latency_ms", "INTEGER NOT NULL DEFAULT 0"),
     ("premium_escalation", "INTEGER NOT NULL DEFAULT 0"),
+)
+_LEDGER_V3_ADDITIONS = (
+    ("token_usage_status", "TEXT NOT NULL DEFAULT 'UNKNOWN_IF_NOT_RETURNED'"),
+    ("provider_reported_cost_status", "TEXT NOT NULL DEFAULT 'UNKNOWN'"),
 )
 
 
@@ -192,6 +200,7 @@ class TestCostController:
         raise TestCostControlError("CERTIFICATION_REPO_ROOT_REQUIRED")
 
     def validate_configuration(self) -> dict[str, Any]:
+        final_plan: dict[str, Any] | None = None
         if not self.enabled:
             return {"enabled": False, "level": self.level.value, "paid_calls_allowed": False}
         if self.level == TestExecutionLevel.LEVEL0 and not self.level0_paid_exception:
@@ -274,6 +283,8 @@ class TestCostController:
             if final_sha != tested_sha:
                 raise TestCostControlError("FINAL_CERTIFICATION_SHA_MISMATCH")
             self._validate_level0_receipt(tested_sha)
+            if self.level == TestExecutionLevel.FINAL:
+                final_plan = self._final_execution_plan()
 
         default_budget_class = {
             TestExecutionLevel.LEVEL0: "normal_fix_iteration",
@@ -320,6 +331,22 @@ class TestCostController:
             "level0_paid_exception": self.level0_paid_exception,
             "runtime_binding_gate": self._runtime_preflight_receipt["runtime_binding_gate"],
             "runtime_preflight_sha256": self._runtime_preflight_receipt["receipt_sha256"],
+            "final_provider_execution_plan": (
+                {
+                    "schema_version": final_plan["schema_version"],
+                    "total_real_provider_call_cap": final_plan["total_real_provider_call_cap"],
+                    "provider_call_caps": final_plan["provider_call_caps"],
+                    "case_count": len(final_plan["cases"]),
+                    "kimi_reserved_vision": sum(
+                        int(case["reserved_provider_calls"])
+                        for case in final_plan["cases"]
+                        if case["primary_provider"] == "kimi"
+                        and case["capability_class"] in {"VISION", "SCANNED_PDF"}
+                    ),
+                }
+                if final_plan is not None
+                else None
+            ),
         }
 
     def _validate_level0_receipt(self, tested_sha: str) -> None:
@@ -341,6 +368,65 @@ class TestCostController:
     def _allowed_providers(self) -> set[str]:
         raw = self.environ.get("CHATBI_TEST_ALLOWED_PROVIDERS", "").strip()
         return {part.strip().lower() for part in raw.split(",") if part.strip()} or self.paid_providers
+
+    def _final_execution_plan(self) -> dict[str, Any]:
+        config_root = Path(__file__).resolve().parents[2] / "config"
+        path = config_root / str(self.policy.get("final_provider_execution_plan") or "")
+        try:
+            plan = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError) as exc:
+            raise TestCostControlError("FINAL_PROVIDER_EXECUTION_PLAN_UNREADABLE") from exc
+        caps = plan.get("provider_call_caps") or {}
+        cases = plan.get("cases") or []
+        if set(caps) != self.paid_providers or any(int(caps[name]) != 4 for name in caps):
+            raise TestCostControlError("FINAL_PROVIDER_CALL_CAPS_INVALID")
+        if int(plan.get("total_real_provider_call_cap") or 0) != 12:
+            raise TestCostControlError("FINAL_TOTAL_PROVIDER_CALL_CAP_INVALID")
+        if not isinstance(cases, list) or not cases:
+            raise TestCostControlError("FINAL_PROVIDER_CASE_PLAN_REQUIRED")
+        patterns: set[str] = set()
+        maximum_calls = 0
+        kimi_vision_reserved = 0
+        required_fields = {
+            "case_id_pattern", "expected_route", "allowed_providers", "primary_provider",
+            "max_internal_provider_calls", "max_retry", "reserved_provider_calls",
+            "estimated_max_cost_cny", "capability_class",
+        }
+        for case in cases:
+            if not isinstance(case, dict) or not required_fields.issubset(case):
+                raise TestCostControlError("FINAL_PROVIDER_CASE_PLAN_INVALID")
+            pattern = str(case["case_id_pattern"])
+            if not pattern or pattern in patterns:
+                raise TestCostControlError("FINAL_PROVIDER_CASE_PATTERN_INVALID")
+            patterns.add(pattern)
+            allowed = {str(value) for value in case["allowed_providers"]}
+            primary = str(case["primary_provider"])
+            call_cap = int(case["max_internal_provider_calls"])
+            retry_cap = int(case["max_retry"])
+            reserved = int(case["reserved_provider_calls"])
+            if not allowed or not allowed <= self.paid_providers or primary not in allowed:
+                raise TestCostControlError("FINAL_PROVIDER_CASE_ALLOWLIST_INVALID")
+            if call_cap < 1 or retry_cap < 0 or retry_cap > 1 or reserved < 0 or reserved > call_cap:
+                raise TestCostControlError("FINAL_PROVIDER_CASE_LIMIT_INVALID")
+            if float(case["estimated_max_cost_cny"]) <= 0:
+                raise TestCostControlError("FINAL_PROVIDER_CASE_COST_INVALID")
+            maximum_calls += call_cap
+            if primary == "kimi" and str(case["capability_class"]) in {"VISION", "SCANNED_PDF"}:
+                kimi_vision_reserved += reserved
+        if maximum_calls > int(plan["total_real_provider_call_cap"]):
+            raise TestCostControlError("FINAL_PROVIDER_EXECUTION_PLAN_EXCEEDS_TOTAL_CAP")
+        if kimi_vision_reserved < 2:
+            raise TestCostControlError("FINAL_KIMI_VISION_RESERVATION_INSUFFICIENT")
+        return plan
+
+    def _final_case_rule(self, case_id: str) -> dict[str, Any]:
+        matches = [
+            case for case in self._final_execution_plan()["cases"]
+            if fnmatchcase(case_id, str(case["case_id_pattern"]))
+        ]
+        if len(matches) != 1:
+            raise TestCostControlError("FINAL_CASE_NOT_IN_EXECUTION_PLAN")
+        return matches[0]
 
     def _ledger_path(self) -> Path:
         root = Path(self.environ["CHATBI_TEST_COST_LEDGER_ROOT"]).expanduser()
@@ -409,9 +495,11 @@ class TestCostController:
               input_tokens INTEGER NOT NULL DEFAULT 0,
               cached_input_tokens INTEGER NOT NULL DEFAULT 0,
               output_tokens INTEGER NOT NULL DEFAULT 0,
+              token_usage_status TEXT NOT NULL DEFAULT 'UNKNOWN_IF_NOT_RETURNED',
               reserved_cost_cny REAL NOT NULL,
               actual_cost_cny REAL NOT NULL DEFAULT 0,
               cost_cny REAL NOT NULL DEFAULT 0,
+              provider_reported_cost_status TEXT NOT NULL DEFAULT 'UNKNOWN',
               latency_ms INTEGER NOT NULL DEFAULT 0,
               retry_count INTEGER NOT NULL DEFAULT 0,
               fallback_count INTEGER NOT NULL DEFAULT 0,
@@ -478,7 +566,7 @@ class TestCostController:
             columns = {
                 str(row[1]) for row in connection.execute("PRAGMA table_info(paid_test_calls)").fetchall()
             }
-            for name, definition in _LEDGER_V2_ADDITIONS:
+            for name, definition in (*_LEDGER_V2_ADDITIONS, *_LEDGER_V3_ADDITIONS):
                 if name not in columns:
                     connection.execute(f"ALTER TABLE paid_test_calls ADD COLUMN {name} {definition}")
             connection.execute(
@@ -587,6 +675,15 @@ class TestCostController:
         test_date = now.date().isoformat()
         run_id = self.environ["CHATBI_TEST_RUN_ID"].strip()
         case_id = self._case_id(context, self.environ.get("CHATBI_TEST_CASE_ID"))
+        final_plan = self._final_execution_plan() if self.level == TestExecutionLevel.FINAL else None
+        final_rule = self._final_case_rule(case_id) if final_plan is not None else None
+        if final_rule is not None:
+            if provider not in {str(value) for value in final_rule["allowed_providers"]}:
+                raise TestCostControlError(f"FINAL_CASE_PROVIDER_NOT_ALLOWED:{case_id}:{provider}")
+            if str(context.route or "UNSPECIFIED") != str(final_rule["expected_route"]):
+                raise TestCostControlError(f"FINAL_CASE_ROUTE_MISMATCH:{case_id}")
+            if retry_count > int(final_rule["max_retry"]):
+                raise TestCostControlError(f"FINAL_CASE_RETRY_CAP_EXCEEDED:{case_id}")
         duplicate_key = self._duplicate_key(
             configuration=configuration,
             case_id=case_id,
@@ -617,6 +714,41 @@ class TestCostController:
                    FROM paid_test_calls WHERE test_date = ?""",
                 (test_date,),
             ).fetchone()[0]
+            if final_plan is not None and final_rule is not None:
+                run_rows = connection.execute(
+                    """SELECT case_id, provider, MAX(reserved_cost_cny, actual_cost_cny)
+                       FROM paid_test_calls WHERE test_run_id = ?""",
+                    (run_id,),
+                ).fetchall()
+                case_pattern = str(final_rule["case_id_pattern"])
+                case_rows = [row for row in run_rows if fnmatchcase(str(row[0]), case_pattern)]
+                case_spend = sum(float(row[2]) for row in case_rows)
+                if case_spend + reserved > float(final_rule["estimated_max_cost_cny"]):
+                    raise TestCostControlError(f"FINAL_CASE_ESTIMATED_COST_EXCEEDED:{case_id}")
+                provider_rows = [row for row in run_rows if str(row[1]) == provider]
+                provider_cap = int(final_plan["provider_call_caps"][provider])
+                if len(provider_rows) >= provider_cap:
+                    raise TestCostControlError(f"FINAL_PROVIDER_CALL_CAP_EXCEEDED:{provider}")
+                remaining_reserved = 0
+                for rule in final_plan["cases"]:
+                    if str(rule["primary_provider"]) != provider:
+                        continue
+                    required = int(rule["reserved_provider_calls"])
+                    existing = sum(
+                        fnmatchcase(str(row[0]), str(rule["case_id_pattern"]))
+                        for row in provider_rows
+                    )
+                    remaining_reserved += max(0, required - existing)
+                current_is_reserved = (
+                    str(final_rule["primary_provider"]) == provider
+                    and int(final_rule["reserved_provider_calls"]) > 0
+                )
+                if not current_is_reserved and len(provider_rows) >= provider_cap - remaining_reserved:
+                    raise TestCostControlError(f"FINAL_PROVIDER_RESERVED_CAPACITY_REQUIRED:{provider}")
+                if len(case_rows) >= int(final_rule["max_internal_provider_calls"]):
+                    raise TestCostControlError(f"FINAL_CASE_CALL_CAP_EXCEEDED:{case_id}")
+                if int(run_count) >= int(final_plan["total_real_provider_call_cap"]):
+                    raise TestCostControlError("MAX_REAL_PROVIDER_REQUESTS_EXCEEDED")
             if self.level in {TestExecutionLevel.LEVEL2, TestExecutionLevel.FINAL}:
                 registered_run = connection.execute(
                     "SELECT test_run_id FROM paid_level2_runs WHERE git_sha = ?",
@@ -741,7 +873,8 @@ class TestCostController:
             connection.execute("BEGIN IMMEDIATE")
             connection.execute(
                 """UPDATE paid_test_calls SET status = ?, input_tokens = ?, cached_input_tokens = ?,
-                   output_tokens = ?, actual_cost_cny = ?, cost_cny = ?, latency_ms = ?, retry_count = ?,
+                   output_tokens = ?, token_usage_status = ?, actual_cost_cny = ?, cost_cny = ?,
+                   provider_reported_cost_status = ?, latency_ms = ?, retry_count = ?,
                    fallback_count = MAX(fallback_count, ?),
                    error_code = ?, completed_at = ?
                    WHERE call_id = ?""",
@@ -750,8 +883,10 @@ class TestCostController:
                     usage.input_tokens if usage else 0,
                     usage.cached_input_tokens if usage else 0,
                     usage.output_tokens if usage else 0,
+                    "KNOWN" if usage is not None and usage.exact else "UNKNOWN_IF_NOT_RETURNED",
                     response.cost_cny if response is not None else 0.0,
                     response.cost_cny if response is not None else 0.0,
+                    "UNKNOWN",
                     actual_latency_ms,
                     max(attempt.retry_count, response.retry_count if response is not None else 0),
                     response.fallback_count if response is not None else 0,
@@ -806,6 +941,8 @@ class TestCostController:
                 **configuration,
                 "paid_test_calls": 0,
                 "paid_test_cost_cny": 0.0,
+                "confirmed_ledger_cost_cny": 0.0,
+                "external_provider_total_billing": "UNKNOWN_NOT_RUN",
                 "cost_by_provider": {},
                 "cost_by_gate": {},
                 "untracked_paid_calls": 0,
@@ -823,6 +960,8 @@ class TestCostController:
                 **configuration,
                 "paid_test_calls": 0,
                 "paid_test_cost_cny": 0.0,
+                "confirmed_ledger_cost_cny": 0.0,
+                "external_provider_total_billing": "UNKNOWN_NOT_RUN",
                 "cost_by_provider": {},
                 "cost_by_gate": {},
                 "untracked_paid_calls": 0,
@@ -862,6 +1001,11 @@ class TestCostController:
             by_provider[provider] = round(by_provider.get(provider, 0.0) + float(cost), 8)
             by_gate[gate] = round(by_gate.get(gate, 0.0) + float(cost), 8)
         paid_cost = round(sum(float(row["cost_cny"]) for row in rows), 8)
+        provider_call_counts = {
+            provider: sum(str(row["provider"]) == provider for row in rows)
+            for provider in sorted(self.paid_providers)
+        }
+        final_plan = self._final_execution_plan() if self.level == TestExecutionLevel.FINAL else None
         schema_present = sum(field in schema_columns for field in _LEDGER_REQUIRED_FIELDS)
         schema_completeness = round(100.0 * schema_present / len(_LEDGER_REQUIRED_FIELDS), 2)
         populated_cells = sum(
@@ -877,6 +1021,12 @@ class TestCostController:
             **configuration,
             "paid_test_calls": len(rows),
             "paid_test_cost_cny": paid_cost,
+            "confirmed_ledger_cost_cny": paid_cost,
+            "external_provider_total_billing": (
+                "KNOWN" if rows and all(
+                    row["provider_reported_cost_status"] == "KNOWN" for row in rows
+                ) else "UNKNOWN_PARTIAL" if rows else "UNKNOWN_NOT_RUN"
+            ),
             "cost_by_provider": by_provider,
             "cost_by_gate": by_gate,
             "input_tokens": sum(int(row["input_tokens"]) for row in rows),
@@ -897,6 +1047,19 @@ class TestCostController:
             "request_ids": [str(row["request_id"]) for row in rows],
             "latency_ms": [int(row["latency_ms"]) for row in rows],
             "premium_escalations": [bool(row["premium_escalation"]) for row in rows],
+            "token_usage_unknown_calls": sum(
+                row["token_usage_status"] != "KNOWN" for row in rows
+            ),
+            "provider_reported_cost_unknown_calls": sum(
+                row["provider_reported_cost_status"] != "KNOWN" for row in rows
+            ),
+            "provider_call_counts": provider_call_counts,
+            "provider_call_caps": final_plan["provider_call_caps"] if final_plan is not None else {},
+            "provider_cap_gate": (
+                all(provider_call_counts[name] <= int(final_plan["provider_call_caps"][name])
+                    for name in provider_call_counts)
+                if final_plan is not None else True
+            ),
             "ledger_records": [
                 {field: row.get(field) for field in _LEDGER_REQUIRED_FIELDS} for row in rows
             ],

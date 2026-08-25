@@ -160,6 +160,12 @@ def rename_conversation(
 @router.delete("/conversations/{conversation_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_conversation(conversation_id: str, db: Session = Depends(get_db), principal: Principal = Depends(require_permission("conversation.manage"))):
     item = get_conversation(db, conversation_id, principal)
+    active = stream_registry.cancel_conversation(item.id)
+    if active and not stream_registry.wait_for_terminal(
+        active,
+        timeout_seconds=max(1.0, get_settings().agent_timeout_ms / 1000 + 1.0),
+    ):
+        raise HTTPException(status_code=409, detail="CONVERSATION_CLOSE_IN_PROGRESS")
     attachments = list(db.scalars(select(Attachment).where(Attachment.conversation_id == item.id)))
     paths = [attachment_path(attachment) for attachment in attachments]
     record_audit(db, principal, action="CONVERSATION_DELETE", resource_type="CONVERSATION", resource_id=item.id)
@@ -177,7 +183,29 @@ def chat(
     db: Session = Depends(get_db),
     principal: Principal = Depends(require_permission("query.ask")),
 ):
-    result = ChatService().execute(db, data, principal)
+    run_id = f"TRACE-{uuid4()}"
+    lifecycle = stream_registry.register(
+        run_id,
+        conversation_id=data.conversation_id,
+        client_message_id=data.client_message_id,
+        connection_open=False,
+    )
+    stream_registry.task_started(run_id)
+    try:
+        result = ChatService().execute(
+            db,
+            data,
+            principal,
+            cancellation_event=lifecycle.cancel_event,
+            trace_id=run_id,
+        )
+    except StreamCancelled as exc:
+        db.rollback()
+        _persist_cancelled_run(data, principal, run_id)
+        _cleanup_cancelled_messages(data.conversation_id, data.client_message_id)
+        raise HTTPException(status_code=409, detail="RUN_CANCELLED") from exc
+    finally:
+        stream_registry.task_finished(run_id)
     if result.answer_envelope is not None:
         response.headers["X-Trace-ID"] = result.answer_envelope.trace_id
     return result

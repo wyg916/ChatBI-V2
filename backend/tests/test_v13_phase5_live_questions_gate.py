@@ -9,6 +9,7 @@ import httpx
 import pytest
 
 from scripts.run_v13_phase5_live_questions_gate import (
+    LiveGateError,
     LiveQuestionsGate,
     REPO_ROOT,
     _action_failures,
@@ -89,6 +90,43 @@ def test_cleanup_transport_failure_is_reported_not_promoted_to_verified():
         "attachment_cleanup_failed",
         "conversation_cleanup_failed",
         "logout_failed",
+    ]
+
+
+def test_sync_chat_timeout_requires_backend_cancellation_acknowledgement():
+    requests: list[str] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        requests.append(request.url.path)
+        if request.url.path.endswith("/conversations"):
+            return httpx.Response(201, json={"id": "conversation-phase5"})
+        if request.url.path.endswith("/chat/stream/cancel"):
+            return httpx.Response(202, json={"cancelled": True})
+        if request.url.path.endswith("/chat"):
+            raise httpx.ReadTimeout("phase5 injected chat timeout", request=request)
+        raise AssertionError(f"unexpected request: {request.url.path}")
+
+    with httpx.Client(
+        transport=httpx.MockTransport(handler),
+        base_url="http://127.0.0.1:8000/api/v1",
+    ) as client:
+        gate = LiveQuestionsGate(
+            client,
+            datasource_id="datasource-phase5",
+            semantic_model_id="semantic-phase5",
+            credentials={"email": "phase5@example.invalid", "password": "external-test-only"},
+            secret_values=("external-test-only",),
+        )
+        with pytest.raises(LiveGateError, match="CHAT_TIMEOUT_CANCELLED_AND_ACKNOWLEDGED"):
+            gate.run_question(
+                {"id": "P5-TIMEOUT", "question": "timeout", "route": "DATA_QUERY"},
+                explicit_route=True,
+            )
+
+    assert requests == [
+        "/api/v1/conversations",
+        "/api/v1/chat",
+        "/api/v1/chat/stream/cancel",
     ]
 
 

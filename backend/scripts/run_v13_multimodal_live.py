@@ -394,6 +394,7 @@ def _call_model(
         context=RequestContext(
             request_id=f"LIVE-{scenario.case_id}",
             trace_id=request.trace_id,
+            route="MULTIMODAL_QUERY",
             workspace_id=_WORKSPACE_ID,
             question=f"synthetic multimodal evaluation {scenario.case_id}",
             budget_mode=BudgetMode.QUALITY,

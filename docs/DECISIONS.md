@@ -1,5 +1,13 @@
 # Architecture Decisions
 
+## ADR-063：最终 Provider 响应先统一归一化，FINAL 调用由 Case 计划原子限额
+
+真实 Provider 的 Chat Completions 响应先进入唯一的协议归一化边界，再交给 NL2SQL 领域解析：文本既可为普通字符串，也可为已知的文本 Part 或严格对象；NL2SQL 只接受完整 JSON、完整 JSON Markdown Fence、单层已知包装或单层 JSON 字符串，不从自然语言中用正则提取 SQL。未知 Content/Tool/Usage 形状、歧义包装、数组、缺失字段或非法 SQLPlan 全部 fail closed，随后仍必须通过 SQLPlan 校验与 SQL Guard。历史失败执行没有保留可安全复现的原始 Provider Body，因此永久 Fixture 明确标为负责人授权的通用变体，不能伪称为历史原文。
+
+FINAL 成本控制不再只依赖 Run 总上限。仓库内冻结代表性 Case 执行计划，逐 Case 固定允许的 Provider、Route、请求上限、重试上限和估算成本，并为 Kimi Vision 扫描 PDF Case 保留不可被非视觉请求消费的容量；控制器在网络前以同一 SQLite 原子事务同时校验 Case、Provider 和 Run 三层额度。账本把 Token 与 Provider 报告费用的未知状态单独记录，汇总中的确认费用不再冒充外部账单全量费用。
+
+同步 `/chat` 也纳入与流式请求相同的 Lifecycle：删除会话前先取消并等待有界终态，超时 Runner 必须取得 Backend 取消确认后才允许清理。取消检查覆盖消息写入、Flush 和 Commit 前边界；任何未确认的取消、晚到写入、外键残留或资源残留都使 Gate 失败。
+
 ## ADR-062：最终真实 Provider 认证使用独立 FINAL 等级和代表性 Case 上限
 
 负责人批准的 Phase 5 收口不再重复执行 Level1 定向与 Level2 全量付费套件。测试成本控制器新增 `FINAL` 等级：仍要求 exact SHA Runtime Preflight、同 SHA 完整 Level0 Receipt、最终认证与 Cache Bypass 标志、Provider allowlist、必要性说明、配置/Prompt 身份和外部 SQLite 台账；每 Run 最多 12 次真实 Provider 请求，运行预算 3.00 CNY、每日总预算 5.00 CNY，既有一次有界重试和非重试型 4xx 立即失败规则不变。每条账本必须原样记录 `test_level=FINAL`，不得用 Level1 结果或文档标签冒充。

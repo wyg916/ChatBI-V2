@@ -1,0 +1,99 @@
+{
+  "schema_version": "chatbi-v1.3-final-provider-execution-plan-v1",
+  "total_real_provider_call_cap": 12,
+  "provider_call_caps": {
+    "mimo": 4,
+    "deepseek": 4,
+    "kimi": 4
+  },
+  "cases": [
+    {
+      "case_id_pattern": "FINAL-NL2SQL-MIMO",
+      "expected_route": "DATA_QUERY",
+      "allowed_providers": ["mimo"],
+      "primary_provider": "mimo",
+      "max_internal_provider_calls": 1,
+      "max_retry": 0,
+      "reserved_provider_calls": 1,
+      "estimated_max_cost_cny": 0.25,
+      "capability_class": "NL2SQL"
+    },
+    {
+      "case_id_pattern": "FINAL-NL2SQL-DEEPSEEK",
+      "expected_route": "DATA_QUERY",
+      "allowed_providers": ["deepseek"],
+      "primary_provider": "deepseek",
+      "max_internal_provider_calls": 1,
+      "max_retry": 0,
+      "reserved_provider_calls": 1,
+      "estimated_max_cost_cny": 0.25,
+      "capability_class": "NL2SQL"
+    },
+    {
+      "case_id_pattern": "P5-P5C03-*",
+      "expected_route": "COMPLEX_ANALYSIS",
+      "allowed_providers": ["deepseek", "mimo"],
+      "primary_provider": "deepseek",
+      "max_internal_provider_calls": 3,
+      "max_retry": 1,
+      "reserved_provider_calls": 0,
+      "estimated_max_cost_cny": 0.35,
+      "capability_class": "COMPLEX"
+    },
+    {
+      "case_id_pattern": "P5-P5C04-*",
+      "expected_route": "COMPLEX_ANALYSIS",
+      "allowed_providers": ["deepseek", "mimo"],
+      "primary_provider": "deepseek",
+      "max_internal_provider_calls": 3,
+      "max_retry": 1,
+      "reserved_provider_calls": 0,
+      "estimated_max_cost_cny": 0.35,
+      "capability_class": "COMPLEX"
+    },
+    {
+      "case_id_pattern": "FINAL-KIMI-TEXT-OPTIONAL",
+      "expected_route": "DATA_QUERY",
+      "allowed_providers": ["kimi"],
+      "primary_provider": "kimi",
+      "max_internal_provider_calls": 1,
+      "max_retry": 0,
+      "reserved_provider_calls": 0,
+      "estimated_max_cost_cny": 0.20,
+      "capability_class": "OPTIONAL_TEXT"
+    },
+    {
+      "case_id_pattern": "LIVE-M04",
+      "expected_route": "MULTIMODAL_QUERY",
+      "allowed_providers": ["kimi"],
+      "primary_provider": "kimi",
+      "max_internal_provider_calls": 1,
+      "max_retry": 0,
+      "reserved_provider_calls": 1,
+      "estimated_max_cost_cny": 0.30,
+      "capability_class": "VISION"
+    },
+    {
+      "case_id_pattern": "LIVE-M06",
+      "expected_route": "MULTIMODAL_QUERY",
+      "allowed_providers": ["kimi"],
+      "primary_provider": "kimi",
+      "max_internal_provider_calls": 1,
+      "max_retry": 0,
+      "reserved_provider_calls": 1,
+      "estimated_max_cost_cny": 0.35,
+      "capability_class": "VISION"
+    },
+    {
+      "case_id_pattern": "LIVE-M10",
+      "expected_route": "MULTIMODAL_QUERY",
+      "allowed_providers": ["kimi"],
+      "primary_provider": "kimi",
+      "max_internal_provider_calls": 1,
+      "max_retry": 0,
+      "reserved_provider_calls": 1,
+      "estimated_max_cost_cny": 0.40,
+      "capability_class": "SCANNED_PDF"
+    }
+  ]
+}
