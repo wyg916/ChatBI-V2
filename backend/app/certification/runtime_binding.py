@@ -270,6 +270,10 @@ def evaluate_runtime_binding(
         if not raw:
             continue
         resolved = _resolved(raw)
+        if _inside(resolved, runtime_prefix):
+            # Installed wheels are verified package-by-package below against
+            # direct_url provenance from the candidate repository.
+            continue
         if _path_hosts_internal_source(resolved, packages) and not _inside(resolved, root):
             failures.append(f"SYS_PATH_INTERNAL_SOURCE_OUTSIDE_CANDIDATE:{resolved}")
 

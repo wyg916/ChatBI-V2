@@ -59,6 +59,51 @@ def test_exact_sha_runtime_binding_accepts_only_candidate_sources_in_fresh_venv(
     assert receipt["stale_editable_bindings"] == []
 
 
+def test_exact_sha_runtime_binding_accepts_candidate_built_installed_artifacts(tmp_path: Path) -> None:
+    repo = tmp_path / "candidate"
+    package_files, package_exports, _sys_path = _candidate_layout(repo)
+    venv = tmp_path / "certification-venv"
+    executable = venv / "Scripts" / "python.exe"
+    site_packages = venv / "Lib" / "site-packages"
+    executable.parent.mkdir(parents=True)
+    executable.touch()
+    direct_urls: list[dict[str, object]] = []
+    for package in INTERNAL_PACKAGES:
+        if package.distribution == "chatbi-backend":
+            continue
+        installed_module = site_packages.joinpath(*package.module.split("."), "__init__.py")
+        installed_module.parent.mkdir(parents=True, exist_ok=True)
+        installed_module.write_text("# candidate-built wheel fixture\n", encoding="utf-8")
+        package_files[package.module] = str(installed_module)
+        direct_urls.append({
+            "distribution": package.distribution,
+            "editable": False,
+            "source": str(repo / package.source_relative).replace("/src", ""),
+        })
+
+    receipt = evaluate_runtime_binding(
+        repo_root=repo,
+        expected_git_sha=SHA,
+        actual_git_sha=SHA,
+        package_files=package_files,
+        package_exports=package_exports,
+        sys_path=[str(repo / "backend"), str(site_packages)],
+        environ={"VIRTUAL_ENV": str(venv)},
+        python_executable=str(executable),
+        prefix=str(venv),
+        base_prefix=str(tmp_path / "base-python"),
+        direct_url_records=direct_urls,
+    )
+
+    assert receipt["status"] == "PASS"
+    bindings = {item["module"]: item["binding_kind"] for item in receipt["internal_packages"]}
+    assert bindings["app"] == "EXACT_WORKTREE_SOURCE"
+    assert set(bindings.values()) == {
+        "EXACT_WORKTREE_SOURCE",
+        "EXACT_WORKTREE_INSTALLED_ARTIFACT",
+    }
+
+
 def test_stale_editable_binding_is_detected_before_provider_construction(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
