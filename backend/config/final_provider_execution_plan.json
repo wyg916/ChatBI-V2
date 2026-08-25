@@ -57,7 +57,7 @@
       "allowed_providers": ["kimi"],
       "primary_provider": "kimi",
       "max_internal_provider_calls": 1,
-      "max_retry": 0,
+      "max_retry": 1,
       "reserved_provider_calls": 0,
       "estimated_max_cost_cny": 0.20,
       "capability_class": "OPTIONAL_TEXT"
