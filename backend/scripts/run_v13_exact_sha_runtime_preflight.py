@@ -47,6 +47,8 @@ def _write(path: Path, payload: dict[str, object]) -> None:
 
 def main() -> int:
     arguments = _arguments()
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(encoding="utf-8", errors="backslashreplace")
     try:
         payload = run_exact_sha_runtime_preflight(
             repo_root=arguments.repo_root,
