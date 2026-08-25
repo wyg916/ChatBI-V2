@@ -20,7 +20,10 @@ from app.model_gateway.configuration import (
 from app.model_gateway.contracts import BudgetMode, ModelCapability, ModelRequest, RequestContext
 from app.model_gateway.service import ModelGateway
 from app.query.contracts import QueryContext, QueryFilter, QueryTimeRange, SQLPlan
-from app.query.nl2sql_response import normalize_nl2sql_response
+from app.query.nl2sql_response import (
+    ProviderSQLPlanPayload,
+    normalize_nl2sql_response_with_metadata,
+)
 
 
 class ModelProviderAdapter(ABC):
@@ -771,10 +774,11 @@ class OpenAICompatibleProvider(ModelProviderAdapter):
                 {
                     "role": "system",
                     "content": (
-                        "Return only one JSON object that validates against the supplied SQLPlan JSON Schema. "
+                        "Return only one JSON object that validates against the supplied Provider SQL plan schema. "
                         "Use only authorized context objects. generated_sql must be exactly one read-only SELECT "
                         "or WITH ... SELECT statement. Never invent a table or column. "
-                        f"SQLPlan JSON Schema: {json.dumps(SQLPlan.model_json_schema(), ensure_ascii=False)}"
+                        "Runtime trace metadata is server-owned and must not be returned. "
+                        f"ProviderSQLPlanPayload JSON Schema: {json.dumps(ProviderSQLPlanPayload.model_json_schema(), ensure_ascii=False)}"
                     ),
                 },
                 {"role": "user", "content": json.dumps({"question": question, "context": context.model_dump(mode="json")}, ensure_ascii=False)},
@@ -814,7 +818,13 @@ class OpenAICompatibleProvider(ModelProviderAdapter):
                 budget_mode=BudgetMode.QUALITY,
             ),
         )
-        plan = normalize_nl2sql_response(response.content)
+        normalized = normalize_nl2sql_response_with_metadata(response.content)
+        plan = normalized.plan
+        model_trace = response.trace_payload()
+        if normalized.normalization_actions:
+            model_trace["provider_response_normalization_actions"] = list(
+                normalized.normalization_actions
+            )
         # Provider output is untrusted. Runtime identity and release-critical
         # context must come from the server-owned request, never model JSON.
         return plan.model_copy(update={
@@ -824,7 +834,7 @@ class OpenAICompatibleProvider(ModelProviderAdapter):
             "semantic_model_id": context.semantic_model_id,
             "semantic_model_version": context.semantic_model_version,
             "limit": min(plan.limit, context.row_limit),
-            "model_trace": response.trace_payload(),
+            "model_trace": model_trace,
         })
 
 
@@ -850,10 +860,11 @@ class GatewayNl2SqlProvider(ModelProviderAdapter):
             {
                 "role": "system",
                 "content": (
-                    "Return only one JSON object that validates against the supplied SQLPlan JSON Schema. "
+                    "Return only one JSON object that validates against the supplied Provider SQL plan schema. "
                     "Use only authorized context objects. generated_sql must be exactly one read-only SELECT "
                     "or WITH ... SELECT statement. Never invent a table or column. "
-                    f"SQLPlan JSON Schema: {json.dumps(SQLPlan.model_json_schema(), ensure_ascii=False)}"
+                    "Runtime trace metadata is server-owned and must not be returned. "
+                    f"ProviderSQLPlanPayload JSON Schema: {json.dumps(ProviderSQLPlanPayload.model_json_schema(), ensure_ascii=False)}"
                 ),
             },
             {"role": "user", "content": json.dumps({"question": question, "context": context.model_dump(mode="json")}, ensure_ascii=False)},
@@ -875,14 +886,20 @@ class GatewayNl2SqlProvider(ModelProviderAdapter):
                 budget_mode=BudgetMode(self.settings.model_budget_mode),
             ),
         )
-        plan = normalize_nl2sql_response(response.content)
+        normalized = normalize_nl2sql_response_with_metadata(response.content)
+        plan = normalized.plan
+        model_trace = response.trace_payload()
+        if normalized.normalization_actions:
+            model_trace["provider_response_normalization_actions"] = list(
+                normalized.normalization_actions
+            )
         return plan.model_copy(update={
             "question": question, "dialect": context.dialect,
             "provider": response.resolved_provider,
             "semantic_model_id": context.semantic_model_id,
             "semantic_model_version": context.semantic_model_version,
             "limit": min(plan.limit, context.row_limit),
-            "model_trace": response.trace_payload(),
+            "model_trace": model_trace,
         })
 
 

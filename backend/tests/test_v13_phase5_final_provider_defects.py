@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from copy import deepcopy
+from datetime import datetime, timezone
 import json
 import sqlite3
 from pathlib import Path
@@ -11,16 +13,26 @@ from app.model_gateway.normalization import (
     ProviderResponseNormalizationError,
     normalize_chat_completion,
 )
-from app.query.contracts import SecurityPolicy
+from app.model_gateway.contracts import ModelResponse, ModelUsage
+from app.model_gateway.service import ModelGateway
+from app.query.contracts import QueryContext, SecurityPolicy
+from app.query.nl2sql import OpenAICompatibleProvider
 from app.query.nl2sql_response import (
     Nl2SqlResponseNormalizationError,
+    STRIP_SERVER_OWNED_MODEL_TRACE,
     normalize_nl2sql_response,
+    normalize_nl2sql_response_with_metadata,
 )
 from app.query.sql_guard import SqlGuard
 from app.streaming.lifecycle import StreamCancelled, StreamRegistry
 
 
 FIXTURES = Path(__file__).parent / "fixtures" / "provider_responses"
+
+
+def _generic_mimo_content() -> dict:
+    fixture = json.loads((FIXTURES / "mimo_nl2sql_object.json").read_text(encoding="utf-8"))
+    return deepcopy(fixture["response"]["choices"][0]["message"]["content"])
 
 
 @pytest.mark.parametrize(
@@ -55,6 +67,162 @@ def test_task_authorized_generic_provider_variant_normalizes_known_shapes(
     assert response.usage.exact is True
     assert plan.provider == provider
     assert guard.allowed is True
+
+
+def test_recorded_real_mimo_model_trace_null_response_regression() -> None:
+    fixture = json.loads(
+        (FIXTURES / "mimo_nl2sql_recorded_real_model_trace_null.json").read_text(encoding="utf-8")
+    )
+    assert fixture["provenance"] == "RECORDED_REAL_SANITIZED_PROVIDER_RESPONSE_2026-08-25"
+    assert fixture["source_evidence"] == {
+        "candidate_sha": "e9e4cf899329c6909c017a293a413def7c0f2134",
+        "case_id": "FINAL-NL2SQL-MIMO",
+        "evidence_sha256": "8fc0874495b46bd947523c791a70e998f1979cfbf1f903c7af4fb2c15f2fb7b2",
+        "raw_response_sha256": "e41afb37da9bf3fbe06ee794666282b4023929aefc9deddce692288fa3467d5a",
+        "response_shape_fingerprint": "91a2e4919b7b51968745678d4ab8a60cc691cd77404201c92b5d3e9b256f1475",
+        "sanitized": True,
+    }
+    response = normalize_chat_completion(fixture["response"])
+    normalized = normalize_nl2sql_response_with_metadata(response.content)
+    guard = SqlGuard().validate(
+        normalized.plan.generated_sql,
+        dialect=normalized.plan.dialect,
+        policy=SecurityPolicy(
+            allowed_tables=["orders"],
+            allowed_columns={"orders": ["revenue"]},
+        ),
+    )
+    assert response.resolved_model == "mimo-v2.5"
+    assert response.usage == ModelUsage(
+        input_tokens=5785,
+        cached_input_tokens=0,
+        output_tokens=220,
+        total_tokens=6005,
+        exact=True,
+    )
+    assert normalized.normalization_actions == (STRIP_SERVER_OWNED_MODEL_TRACE,)
+    assert normalized.plan.model_trace == {}
+    assert guard.allowed is True
+
+
+@pytest.mark.parametrize(
+    "variant,value,expected_actions",
+    (
+        ("absent", None, ()),
+        ("null", None, (STRIP_SERVER_OWNED_MODEL_TRACE,)),
+        ("object", {"trace_id": "provider-fake"}, (STRIP_SERVER_OWNED_MODEL_TRACE,)),
+        ("string", "provider-fake", (STRIP_SERVER_OWNED_MODEL_TRACE,)),
+        ("list", ["provider-fake"], (STRIP_SERVER_OWNED_MODEL_TRACE,)),
+    ),
+)
+def test_server_owned_model_trace_variants_are_stripped(
+    variant: str,
+    value: object,
+    expected_actions: tuple[str, ...],
+) -> None:
+    content = _generic_mimo_content()
+    if variant == "absent":
+        content.pop("model_trace", None)
+    else:
+        content["model_trace"] = value
+    normalized = normalize_nl2sql_response_with_metadata(content)
+    assert normalized.normalization_actions == expected_actions
+    assert normalized.plan.model_trace == {}
+
+
+@pytest.mark.parametrize("variant", ("unknown_field", "missing_required", "wrong_type"))
+def test_business_payload_remains_strict_and_fail_closed(variant: str) -> None:
+    content = _generic_mimo_content()
+    if variant == "unknown_field":
+        content["provider_defined_business_mode"] = "unsafe"
+    elif variant == "missing_required":
+        content.pop("selected_tables")
+    else:
+        content["selected_tables"] = "orders"
+    with pytest.raises(Nl2SqlResponseNormalizationError, match="NL2SQL_RESPONSE_SCHEMA_INVALID"):
+        normalize_nl2sql_response(content)
+
+
+def test_provider_trace_spoof_cannot_replace_server_runtime_identity(monkeypatch: pytest.MonkeyPatch) -> None:
+    provider_payload = _generic_mimo_content()
+    provider_payload["model_trace"] = {
+        "workspace_id": "other-workspace",
+        "trace_id": "provider-fake-trace",
+        "request_id": "provider-fake-request",
+        "cost_cny": 999,
+    }
+    captured: dict[str, object] = {}
+
+    def fake_execute(self, request, context, *, cancellation_event=None):
+        captured["context"] = context
+        return ModelResponse(
+            content=json.dumps(provider_payload, ensure_ascii=False),
+            requested_alias="mimo",
+            resolved_provider="mimo",
+            resolved_model="mimo-v2.5",
+            usage=ModelUsage(input_tokens=5, output_tokens=3, total_tokens=8, exact=True),
+            cost_cny=0.001,
+            latency_ms=12,
+            pricing_version="test-pricing",
+        )
+
+    monkeypatch.setattr(ModelGateway, "execute", fake_execute)
+    provider = OpenAICompatibleProvider(
+        provider_name="mimo",
+        display_name="MiMo",
+        base_url="https://provider.invalid/v1",
+        api_key="test-only-key",
+        model_name="mimo-v2.5",
+    )
+    context = QueryContext(
+        request_id="trusted-request",
+        trace_id="trusted-trace-0001",
+        route="DATA_QUERY",
+        user_id="trusted-user",
+        conversation_id="trusted-conversation",
+        permission_hash="trusted-permission",
+        workspace_id="trusted-workspace",
+        workspace_name="Trusted Workspace",
+        datasource_id="trusted-datasource",
+        datasource_name="Demo MySQL",
+        dialect="mysql",
+        semantic_model_id="trusted-semantic-model",
+        semantic_model_name="Demo Model",
+        semantic_model_version=7,
+        entities=[],
+        candidate_tables=[],
+        candidate_columns=[],
+        metrics=[],
+        dimensions=[],
+        relationships=[],
+        business_terms=[],
+        now=datetime(2026, 8, 25, tzinfo=timezone.utc),
+        row_limit=500,
+        token_budget=4096,
+        estimated_tokens=256,
+        security_policy=SecurityPolicy(
+            allowed_tables=["orders"],
+            allowed_columns={"orders": ["revenue"]},
+        ),
+    )
+    plan = provider.generate(question="trusted question", context=context)
+    runtime_context = captured["context"]
+    assert runtime_context.workspace_id == "trusted-workspace"
+    assert runtime_context.trace_id == "trusted-trace-0001"
+    assert runtime_context.request_id == "trusted-request"
+    assert plan.question == "trusted question"
+    assert plan.provider == "mimo"
+    assert plan.semantic_model_id == "trusted-semantic-model"
+    assert plan.semantic_model_version == 7
+    assert plan.model_trace["resolved_provider"] == "mimo"
+    assert plan.model_trace["resolved_model"] == "mimo-v2.5"
+    assert plan.model_trace["cost_cny"] == 0.001
+    assert plan.model_trace["provider_response_normalization_actions"] == [
+        STRIP_SERVER_OWNED_MODEL_TRACE
+    ]
+    assert "workspace_id" not in plan.model_trace
+    assert "trace_id" not in plan.model_trace
+    assert "request_id" not in plan.model_trace
 
 
 @pytest.mark.parametrize(
