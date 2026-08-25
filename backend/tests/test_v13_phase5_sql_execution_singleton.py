@@ -20,7 +20,7 @@ def test_business_sql_execution_has_one_allowlisted_gateway() -> None:
         Path("connectors/sqlalchemy_connector.py"): {"test_connection", "sync_metadata"},
         Path("query/executor.py"): {"_prepare_postgres_transaction", "execute", "explain"},
         Path("model_gateway/test_cost_control.py"): {
-            "_connect", "reserve_attempt", "complete_attempt", "summary",
+            "_connect", "_schema_version", "reserve_attempt", "complete_attempt", "summary",
         },
     }
     violations: list[str] = []
@@ -70,7 +70,8 @@ def test_business_sql_execution_has_one_allowlisted_gateway() -> None:
     assert query_executor_classes == 1
     assert violations == []
     assert len(trusted_policy_call_sites) == 1
-    assert trusted_policy_call_sites[0].startswith("services/content.py:")
+    trusted_path, _line = trusted_policy_call_sites[0].rsplit(":", 1)
+    assert Path(trusted_path) == Path("services/content.py")
 
 
 def test_dashboard_runtime_uses_guard_executor_signature_trace_and_audit(

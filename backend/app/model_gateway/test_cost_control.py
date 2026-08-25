@@ -5,6 +5,7 @@ import json
 import os
 import re
 import sqlite3
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime
 from enum import StrEnum
@@ -12,6 +13,7 @@ from pathlib import Path
 from typing import Any, Mapping
 from uuid import uuid4
 
+from app.certification.runtime_binding import RuntimeBindingError, run_exact_sha_runtime_preflight
 from app.model_gateway.configuration import load_control_config
 from app.model_gateway.contracts import ModelRequest, ModelResponse, RequestContext
 
@@ -25,6 +27,46 @@ _CONFIG_FILES = (
     "model_capabilities.yaml",
     "model_pricing.yaml",
     "provider_health.yaml",
+)
+_LEDGER_SCHEMA_VERSION = 2
+_LEDGER_REQUIRED_FIELDS = (
+    "ledger_id",
+    "test_run_id",
+    "case_id",
+    "test_level",
+    "necessity_declaration",
+    "deterministic_insufficient_reason",
+    "git_sha",
+    "backend_sha",
+    "config_hash",
+    "prompt_version",
+    "trace_id",
+    "request_id",
+    "provider",
+    "model",
+    "capability",
+    "route",
+    "input_tokens",
+    "cached_input_tokens",
+    "output_tokens",
+    "cost_cny",
+    "latency_ms",
+    "retry_count",
+    "fallback_count",
+    "premium_escalation",
+    "status",
+    "error_code",
+    "created_at",
+)
+_LEDGER_V2_ADDITIONS = (
+    ("ledger_id", "TEXT"),
+    ("trace_id", "TEXT"),
+    ("request_id", "TEXT"),
+    ("capability", "TEXT"),
+    ("route", "TEXT"),
+    ("cost_cny", "REAL NOT NULL DEFAULT 0"),
+    ("latency_ms", "INTEGER NOT NULL DEFAULT 0"),
+    ("premium_escalation", "INTEGER NOT NULL DEFAULT 0"),
 )
 
 
@@ -86,12 +128,19 @@ class TestCostController:
     and a hard budget.
     """
 
-    def __init__(self, *, environ: Mapping[str, str] | None = None) -> None:
+    def __init__(
+        self,
+        *,
+        environ: Mapping[str, str] | None = None,
+        runtime_preflight: Callable[..., Mapping[str, Any]] | None = None,
+    ) -> None:
         self.environ = dict(os.environ if environ is None else environ)
         self.policy = load_control_config("test_cost_control.yaml")
         self.enabled = _enabled(self.environ.get("CHATBI_TEST_COST_CONTROL"))
         self.level = _level(self.environ.get("CHATBI_TEST_EXECUTION_LEVEL"))
         self.config_hash = control_config_hash()
+        self._runtime_preflight = runtime_preflight or run_exact_sha_runtime_preflight
+        self._runtime_preflight_receipt: dict[str, Any] | None = None
 
     @property
     def paid_providers(self) -> set[str]:
@@ -126,6 +175,19 @@ class TestCostController:
 
     def _paid_mode_requested(self) -> bool:
         return self.level != TestExecutionLevel.LEVEL0 or self.level0_paid_exception
+
+    def _certification_repo_root(self) -> Path:
+        explicit = str(self.environ.get("CHATBI_CERTIFICATION_REPO_ROOT") or "").strip()
+        if explicit:
+            root = Path(explicit).expanduser().resolve()
+            if not (root / "backend" / "app").is_dir():
+                raise TestCostControlError("CERTIFICATION_REPO_ROOT_INVALID")
+            return root
+        candidates = (*Path(__file__).resolve().parents, Path.cwd().resolve(), *Path.cwd().resolve().parents)
+        for root in candidates:
+            if (root / ".git").exists() and (root / "backend" / "app").is_dir():
+                return root
+        raise TestCostControlError("CERTIFICATION_REPO_ROOT_REQUIRED")
 
     def validate_configuration(self) -> dict[str, Any]:
         if not self.enabled:
@@ -176,6 +238,24 @@ class TestCostController:
             not _HASH_RE.fullmatch(expected_config_hash) or expected_config_hash != self.config_hash
         ):
             raise TestCostControlError("BACKEND_CONFIG_HASH_MISMATCH")
+        if self._runtime_preflight_receipt is None:
+            try:
+                runtime_receipt = self._runtime_preflight(
+                    repo_root=self._certification_repo_root(),
+                    expected_git_sha=tested_sha,
+                )
+            except RuntimeBindingError as exc:
+                detail = ",".join(str(value) for value in exc.receipt.get("failures", ())[:3])
+                raise TestCostControlError(
+                    f"EXACT_SHA_RUNTIME_PREFLIGHT_FAILED:{detail or str(exc)}"
+                ) from exc
+            if (
+                runtime_receipt.get("status") != "PASS"
+                or runtime_receipt.get("expected_git_sha") != tested_sha
+                or runtime_receipt.get("actual_git_sha") != tested_sha
+            ):
+                raise TestCostControlError("EXACT_SHA_RUNTIME_PREFLIGHT_RECEIPT_INVALID")
+            self._runtime_preflight_receipt = dict(runtime_receipt)
 
         affected_path = self.environ.get("CHATBI_TEST_AFFECTED_PATH", "").strip().lower()
         if self.level in {TestExecutionLevel.LEVEL0, TestExecutionLevel.LEVEL1}:
@@ -234,6 +314,8 @@ class TestCostController:
             "affected_path": affected_path or "final_certification",
             "ledger_identity": self._ledger_identity(),
             "level0_paid_exception": self.level0_paid_exception,
+            "runtime_binding_gate": self._runtime_preflight_receipt["runtime_binding_gate"],
+            "runtime_preflight_sha256": self._runtime_preflight_receipt["receipt_sha256"],
         }
 
     def _validate_level0_receipt(self, tested_sha: str) -> None:
@@ -282,6 +364,8 @@ class TestCostController:
             "ledger_identity": configuration.get("ledger_identity"),
             "test_run_id": self.environ.get("CHATBI_TEST_RUN_ID") or None,
             "gate": self.environ.get("CHATBI_TEST_GATE") or None,
+            "runtime_binding_gate": configuration.get("runtime_binding_gate"),
+            "runtime_preflight_sha256": configuration.get("runtime_preflight_sha256"),
         }
         canonical = json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
         return {
@@ -299,6 +383,7 @@ class TestCostController:
             """
             CREATE TABLE IF NOT EXISTS paid_test_calls (
               call_id TEXT PRIMARY KEY,
+              ledger_id TEXT NOT NULL UNIQUE,
               test_date TEXT NOT NULL,
               test_run_id TEXT NOT NULL,
               test_level TEXT NOT NULL,
@@ -310,20 +395,27 @@ class TestCostController:
               gate_name TEXT NOT NULL,
               necessity_declaration TEXT NOT NULL,
               deterministic_insufficient_reason TEXT NOT NULL,
+              trace_id TEXT NOT NULL,
+              request_id TEXT NOT NULL,
               provider TEXT NOT NULL,
               model TEXT NOT NULL,
+              capability TEXT NOT NULL,
+              route TEXT NOT NULL,
               status TEXT NOT NULL,
               input_tokens INTEGER NOT NULL DEFAULT 0,
               cached_input_tokens INTEGER NOT NULL DEFAULT 0,
               output_tokens INTEGER NOT NULL DEFAULT 0,
               reserved_cost_cny REAL NOT NULL,
               actual_cost_cny REAL NOT NULL DEFAULT 0,
+              cost_cny REAL NOT NULL DEFAULT 0,
+              latency_ms INTEGER NOT NULL DEFAULT 0,
               retry_count INTEGER NOT NULL DEFAULT 0,
               fallback_count INTEGER NOT NULL DEFAULT 0,
+              premium_escalation INTEGER NOT NULL DEFAULT 0,
               duplicate_key TEXT NOT NULL,
               daily_cost_before_cny REAL NOT NULL,
               daily_cost_after_cny REAL NOT NULL,
-              error_code TEXT,
+              error_code TEXT NOT NULL DEFAULT 'NONE',
               created_at TEXT NOT NULL,
               completed_at TEXT
             )
@@ -358,7 +450,64 @@ class TestCostController:
         connection.execute(
             "CREATE INDEX IF NOT EXISTS ix_paid_test_calls_run ON paid_test_calls(test_run_id)"
         )
+        connection.execute("BEGIN IMMEDIATE")
+        try:
+            connection.execute(
+                """
+                CREATE TABLE IF NOT EXISTS paid_test_ledger_meta (
+                  key TEXT PRIMARY KEY,
+                  value TEXT NOT NULL,
+                  updated_at TEXT NOT NULL
+                )
+                """
+            )
+            version_row = connection.execute(
+                "SELECT value FROM paid_test_ledger_meta WHERE key = 'schema_version'"
+            ).fetchone()
+            if version_row is not None:
+                try:
+                    existing_version = int(version_row[0])
+                except (TypeError, ValueError) as exc:
+                    raise TestCostControlError("PAID_LEDGER_SCHEMA_VERSION_INVALID") from exc
+                if existing_version > _LEDGER_SCHEMA_VERSION:
+                    raise TestCostControlError("PAID_LEDGER_SCHEMA_VERSION_UNSUPPORTED")
+            columns = {
+                str(row[1]) for row in connection.execute("PRAGMA table_info(paid_test_calls)").fetchall()
+            }
+            for name, definition in _LEDGER_V2_ADDITIONS:
+                if name not in columns:
+                    connection.execute(f"ALTER TABLE paid_test_calls ADD COLUMN {name} {definition}")
+            connection.execute(
+                "UPDATE paid_test_calls SET ledger_id = call_id WHERE ledger_id IS NULL OR ledger_id = ''"
+            )
+            connection.execute(
+                "UPDATE paid_test_calls SET cost_cny = actual_cost_cny WHERE cost_cny = 0 AND actual_cost_cny != 0"
+            )
+            connection.execute(
+                "CREATE UNIQUE INDEX IF NOT EXISTS ux_paid_test_calls_ledger_id ON paid_test_calls(ledger_id)"
+            )
+            now = datetime.now().astimezone().isoformat()
+            connection.execute(
+                """INSERT INTO paid_test_ledger_meta (key, value, updated_at)
+                   VALUES ('schema_version', ?, ?)
+                   ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at""",
+                (str(_LEDGER_SCHEMA_VERSION), now),
+            )
+            connection.commit()
+        except Exception:
+            connection.rollback()
+            connection.close()
+            raise
         return connection
+
+    @staticmethod
+    def _schema_version(connection: sqlite3.Connection) -> int:
+        row = connection.execute(
+            "SELECT value FROM paid_test_ledger_meta WHERE key = 'schema_version'"
+        ).fetchone()
+        if row is None:
+            raise TestCostControlError("PAID_LEDGER_SCHEMA_VERSION_MISSING")
+        return int(row[0])
 
     @staticmethod
     def _case_id(context: RequestContext, environment_case_id: str | None) -> str:
@@ -411,6 +560,7 @@ class TestCostController:
         retry_count: int,
         recorded_transport: bool,
         fallback_count: int = 0,
+        premium_escalation: bool = False,
     ) -> PaidTestAttempt | None:
         if not self.enabled or recorded_transport or provider not in self.paid_providers:
             return None
@@ -511,13 +661,16 @@ class TestCostController:
                 )
             connection.execute(
                 """INSERT INTO paid_test_calls (
-                     call_id, test_date, test_run_id, test_level, git_sha, backend_sha,
+                     call_id, ledger_id, test_date, test_run_id, test_level, git_sha, backend_sha,
                      config_hash, prompt_version, case_id, gate_name, necessity_declaration,
-                     deterministic_insufficient_reason, provider, model, status,
+                     deterministic_insufficient_reason, trace_id, request_id, provider, model,
+                     capability, route, status,
                      reserved_cost_cny, retry_count, fallback_count, duplicate_key,
-                     daily_cost_before_cny, daily_cost_after_cny, created_at
-                   ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'RESERVED', ?, ?, ?, ?, ?, ?, ?)""",
+                     premium_escalation, daily_cost_before_cny, daily_cost_after_cny,
+                     error_code, created_at
+                   ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'RESERVED', ?, ?, ?, ?, ?, ?, ?, 'NONE', ?)""",
                 (
+                    call_id,
                     call_id,
                     test_date,
                     run_id,
@@ -530,12 +683,17 @@ class TestCostController:
                     self.environ.get("CHATBI_TEST_GATE") or context.route or "unspecified",
                     configuration["necessity_declaration"],
                     configuration["deterministic_insufficient_reason"],
+                    context.trace_id,
+                    context.request_id,
                     provider,
                     model,
+                    request.capability.value,
+                    context.route or "UNSPECIFIED",
                     reserved,
                     max(0, retry_count),
                     max(0, fallback_count),
                     duplicate_key,
+                    int(bool(premium_escalation)),
                     float(daily_spend),
                     float(daily_spend) + reserved,
                     now.isoformat(),
@@ -562,10 +720,15 @@ class TestCostController:
         status: str,
         response: ModelResponse | None = None,
         error_code: str | None = None,
+        latency_ms: int | None = None,
     ) -> None:
         if attempt is None:
             return
         usage = response.usage if response is not None else None
+        actual_latency_ms = max(
+            0,
+            int(latency_ms if latency_ms is not None else response.latency_ms if response is not None else 0),
+        )
         configuration = self.validate_configuration()
         connection = self._connect(self._ledger_path())
         exceeded: str | None = None
@@ -573,7 +736,7 @@ class TestCostController:
             connection.execute("BEGIN IMMEDIATE")
             connection.execute(
                 """UPDATE paid_test_calls SET status = ?, input_tokens = ?, cached_input_tokens = ?,
-                   output_tokens = ?, actual_cost_cny = ?, retry_count = ?,
+                   output_tokens = ?, actual_cost_cny = ?, cost_cny = ?, latency_ms = ?, retry_count = ?,
                    fallback_count = MAX(fallback_count, ?),
                    error_code = ?, completed_at = ?
                    WHERE call_id = ?""",
@@ -583,9 +746,11 @@ class TestCostController:
                     usage.cached_input_tokens if usage else 0,
                     usage.output_tokens if usage else 0,
                     response.cost_cny if response is not None else 0.0,
+                    response.cost_cny if response is not None else 0.0,
+                    actual_latency_ms,
                     max(attempt.retry_count, response.retry_count if response is not None else 0),
                     response.fallback_count if response is not None else 0,
-                    error_code,
+                    error_code or "NONE",
                     datetime.now().astimezone().isoformat(),
                     attempt.call_id,
                 ),
@@ -643,6 +808,9 @@ class TestCostController:
                 "unbounded_retry": 0,
                 "level2_runs_per_sha": 0,
                 "budget_exceeded": False,
+                "paid_ledger_schema_version": _LEDGER_SCHEMA_VERSION,
+                "paid_ledger_required_fields": list(_LEDGER_REQUIRED_FIELDS),
+                "paid_ledger_required_field_completeness": 100.0,
             }
         path = self._ledger_path()
         if not path.exists():
@@ -657,18 +825,23 @@ class TestCostController:
                 "unbounded_retry": 0,
                 "level2_runs_per_sha": 0,
                 "budget_exceeded": False,
+                "paid_ledger_schema_version": _LEDGER_SCHEMA_VERSION,
+                "paid_ledger_required_fields": list(_LEDGER_REQUIRED_FIELDS),
+                "paid_ledger_required_field_completeness": 100.0,
             }
         connection = self._connect(path)
         try:
             run_id = self.environ["CHATBI_TEST_RUN_ID"].strip()
-            rows = connection.execute(
-                """SELECT provider, gate_name, actual_cost_cny, status, input_tokens,
-                   cached_input_tokens, output_tokens, retry_count, fallback_count,
-                   duplicate_key, necessity_declaration, deterministic_insufficient_reason,
-                   daily_cost_before_cny, daily_cost_after_cny, case_id, model
-                   FROM paid_test_calls WHERE test_run_id = ? ORDER BY created_at, call_id""",
+            cursor = connection.execute(
+                "SELECT * FROM paid_test_calls WHERE test_run_id = ? ORDER BY created_at, call_id",
                 (run_id,),
-            ).fetchall()
+            )
+            names = [str(item[0]) for item in cursor.description]
+            rows = [dict(zip(names, row, strict=True)) for row in cursor.fetchall()]
+            schema_columns = {
+                str(row[1]) for row in connection.execute("PRAGMA table_info(paid_test_calls)").fetchall()
+            }
+            schema_version = self._schema_version(connection)
             level2_runs = connection.execute(
                 "SELECT COUNT(*) FROM paid_level2_runs WHERE git_sha = ?",
                 (configuration["git_sha"],),
@@ -677,30 +850,62 @@ class TestCostController:
             connection.close()
         by_provider: dict[str, float] = {}
         by_gate: dict[str, float] = {}
-        for provider, gate, cost, *_ in rows:
+        for row in rows:
+            provider = str(row["provider"])
+            gate = str(row["gate_name"])
+            cost = float(row["cost_cny"])
             by_provider[provider] = round(by_provider.get(provider, 0.0) + float(cost), 8)
             by_gate[gate] = round(by_gate.get(gate, 0.0) + float(cost), 8)
-        paid_cost = round(sum(float(row[2]) for row in rows), 8)
+        paid_cost = round(sum(float(row["cost_cny"]) for row in rows), 8)
+        schema_present = sum(field in schema_columns for field in _LEDGER_REQUIRED_FIELDS)
+        schema_completeness = round(100.0 * schema_present / len(_LEDGER_REQUIRED_FIELDS), 2)
+        populated_cells = sum(
+            value is not None and (not isinstance(value, str) or bool(value.strip()))
+            for row in rows
+            for field in _LEDGER_REQUIRED_FIELDS
+            for value in (row.get(field),)
+        )
+        required_cells = len(rows) * len(_LEDGER_REQUIRED_FIELDS)
+        record_completeness = round(100.0 * populated_cells / required_cells, 2) if required_cells else 100.0
+        completeness = min(schema_completeness, record_completeness)
         return {
             **configuration,
             "paid_test_calls": len(rows),
             "paid_test_cost_cny": paid_cost,
             "cost_by_provider": by_provider,
             "cost_by_gate": by_gate,
-            "input_tokens": sum(int(row[4]) for row in rows),
-            "cached_input_tokens": sum(int(row[5]) for row in rows),
-            "output_tokens": sum(int(row[6]) for row in rows),
-            "retry_count": sum(int(row[7]) for row in rows),
-            "fallback_count": sum(int(row[8]) for row in rows),
-            "duplicate_keys": [str(row[9]) for row in rows],
-            "necessity_declarations_complete": all(row[10] == "YES" and bool(row[11]) for row in rows),
-            "daily_cost_before_cny": min((float(row[12]) for row in rows), default=0.0),
-            "daily_cost_after_cny": max((float(row[13]) for row in rows), default=0.0),
-            "case_ids": [str(row[14]) for row in rows],
-            "models": [str(row[15]) for row in rows],
+            "input_tokens": sum(int(row["input_tokens"]) for row in rows),
+            "cached_input_tokens": sum(int(row["cached_input_tokens"]) for row in rows),
+            "output_tokens": sum(int(row["output_tokens"]) for row in rows),
+            "retry_count": sum(int(row["retry_count"]) for row in rows),
+            "fallback_count": sum(int(row["fallback_count"]) for row in rows),
+            "duplicate_keys": [str(row["duplicate_key"]) for row in rows],
+            "necessity_declarations_complete": all(
+                row["necessity_declaration"] == "YES" and bool(row["deterministic_insufficient_reason"])
+                for row in rows
+            ),
+            "daily_cost_before_cny": min((float(row["daily_cost_before_cny"]) for row in rows), default=0.0),
+            "daily_cost_after_cny": max((float(row["daily_cost_after_cny"]) for row in rows), default=0.0),
+            "case_ids": [str(row["case_id"]) for row in rows],
+            "models": [str(row["model"]) for row in rows],
+            "trace_ids": [str(row["trace_id"]) for row in rows],
+            "request_ids": [str(row["request_id"]) for row in rows],
+            "latency_ms": [int(row["latency_ms"]) for row in rows],
+            "premium_escalations": [bool(row["premium_escalation"]) for row in rows],
+            "ledger_records": [
+                {field: row.get(field) for field in _LEDGER_REQUIRED_FIELDS} for row in rows
+            ],
+            "paid_ledger_schema_version": int(schema_version),
+            "paid_ledger_required_fields": list(_LEDGER_REQUIRED_FIELDS),
+            "paid_ledger_schema_field_completeness": schema_completeness,
+            "paid_ledger_record_field_completeness": record_completeness,
+            "paid_ledger_required_field_completeness": completeness,
             "untracked_paid_calls": 0,
             "unnecessary_duplicate_paid_calls": 0,
-            "unbounded_retry": int(any(int(row[7]) > int(self.policy["limits"]["provider_max_retry"]) for row in rows)),
+            "unbounded_retry": int(any(
+                int(row["retry_count"]) > int(self.policy["limits"]["provider_max_retry"])
+                for row in rows
+            )),
             "level2_runs_per_sha": int(level2_runs),
             "budget_exceeded": paid_cost > float(configuration["run_budget_cny"]),
         }

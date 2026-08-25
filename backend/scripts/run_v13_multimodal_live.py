@@ -20,6 +20,11 @@ from PIL import Image, ImageDraw, ImageFont
 from pypdf import PdfReader, PdfWriter
 
 from app.core.config import get_settings
+from app.certification.runtime_binding import (
+    RuntimeBindingError,
+    run_exact_sha_runtime_preflight,
+    seal_runtime_preflight_receipt,
+)
 from app.file_multimodal.comparison import compare_image_with_database
 from app.file_multimodal.contracts import (
     DatabaseEvidence,
@@ -784,6 +789,13 @@ def main() -> int:
             write_report(payload, arguments.output)
         print(json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True))
         return 0 if payload["status"] == "PASS" else 1
+    try:
+        runtime_preflight = run_exact_sha_runtime_preflight(
+            repo_root=_ROOT,
+            expected_git_sha=os.environ.get("CHATBI_TEST_SHA", ""),
+        )
+    except RuntimeBindingError as exc:
+        raise SystemExit(str(exc)) from exc
     controller = TestCostController()
     try:
         configuration = controller.validate_configuration()
@@ -791,6 +803,9 @@ def main() -> int:
         raise SystemExit(str(exc)) from exc
     if not configuration.get("paid_calls_allowed"):
         raise SystemExit("LIVE_MULTIMODAL_REQUIRES_LEVEL1_OR_LEVEL2_AUTHORIZATION")
+    runtime_preflight = seal_runtime_preflight_receipt(
+        runtime_preflight, config_hash=controller.config_hash
+    )
     selected = frozenset(arguments.case_id or ())
     if controller.level == TestExecutionLevel.LEVEL1:
         if not selected or len(selected) > 3:
@@ -806,6 +821,7 @@ def main() -> int:
     )
     payload["tested_sha"] = configuration["tested_sha"]
     payload["backend_cost_control_identity"] = controller.runtime_identity()
+    payload["exact_sha_runtime_preflight"] = runtime_preflight
     payload["paid_test_summary"] = controller.summary()
     payload["evidence_signature"] = canonical_sha256({
         key: value for key, value in payload.items() if key != "evidence_signature"

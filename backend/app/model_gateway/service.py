@@ -158,6 +158,12 @@ class ModelGateway:
             raise error("No configured model provider is available")
         return candidates
 
+    def _premium_escalation(self, request: ModelRequest, provider: ResolvedProvider) -> bool:
+        """Describe the gateway's resolved premium decision without changing routing."""
+
+        explicit_provider = self.policy.resolve_alias(request.requested_alias)
+        return provider.provider_id == "kimi" and explicit_provider != "kimi"
+
     def _payload(self, provider: ResolvedProvider, request: ModelRequest, *, stream: bool) -> dict[str, Any]:
         max_output_tokens = self.policy.max_output_tokens(request)
         if self.transport is None:
@@ -249,6 +255,7 @@ class ModelGateway:
                         retry_count=attempt,
                         recorded_transport=self.transport is not None,
                         fallback_count=fallback_count,
+                        premium_escalation=self._premium_escalation(request, provider),
                     )
                     timeout = request.timeout_seconds or float(self.health_config["request_timeout_seconds"])
                     with httpx.Client(timeout=timeout, transport=self.transport) as client:
@@ -290,7 +297,10 @@ class ModelGateway:
                     self._circuits.success(provider.provider_id)
                     self.last_response = result
                     self.test_cost_control.complete_attempt(
-                        paid_attempt, status="SUCCEEDED", response=result
+                        paid_attempt,
+                        status="SUCCEEDED",
+                        response=result,
+                        latency_ms=round((perf_counter() - attempt_started) * 1000),
                     )
                     record_model_invocation(
                         context, request, response=result, provider=result.resolved_provider,
@@ -318,7 +328,10 @@ class ModelGateway:
                     status = exc.response.status_code if isinstance(exc, httpx.HTTPStatusError) else "transport"
                     error_code = f"HTTP_{status}" if isinstance(status, int) else type(exc).__name__
                     self.test_cost_control.complete_attempt(
-                        paid_attempt, status="FAILED", error_code=error_code
+                        paid_attempt,
+                        status="FAILED",
+                        error_code=error_code,
+                        latency_ms=round((perf_counter() - attempt_started) * 1000),
                     )
                     failures.append(f"{provider.provider_id}:{type(exc).__name__}:{status}:attempt{attempt + 1}")
                     self._circuits.failure(provider.provider_id)
@@ -337,7 +350,10 @@ class ModelGateway:
                     break
                 except (KeyError, TypeError, ValueError, json.JSONDecodeError) as exc:
                     self.test_cost_control.complete_attempt(
-                        paid_attempt, status="FAILED", error_code=type(exc).__name__
+                        paid_attempt,
+                        status="FAILED",
+                        error_code=type(exc).__name__,
+                        latency_ms=round((perf_counter() - attempt_started) * 1000),
                     )
                     failures.append(f"{provider.provider_id}:{type(exc).__name__}:attempt{attempt + 1}")
                     self._circuits.failure(provider.provider_id)
@@ -354,7 +370,10 @@ class ModelGateway:
                     if cancellation_event is None or not cancellation_event.is_set():
                         raise
                     self.test_cost_control.complete_attempt(
-                        paid_attempt, status="CANCELLED", error_code="REQUEST_CANCELLED"
+                        paid_attempt,
+                        status="CANCELLED",
+                        error_code="REQUEST_CANCELLED",
+                        latency_ms=round((perf_counter() - attempt_started) * 1000),
                     )
                     record_model_invocation(
                         context, request, response=None, provider=provider.provider_id,
@@ -492,6 +511,7 @@ class ModelGateway:
                         retry_count=attempt,
                         recorded_transport=self.transport is not None,
                         fallback_count=fallback_count,
+                        premium_escalation=self._premium_escalation(request, provider),
                     )
                     timeout = request.timeout_seconds or float(self.health_config["request_timeout_seconds"])
                     with httpx.Client(timeout=timeout, transport=self.transport) as client:
@@ -541,7 +561,10 @@ class ModelGateway:
                     self._circuits.success(provider.provider_id)
                     self.last_response = result
                     self.test_cost_control.complete_attempt(
-                        paid_attempt, status="SUCCEEDED", response=result
+                        paid_attempt,
+                        status="SUCCEEDED",
+                        response=result,
+                        latency_ms=round((perf_counter() - attempt_started) * 1000),
                     )
                     record_model_invocation(
                         context, request, response=result, provider=result.resolved_provider,
@@ -568,7 +591,10 @@ class ModelGateway:
                 except httpx.HTTPError as exc:
                     if emitted:
                         self.test_cost_control.complete_attempt(
-                            paid_attempt, status="FAILED", error_code="STREAM_HTTP_ERROR"
+                            paid_attempt,
+                            status="FAILED",
+                            error_code="STREAM_HTTP_ERROR",
+                            latency_ms=round((perf_counter() - attempt_started) * 1000),
                         )
                         record_model_invocation(
                             context, request, response=None, provider=provider.provider_id,
@@ -582,7 +608,10 @@ class ModelGateway:
                     status = exc.response.status_code if isinstance(exc, httpx.HTTPStatusError) else "transport"
                     error_code = f"HTTP_{status}" if isinstance(status, int) else type(exc).__name__
                     self.test_cost_control.complete_attempt(
-                        paid_attempt, status="FAILED", error_code=error_code
+                        paid_attempt,
+                        status="FAILED",
+                        error_code=error_code,
+                        latency_ms=round((perf_counter() - attempt_started) * 1000),
                     )
                     failures.append(f"{provider.provider_id}:{type(exc).__name__}:{status}:attempt{attempt + 1}")
                     self._circuits.failure(provider.provider_id)
@@ -602,7 +631,10 @@ class ModelGateway:
                 except (KeyError, TypeError, ValueError, json.JSONDecodeError) as exc:
                     if emitted:
                         self.test_cost_control.complete_attempt(
-                            paid_attempt, status="FAILED", error_code="STREAM_INVALID_RESPONSE"
+                            paid_attempt,
+                            status="FAILED",
+                            error_code="STREAM_INVALID_RESPONSE",
+                            latency_ms=round((perf_counter() - attempt_started) * 1000),
                         )
                         record_model_invocation(
                             context, request, response=None, provider=provider.provider_id,
@@ -614,7 +646,10 @@ class ModelGateway:
                         )
                         raise ModelUnavailable("Provider stream became invalid after content was emitted") from exc
                     self.test_cost_control.complete_attempt(
-                        paid_attempt, status="FAILED", error_code=type(exc).__name__
+                        paid_attempt,
+                        status="FAILED",
+                        error_code=type(exc).__name__,
+                        latency_ms=round((perf_counter() - attempt_started) * 1000),
                     )
                     failures.append(f"{provider.provider_id}:{type(exc).__name__}:attempt{attempt + 1}")
                     self._circuits.failure(provider.provider_id)
@@ -631,7 +666,10 @@ class ModelGateway:
                     if cancellation_event is None or not cancellation_event.is_set():
                         raise
                     self.test_cost_control.complete_attempt(
-                        paid_attempt, status="CANCELLED", error_code="REQUEST_CANCELLED"
+                        paid_attempt,
+                        status="CANCELLED",
+                        error_code="REQUEST_CANCELLED",
+                        latency_ms=round((perf_counter() - attempt_started) * 1000),
                     )
                     record_model_invocation(
                         context, request, response=None, provider=provider.provider_id,

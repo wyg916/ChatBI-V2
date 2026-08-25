@@ -8,6 +8,11 @@ from datetime import datetime, timezone
 from pathlib import Path
 from uuid import uuid4
 
+from app.certification.runtime_binding import (
+    RuntimeBindingError,
+    run_exact_sha_runtime_preflight,
+    seal_runtime_preflight_receipt,
+)
 from app.core.config import get_settings
 from app.model_gateway import BudgetMode, ModelCapability, ModelGateway, ModelRequest, RequestContext
 from app.model_gateway.test_cost_control import TestCostControlError, TestCostController, TestExecutionLevel
@@ -37,6 +42,13 @@ def _write_evidence(path: Path, payload: dict[str, object]) -> None:
 
 def main() -> int:
     arguments = _arguments()
+    try:
+        runtime_preflight = run_exact_sha_runtime_preflight(
+            repo_root=Path(__file__).resolve().parents[2],
+            expected_git_sha=os.environ.get("CHATBI_TEST_SHA", ""),
+        )
+    except RuntimeBindingError as exc:
+        raise SystemExit(str(exc)) from exc
     controller = TestCostController()
     try:
         configuration = controller.validate_configuration()
@@ -44,6 +56,9 @@ def main() -> int:
         raise SystemExit(str(exc)) from exc
     if not configuration.get("paid_calls_allowed"):
         raise SystemExit("REAL_PROVIDER_SMOKE_REQUIRES_LEVEL1_OR_LEVEL2_AUTHORIZATION")
+    runtime_preflight = seal_runtime_preflight_receipt(
+        runtime_preflight, config_hash=controller.config_hash
+    )
     providers = tuple(arguments.provider or ())
     if controller.level == TestExecutionLevel.LEVEL1 and not providers:
         raise SystemExit("LEVEL1_REQUIRES_EXPLICIT_TARGET_PROVIDER")
@@ -122,6 +137,7 @@ def main() -> int:
         "authorization_headers_exposed": False,
         "cost_control_failure": cost_control_failure,
         "backend_cost_control_identity": controller.runtime_identity(),
+        "exact_sha_runtime_preflight": runtime_preflight,
         "paid_test_summary": controller.summary(),
         "results": results,
         "status": "PASS" if all(item["status"] == "PASS" for item in results) else "FAIL",

@@ -18,6 +18,11 @@ from uuid import uuid4
 import httpx
 from dotenv import dotenv_values
 
+from app.certification.runtime_binding import (
+    RuntimeBindingError,
+    run_exact_sha_runtime_preflight,
+    seal_runtime_preflight_receipt,
+)
 from app.model_gateway.test_cost_control import TestCostControlError, TestCostController, TestExecutionLevel
 
 
@@ -1435,6 +1440,15 @@ def main(argv: Sequence[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     if args.timeout_seconds <= 0:
         raise SystemExit("--timeout-seconds must be positive")
+    runtime_preflight: dict[str, Any] | None = None
+    if not args.level0_deterministic:
+        try:
+            runtime_preflight = run_exact_sha_runtime_preflight(
+                repo_root=REPO_ROOT,
+                expected_git_sha=os.environ.get("CHATBI_TEST_SHA", ""),
+            )
+        except RuntimeBindingError as exc:
+            raise SystemExit(str(exc)) from exc
     controller = TestCostController()
     try:
         configuration = controller.validate_configuration()
@@ -1445,6 +1459,10 @@ def main(argv: Sequence[str] | None = None) -> int:
             raise SystemExit("LEVEL0_DETERMINISTIC_REQUIRES_LEVEL0_WITH_PAID_CALLS_DISABLED")
     elif not configuration.get("paid_calls_allowed"):
         raise SystemExit("LIVE_QUESTIONS_GATE_REQUIRES_LEVEL1_OR_LEVEL2_AUTHORIZATION")
+    if runtime_preflight is not None:
+        runtime_preflight = seal_runtime_preflight_receipt(
+            runtime_preflight, config_hash=controller.config_hash
+        )
     selected_weird = frozenset(args.weird_case or ())
     selected_complex = frozenset(args.complex_case or ())
     selected_count = len(selected_complex)
@@ -1500,6 +1518,9 @@ def main(argv: Sequence[str] | None = None) -> int:
             expected_cost_control_identity=runtime_identity,
             tested_sha=runtime_tested_sha(runtime_identity),
         )
+    evidence["exact_sha_runtime_preflight"] = runtime_preflight or {
+        "status": "NOT_APPLICABLE_LEVEL0_DETERMINISTIC"
+    }
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps(evidence, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     print(json.dumps({
