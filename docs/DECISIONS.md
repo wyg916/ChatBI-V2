@@ -1,5 +1,9 @@
 # Architecture Decisions
 
+## ADR-061：查询容量以可取消 FIFO 槽位防止 EXPLAIN 在持续负载下饥饿
+
+SQL 安全链的 EXPLAIN 与实际只读执行继续共享固定 `query_concurrency` 上限，等待时间继续受原查询超时约束，任何失败仍 fail closed。标准 `BoundedSemaphore` 不承诺等待者先到先得；EXPLAIN 与执行分别竞争槽位时，持续进入的新请求可能反复插队，使少量早到请求在数据库未被访问前以 `QUERY_CONCURRENCY_LIMIT` 超时，外层表现为 `QUERY_EXPLAIN_REQUIRED`。查询槽位因此改为进程内可取消 FIFO 队列：每个等待者持有稳定 ticket，释放只唤醒队首资格，取消或超时会原子移除自身且不泄漏容量；并发首次初始化也由锁保证只有一个共享 Gate。该修复不增加 retry、不放宽超时、不提高并发上限，也不绕过 EXPLAIN、SQL Guard 或只读事务。
+
 ## ADR-060：刷新持久化按同步精确状态与异步行身份保存分别证明
 
 控件认证不能把刷新后“整个业务组的聚合状态必须与动作后即时状态字节级相等”作为所有操作的共同持久化定义。Ask 结果路由带查询参数时，刷新会按产品契约再次执行确定性查询并追加 Conversation、Message 与 QueryRun；Evaluation Run 也允许从 RUNNING 异步收敛为终态。这些新增或终态更新不代表原动作数据丢失。DB probe 因此为每张受控表输出基于主键的脱敏 identity digest 集合。普通同步 mutation group 继续要求动作后与刷新后精确 fingerprint 相等；仅 Chat 与 Evaluation 允许异步收敛，但必须证明动作后每一个行身份在刷新后仍存在、所有表行数不下降、变化表非空且缺失 identity digest 为 0。该例外不允许删除后重建、减少行数或只比较 HTTP 200。

@@ -4,6 +4,7 @@ import hashlib
 import json
 import threading
 import time
+from collections import deque
 from datetime import date, datetime
 from decimal import Decimal
 from typing import Any
@@ -41,21 +42,71 @@ def result_signature(columns: list[str], rows: list[dict[str, Any]], *, order_in
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
 
+class _FairBoundedSemaphore:
+    """A bounded FIFO semaphore that supports cancellation while queued."""
+
+    def __init__(self, value: int) -> None:
+        if value < 1:
+            raise ValueError("semaphore initial value must be at least one")
+        self._capacity = value
+        self._available = value
+        self._condition = threading.Condition()
+        self._waiters: deque[object] = deque()
+
+    def acquire_until(
+        self,
+        *,
+        timeout_seconds: float,
+        cancellation_event: threading.Event | None = None,
+    ) -> tuple[bool, bool]:
+        ticket = object()
+        deadline = time.perf_counter() + max(0.0, timeout_seconds)
+        with self._condition:
+            self._waiters.append(ticket)
+            while True:
+                if cancellation_event is not None and cancellation_event.is_set():
+                    self._waiters.remove(ticket)
+                    self._condition.notify_all()
+                    return False, True
+                if self._waiters[0] is ticket and self._available > 0:
+                    self._waiters.popleft()
+                    self._available -= 1
+                    self._condition.notify_all()
+                    return True, False
+                remaining = deadline - time.perf_counter()
+                if remaining <= 0:
+                    self._waiters.remove(ticket)
+                    self._condition.notify_all()
+                    return False, False
+                self._condition.wait(
+                    timeout=min(0.05, remaining) if cancellation_event is not None else remaining
+                )
+
+    def release(self) -> None:
+        with self._condition:
+            if self._available >= self._capacity:
+                raise ValueError("Semaphore released too many times")
+            self._available += 1
+            self._condition.notify_all()
+
+
 class QueryExecutor:
-    _semaphore: threading.BoundedSemaphore | None = None
+    _semaphore: _FairBoundedSemaphore | None = None
     _semaphore_size: int | None = None
+    _semaphore_lock = threading.Lock()
 
     @classmethod
-    def _limit_semaphore(cls) -> threading.BoundedSemaphore:
+    def _limit_semaphore(cls) -> _FairBoundedSemaphore:
         size = max(1, get_settings().query_concurrency)
-        if cls._semaphore is None or cls._semaphore_size != size:
-            cls._semaphore = threading.BoundedSemaphore(size)
-            cls._semaphore_size = size
-        return cls._semaphore
+        with cls._semaphore_lock:
+            if cls._semaphore is None or cls._semaphore_size != size:
+                cls._semaphore = _FairBoundedSemaphore(size)
+                cls._semaphore_size = size
+            return cls._semaphore
 
     @staticmethod
     def _acquire_slot(
-        semaphore: threading.BoundedSemaphore,
+        semaphore: threading.BoundedSemaphore | _FairBoundedSemaphore,
         *,
         timeout_ms: int,
         cancellation_event: threading.Event | None = None,
@@ -68,7 +119,14 @@ class QueryExecutor:
         queued until the full deadline.
         """
 
-        deadline = time.perf_counter() + max(0, timeout_ms) / 1000
+        timeout_seconds = max(0, timeout_ms) / 1000
+        if isinstance(semaphore, _FairBoundedSemaphore):
+            return semaphore.acquire_until(
+                timeout_seconds=timeout_seconds,
+                cancellation_event=cancellation_event,
+            )
+
+        deadline = time.perf_counter() + timeout_seconds
         while True:
             if cancellation_event is not None and cancellation_event.is_set():
                 return False, True
