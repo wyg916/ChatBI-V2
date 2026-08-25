@@ -4,7 +4,8 @@
   "level_caps_cny": {
     "level0": 0.5,
     "level1": 1.5,
-    "level2": 3.0
+    "level2": 3.0,
+    "final": 3.0
   },
   "budgets_cny": {
     "normal_fix_iteration": 0.5,
@@ -16,6 +17,7 @@
   "limits": {
     "level1_max_real_provider_requests": 30,
     "level2_max_real_provider_requests": 1000,
+    "final_max_real_provider_requests": 12,
     "provider_max_retry": 1,
     "default_max_output_tokens": 512,
     "complex_max_output_tokens": 1024

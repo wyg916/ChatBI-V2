@@ -807,9 +807,9 @@ def main() -> int:
         runtime_preflight, config_hash=controller.config_hash
     )
     selected = frozenset(arguments.case_id or ())
-    if controller.level == TestExecutionLevel.LEVEL1:
+    if controller.level in {TestExecutionLevel.LEVEL1, TestExecutionLevel.FINAL}:
         if not selected or len(selected) > 3:
-            raise SystemExit("LEVEL1_MULTIMODAL_REQUIRES_ONE_TO_THREE_EXPLICIT_CASES")
+            raise SystemExit("TARGETED_OR_FINAL_MULTIMODAL_REQUIRES_ONE_TO_THREE_EXPLICIT_CASES")
     elif selected:
         raise SystemExit("LEVEL2_FINAL_MULTIMODAL_CERTIFICATION_MUST_EXECUTE_ALL_TEN_CASES")
     gateway = ModelGateway(get_settings())

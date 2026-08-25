@@ -60,8 +60,8 @@ def main() -> int:
         runtime_preflight, config_hash=controller.config_hash
     )
     providers = tuple(arguments.provider or ())
-    if controller.level == TestExecutionLevel.LEVEL1 and not providers:
-        raise SystemExit("LEVEL1_REQUIRES_EXPLICIT_TARGET_PROVIDER")
+    if controller.level in {TestExecutionLevel.LEVEL1, TestExecutionLevel.FINAL} and not providers:
+        raise SystemExit("TARGETED_OR_FINAL_REQUIRES_EXPLICIT_TARGET_PROVIDER")
     if controller.level == TestExecutionLevel.LEVEL2 and providers:
         raise SystemExit("LEVEL2_FINAL_PROVIDER_SMOKE_MUST_EXECUTE_ALL_THREE_PROVIDERS")
     providers = providers or ("mimo", "deepseek", "kimi")

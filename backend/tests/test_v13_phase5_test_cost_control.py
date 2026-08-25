@@ -128,6 +128,13 @@ def _level2_environment(tmp_path: Path, *, run_id: str = "RUN-FINAL-001", **upda
     return environment
 
 
+def _final_environment(tmp_path: Path, *, run_id: str = "RUN-OWNER-FINAL-001", **updates: str) -> dict[str, str]:
+    environment = _level2_environment(tmp_path, run_id=run_id)
+    environment["CHATBI_TEST_EXECUTION_LEVEL"] = "FINAL"
+    environment.update(updates)
+    return environment
+
+
 def test_level0_blocks_real_transport_before_any_http_call(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("CHATBI_TEST_COST_CONTROL", "YES")
     monkeypatch.setenv("CHATBI_TEST_EXECUTION_LEVEL", "LEVEL0")
@@ -414,6 +421,43 @@ def test_level2_requires_same_sha_complete_level0_receipt_and_cache_bypass(tmp_p
     environment["CHATBI_PAID_TEST_CACHE_BYPASS"] = "NO"
     with pytest.raises(CostControlError, match="PAID_TEST_CACHE_BYPASS_REQUIRED"):
         _cost_controller(environment).validate_configuration()
+
+
+def test_owner_final_level_writes_final_ledger_identity_and_caps_calls_at_twelve(tmp_path: Path) -> None:
+    controller = _cost_controller(_final_environment(tmp_path))
+    configuration = controller.validate_configuration()
+    assert configuration["level"] == "FINAL"
+    assert configuration["run_budget_cny"] == 3.0
+
+    for index in range(12):
+        attempt = controller.reserve_attempt(
+            provider="mimo",
+            model="mimo-test",
+            request=_request(),
+            context=RequestContext(
+                request_id=f"REQ-FINAL-{index}",
+                trace_id=f"TRACE-FINAL-{index}",
+            ),
+            estimated_cost_cny=0,
+            retry_count=0,
+            recorded_transport=False,
+        )
+        assert attempt is not None
+    with pytest.raises(CostControlError, match="MAX_REAL_PROVIDER_REQUESTS_EXCEEDED"):
+        controller.reserve_attempt(
+            provider="mimo",
+            model="mimo-test",
+            request=_request(),
+            context=RequestContext(request_id="REQ-FINAL-12", trace_id="TRACE-FINAL-12"),
+            estimated_cost_cny=0,
+            retry_count=0,
+            recorded_transport=False,
+        )
+
+    with sqlite3.connect(tmp_path / "phase5-paid-test-ledger.sqlite3") as connection:
+        assert connection.execute(
+            "SELECT DISTINCT test_level FROM paid_test_calls"
+        ).fetchall() == [("FINAL",)]
 
 
 def test_level2_is_registered_only_once_per_final_sha(tmp_path: Path) -> None:

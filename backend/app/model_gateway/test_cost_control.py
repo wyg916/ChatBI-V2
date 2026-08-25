@@ -89,6 +89,7 @@ class TestExecutionLevel(StrEnum):
     LEVEL0 = "LEVEL0"
     LEVEL1 = "LEVEL1"
     LEVEL2 = "LEVEL2"
+    FINAL = "FINAL"
 
 
 def _enabled(value: str | None) -> bool:
@@ -102,7 +103,8 @@ def _level(value: str | None) -> TestExecutionLevel:
                "1": TestExecutionLevel.LEVEL1, "L1": TestExecutionLevel.LEVEL1,
                "LEVEL1": TestExecutionLevel.LEVEL1,
                "2": TestExecutionLevel.LEVEL2, "L2": TestExecutionLevel.LEVEL2,
-               "LEVEL2": TestExecutionLevel.LEVEL2}
+               "LEVEL2": TestExecutionLevel.LEVEL2,
+               "FINAL": TestExecutionLevel.FINAL}
     try:
         return aliases[normalized]
     except KeyError as exc:
@@ -277,6 +279,7 @@ class TestCostController:
             TestExecutionLevel.LEVEL0: "normal_fix_iteration",
             TestExecutionLevel.LEVEL1: "pre_final_live",
             TestExecutionLevel.LEVEL2: "final_certification",
+            TestExecutionLevel.FINAL: "final_certification",
         }[self.level]
         budget_class = self.environ.get("CHATBI_TEST_BUDGET_CLASS", default_budget_class).strip().lower()
         budgets = self.policy["budgets_cny"]
@@ -284,6 +287,7 @@ class TestCostController:
             TestExecutionLevel.LEVEL0: {"normal_fix_iteration"},
             TestExecutionLevel.LEVEL1: {"normal_fix_iteration", "targeted_live_regression", "pre_final_live"},
             TestExecutionLevel.LEVEL2: {"final_certification"},
+            TestExecutionLevel.FINAL: {"final_certification"},
         }[self.level]
         if budget_class not in allowed_budget_classes:
             raise TestCostControlError("TEST_BUDGET_CLASS_NOT_ALLOWED_FOR_LEVEL")
@@ -590,11 +594,12 @@ class TestCostController:
             model=model,
             request=request,
         )
-        max_requests_key = (
-            "level1_max_real_provider_requests"
-            if self.level == TestExecutionLevel.LEVEL1
-            else "level2_max_real_provider_requests"
-        )
+        max_requests_key = {
+            TestExecutionLevel.LEVEL0: "level1_max_real_provider_requests",
+            TestExecutionLevel.LEVEL1: "level1_max_real_provider_requests",
+            TestExecutionLevel.LEVEL2: "level2_max_real_provider_requests",
+            TestExecutionLevel.FINAL: "final_max_real_provider_requests",
+        }[self.level]
         max_requests = int(self.policy["limits"][max_requests_key])
         run_budget = float(configuration["run_budget_cny"])
         daily_cap = float(configuration["daily_hard_cap_cny"])
@@ -612,7 +617,7 @@ class TestCostController:
                    FROM paid_test_calls WHERE test_date = ?""",
                 (test_date,),
             ).fetchone()[0]
-            if self.level == TestExecutionLevel.LEVEL2:
+            if self.level in {TestExecutionLevel.LEVEL2, TestExecutionLevel.FINAL}:
                 registered_run = connection.execute(
                     "SELECT test_run_id FROM paid_level2_runs WHERE git_sha = ?",
                     (configuration["git_sha"],),

@@ -1385,6 +1385,8 @@ def run_live_gate(
         "certification_scope": (
             "LEVEL0_FULL"
             if execution_mode == "level0_deterministic"
+            else "FINAL_REPRESENTATIVE_COMPLEX"
+            if execution_mode == "final_representative"
             else "LEVEL2_COMPLEX5_REQUIRED_LIVE"
             if not selected_weird_ids and selected_complex_ids == all_complex_ids
             else "FULL_FINAL"
@@ -1469,11 +1471,12 @@ def main(argv: Sequence[str] | None = None) -> int:
     if args.level0_deterministic:
         if selected_count:
             raise SystemExit("LEVEL0_DETERMINISTIC_MUST_EXECUTE_FULL_WEIRD50_AND_COMPLEX5")
-    elif controller.level == TestExecutionLevel.LEVEL1:
+    elif controller.level in {TestExecutionLevel.LEVEL1, TestExecutionLevel.FINAL}:
         if selected_weird:
             raise SystemExit("PAID_WEIRD50_NOT_ALLOWED_USE_LEVEL0_DETERMINISTIC")
-        if selected_count == 0 or selected_count > 3:
-            raise SystemExit("LEVEL1_REQUIRES_ONE_TO_THREE_EXPLICIT_FAILED_CASES")
+        minimum = 2 if controller.level == TestExecutionLevel.FINAL else 1
+        if selected_count < minimum or selected_count > 3:
+            raise SystemExit("FINAL_REQUIRES_TWO_TO_THREE_OR_LEVEL1_ONE_TO_THREE_EXPLICIT_CASES")
     elif selected_weird or selected_complex:
         raise SystemExit("LEVEL2_FINAL_CERTIFICATION_DISALLOWS_CASE_FILTERS")
     credentials = load_external_credentials(
@@ -1508,13 +1511,23 @@ def main(argv: Sequence[str] | None = None) -> int:
             controller_client=controller_client,
             weird_case_ids=(
                 selected_weird
-                if controller.level == TestExecutionLevel.LEVEL1
+                if controller.level in {TestExecutionLevel.LEVEL1, TestExecutionLevel.FINAL}
                 else frozenset()
                 if controller.level == TestExecutionLevel.LEVEL2
                 else None
             ),
-            complex_case_ids=selected_complex if controller.level == TestExecutionLevel.LEVEL1 else None,
-            execution_mode="level0_deterministic" if args.level0_deterministic else "live",
+            complex_case_ids=(
+                selected_complex
+                if controller.level in {TestExecutionLevel.LEVEL1, TestExecutionLevel.FINAL}
+                else None
+            ),
+            execution_mode=(
+                "level0_deterministic"
+                if args.level0_deterministic
+                else "final_representative"
+                if controller.level == TestExecutionLevel.FINAL
+                else "live"
+            ),
             expected_cost_control_identity=runtime_identity,
             tested_sha=runtime_tested_sha(runtime_identity),
         )

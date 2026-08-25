@@ -1,5 +1,11 @@
 # Architecture Decisions
 
+## ADR-062：最终真实 Provider 认证使用独立 FINAL 等级和代表性 Case 上限
+
+负责人批准的 Phase 5 收口不再重复执行 Level1 定向与 Level2 全量付费套件。测试成本控制器新增 `FINAL` 等级：仍要求 exact SHA Runtime Preflight、同 SHA 完整 Level0 Receipt、最终认证与 Cache Bypass 标志、Provider allowlist、必要性说明、配置/Prompt 身份和外部 SQLite 台账；每 Run 最多 12 次真实 Provider 请求，运行预算 3.00 CNY、每日总预算 5.00 CNY，既有一次有界重试和非重试型 4xx 立即失败规则不变。每条账本必须原样记录 `test_level=FINAL`，不得用 Level1 结果或文档标签冒充。
+
+FINAL Runner 只允许显式选择 2～3 个 Complex Case，以及 1～3 个 Multimodal 代表 Case，从而覆盖 Agent/Tool/SQL 或 Python/Trace/Verification、扫描 PDF、复杂图表和 Premium Vision；完整 Complex5 与 Multimodal10 的 deterministic Level0 Evidence 通过受控 Delta Inheritance 保留。旧 Level1 仍用于受影响 Case 定向回归，旧 Level2 全量模式保持兼容；普通 Push 继续强制真实 Provider 调用为 0。
+
 ## ADR-061：查询容量以可取消 FIFO 槽位防止 EXPLAIN 在持续负载下饥饿
 
 SQL 安全链的 EXPLAIN 与实际只读执行继续共享固定 `query_concurrency` 上限，等待时间继续受原查询超时约束，任何失败仍 fail closed。标准 `BoundedSemaphore` 不承诺等待者先到先得；EXPLAIN 与执行分别竞争槽位时，持续进入的新请求可能反复插队，使少量早到请求在数据库未被访问前以 `QUERY_CONCURRENCY_LIMIT` 超时，外层表现为 `QUERY_EXPLAIN_REQUIRED`。查询槽位因此改为进程内可取消 FIFO 队列：每个等待者持有稳定 ticket，释放只唤醒队首资格，取消或超时会原子移除自身且不泄漏容量；并发首次初始化也由锁保证只有一个共享 Gate。该修复不增加 retry、不放宽超时、不提高并发上限，也不绕过 EXPLAIN、SQL Guard 或只读事务。
