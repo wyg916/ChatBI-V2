@@ -26,6 +26,19 @@ def _canonical_rows(rows: list[dict[str, Any]], columns: list[str]) -> list[dict
     return sorted(rows, key=lambda row: tuple(str(row.get(column)) for column in columns))
 
 
+def _valid_join_keys(value: Any) -> bool:
+    return (
+        isinstance(value, list)
+        and bool(value)
+        and all(
+            isinstance(key, dict)
+            and bool(str(key.get("left") or "").strip())
+            and bool(str(key.get("right") or "").strip())
+            for key in value
+        )
+    )
+
+
 def _join_uses_selected_entities(item: dict[str, Any], selected_tables: set[str]) -> bool:
     left = str(item.get("left") or "")
     right = str(item.get("right") or "")
@@ -37,12 +50,10 @@ def _join_uses_selected_entities(item: dict[str, Any], selected_tables: set[str]
     left_column = str(item.get("left_column") or "")
     right_column = str(item.get("right_column") or "")
     if any((left_table, right_table, left_column, right_column)):
-        return (
-            left_table in selected_tables
-            and right_table in selected_tables
-            and bool(left_column)
-            and bool(right_column)
-        )
+        endpoints_selected = left_table in selected_tables and right_table in selected_tables
+        if left_column or right_column:
+            return endpoints_selected and bool(left_column) and bool(right_column)
+        return endpoints_selected and _valid_join_keys(item.get("join_keys"))
 
     left_entity = str(item.get("left_entity") or "")
     right_entity = str(item.get("right_entity") or "")
@@ -50,8 +61,7 @@ def _join_uses_selected_entities(item: dict[str, Any], selected_tables: set[str]
     return (
         left_entity in selected_tables
         and right_entity in selected_tables
-        and bool(join_keys)
-        and all(isinstance(key, dict) and key.get("left") and key.get("right") for key in join_keys)
+        and _valid_join_keys(join_keys)
     )
 
 

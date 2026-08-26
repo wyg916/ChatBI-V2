@@ -1,5 +1,11 @@
 # Architecture Decisions
 
+## ADR-068：Result Oracle 接受两种严格等价的 Provider Join Key 结构
+
+Provider 的结构化 Join 可以把键表示为 `left_column/right_column`，也可以在同一 `left_table/right_table` 端点下表示为非空 `join_keys[{left,right}]`。Result Oracle 只在左右端点都精确属于 SQLPlan 已选表，并且选择的键形态完整时接受：列形态要求两列同时非空；列表形态要求列表非空、每项是对象且左右键同时非空。两种形态不得通过半列、空列表、空键、未选表或混合不完整字段降级通过。
+
+该兼容只修复 Oracle 对已经结构化并通过 SQL Guard/执行链的 Join 元数据验证，不从 SQL 文本猜测实体、不增加表或列、不放宽 Workspace、Schema、SQL AST、只读执行、复核查询或冻结结果验证。真实 Provider 在该边界失败的 Evidence 保留于原 SHA；修复必须进入新 forward successor 并从空账本重新认证。
+
 ## ADR-067：Canonical Projection 只沿唯一 CTE 输出做 AST Lineage 证明
 
 外部 Provider 可以把聚合放入 CTE，再由根 SELECT 投影 CTE 输出列。Projection Contract 只在根 SELECT 的 FROM 恰为一个 CTE、没有 Join、根投影是该 CTE 的直接列引用、CTE 名与输出名都唯一且 CTE 本体是 SELECT 时，沿该列回溯一次到内层投影表达式；任何多来源、重复输出、嵌套歧义、未知 Relation 或非直接引用都保持原表达式并最终 fail closed。回溯只用于 SQL AST、SQLPlan 和 Semantic Contract 的结构指纹比较，规范化仍只修改根 SELECT 的输出 alias 及同层安全依赖，不修改 CTE、底层列、Filter、Join 或 Result Oracle。
