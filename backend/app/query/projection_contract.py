@@ -242,6 +242,65 @@ def _semantic_fingerprint(
     return _fingerprint(expression, dialect=dialect, aliases=aliases, owners=owners)
 
 
+def _is_bound_year_grain_projection(
+    projection: exp.Expression,
+    expected: _ExpectedProjection,
+    *,
+    plan: SQLPlan,
+    root: exp.Select,
+    dialect: str,
+    aliases: dict[str, str],
+    owners: dict[str, set[str]],
+) -> bool:
+    """Prove a YEAR(date_dimension) projection from SQL AST, plan, and semantics."""
+
+    if (
+        expected.field.kind != "DIMENSION"
+        or expected.field.expected_projection_type.upper() not in {"DATE", "DATETIME", "TIMESTAMP"}
+        or expected.semantic_expression is None
+    ):
+        return False
+    body = _projection_body(projection)
+    if not isinstance(body, exp.Year):
+        return False
+    columns = list(body.find_all(exp.Column))
+    if len(columns) != 1:
+        return False
+    try:
+        semantic = parse_one(expected.semantic_expression, dialect=dialect)
+    except ParseError as exc:
+        raise ProjectionContractError("PROJECTION_SEMANTIC_EXPRESSION_INVALID") from exc
+    if not isinstance(semantic, exp.Column):
+        return False
+    if _fingerprint(columns[0], dialect=dialect, aliases=aliases, owners=owners) != _fingerprint(
+        semantic,
+        dialect=dialect,
+        aliases=aliases,
+        owners=owners,
+    ):
+        return False
+
+    body_fingerprint = _fingerprint(body, dialect=dialect, aliases=aliases, owners=owners)
+    group = root.args.get("group")
+    sql_group_expressions = list(group.expressions) if isinstance(group, exp.Group) else []
+    if body_fingerprint not in {
+        _fingerprint(item, dialect=dialect, aliases=aliases, owners=owners)
+        for item in sql_group_expressions
+    }:
+        return False
+
+    plan_group_fingerprints: set[str] = set()
+    for item in plan.group_by:
+        try:
+            parsed = parse_one(item, dialect=dialect)
+        except ParseError:
+            continue
+        plan_group_fingerprints.add(
+            _fingerprint(parsed, dialect=dialect, aliases=aliases, owners=owners)
+        )
+    return body_fingerprint in plan_group_fingerprints
+
+
 def _nearest_select(node: exp.Expression) -> exp.Select | None:
     parent = node.parent
     while parent is not None and not isinstance(parent, exp.Select):
@@ -412,6 +471,15 @@ class ProjectionContractValidator:
             projection_candidates[index] = [
                 item for item in remaining_expected
                 if semantic_fingerprints.get(item.field.canonical_name.casefold()) == projection_fingerprint
+                or _is_bound_year_grain_projection(
+                    projections[index],
+                    item,
+                    plan=plan,
+                    root=root,
+                    dialect=dialect,
+                    aliases=aliases,
+                    owners=owners,
+                )
             ]
 
         if any(len(candidates) > 1 for candidates in projection_candidates.values()):

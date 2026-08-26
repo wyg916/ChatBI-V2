@@ -8,6 +8,8 @@ SQLPlan 的服务端输出契约显式包含 dimensions、metrics 和受控 auxi
 
 确定性/Wren 已有 canonical alias 的 SQL 保持原字符串，不为无动作验证重写整棵 AST；Wren 比较查询的 `previous_<metric>`、`comparison_rate` 和 `contribution_rate` 仅在受信任服务端 Runtime 中作为显式 auxiliary 声明，外部 Provider 的同名额外输出仍不获得豁免。真实 MiMo 失败响应以脱敏 Recorded Fixture 回归，最终必须证明规范输出列为 `revenue`、值为 `1725750.0` 且 Result Oracle PASS。
 
+最终代表性 Complex 实跑又发现年度聚合投影的独立边界：SQLPlan 声明日期维度 `order_date`，SQL 投影可能是 `YEAR(order_date) AS year`。这类派生维度不允许按列包含关系或函数名猜测。当前唯一例外只接受 `YEAR` 这一冻结时间粒度，并同时要求语义对象为 DATE/DATETIME/TIMESTAMP、函数内恰有一个源列且与该语义表达式指纹相同、相同 YEAR AST 同时存在于 SQL `GROUP BY` 和 SQLPlan `group_by`；三方任一不一致仍以缺失规范输出 fail closed。证明成立后只把输出 alias 规范为 `order_date`，不会修改源列、GROUP BY 表达式、Filter、Join 或 Result Oracle。
+
 ## ADR-063：最终 Provider 响应先统一归一化，FINAL 调用由 Case 计划原子限额
 
 真实 Provider 的 Chat Completions 响应先进入唯一的协议归一化边界，再交给 NL2SQL 领域解析：文本既可为普通字符串，也可为已知的文本 Part 或严格对象；NL2SQL 只接受完整 JSON、完整 JSON Markdown Fence、单层已知包装或单层 JSON 字符串，不从自然语言中用正则提取 SQL。未知 Content/Tool/Usage 形状、歧义包装、数组、缺失字段或非法 SQLPlan 全部 fail closed，随后仍必须通过 SQLPlan 校验与 SQL Guard。历史失败执行没有保留可安全复现的原始 Provider Body，因此永久 Fixture 明确标为负责人授权的通用变体，不能伪称为历史原文。

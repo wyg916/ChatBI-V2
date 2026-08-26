@@ -79,6 +79,12 @@ def _context(*, dialect: str = "postgresql", duplicate_metric_expression: bool =
             "label": "省份",
             "source_column": "regions.province",
             "type": "STRING",
+        }, {
+            "id": "dimension-order-date",
+            "name": "order_date",
+            "label": "订单日期",
+            "source_column": "orders.order_date",
+            "type": "DATE",
         }],
         relationships=[],
         business_terms=[],
@@ -89,7 +95,7 @@ def _context(*, dialect: str = "postgresql", duplicate_metric_expression: bool =
         security_policy=SecurityPolicy(
             allowed_tables=["orders", "regions"],
             allowed_columns={
-                "orders": ["id", "revenue", "cost"],
+                "orders": ["id", "revenue", "cost", "order_date"],
                 "regions": ["id", "province"],
             },
         ),
@@ -242,6 +248,37 @@ def test_group_by_alias_is_rewritten_when_not_a_source_column() -> None:
     assert "AS province" in result.plan.generated_sql
     assert "GROUP BY province" in result.plan.generated_sql
     assert "r.province" in result.plan.generated_sql
+
+
+def test_year_grain_dimension_normalizes_only_with_ast_plan_and_semantic_binding() -> None:
+    plan = _plan(
+        "SELECT YEAR(o.order_date) AS year, SUM(o.revenue) AS total_revenue, "
+        "SUM(o.cost) AS total_cost FROM orders o GROUP BY YEAR(o.order_date) "
+        "ORDER BY YEAR(o.order_date)",
+        dimensions=["order_date"],
+        metrics=["revenue", "cost"],
+        dialect="mysql",
+    ).model_copy(update={
+        "group_by": ["YEAR(orders.order_date)"],
+        "order_by": ["YEAR(orders.order_date)"],
+    })
+    result = _validate(plan, context=_context(dialect="mysql"))
+    assert "YEAR(o.order_date) AS order_date" in result.plan.generated_sql
+    assert "SUM(o.revenue) AS revenue" in result.plan.generated_sql
+    assert "SUM(o.cost) AS cost" in result.plan.generated_sql
+    assert {item["to"] for item in result.normalization_actions} == {"order_date", "revenue", "cost"}
+
+
+def test_year_grain_dimension_without_matching_plan_group_by_fails_closed() -> None:
+    plan = _plan(
+        "SELECT YEAR(o.order_date) AS year, SUM(o.revenue) AS revenue "
+        "FROM orders o GROUP BY YEAR(o.order_date)",
+        dimensions=["order_date"],
+        metrics=["revenue"],
+        dialect="mysql",
+    )
+    with pytest.raises(ProjectionContractError, match="PROJECTION_MISSING_EXPECTED_OUTPUT"):
+        _validate(plan, context=_context(dialect="mysql"))
 
 
 def test_wren_comparison_auxiliary_outputs_are_explicitly_declared() -> None:
