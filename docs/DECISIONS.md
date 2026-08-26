@@ -6,6 +6,8 @@ Result Oracle 继续只接受已选语义实体间的 Join。除既有 `left/rig
 
 FINAL 取消探针与其主 Complex Case 共享 Case 预算和 Provider allowlist。P5C03/P5C04 的唯一计划模式显式同时匹配 `P5-P5Cxx-*` 与 `P5-CANCEL-P5Cxx-*`，不增加总调用上限、Provider 上限、重试或成本预算；网络前仍要求唯一模式、精确 Route 和允许 Provider，取消后仍必须证明唯一 CANCELLED 终态、账本状态、消息清理及 Agent/Sandbox 资源释放。
 
+最终 NL2SQL 认证的绑定输入必须是已发布语义模型及其同一 `datasource_id` 下已同步、`table_count > 0` 的数据源；若目录为空，辅助程序必须先执行真实 Schema Sync 并重新读取目录，仍为空则在 Provider 网络前 fail closed。仅按 API 返回顺序选择第一个已发布模型是无效认证输入。由空目录触发的 `TABLE_NOT_AUTHORIZED` 继续视为 SQL Guard 正确拒绝，真实响应和费用完整保留，不能删除账本或以重试绕过 Case 上限；只能在记录该独立输入缺陷的新 forward successor 上重新认证。
+
 ## ADR-064：Provider 投影必须在 SQL Guard 前收敛为 Canonical Output Contract
 
 SQLPlan 的服务端输出契约显式包含 dimensions、metrics 和受控 auxiliary，每项绑定 `canonical_name`、`semantic_id`、`kind` 与 `expected_projection_type`。Provider 无权声明该服务端字段；任何 Provider 注入的 Canonical Output Schema 与 `model_trace` 一样先剥离，再由当前 QueryContext 的语义对象重建。正式链路固定为 Provider Response → SQLPlan Validation → Projection Contract → SQL Guard → QueryExecutor → Result Oracle，后两项既有规则不得为适配模型别名而放宽。
