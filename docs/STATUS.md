@@ -190,3 +190,6 @@
 - SQLBot 仅作流程参考；反馈闭环以 ChatBI 自有 QueryFeedback、VerifiedAnswer、AnswerVersion、SQL Guard、Query Executor 和 Result Oracle 实现，无第三方源码/UI/品牌复制。
 - 隔离验证：Backend 130/130、Frontend 29/29、Vite build、专项 E2E 2/2、PostgreSQL Golden 50/50、MySQL 10/10、危险 SQL 38/38、Feedback replay 3/3 全部 PASS。
 - 详细状态与证据：`docs/status/V2_1_EVAL_GOLDEN_FEEDBACK_STATUS.md`、`docs/evidence/v2.1/`；主控接口请求见 `docs/integration_requests/EVAL_FEEDBACK_INTEGRATION_REQUEST.md`。
+- Phase5 final Provider P5C04 follow-up: bound exact SQL-AST year-grain aliases
+  can now satisfy the canonical output contract without a duplicate paid repair
+  call; unbound plans remain fail-closed (ADR-071).

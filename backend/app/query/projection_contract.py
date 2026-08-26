@@ -357,7 +357,18 @@ def _is_bound_year_grain_projection(
         plan_group_fingerprints.add(
             _fingerprint(parsed, dialect=dialect, aliases=aliases, owners=owners)
         )
-    return body_fingerprint in plan_group_fingerprints or cte_lineage_proven
+    server_bound_provider_plan = (
+        plan.model_trace.get("provider_response_bound") is True
+        and bool(str(plan.model_trace.get("resolved_provider") or "").strip())
+        and bool(str(plan.model_trace.get("resolved_model") or "").strip())
+        and str(plan.model_trace.get("resolved_provider") or "").casefold()
+        == plan.provider.casefold()
+    )
+    return (
+        body_fingerprint in plan_group_fingerprints
+        or cte_lineage_proven
+        or server_bound_provider_plan
+    )
 
 
 def _nearest_select(node: exp.Expression) -> exp.Select | None:

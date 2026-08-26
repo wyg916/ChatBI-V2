@@ -821,6 +821,10 @@ class OpenAICompatibleProvider(ModelProviderAdapter):
         normalized = normalize_nl2sql_response_with_metadata(response.content)
         plan = normalized.plan
         model_trace = response.trace_payload()
+        # This marker is server-owned: ProviderSQLPlanPayload forbids model_trace,
+        # and normalization strips any attempted server-owned fields before the
+        # runtime attaches this response binding.
+        model_trace["provider_response_bound"] = True
         if normalized.normalization_actions:
             model_trace["provider_response_normalization_actions"] = list(
                 normalized.normalization_actions
@@ -889,6 +893,9 @@ class GatewayNl2SqlProvider(ModelProviderAdapter):
         normalized = normalize_nl2sql_response_with_metadata(response.content)
         plan = normalized.plan
         model_trace = response.trace_payload()
+        # Projection validation may use this server-owned binding to reconcile
+        # an exact SQL AST group expression with a typed semantic dimension.
+        model_trace["provider_response_bound"] = True
         if normalized.normalization_actions:
             model_trace["provider_response_normalization_actions"] = list(
                 normalized.normalization_actions

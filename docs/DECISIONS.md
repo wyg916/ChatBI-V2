@@ -419,3 +419,18 @@ Phase 5 测试成本治理以 Backend 唯一 Model Gateway 为强制预留点。
 外部 Provider 生成的聚合 SQL 即使通过表、列、函数和只读 AST allowlist，也可能包含数据库无法执行的排序项，例如 `ORDER BY` 引用了既未投影、也未进入 `GROUP BY` 的稳定 ID。SQL Guard 在授权检查通过后，只允许删除这种无效排序项；投影表达式、投影别名、聚合表达式、序号以及已分组表达式必须原样保留。该归一化不得新增列、表、Join、Filter 或 Group，也不得修改选择行和聚合值；每个动作写入 `GuardResult.normalization_actions` 与 `SQL_GUARD` Audit，随后仍必须经过真实 EXPLAIN、只读执行、验证查询和 Result Oracle。合法 SQL 不产生 normalization action。
 
 Phase5 Live Runner 在 Level0/1/2 运行前已经通过唯一成本控制器验证 Backend SHA、Git SHA、配置、Prompt、Gate 和 Ledger Identity，因此 Evidence 的 `tested_sha` 应直接来自该验证后的 runtime identity。发布运行镜像可以继续不安装 Git；Runner 只有在没有合法运行时 SHA 时才允许回退读取 checkout Git，读取失败必须明确标记 `tested_sha_missing`，不得崩溃或用宿主 HEAD 冒充被测 Backend。
+## ADR-071 — Server-bound Provider year-grain AST reconciliation
+
+- Status: Accepted (2026-08-26)
+- A Provider SQL plan may omit its descriptive `group_by` array while its single
+  read-only SQL AST contains an exact `YEAR`/`EXTRACT(YEAR ...)` projection and
+  matching `GROUP BY` expression for a typed semantic date dimension.
+- The Projection Contract may normalize that alias only when the response is
+  marked by the server-owned Model Gateway binding, the resolved Provider equals
+  the runtime plan Provider, the semantic column fingerprint matches exactly,
+  and the SQL AST group expression matches exactly.
+- Bare/unbound plans still fail closed. Provider JSON cannot assert the binding:
+  the strict Provider DTO forbids `model_trace`, normalization strips attempted
+  server-owned fields, and the runtime attaches the marker after capture.
+- This prevents a second paid NL2SQL call for an already valid grouped query
+  without relaxing SQL Guard, Result Oracle, or ambiguous projection behavior.

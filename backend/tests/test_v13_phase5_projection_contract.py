@@ -295,6 +295,49 @@ def test_year_grain_dimension_without_matching_plan_group_by_fails_closed() -> N
         _validate(plan, context=_context(dialect="mysql"))
 
 
+def test_server_bound_provider_year_grain_uses_exact_ast_group_without_duplicate_call() -> None:
+    plan = _plan(
+        "SELECT EXTRACT(YEAR FROM orders.order_date) AS year, "
+        "SUM(orders.revenue) AS revenue, SUM(orders.cost) AS cost "
+        "FROM orders GROUP BY EXTRACT(YEAR FROM orders.order_date) ORDER BY year",
+        dimensions=["order_date"],
+        metrics=["revenue", "cost"],
+    ).model_copy(update={
+        "selected_tables": ["orders"],
+        "model_trace": {
+            "provider_response_bound": True,
+            "resolved_provider": "mimo",
+            "resolved_model": "mimo-v2.5",
+        },
+    })
+
+    result = _validate(plan)
+
+    assert "EXTRACT(YEAR FROM orders.order_date) AS order_date" in result.plan.generated_sql
+    assert "ORDER BY order_date" in result.plan.generated_sql
+    assert {item["to"] for item in result.normalization_actions} == {"order_date"}
+
+
+def test_unbound_provider_year_grain_cannot_claim_server_response_binding() -> None:
+    plan = _plan(
+        "SELECT EXTRACT(YEAR FROM orders.order_date) AS year, "
+        "SUM(orders.revenue) AS revenue FROM orders "
+        "GROUP BY EXTRACT(YEAR FROM orders.order_date)",
+        dimensions=["order_date"],
+        metrics=["revenue"],
+    ).model_copy(update={
+        "selected_tables": ["orders"],
+        "model_trace": {
+            "provider_response_bound": True,
+            "resolved_provider": "deepseek",
+            "resolved_model": "deepseek-v4-flash",
+        },
+    })
+
+    with pytest.raises(ProjectionContractError, match="PROJECTION_MISSING_EXPECTED_OUTPUT"):
+        _validate(plan)
+
+
 def test_unique_cte_lineage_normalizes_recorded_deepseek_year_and_metric_aliases() -> None:
     plan = _plan(
         "WITH yearly AS (SELECT EXTRACT(YEAR FROM order_date) AS yr, "
