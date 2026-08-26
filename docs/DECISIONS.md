@@ -1,5 +1,11 @@
 # Architecture Decisions
 
+## ADR-069：Provider ON Join 只按端点列等值 AST 证明
+
+当结构化 Join 使用 `left_table/right_table + on` 而不是列字段或 `join_keys` 时，Result Oracle 使用 SQLGlot 解析 ON 表达式，并且只接受一个或由 AND 连接的多个 EQ 叶子；每个 EQ 两侧都必须是非空 Column、分别由左右已选端点表限定，且不能携带 Schema/Catalog。OR、常量比较、函数、算术、无表限定、同端点自比较、未知表和解析失败都 fail closed。不得用正则、字符串包含或 SQL 执行成功替代这项结构证明。
+
+该决定只覆盖真实 Provider 已产生且 SQL Guard/EXPLAIN/执行/复核值均通过的第三种 Join 元数据表示，不改变 Result Oracle 的结果、指标、维度、时间、过滤或冻结值规则，也不让 Plan 元数据绕过 SQL Guard。旧 SHA 的失败响应与账本保留，新规则必须在 forward successor 上重新通过 exact-SHA 免费与付费 Gate。
+
 ## ADR-068：Result Oracle 接受两种严格等价的 Provider Join Key 结构
 
 Provider 的结构化 Join 可以把键表示为 `left_column/right_column`，也可以在同一 `left_table/right_table` 端点下表示为非空 `join_keys[{left,right}]`。Result Oracle 只在左右端点都精确属于 SQLPlan 已选表，并且选择的键形态完整时接受：列形态要求两列同时非空；列表形态要求列表非空、每项是对象且左右键同时非空。两种形态不得通过半列、空列表、空键、未选表或混合不完整字段降级通过。

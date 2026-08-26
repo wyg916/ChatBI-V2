@@ -3,6 +3,9 @@ from __future__ import annotations
 import math
 from typing import Any
 
+from sqlglot import exp, parse_one
+from sqlglot.errors import ParseError
+
 from app.query.contracts import (
     ExecutionResult,
     ExpectedResult,
@@ -39,6 +42,33 @@ def _valid_join_keys(value: Any) -> bool:
     )
 
 
+def _valid_join_on(value: Any, left_table: str, right_table: str) -> bool:
+    if not isinstance(value, str) or not value.strip() or not left_table or not right_table:
+        return False
+    try:
+        condition = parse_one(value)
+    except (ParseError, ValueError):
+        return False
+
+    endpoints = {left_table, right_table}
+
+    def valid(node: exp.Expression) -> bool:
+        while isinstance(node, exp.Paren):
+            node = node.this
+        if isinstance(node, exp.And):
+            return valid(node.this) and valid(node.expression)
+        if not isinstance(node, exp.EQ):
+            return False
+        left, right = node.this, node.expression
+        if not isinstance(left, exp.Column) or not isinstance(right, exp.Column):
+            return False
+        if not left.name or not right.name or left.db or right.db or left.catalog or right.catalog:
+            return False
+        return {left.table, right.table} == endpoints and left.table != right.table
+
+    return valid(condition)
+
+
 def _join_uses_selected_entities(item: dict[str, Any], selected_tables: set[str]) -> bool:
     left = str(item.get("left") or "")
     right = str(item.get("right") or "")
@@ -53,7 +83,9 @@ def _join_uses_selected_entities(item: dict[str, Any], selected_tables: set[str]
         endpoints_selected = left_table in selected_tables and right_table in selected_tables
         if left_column or right_column:
             return endpoints_selected and bool(left_column) and bool(right_column)
-        return endpoints_selected and _valid_join_keys(item.get("join_keys"))
+        if item.get("join_keys") is not None:
+            return endpoints_selected and _valid_join_keys(item.get("join_keys"))
+        return endpoints_selected and _valid_join_on(item.get("on"), left_table, right_table)
 
     left_entity = str(item.get("left_entity") or "")
     right_entity = str(item.get("right_entity") or "")

@@ -509,6 +509,28 @@ def test_result_oracle_accepts_provider_table_join_keys_shape() -> None:
     assert next(item for item in result.checks if item.name == "join_semantics").passed is True
 
 
+def test_result_oracle_accepts_provider_table_join_on_shape() -> None:
+    plan = DeterministicTestProvider().plan(question="按地区统计收入", context=semantic_context()).model_copy(update={
+        "joins": [{
+            "left_table": "orders",
+            "right_table": "regions",
+            "join_type": "INNER",
+            "on": "orders.region_id = regions.region_id",
+        }],
+    })
+    guard = GuardResult(allowed=True, dialect="postgresql", normalized_sql="SELECT ...", statement_type="SELECT")
+    execution = ExecutionResult(
+        status="SUCCEEDED", columns=["region", "revenue"], column_types=["text", "numeric"],
+        rows=[{"region": "华东", "revenue": 100.0}], row_count=1, datasource_id="d",
+        dialect="postgresql", normalized_sql="SELECT ...", result_signature="provider-table-join-on",
+    )
+
+    result = ResultOracle().verify(plan=plan, guard=guard, execution=execution)
+
+    assert result.status == "PASSED"
+    assert next(item for item in result.checks if item.name == "join_semantics").passed is True
+
+
 @pytest.mark.parametrize(
     "join",
     [
@@ -523,6 +545,14 @@ def test_result_oracle_accepts_provider_table_join_keys_shape() -> None:
         {
             "left_table": "orders", "right_table": "regions",
             "join_keys": [{"left": "region_id", "right": ""}],
+        },
+        {
+            "left_table": "orders", "right_table": "regions",
+            "on": "orders.region_id = regions.region_id OR 1 = 1",
+        },
+        {
+            "left_table": "orders", "right_table": "regions",
+            "on": "region_id = region_id",
         },
     ],
 )
