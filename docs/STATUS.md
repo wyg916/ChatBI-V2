@@ -197,3 +197,9 @@
   now fail-closed against structured filters/time range before execution, and
   the prompt forbids inferred business filters; terminal query-contract
   failures cannot trigger a duplicate paid fallback call (ADR-072).
+- Phase5 final Provider annual-output follow-up: the prompt now requires one
+  aggregate row per year, exact declared projection, and no raw fact rows;
+  server-bound `DATE_TRUNC('year', ...)` is reconciled only through matching
+  semantic and SQL AST identity, correlation scopes normalize to canonical
+  years, DB-GPT is preloaded at startup, and Oracle/runtime terminal failures
+  cannot trigger duplicate paid calls (ADR-073).

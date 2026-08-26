@@ -13,6 +13,7 @@ from .runtime import (
     DbgptRuntimeUnavailable,
     RuntimeControl,
     RuntimeRequest,
+    preload_selected_runtime,
 )
 
 __all__ = [
@@ -30,4 +31,5 @@ __all__ = [
     "DbgptRuntimeUnavailable",
     "RuntimeControl",
     "RuntimeRequest",
+    "preload_selected_runtime",
 ]

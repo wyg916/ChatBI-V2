@@ -44,6 +44,44 @@ class Nl2SqlEngine(ABC):
         raise NotImplementedError
 
 
+def _provider_output_contract_guidance(
+    question: str,
+    context: QueryContext,
+) -> dict[str, Any]:
+    guidance: dict[str, Any] = {
+        "projection_rule": (
+            "Every declared metric and dimension must appear exactly once in the SELECT output; "
+            "aggregate metrics and group by every declared non-aggregate dimension."
+        ),
+    }
+    yearly = re.search(r"(?:年度|逐年|按年|每年|annual|yearly|by\s+year)", question, re.IGNORECASE)
+    if not yearly:
+        return guidance
+    date_dimensions = [
+        str(item.get("name") or "").strip()
+        for item in context.dimensions
+        if str(item.get("name") or "").strip()
+        and str(item.get("data_type") or item.get("type") or "").upper()
+        in {"DATE", "DATETIME", "TIMESTAMP"}
+    ]
+    if "order_date" in {
+        str(item.get("name") or "").strip().casefold() for item in context.dimensions
+    }:
+        date_dimensions = ["order_date", *[item for item in date_dimensions if item != "order_date"]]
+    guidance["required_time_grain"] = {
+        "grain": "YEAR",
+        "canonical_dimension": date_dimensions[0] if date_dimensions else "order_date",
+        "row_shape": "one aggregated row per year",
+        "allowed_ast": ["EXTRACT(YEAR FROM date_column)", "DATE_TRUNC('year', date_column)"],
+    }
+    if re.search(r"(?:相关性|相关系数|correlation)", question, re.IGNORECASE):
+        guidance["downstream_operation"] = (
+            "Return annual aggregate rows for bounded Python correlation; do not return raw fact rows "
+            "and do not calculate the correlation in SQL."
+        )
+    return guidance
+
+
 def _provider_values(settings: Settings, definition: ProviderDefinition) -> tuple[str, str, str]:
     resolved = resolve_provider(settings, definition)
     return resolved.base_url, resolved.api_key, resolved.model_name
@@ -779,12 +817,18 @@ class OpenAICompatibleProvider(ModelProviderAdapter):
                         "or WITH ... SELECT statement. Never invent a table or column. "
                         "Every literal WHERE predicate must be declared in filters or time_range, with the same "
                         "field and scope; never infer a status or other business filter not stated by the question. "
-                        "group_by and order_by must describe the expressions used by generated_sql. "
+                        "Every declared metric and dimension must be projected exactly once. Aggregate metrics and "
+                        "group by each declared dimension. Annual/yearly analysis must return one aggregate row per "
+                        "year, never raw fact rows. group_by and order_by must describe generated_sql expressions. "
                         "Runtime trace metadata is server-owned and must not be returned. "
                         f"ProviderSQLPlanPayload JSON Schema: {json.dumps(ProviderSQLPlanPayload.model_json_schema(), ensure_ascii=False)}"
                     ),
                 },
-                {"role": "user", "content": json.dumps({"question": question, "context": context.model_dump(mode="json")}, ensure_ascii=False)},
+                {"role": "user", "content": json.dumps({
+                    "question": question,
+                    "context": context.model_dump(mode="json"),
+                    "canonical_output_guidance": _provider_output_contract_guidance(question, context),
+                }, ensure_ascii=False)},
         )
         provider = ResolvedProvider(
             provider_id=self.name, display_name=self.display_name, base_url=self.base_url,
@@ -872,12 +916,18 @@ class GatewayNl2SqlProvider(ModelProviderAdapter):
                     "or WITH ... SELECT statement. Never invent a table or column. "
                     "Every literal WHERE predicate must be declared in filters or time_range, with the same "
                     "field and scope; never infer a status or other business filter not stated by the question. "
-                    "group_by and order_by must describe the expressions used by generated_sql. "
+                    "Every declared metric and dimension must be projected exactly once. Aggregate metrics and "
+                    "group by each declared dimension. Annual/yearly analysis must return one aggregate row per "
+                    "year, never raw fact rows. group_by and order_by must describe generated_sql expressions. "
                     "Runtime trace metadata is server-owned and must not be returned. "
                     f"ProviderSQLPlanPayload JSON Schema: {json.dumps(ProviderSQLPlanPayload.model_json_schema(), ensure_ascii=False)}"
                 ),
             },
-            {"role": "user", "content": json.dumps({"question": question, "context": context.model_dump(mode="json")}, ensure_ascii=False)},
+            {"role": "user", "content": json.dumps({
+                "question": question,
+                "context": context.model_dump(mode="json"),
+                "canonical_output_guidance": _provider_output_contract_guidance(question, context),
+            }, ensure_ascii=False)},
         )
         response = self.gateway.execute(
             ModelRequest(

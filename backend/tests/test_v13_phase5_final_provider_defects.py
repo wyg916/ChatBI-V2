@@ -146,6 +146,40 @@ def test_correlation_scope_consumes_canonical_order_date_year_grain(monkeypatch)
     }]
 
 
+def test_correlation_scope_normalizes_date_trunc_values_to_years(monkeypatch):
+    monkeypatch.setattr(
+        tool_executor_module,
+        "execute_selected_pandasai_runtime",
+        lambda *_args, **_kwargs: SimpleNamespace(output={
+            "status": "SUCCEEDED",
+            "runtime_verified": True,
+            "container_destroyed": True,
+            "output": {"correlation": 1.0, "sample_size": 2},
+        }),
+    )
+    executor = ChatBIToolExecutor(object(), object(), rag_adapter=None)
+    payload, error = executor._correlation_result(
+        {"execution": {"rows": [
+            {"order_date": "2025-01-01T00:00:00", "revenue": 100.0, "cost": 80.0},
+            {"order_date": "2026-01-01T00:00:00", "revenue": 120.0, "cost": 96.0},
+        ]}},
+        AgentExecutionContext(
+            workspace_id="workspace",
+            user_id="user",
+            roles=frozenset({"ADMIN"}),
+            allowed_datasources=frozenset(),
+            allowed_semantic_models=frozenset(),
+            allowed_tools=frozenset({"QUERY_DATA"}),
+            trace_id="TRACE-DATE-TRUNC-YEAR-SCOPE",
+            timeout_ms=30_000,
+            token_budget=6_000,
+        ),
+    )
+
+    assert error is None
+    assert payload["answer_claims"][0]["scope"] == "ANNUAL_REVENUE_COST_2025_2026"
+
+
 def _generic_mimo_content() -> dict:
     fixture = json.loads((FIXTURES / "mimo_nl2sql_object.json").read_text(encoding="utf-8"))
     return deepcopy(fixture["response"]["choices"][0]["message"]["content"])

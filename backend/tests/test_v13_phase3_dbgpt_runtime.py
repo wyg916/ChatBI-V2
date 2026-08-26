@@ -27,6 +27,7 @@ from chatbi_dbgpt_runtime import (  # noqa: E402
     DbgptRuntimeTimeout,
     DbgptRuntimeUnavailable,
     RuntimeRequest,
+    preload_selected_runtime,
     UPSTREAM_ARCHIVE_SHA256,
     UPSTREAM_ARCHIVE_URL,
     UPSTREAM_REVISION,
@@ -129,6 +130,18 @@ def test_awel_call_invokes_chatbi_callback_and_reports_selected_runtime():
         "callback_status": "COMPLETED",
     }
     assert result.trace_stages[-1] == "agent.runtime.completed"
+
+
+def test_preload_selected_runtime_validates_and_returns_public_provenance(monkeypatch):
+    monkeypatch.setattr(runtime_module, "_load_selected_runtime", selected_loader)
+
+    result = preload_selected_runtime()
+
+    assert result == {
+        "revision": UPSTREAM_REVISION,
+        "package_version": "0.8.1",
+        "install_source": "git",
+    }
 
 
 def test_runtime_counter_records_each_real_base_operator_call():

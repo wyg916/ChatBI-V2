@@ -421,7 +421,11 @@ def _is_bound_year_grain_projection(
         isinstance(body, exp.Extract)
         and str(body.this).strip().casefold() == "year"
     )
-    if not is_year and not is_extract_year:
+    is_date_trunc_year = (
+        isinstance(body, (exp.DateTrunc, exp.TimestampTrunc))
+        and str(body.args.get("unit") or "").strip(" '\"").casefold() == "year"
+    )
+    if not is_year and not is_extract_year and not is_date_trunc_year:
         return False
     columns = list(body.find_all(exp.Column))
     if len(columns) != 1:

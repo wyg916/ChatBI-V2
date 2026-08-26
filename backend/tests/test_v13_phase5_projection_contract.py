@@ -322,6 +322,33 @@ def test_server_bound_provider_year_grain_uses_exact_ast_group_without_duplicate
     assert {item["to"] for item in result.normalization_actions} == {"order_date"}
 
 
+def test_server_bound_provider_date_trunc_year_grain_normalizes_exact_ast() -> None:
+    plan = _plan(
+        "SELECT DATE_TRUNC('year', orders.order_date) AS year, "
+        "SUM(orders.revenue) AS revenue, SUM(orders.cost) AS cost "
+        "FROM orders GROUP BY DATE_TRUNC('year', orders.order_date) "
+        "ORDER BY DATE_TRUNC('year', orders.order_date)",
+        dimensions=["order_date"],
+        metrics=["revenue", "cost"],
+    ).model_copy(update={
+        "provider": "wrenai-upstream-runtime",
+        "selected_tables": ["orders"],
+        "group_by": ["DATE_TRUNC('year', orders.order_date)"],
+        "order_by": ["DATE_TRUNC('year', orders.order_date)"],
+        "model_trace": {
+            "provider_response_bound": True,
+            "requested_alias": "deepseek",
+            "resolved_provider": "deepseek",
+            "resolved_model": "deepseek-v4-flash",
+        },
+    })
+
+    result = _validate(plan)
+
+    assert "DATE_TRUNC('YEAR', orders.order_date) AS order_date" in result.plan.generated_sql
+    assert {item["to"] for item in result.normalization_actions} == {"order_date"}
+
+
 def test_unbound_provider_year_grain_cannot_claim_server_response_binding() -> None:
     plan = _plan(
         "SELECT EXTRACT(YEAR FROM orders.order_date) AS year, "

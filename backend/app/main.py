@@ -5,6 +5,7 @@ from uuid import uuid4
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from chatbi_dbgpt_runtime import DbgptRuntimeError, preload_selected_runtime
 
 from app.api.router import api_router
 from app.core.config import get_settings
@@ -19,6 +20,15 @@ logger = logging.getLogger(__name__)
 @asynccontextmanager
 async def lifespan(_: FastAPI):
     logger.info("ChatBI API starting")
+    try:
+        selected = preload_selected_runtime()
+        logger.info(
+            "DB-GPT selected runtime preloaded revision=%s source=%s",
+            selected["revision"],
+            selected["install_source"],
+        )
+    except DbgptRuntimeError:
+        logger.exception("DB-GPT selected runtime preload failed; Agent requests remain fail-closed")
     if get_settings().seed_demo_semantic_model:
         try:
             with SessionLocal() as db:

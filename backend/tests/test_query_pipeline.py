@@ -16,7 +16,13 @@ from app.query.contracts import (
     QueryContext,
     SecurityPolicy,
 )
-from app.query.nl2sql import DeterministicTestProvider, Nl2SqlRouter, OpenAICompatibleProvider, model_provider_catalog
+from app.query.nl2sql import (
+    DeterministicTestProvider,
+    Nl2SqlRouter,
+    OpenAICompatibleProvider,
+    _provider_output_contract_guidance,
+    model_provider_catalog,
+)
 from app.query.oracle import ResultOracle
 from app.query.sql_guard import SqlGuard
 
@@ -256,6 +262,34 @@ def test_phase5_level0_planner_supports_multi_metric_dates_extremes_and_filters(
     assert any(item.field == "products.category" and item.value == "软件与终端" for item in filtered_category.filters)
     assert "o.revenue >= 1000" in ranged.generated_sql
     assert "o.revenue < 2000" in ranged.generated_sql
+
+
+def test_provider_output_guidance_requires_annual_aggregate_rows_for_correlation() -> None:
+    context = semantic_context().model_copy(update={
+        "dimensions": [{
+            "id": "d-order-date",
+            "name": "order_date",
+            "label": "订单日期",
+            "source_column": "orders.order_date",
+            "type": "DATE",
+        }],
+    })
+
+    guidance = _provider_output_contract_guidance(
+        "对2025与2026年度收入和成本汇总做Python相关性分析",
+        context,
+    )
+
+    assert guidance["required_time_grain"] == {
+        "grain": "YEAR",
+        "canonical_dimension": "order_date",
+        "row_shape": "one aggregated row per year",
+        "allowed_ast": [
+            "EXTRACT(YEAR FROM date_column)",
+            "DATE_TRUNC('year', date_column)",
+        ],
+    }
+    assert "do not return raw fact rows" in guidance["downstream_operation"]
 
 
 @pytest.mark.parametrize(

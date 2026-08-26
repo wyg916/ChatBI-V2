@@ -311,9 +311,10 @@ class AnalysisService:
         )
         non_retryable = (
             error_code.startswith(("PROJECTION_", "PROVIDER_"))
-            or error_code == "SANDBOX_CODE_FAILED"
+            or error_code in {"RESULT_ORACLE_NOT_PASSED", "SANDBOX_CODE_FAILED"}
         )
-        if not (query_failed and non_retryable):
+        runtime_query_may_be_inflight = error_code == "DBGPT_RUNTIME_TIMEOUT"
+        if not ((query_failed and non_retryable) or runtime_query_may_be_inflight):
             return None
         return {"status": "FAILED", "error_code": error_code}
 

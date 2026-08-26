@@ -448,3 +448,22 @@ Phase5 Live Runner 在 Level0/1/2 运行前已经通过唯一成本控制器验�
 - A failed `QUERY_DATA` projection/provider contract or sandbox validation is
   terminal for that orchestration attempt. The API returns the structured
   failure and never launches a second paid NL2SQL fallback call.
+
+## ADR-073 — Annual Provider output and runtime readiness are canonical gates
+
+- Status: Accepted (2026-08-26)
+- Annual/yearly analytical requests require one aggregate row per year. The
+  live Provider prompt repeats that canonical output contract and forbids raw
+  fact rows; declared metrics and dimensions must each be projected exactly
+  once and aggregate metrics must be grouped by the declared dimensions.
+- A server-bound annual dimension may use `DATE_TRUNC('year', <date column>)`
+  only when its semantic column fingerprint and exact SQL `GROUP BY` AST match.
+  `YEAR`/`EXTRACT` remain supported, and unbound or ambiguous plans still fail
+  closed before execution.
+- Correlation scope identity canonicalizes date/timestamp values to four-digit
+  years after Result Oracle validation, so equivalent annual SQL forms produce
+  one stable scope without changing result values.
+- `RESULT_ORACLE_NOT_PASSED` and DB-GPT runtime timeout are terminal for the
+  current orchestration attempt; neither may launch a second paid query. The
+  selected DB-GPT runtime import closure is preloaded during Backend lifespan
+  startup so readiness reflects the exact runtime before requests are served.

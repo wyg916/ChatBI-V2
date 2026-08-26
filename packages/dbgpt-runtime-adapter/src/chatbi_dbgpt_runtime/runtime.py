@@ -182,6 +182,17 @@ def _validate_direct_url(direct_url: Mapping[str, Any]) -> tuple[str, str]:
     return UPSTREAM_REVISION, "verified-archive"
 
 
+def preload_selected_runtime() -> dict[str, str]:
+    """Validate and cache the selected DB-GPT import closure before serving traffic."""
+
+    selected = _load_selected_runtime()
+    return {
+        "revision": selected.revision,
+        "package_version": selected.package_version,
+        "install_source": selected.install_source,
+    }
+
+
 class DbgptAwelRuntime:
     """Invoke the pinned AWEL engine while all privileged work stays in ChatBI."""
 

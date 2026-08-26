@@ -217,11 +217,16 @@ class ChatBIToolExecutor:
         payload["sandbox_evidence"] = evidence
         if evidence["status"] != "SUCCEEDED" or not evidence["runtime_verified"] or not evidence["container_destroyed"]:
             return payload, str(sandbox.get("error_code") or "SANDBOX_RESULT_NOT_VERIFIED")
-        years = [
-            str(row.get("year") if row.get("year") is not None else row.get("order_date"))
-            for row in rows
-            if row.get("year") is not None or row.get("order_date") is not None
-        ]
+        years: list[str] = []
+        for row in rows:
+            value = row.get("year") if row.get("year") is not None else row.get("order_date")
+            if value is None:
+                continue
+            rendered = str(value)
+            match = re.search(r"(?<!\d)(20\d{2})(?!\d)", rendered)
+            canonical = match.group(1) if match else rendered
+            if canonical not in years:
+                years.append(canonical)
         scope = "ANNUAL_REVENUE_COST" + ("_" + "_".join(years) if years else "")
         derived_rows = [{"correlation": float(result["correlation"]), "sample_size": int(result["sample_size"])}]
         claim = {"metric": "correlation", "scope": scope, "value": float(result["correlation"])}

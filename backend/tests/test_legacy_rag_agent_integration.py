@@ -607,8 +607,12 @@ def test_agent_timeout_reuses_verified_tool_result_without_duplicate_query(
     assert body["shadow"]["error_code"] == "AGENT_TIMEOUT"
 
 
+@pytest.mark.parametrize(
+    "error_code",
+    ("PROVIDER_UNDECLARED_FILTER", "RESULT_ORACLE_NOT_PASSED"),
+)
 def test_failed_provider_contract_query_does_not_trigger_duplicate_query(
-    client, db_session, monkeypatch,
+    client, db_session, monkeypatch, error_code,
 ):
     datasource, model = prepare_catalog(db_session)
 
@@ -625,11 +629,11 @@ def test_failed_provider_contract_query_does_not_trigger_duplicate_query(
                     agent_role=AgentRole.DATA_ANALYST,
                     tool_name=ToolName.QUERY_DATA.value,
                     status="FAILED",
-                    detail={"error_code": "PROVIDER_UNDECLARED_FILTER"},
+                    detail={"error_code": error_code},
                 ),
             ),
             fallback_used=True,
-            error_code="PROVIDER_UNDECLARED_FILTER",
+            error_code=error_code,
             verification={"result_verified": False, "citation_verified": False},
             performance={"ttft_ms": 0, "total_latency_ms": 1, "tool_latency_ms": 1},
             trace_complete=True,
@@ -645,7 +649,7 @@ def test_failed_provider_contract_query_does_not_trigger_duplicate_query(
         "route": "COMPLEX_ANALYSIS",
         "datasource_id": datasource.id,
         "semantic_model_id": model.id,
-        "idempotency_key": "provider-contract-no-retry-test",
+        "idempotency_key": f"provider-contract-no-retry-{error_code.lower()}",
     })
 
     assert response.status_code == 201
@@ -654,9 +658,50 @@ def test_failed_provider_contract_query_does_not_trigger_duplicate_query(
     assert body["fallback_used"] is True
     assert body["primary"] == {
         "status": "FAILED",
-        "error_code": "PROVIDER_UNDECLARED_FILTER",
+        "error_code": error_code,
     }
-    assert body["shadow"]["error_code"] == "PROVIDER_UNDECLARED_FILTER"
+    assert body["shadow"]["error_code"] == error_code
+
+
+def test_dbgpt_runtime_timeout_does_not_launch_concurrent_fallback_query(
+    client, db_session, monkeypatch,
+):
+    datasource, model = prepare_catalog(db_session)
+
+    def runtime_timeout(_self, request, **_kwargs):
+        return OrchestrationResult(
+            status="TIMEOUT",
+            route=QuestionRoute.COMPLEX_ANALYSIS,
+            trace_id=request.context.trace_id,
+            run_id="dbgpt-timeout-no-retry",
+            steps=(),
+            fallback_used=False,
+            error_code="DBGPT_RUNTIME_TIMEOUT",
+            verification={"result_verified": False, "citation_verified": False},
+            performance={"ttft_ms": 0, "total_latency_ms": 30000, "tool_latency_ms": 0},
+            trace_complete=False,
+        )
+
+    def duplicate_query_forbidden(*_args, **_kwargs):
+        raise AssertionError("timed out DB-GPT callback may still own the query boundary")
+
+    monkeypatch.setattr(BoundedAgentOrchestrator, "run", runtime_timeout)
+    monkeypatch.setattr(AnalysisService, "_data", duplicate_query_forbidden)
+    response = client.post("/api/v1/analysis", json={
+        "question": "请综合分析收入",
+        "route": "COMPLEX_ANALYSIS",
+        "datasource_id": datasource.id,
+        "semantic_model_id": model.id,
+        "idempotency_key": "dbgpt-timeout-no-concurrent-fallback",
+    })
+
+    assert response.status_code == 201
+    body = response.json()
+    assert body["status"] == "FAILED"
+    assert body["primary"] == {
+        "status": "FAILED",
+        "error_code": "DBGPT_RUNTIME_TIMEOUT",
+    }
 
 
 def test_failed_complex_query_returns_structured_failed_fallback(db_session):
