@@ -1,5 +1,13 @@
 # Architecture Decisions
 
+## ADR-064：Provider 投影必须在 SQL Guard 前收敛为 Canonical Output Contract
+
+SQLPlan 的服务端输出契约显式包含 dimensions、metrics 和受控 auxiliary，每项绑定 `canonical_name`、`semantic_id`、`kind` 与 `expected_projection_type`。Provider 无权声明该服务端字段；任何 Provider 注入的 Canonical Output Schema 与 `model_trace` 一样先剥离，再由当前 QueryContext 的语义对象重建。正式链路固定为 Provider Response → SQLPlan Validation → Projection Contract → SQL Guard → QueryExecutor → Result Oracle，后两项既有规则不得为适配模型别名而放宽。
+
+别名不一致只能通过 SQLGlot AST、SQLPlan 和语义表达式的一对一结构指纹唯一证明后规范化。禁止按列序、字符串相似度、子串或正则文本替换；歧义候选、重复 canonical alias、输出碰撞、缺失投影、未声明额外输出或未知语义对象全部在执行前 fail closed。规范化只改 SELECT 输出 alias，并在不与可见源字段冲突时同步改写 GROUP BY、ORDER BY、HAVING、QUALIFY 的未限定 alias 引用；WHERE、JOIN、底层列或其他不安全依赖一律拒绝。每次动作同时进入 SQLPlan `model_trace.projection_contract` 和 `PROJECTION_NORMALIZATION_ACTION` Audit，不记录提示词、响应正文或内部推理。
+
+确定性/Wren 已有 canonical alias 的 SQL 保持原字符串，不为无动作验证重写整棵 AST；Wren 比较查询的 `previous_<metric>`、`comparison_rate` 和 `contribution_rate` 仅在受信任服务端 Runtime 中作为显式 auxiliary 声明，外部 Provider 的同名额外输出仍不获得豁免。真实 MiMo 失败响应以脱敏 Recorded Fixture 回归，最终必须证明规范输出列为 `revenue`、值为 `1725750.0` 且 Result Oracle PASS。
+
 ## ADR-063：最终 Provider 响应先统一归一化，FINAL 调用由 Case 计划原子限额
 
 真实 Provider 的 Chat Completions 响应先进入唯一的协议归一化边界，再交给 NL2SQL 领域解析：文本既可为普通字符串，也可为已知的文本 Part 或严格对象；NL2SQL 只接受完整 JSON、完整 JSON Markdown Fence、单层已知包装或单层 JSON 字符串，不从自然语言中用正则提取 SQL。未知 Content/Tool/Usage 形状、歧义包装、数组、缺失字段或非法 SQLPlan 全部 fail closed，随后仍必须通过 SQLPlan 校验与 SQL Guard。历史失败执行没有保留可安全复现的原始 Provider Body，因此永久 Fixture 明确标为负责人授权的通用变体，不能伪称为历史原文。

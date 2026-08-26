@@ -40,6 +40,7 @@ from app.query.executor import QueryExecutor
 from app.query.explain_cost import ExplainCostGuard
 from app.query.nl2sql import Nl2SqlRouter
 from app.query.oracle import ResultOracle
+from app.query.projection_contract import ProjectionContractError, ProjectionContractValidator
 from app.query.sql_guard import SqlGuard
 from app.query.verification import VerificationQueryRunner
 from app.semantic_runtime import SemanticRuntimeError, default_semantic_runtime
@@ -393,6 +394,52 @@ class QueryPipeline:
             _audit(db, run, "SQL_PLAN_GENERATED", "PASS", {
                 "provider": plan.provider, "confidence": plan.confidence, "repair_count": plan.repair_count,
             })
+            try:
+                projection_contract = ProjectionContractValidator().validate_and_normalize(
+                    plan=plan,
+                    context=context,
+                )
+            except ProjectionContractError as exc:
+                run.status = "FAILED"
+                run.error_code = exc.code
+                run.error_message = exc.code
+                run.plan_payload = {
+                    **(run.plan_payload or {}),
+                    "projection_contract_error": {"code": exc.code, "details": exc.details},
+                }
+                run.oracle_payload = _json(OracleResult(status="NOT_RUN", confidence=0))
+                _audit(db, run, "PROJECTION_CONTRACT", "REJECTED", {
+                    "code": exc.code,
+                    "details": exc.details,
+                })
+                db.commit()
+                db.refresh(run)
+                if principal is not None:
+                    record_audit(
+                        db, principal, action="QUERY_RUN", resource_type="QUERY_RUN", resource_id=run.id,
+                        status="FAILED", details={"error_code": run.error_code},
+                    )
+                    db.commit()
+                return run
+            plan = projection_contract.plan
+            run.plan_payload = {
+                **_json(plan),
+                "semantic_query": trace_payload.get("semantic_query"),
+                "wren_dry_plan": trace_payload.get("wren_dry_plan"),
+                "runtime_call_chain": trace_payload.get("call_chain", []),
+            }
+            run.generated_sql = plan.generated_sql
+            _audit(db, run, "PROJECTION_CONTRACT", "PASS", {
+                "status": projection_contract.status,
+                "dimensions": [item.canonical_name for item in plan.canonical_output_schema.dimensions],
+                "metrics": [item.canonical_name for item in plan.canonical_output_schema.metrics],
+                "auxiliary": [item.canonical_name for item in plan.canonical_output_schema.auxiliary],
+                "normalization_action_count": len(projection_contract.normalization_actions),
+            })
+            if projection_contract.normalization_actions:
+                _audit(db, run, "PROJECTION_NORMALIZATION_ACTION", "PASS", {
+                    "actions": list(projection_contract.normalization_actions),
+                })
             guard = self.guard.validate(plan.generated_sql, dialect=context.dialect, policy=context.security_policy)
             run.guard_payload = _json(guard)
             _audit(db, run, "SQL_GUARD", "PASS" if guard.allowed else "REJECTED", {

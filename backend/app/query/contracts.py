@@ -77,6 +77,19 @@ class QueryTimeRange(BaseModel):
     end_exclusive: str | None = None
 
 
+class CanonicalOutputField(BaseModel):
+    canonical_name: str
+    semantic_id: str
+    kind: Literal["METRIC", "DIMENSION", "AUXILIARY"]
+    expected_projection_type: str
+
+
+class CanonicalOutputSchema(BaseModel):
+    dimensions: list[CanonicalOutputField] = Field(default_factory=list)
+    metrics: list[CanonicalOutputField] = Field(default_factory=list)
+    auxiliary: list[CanonicalOutputField] = Field(default_factory=list)
+
+
 class SQLPlan(BaseModel):
     question: str
     intent: str
@@ -100,6 +113,7 @@ class SQLPlan(BaseModel):
     warnings: list[str] = Field(default_factory=list)
     repair_count: int = Field(default=0, ge=0, le=2)
     model_trace: dict[str, Any] = Field(default_factory=dict)
+    canonical_output_schema: CanonicalOutputSchema = Field(default_factory=CanonicalOutputSchema)
 
 
 class GuardIssue(BaseModel):

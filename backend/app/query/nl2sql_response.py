@@ -18,8 +18,9 @@ class Nl2SqlResponseNormalizationError(ValueError):
 _FENCE = re.compile(r"\A```(?:json)?\s*(.*?)\s*```\Z", re.IGNORECASE | re.DOTALL)
 _WRAPPER_KEYS = ("sql_plan", "plan", "result", "data")
 _MAX_RESPONSE_CHARS = 200_000
-SERVER_OWNED_FIELDS = frozenset({"model_trace"})
+SERVER_OWNED_FIELDS = frozenset({"model_trace", "canonical_output_schema"})
 STRIP_SERVER_OWNED_MODEL_TRACE = "STRIP_SERVER_OWNED_MODEL_TRACE"
+STRIP_SERVER_OWNED_CANONICAL_OUTPUT_SCHEMA = "STRIP_SERVER_OWNED_CANONICAL_OUTPUT_SCHEMA"
 
 
 class ProviderSQLPlanPayload(BaseModel):
@@ -73,10 +74,14 @@ def _decode_text(value: str, *, allow_nested_string: bool = True) -> Any:
 
 
 def _strip_server_owned_fields(payload: dict[str, Any], actions: list[str]) -> dict[str, Any]:
-    for field in SERVER_OWNED_FIELDS.intersection(payload):
+    for field in ("model_trace", "canonical_output_schema"):
+        if field not in payload:
+            continue
         payload.pop(field)
         if field == "model_trace":
             actions.append(STRIP_SERVER_OWNED_MODEL_TRACE)
+        elif field == "canonical_output_schema":
+            actions.append(STRIP_SERVER_OWNED_CANONICAL_OUTPUT_SCHEMA)
     return payload
 
 

@@ -1,0 +1,42 @@
+{
+  "schema_version": "chatbi-recorded-real-sanitized-provider-response-v1",
+  "provider": "mimo",
+  "provenance": "RECORDED_REAL_SANITIZED_PROVIDER_RESPONSE_2026-08-26",
+  "source_evidence": {
+    "candidate_sha": "e42eb8a0df0b0df299e7fcca3f0addb744bfdc38",
+    "case_id": "FINAL-NL2SQL-MIMO",
+    "call_id": "c0bafa1d-e20e-442c-8cee-f9633fdfe4ed",
+    "diagnostic_sha256": "5ce77c9bfa27bb87064df6b7daa2731157739d23065c4cfa8bcf0884c34cfab1",
+    "raw_response_sha256": "c58d3948cdd21ac4d267079c4c4fa8326c4372dca9d7e5e8e0726714e315d3e7",
+    "response_shape_fingerprint": "91a2e4919b7b51968745678d4ab8a60cc691cd77404201c92b5d3e9b256f1475",
+    "sanitized": true
+  },
+  "response": {
+    "choices": [
+      {
+        "finish_reason": "stop",
+        "index": 0,
+        "message": {
+          "content": "{\n  \"question\": \"统计全部订单收入\",\n  \"intent\": \"聚合查询\",\n  \"dialect\": \"mysql\",\n  \"provider\": \"default\",\n  \"semantic_model_id\": \"3aace684-bb8a-47d5-92bc-3ae49ffea9a3\",\n  \"semantic_model_version\": 1,\n  \"selected_entities\": [\"orders\"],\n  \"selected_tables\": [\"orders\"],\n  \"selected_columns\": [\"revenue\"],\n  \"metrics\": [\"revenue\"],\n  \"dimensions\": [],\n  \"joins\": [],\n  \"filters\": [],\n  \"time_range\": null,\n  \"group_by\": [],\n  \"order_by\": [],\n  \"limit\": 1,\n  \"generated_sql\": \"SELECT SUM(orders.revenue) AS total_revenue FROM orders\",\n  \"confidence\": 0.95,\n  \"warnings\": [],\n  \"repair_count\": 0\n}",
+          "role": "assistant",
+          "tool_calls": null
+        }
+      }
+    ],
+    "created": 1787687159,
+    "id": "be523786-abc0-43e8-8418-63a6064d5008_ce74063a3b0346108ff34dff1040d4a4",
+    "model": "mimo-v2.5",
+    "object": "chat.completion",
+    "usage": {
+      "completion_tokens": 200,
+      "completion_tokens_details": {"reasoning_tokens": 0},
+      "prompt_tokens": 6471,
+      "prompt_tokens_details": {"cached_tokens": 512},
+      "total_tokens": 6671
+    }
+  },
+  "expected_result": {
+    "columns": ["revenue"],
+    "rows": [{"revenue": 1725750.0}]
+  }
+}
