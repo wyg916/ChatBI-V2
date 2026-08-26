@@ -463,6 +463,59 @@ def test_result_oracle_accepts_semantic_relationship_join_shape() -> None:
     assert next(item for item in result.checks if item.name == "join_semantics").passed is True
 
 
+def test_result_oracle_accepts_validated_provider_join_shape() -> None:
+    plan = DeterministicTestProvider().plan(question="按地区统计收入", context=semantic_context()).model_copy(update={
+        "joins": [{
+            "left_table": "orders",
+            "right_table": "regions",
+            "join_type": "INNER",
+            "left_column": "region_id",
+            "right_column": "region_id",
+        }],
+    })
+    guard = GuardResult(allowed=True, dialect="postgresql", normalized_sql="SELECT ...", statement_type="SELECT")
+    execution = ExecutionResult(
+        status="SUCCEEDED", columns=["region", "revenue"], column_types=["text", "numeric"],
+        rows=[{"region": "华东", "revenue": 100.0}], row_count=1, datasource_id="d",
+        dialect="postgresql", normalized_sql="SELECT ...", result_signature="provider-join",
+    )
+
+    result = ResultOracle().verify(plan=plan, guard=guard, execution=execution)
+
+    assert result.status == "PASSED"
+    assert next(item for item in result.checks if item.name == "join_semantics").passed is True
+
+
+@pytest.mark.parametrize(
+    "join",
+    [
+        {
+            "left_table": "orders", "right_table": "secret_payroll",
+            "left_column": "region_id", "right_column": "region_id",
+        },
+        {
+            "left_table": "orders", "right_table": "regions",
+            "left_column": "", "right_column": "region_id",
+        },
+    ],
+)
+def test_result_oracle_rejects_incomplete_or_unselected_provider_join_shape(join: dict[str, str]) -> None:
+    plan = DeterministicTestProvider().plan(question="按地区统计收入", context=semantic_context()).model_copy(
+        update={"joins": [join]},
+    )
+    guard = GuardResult(allowed=True, dialect="postgresql", normalized_sql="SELECT ...", statement_type="SELECT")
+    execution = ExecutionResult(
+        status="SUCCEEDED", columns=["region", "revenue"], column_types=["text", "numeric"],
+        rows=[{"region": "华东", "revenue": 100.0}], row_count=1, datasource_id="d",
+        dialect="postgresql", normalized_sql="SELECT ...", result_signature="provider-join-rejected",
+    )
+
+    result = ResultOracle().verify(plan=plan, guard=guard, execution=execution)
+
+    assert result.status == "MISMATCH"
+    assert next(item for item in result.checks if item.name == "join_semantics").passed is False
+
+
 def test_context_builder_link_score_is_deterministic():
     first = ContextBuilder()
     assert first.token_budget > 0

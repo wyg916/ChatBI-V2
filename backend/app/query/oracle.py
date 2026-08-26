@@ -32,6 +32,18 @@ def _join_uses_selected_entities(item: dict[str, Any], selected_tables: set[str]
     if left and right:
         return left.split(".")[0] in selected_tables and right.split(".")[0] in selected_tables
 
+    left_table = str(item.get("left_table") or "")
+    right_table = str(item.get("right_table") or "")
+    left_column = str(item.get("left_column") or "")
+    right_column = str(item.get("right_column") or "")
+    if any((left_table, right_table, left_column, right_column)):
+        return (
+            left_table in selected_tables
+            and right_table in selected_tables
+            and bool(left_column)
+            and bool(right_column)
+        )
+
     left_entity = str(item.get("left_entity") or "")
     right_entity = str(item.get("right_entity") or "")
     join_keys = item.get("join_keys") or []

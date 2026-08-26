@@ -433,6 +433,17 @@ def test_owner_final_level_enforces_execution_plan_provider_caps_and_vision_rese
     assert plan["provider_call_caps"] == {"mimo": 4, "deepseek": 4, "kimi": 4}
     assert plan["kimi_reserved_vision"] == 3
 
+    for case_id in ("P5-CANCEL-P5C03-test", "P5-CANCEL-P5C04-test"):
+        assert controller.reserve_attempt(
+            provider="deepseek", model="deepseek-test", request=_request(alias="deepseek"),
+            context=RequestContext(
+                request_id=case_id,
+                trace_id=f"TRACE-{case_id}",
+                route="COMPLEX_ANALYSIS",
+            ),
+            estimated_cost_cny=0, retry_count=0, recorded_transport=False,
+        ) is not None
+
     optional_context = RequestContext(
         request_id="FINAL-KIMI-TEXT-OPTIONAL",
         trace_id="TRACE-FINAL-KIMI-TEXT-OPTIONAL",

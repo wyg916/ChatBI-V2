@@ -1,5 +1,11 @@
 # Architecture Decisions
 
+## ADR-065：Provider Join 契约与取消请求共享同一受控 Case 边界
+
+Result Oracle 继续只接受已选语义实体间的 Join。除既有 `left/right` 与 `left_entity/right_entity/join_keys` 形态外，NL2SQL 校验后产生的 `left_table/right_table/left_column/right_column` 形态仅在两端表都精确属于 SQLPlan `selected_tables` 且两端列均非空时通过；部分字段、未知表或越界端点均 fail closed。该兼容不推断 Join、不放宽 SQL Guard，也不以结果值正确替代语义验证。
+
+FINAL 取消探针与其主 Complex Case 共享 Case 预算和 Provider allowlist。P5C03/P5C04 的唯一计划模式显式同时匹配 `P5-P5Cxx-*` 与 `P5-CANCEL-P5Cxx-*`，不增加总调用上限、Provider 上限、重试或成本预算；网络前仍要求唯一模式、精确 Route 和允许 Provider，取消后仍必须证明唯一 CANCELLED 终态、账本状态、消息清理及 Agent/Sandbox 资源释放。
+
 ## ADR-064：Provider 投影必须在 SQL Guard 前收敛为 Canonical Output Contract
 
 SQLPlan 的服务端输出契约显式包含 dimensions、metrics 和受控 auxiliary，每项绑定 `canonical_name`、`semantic_id`、`kind` 与 `expected_projection_type`。Provider 无权声明该服务端字段；任何 Provider 注入的 Canonical Output Schema 与 `model_trace` 一样先剥离，再由当前 QueryContext 的语义对象重建。正式链路固定为 Provider Response → SQLPlan Validation → Projection Contract → SQL Guard → QueryExecutor → Result Oracle，后两项既有规则不得为适配模型别名而放宽。

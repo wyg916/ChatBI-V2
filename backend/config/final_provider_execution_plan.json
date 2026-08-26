@@ -30,7 +30,7 @@
       "capability_class": "NL2SQL"
     },
     {
-      "case_id_pattern": "P5-P5C03-*",
+      "case_id_pattern": "P5-*P5C03-*",
       "expected_route": "COMPLEX_ANALYSIS",
       "allowed_providers": ["deepseek", "mimo"],
       "primary_provider": "deepseek",
@@ -41,7 +41,7 @@
       "capability_class": "COMPLEX"
     },
     {
-      "case_id_pattern": "P5-P5C04-*",
+      "case_id_pattern": "P5-*P5C04-*",
       "expected_route": "COMPLEX_ANALYSIS",
       "allowed_providers": ["deepseek", "mimo"],
       "primary_provider": "deepseek",
