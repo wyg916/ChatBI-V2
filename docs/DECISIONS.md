@@ -8,6 +8,8 @@ FINAL 取消探针与其主 Complex Case 共享 Case 预算和 Provider allowlis
 
 最终 NL2SQL 认证的绑定输入必须是已发布语义模型及其同一 `datasource_id` 下已同步、`table_count > 0` 的数据源；若目录为空，辅助程序必须先执行真实 Schema Sync 并重新读取目录，仍为空则在 Provider 网络前 fail closed。仅按 API 返回顺序选择第一个已发布模型是无效认证输入。由空目录触发的 `TABLE_NOT_AUTHORIZED` 继续视为 SQL Guard 正确拒绝，真实响应和费用完整保留，不能删除账本或以重试绕过 Case 上限；只能在记录该独立输入缺陷的新 forward successor 上重新认证。
 
+真实 DeepSeek 又证明限定符解析不能只看全数据源列名：`revenue` 同时存在于 `orders` 与 `daily_kpi`，但 SQL AST 的唯一可见来源只有 `orders`。Projection Contract 允许把未限定列绑定到“全局授权 owner 与当前 SQL 可见表的交集恰为 1”的 owner；交集为 0 时仍只接受全局唯一 owner，交集大于 1、两张可见表同名列或语义表达式指向另一表时全部 fail closed。该证明只用于表达式结构指纹，不修改源列限定符；规范化仍仅修改输出 alias。
+
 ## ADR-064：Provider 投影必须在 SQL Guard 前收敛为 Canonical Output Contract
 
 SQLPlan 的服务端输出契约显式包含 dimensions、metrics 和受控 auxiliary，每项绑定 `canonical_name`、`semantic_id`、`kind` 与 `expected_projection_type`。Provider 无权声明该服务端字段；任何 Provider 注入的 Canonical Output Schema 与 `model_trace` 一样先剥离，再由当前 QueryContext 的语义对象重建。正式链路固定为 Provider Response → SQLPlan Validation → Projection Contract → SQL Guard → QueryExecutor → Result Oracle，后两项既有规则不得为适配模型别名而放宽。

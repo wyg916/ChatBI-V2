@@ -26,7 +26,12 @@ from app.query.sql_guard import SqlGuard
 FIXTURES = Path(__file__).parent / "fixtures" / "provider_responses"
 
 
-def _context(*, dialect: str = "postgresql", duplicate_metric_expression: bool = False) -> QueryContext:
+def _context(
+    *,
+    dialect: str = "postgresql",
+    duplicate_metric_expression: bool = False,
+    shared_revenue_column: bool = False,
+) -> QueryContext:
     metrics = [
         {
             "id": "metric-revenue",
@@ -57,6 +62,21 @@ def _context(*, dialect: str = "postgresql", duplicate_metric_expression: bool =
             "aggregation": "SUM",
             "filters": [],
         })
+    entities = [
+        {"id": "orders", "name": "orders", "source_table": "orders", "primary_key": "id"},
+        {"id": "regions", "name": "regions", "source_table": "regions", "primary_key": "id"},
+    ]
+    allowed_tables = ["orders", "regions"]
+    allowed_columns = {
+        "orders": ["id", "revenue", "cost", "order_date"],
+        "regions": ["id", "province"],
+    }
+    if shared_revenue_column:
+        entities.append({
+            "id": "daily_kpi", "name": "daily_kpi", "source_table": "daily_kpi", "primary_key": "id",
+        })
+        allowed_tables.append("daily_kpi")
+        allowed_columns["daily_kpi"] = ["id", "revenue"]
     return QueryContext(
         workspace_id="workspace",
         workspace_name="Workspace",
@@ -66,10 +86,7 @@ def _context(*, dialect: str = "postgresql", duplicate_metric_expression: bool =
         semantic_model_id="semantic-model",
         semantic_model_name="Business",
         semantic_model_version=1,
-        entities=[
-            {"id": "orders", "name": "orders", "source_table": "orders", "primary_key": "id"},
-            {"id": "regions", "name": "regions", "source_table": "regions", "primary_key": "id"},
-        ],
+        entities=entities,
         candidate_tables=[],
         candidate_columns=[],
         metrics=metrics,
@@ -93,11 +110,8 @@ def _context(*, dialect: str = "postgresql", duplicate_metric_expression: bool =
         token_budget=4000,
         estimated_tokens=100,
         security_policy=SecurityPolicy(
-            allowed_tables=["orders", "regions"],
-            allowed_columns={
-                "orders": ["id", "revenue", "cost", "order_date"],
-                "regions": ["id", "province"],
-            },
+            allowed_tables=allowed_tables,
+            allowed_columns=allowed_columns,
         ),
     )
 
@@ -281,6 +295,28 @@ def test_year_grain_dimension_without_matching_plan_group_by_fails_closed() -> N
         _validate(plan, context=_context(dialect="mysql"))
 
 
+def test_unqualified_projection_resolves_only_with_one_visible_ast_owner() -> None:
+    context = _context(shared_revenue_column=True)
+    plan = _plan("SELECT SUM(revenue) AS total_revenue FROM orders", metrics=["revenue"])
+
+    result = _validate(plan, context=context)
+
+    assert result.plan.generated_sql == "SELECT SUM(revenue) AS revenue FROM orders"
+    assert result.normalization_actions[0]["to"] == "revenue"
+
+
+def test_unqualified_projection_with_two_visible_ast_owners_fails_closed() -> None:
+    context = _context(shared_revenue_column=True)
+    plan = _plan(
+        "SELECT SUM(revenue) AS total_revenue FROM orders "
+        "JOIN daily_kpi ON orders.id = daily_kpi.id",
+        metrics=["revenue"],
+    ).model_copy(update={"selected_tables": ["orders", "daily_kpi"]})
+
+    with pytest.raises(ProjectionContractError, match="PROJECTION_MISSING_EXPECTED_OUTPUT"):
+        _validate(plan, context=context)
+
+
 def test_wren_comparison_auxiliary_outputs_are_explicitly_declared() -> None:
     plan = _plan(
         "WITH compared AS (SELECT SUM(o.revenue) AS revenue FROM orders o) "
@@ -381,6 +417,50 @@ def test_recorded_real_mimo_alias_mismatch_full_contract_regression(monkeypatch:
     assert response.resolved_model == "mimo-v2.5"
     assert contract.plan.generated_sql == "SELECT SUM(orders.revenue) AS revenue FROM orders"
     assert execution == ExecutionResult.model_validate(execution.model_dump())
+    assert execution.columns == ["revenue"]
+    assert execution.rows == [{"revenue": 1725750.0}]
+    assert oracle.status == "PASSED", oracle.checks
+
+
+def test_recorded_real_deepseek_unqualified_alias_full_contract_regression(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    fixture = json.loads(
+        (FIXTURES / "deepseek_nl2sql_recorded_real_unqualified_alias.json").read_text(encoding="utf-8")
+    )
+    assert fixture["provenance"] == "RECORDED_REAL_SANITIZED_PROVIDER_RESPONSE_2026-08-26"
+    assert fixture["source_evidence"]["candidate_sha"] == "67cdfa88d2d9a1eb239d74183b36551eb58b78d4"
+    response = normalize_chat_completion(fixture["response"])
+    plan = normalize_nl2sql_response(response.content)
+    context = _context(shared_revenue_column=True)
+    contract = _validate(plan, context=context)
+    guard = SqlGuard().validate(
+        contract.plan.generated_sql,
+        dialect="postgresql",
+        policy=context.security_policy,
+    )
+    assert guard.allowed is True, guard.issues
+
+    monkeypatch.setattr(
+        "app.query.executor.build_connector",
+        lambda _datasource: SimpleNamespace(_engine=lambda: _FakeEngine()),
+    )
+    datasource = SimpleNamespace(id="datasource", type="postgresql", schema=None)
+    execution = QueryExecutor().execute(
+        datasource=datasource,
+        normalized_sql=guard.normalized_sql or "",
+        row_limit=1,
+        timeout_ms=1000,
+    )
+    expected = ExpectedResult(
+        columns=fixture["expected_result"]["columns"],
+        rows=fixture["expected_result"]["rows"],
+        metric_names=["revenue"],
+    )
+    oracle = ResultOracle().verify(plan=contract.plan, guard=guard, execution=execution, expected=expected)
+
+    assert response.resolved_model == "deepseek-v4-flash"
+    assert contract.plan.generated_sql == "SELECT SUM(revenue) AS revenue FROM orders"
     assert execution.columns == ["revenue"]
     assert execution.rows == [{"revenue": 1725750.0}]
     assert oracle.status == "PASSED", oracle.checks

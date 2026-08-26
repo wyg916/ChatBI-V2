@@ -212,6 +212,7 @@ def _fingerprint(
     owners: dict[str, set[str]],
 ) -> str:
     normalized = expression.copy()
+    visible_tables = {table.casefold(): table for table in aliases.values()}
     for column in normalized.find_all(exp.Column):
         table = column.table
         if table:
@@ -221,8 +222,13 @@ def _fingerprint(
             column.set("table", exp.to_identifier(resolved))
         else:
             candidates = owners.get(column.name.casefold(), set())
-            if len(candidates) == 1:
-                column.set("table", exp.to_identifier(next(iter(candidates))))
+            visible_candidates = {
+                candidate for candidate in candidates if candidate.casefold() in visible_tables
+            }
+            resolvable = visible_candidates if visible_candidates else candidates
+            if len(resolvable) == 1:
+                owner = next(iter(resolvable))
+                column.set("table", exp.to_identifier(visible_tables.get(owner.casefold(), owner)))
     return normalized.sql(dialect=dialect, pretty=False).casefold()
 
 
