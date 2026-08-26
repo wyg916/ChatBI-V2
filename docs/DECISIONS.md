@@ -481,3 +481,14 @@ Phase5 Live Runner 在 Level0/1/2 运行前已经通过唯一成本控制器验�
   table, column, Join predicate, or SQL rewrite.
 - This keeps the Oracle aligned with the SQL Guard and Projection Contract for
   live schema-qualified Provider plans without weakening cross-schema safety.
+
+## ADR-075 — Broad CI unit suites isolate Level0 fallback from injected gateways
+
+- Status: Accepted (2026-08-27)
+- The Phase3/IBM workflow keeps Level0 as its workflow-wide default for real
+  runners, but clears `CHATBI_TEST_COST_CONTROL` and
+  `CHATBI_TEST_EXECUTION_LEVEL` only for the broad Backend unit-test step.
+- Those unit tests inject explicit fake gateways and contain no Provider
+  credentials. Applying the runtime Level0 fallback to that step replaces the
+  injected doubles and tests a different behavior; all later deterministic,
+  security, Phase3 and IBM jobs continue to run with Level0 enforced.

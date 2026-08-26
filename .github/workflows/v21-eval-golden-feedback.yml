@@ -82,7 +82,12 @@ jobs:
             ./packages/prompt-registry
           pip check
       - name: Backend unit and integration
+        # The broad unit suite injects its own fake gateways. Keep the paid
+        # transport disabled by the absence of credentials, but do not let the
+        # workflow-wide Level0 fallback replace those explicit test doubles.
         env:
+          CHATBI_TEST_COST_CONTROL: ""
+          CHATBI_TEST_EXECUTION_LEVEL: ""
           PYTHONPATH: >-
             backend:packages/agent-contracts/src:packages/agent-orchestrator/src:packages/prompt-registry/src:packages/rag-adapter/src:packages/rag-contracts/src:packages/dbgpt-runtime-adapter/src:packages/pandasai-selected-runtime/src
         run: pytest backend/tests -q

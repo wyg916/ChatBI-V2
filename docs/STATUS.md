@@ -207,3 +207,7 @@
   unqualified Provider Join entity with a schema-qualified selected table only
   when its leaf name is unique; duplicate leaf names across schemas remain
   ambiguous and fail closed (ADR-074).
+- Remote Phase3/IBM CI follow-up: the broad Backend unit step now isolates the
+  workflow-wide Level0 fallback so its explicit fake gateways remain active;
+  real deterministic runners and every downstream remote Gate remain Level0
+  with paid Provider calls disabled (ADR-075).
