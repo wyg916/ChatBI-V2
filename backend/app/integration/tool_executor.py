@@ -18,6 +18,7 @@ from chatbi_rag_contracts import Citation, RagExecutionContext, RagRequest
 from sqlalchemy.orm import Session
 
 from app.core.access import Principal
+from app.model_gateway.contracts import RequestContext
 from app.query.contracts import AskRequest
 from app.query.service import QueryPipeline, query_response
 from app.core.config import get_settings
@@ -90,12 +91,14 @@ class ChatBIToolExecutor:
     def __init__(
         self, db: Session, principal: Principal, rag_adapter,
         *, cancellation_event: Event | None = None, file_evidence: dict | None = None,
+        request_context: RequestContext | None = None,
     ) -> None:
         self.db = db
         self.principal = principal
         self.rag_adapter = rag_adapter
         self.cancellation_event = cancellation_event
         self.file_evidence = file_evidence
+        self.request_context = request_context
         self.citation_verifier = CitationVerifierV1()
 
     def execute(self, call: ToolCall, context: AgentExecutionContext) -> ToolResult:
@@ -150,6 +153,14 @@ class ChatBIToolExecutor:
             ),
             principal=self.principal,
             cancellation_event=self.cancellation_event,
+            request_context=(
+                self.request_context.model_copy(update={
+                    "question": question,
+                    "datasource_id": datasource_id or self.request_context.datasource_id,
+                })
+                if self.request_context is not None
+                else None
+            ),
         )
         payload = query_response(run).model_dump(mode="json")
         guard_allowed = bool((payload.get("guard") or {}).get("allowed"))

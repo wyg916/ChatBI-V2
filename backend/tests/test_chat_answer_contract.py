@@ -36,6 +36,31 @@ def _events(response_text: str) -> list[dict]:
     return events
 
 
+def test_run_started_cancel_window_sets_event_before_worker_submission(monkeypatch):
+    lifecycle = stream_registry.register(
+        "TRACE-CANCEL-PREEMPT-001",
+        conversation_id="conversation-cancel-preempt",
+        client_message_id="message-cancel-preempt",
+        connection_open=False,
+    )
+    submitted = Event()
+
+    class _Executor:
+        @staticmethod
+        def submit(_worker):
+            assert lifecycle.cancel_event.is_set()
+            submitted.set()
+
+    monkeypatch.setattr(chat_route, "_CHAT_STREAM_EXECUTOR", _Executor())
+    monkeypatch.setattr(chat_route, "_CHAT_CANCEL_PREEMPTION_WINDOW_SECONDS", 0.5)
+    canceller = Thread(target=lambda: lifecycle.cancel_event.wait(0.01) or lifecycle.cancel())
+    canceller.start()
+    chat_route._submit_stream_worker_after_ack(lifecycle, lambda: None)
+    canceller.join(timeout=1)
+    assert submitted.is_set()
+    stream_registry.connection_closed(lifecycle.trace_id)
+
+
 class _StreamingGateway:
     def stream(self, **_kwargs):
         for content in ("这是第一段。", "这是第二段，", "回答完成。"):

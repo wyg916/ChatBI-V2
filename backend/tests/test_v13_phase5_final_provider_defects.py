@@ -13,8 +13,11 @@ from app.model_gateway.normalization import (
     ProviderResponseNormalizationError,
     normalize_chat_completion,
 )
-from app.model_gateway.contracts import ModelResponse, ModelUsage
+from app.model_gateway.contracts import ModelResponse, ModelUsage, RequestContext
 from app.model_gateway.service import ModelGateway
+from app.integration.tool_executor import ChatBIToolExecutor
+from app.integration import tool_executor as tool_executor_module
+from chatbi_agent_contracts import AgentExecutionContext, AgentRole, ToolCall
 from app.query.contracts import QueryContext, SecurityPolicy
 from app.query.nl2sql import OpenAICompatibleProvider
 from app.query.nl2sql_response import (
@@ -28,6 +31,80 @@ from app.streaming.lifecycle import StreamCancelled, StreamRegistry
 
 
 FIXTURES = Path(__file__).parent / "fixtures" / "provider_responses"
+
+
+def test_complex_query_tool_preserves_outer_paid_case_and_trace_identity(monkeypatch):
+    captured: dict[str, object] = {}
+
+    class _Run:
+        id = "query-run"
+        status = "SUCCEEDED"
+        error_code = None
+
+    class _Pipeline:
+        def execute(self, _db, request, principal=None, **kwargs):
+            del principal
+            captured["question"] = request.question
+            captured["request_context"] = kwargs.get("request_context")
+            return _Run()
+
+    class _Response:
+        def model_dump(self, **_kwargs):
+            return {
+                "id": "query-run",
+                "status": "SUCCEEDED",
+                "guard": {"allowed": True},
+                "oracle": {"status": "PASSED"},
+                "execution": {"result_signature": "a" * 64},
+            }
+
+    monkeypatch.setattr(tool_executor_module, "QueryPipeline", _Pipeline)
+    monkeypatch.setattr(tool_executor_module, "query_response", lambda _run: _Response())
+    runtime = RequestContext(
+        request_id="P5-P5C03-paid-case",
+        trace_id="TRACE-P5C03-trusted",
+        conversation_id="conversation-p5c03",
+        route="COMPLEX_ANALYSIS",
+        user_id="user-p5c03",
+        workspace_id="workspace-p5c03",
+        datasource_id="datasource-p5c03",
+        roles=frozenset({"ADMIN"}),
+        permission_hash="permission-p5c03",
+        question="outer question",
+    )
+    executor = ChatBIToolExecutor(
+        object(), object(), rag_adapter=None, request_context=runtime,
+    )
+    result = executor.execute(
+        ToolCall(
+            tool_name="QUERY_DATA",
+            agent_role=AgentRole.DATA_ANALYST,
+            arguments={
+                "question": "tool question",
+                "datasource_id": "datasource-p5c03",
+                "semantic_model_id": "semantic-p5c03",
+            },
+            idempotency_key="tool-p5c03-identity",
+        ),
+        AgentExecutionContext(
+            workspace_id="workspace-p5c03",
+            user_id="user-p5c03",
+            roles=frozenset({"ADMIN"}),
+            allowed_datasources=frozenset({"datasource-p5c03"}),
+            allowed_semantic_models=frozenset({"semantic-p5c03"}),
+            allowed_tools=frozenset({"QUERY_DATA"}),
+            trace_id="TRACE-P5C03-trusted",
+            timeout_ms=30_000,
+            token_budget=6_000,
+        ),
+    )
+    bound = captured["request_context"]
+    assert result.status == "SUCCEEDED"
+    assert captured["question"] == "tool question"
+    assert bound.request_id == "P5-P5C03-paid-case"
+    assert bound.trace_id == "TRACE-P5C03-trusted"
+    assert bound.datasource_id == "datasource-p5c03"
+    assert bound.question == "tool question"
 
 
 def _generic_mimo_content() -> dict:

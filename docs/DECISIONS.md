@@ -1,5 +1,13 @@
 # Architecture Decisions
 
+## ADR-066：固定 Agent Tool 继承外层控制身份，取消在首事件后抢占工作提交
+
+Complex Analysis 的固定 `QUERY_DATA` 工具必须继承 Chat 创建的服务端 `RequestContext`，包括 `request_id`、`trace_id`、Workspace、User、Route、DataSource、权限签名和成本模式；工具只可把 `question` 更新为受控 ToolCall 的问题，不得自建新的 Case/Trace 身份。这样 Model Gateway、FINAL Case 计划、运营 Ledger、QueryRun 与 OrchestrationRun 对同一请求保持可追溯的一致身份。缺少外层上下文的非 Chat 独立工具测试仍可使用既有系统默认值，但不能冒充最终 Provider 认证。
+
+SSE `run.started` 保持第一事件。服务端在该事件之后、向有界线程池提交实际工作之前等待最多 100ms 的共享取消事件；立即取消会提前结束等待并让工作线程在首个业务 checkpoint 以零模型调用收敛为唯一 `run.cancelled`。窗口不增加首事件 TTFE、不延长取消确认上限，也不改 Provider 超时或重试。若取消发生在真实调用完成之后，已产生的 Token/成本仍必须如实保留，不能改写成零费用。
+
+冻结 Complex 结果的行值验证遵守关系语义：问题明确要求升序、降序或排序时，完整列表顺序和每个单元格都必须一致；未声明排序且存在冻结维度时，以全部维度组成的唯一键进行一对一完整行比较。重复维度键、缺失键、行数不同、缺列或任意值差异均失败。该规则不修改冻结数据、SQL、Result Oracle 或业务指标，只消除把未声明列表顺序误当业务正确性的认证器缺陷。
+
 ## ADR-065：Provider Join 契约与取消请求共享同一受控 Case 边界
 
 Result Oracle 继续只接受已选语义实体间的 Join。除既有 `left/right` 与 `left_entity/right_entity/join_keys` 形态外，NL2SQL 校验后产生的 `left_table/right_table/left_column/right_column` 形态仅在两端表都精确属于 SQLPlan `selected_tables` 且两端列均非空时通过；部分字段、未知表或越界端点均 fail closed。该兼容不推断 Join、不放宽 SQL Guard，也不以结果值正确替代语义验证。

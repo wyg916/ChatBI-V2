@@ -241,6 +241,7 @@ class AnalysisService:
         tool_executor = ChatBIToolExecutor(
             db, principal, self._rag_adapter_instance(), cancellation_event=cancellation_event,
             file_evidence=request.file_evidence,
+            request_context=self._runtime_context,
         )
         result = DbgptSelectedRuntimeOrchestrator(
             tool_executor, progress_callback=progress_callback

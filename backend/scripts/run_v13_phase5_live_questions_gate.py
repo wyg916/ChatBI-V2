@@ -325,6 +325,57 @@ def _visible_claim_evidence(
     }
 
 
+def _exact_frozen_rows_match(
+    *,
+    question: str,
+    actual_rows: Any,
+    expected_rows: Any,
+    dimensions: Sequence[str],
+) -> bool:
+    """Compare exact relational rows without inventing an unstated order.
+
+    An explicit ordering phrase remains sequence-sensitive. Otherwise a
+    dimension-keyed result is compared as a one-to-one relation: duplicate or
+    missing keys and every cell mismatch still fail closed.
+    """
+
+    if not isinstance(actual_rows, list) or not isinstance(expected_rows, list):
+        return False
+    order_required = re.search(
+        r"(?:升序|降序|排序|从高到低|从低到高|ascending|descending|order\s+by)",
+        question,
+        re.IGNORECASE,
+    ) is not None
+    dimension_names = tuple(str(value) for value in dimensions if str(value))
+    if order_required or not dimension_names:
+        return actual_rows == expected_rows
+    if len(actual_rows) != len(expected_rows):
+        return False
+
+    def keyed(rows: list[Any]) -> dict[tuple[Any, ...], Mapping[str, Any]] | None:
+        result: dict[tuple[Any, ...], Mapping[str, Any]] = {}
+        for row in rows:
+            if not isinstance(row, Mapping) or any(name not in row for name in dimension_names):
+                return None
+            key = tuple(row[name] for name in dimension_names)
+            try:
+                duplicate = key in result
+            except TypeError:
+                return None
+            if duplicate:
+                return None
+            result[key] = row
+        return result
+
+    actual_by_key = keyed(actual_rows)
+    expected_by_key = keyed(expected_rows)
+    return (
+        actual_by_key is not None
+        and expected_by_key is not None
+        and actual_by_key == expected_by_key
+    )
+
+
 def _named_values(value: Any, key: str) -> set[str]:
     values: set[str] = set()
     for item in _nested_values(value, key):
@@ -1125,7 +1176,12 @@ class LiveQuestionsGate:
             failures.append("complex_frozen_dimension_evidence_missing")
         if result_evidence["maximum_row_count"] < int(result_contract["minimum_row_count"]):
             failures.append("complex_frozen_row_evidence_missing")
-        if actual_rows != result_contract["expected_rows"]:
+        if not _exact_frozen_rows_match(
+            question=str(case["question"]),
+            actual_rows=actual_rows,
+            expected_rows=result_contract["expected_rows"],
+            dimensions=result_contract["required_dimensions"],
+        ):
             failures.append("complex_frozen_result_rows_mismatch")
         if actual_claims != result_contract["expected_answer_claims"]:
             failures.append("complex_frozen_answer_claims_mismatch")

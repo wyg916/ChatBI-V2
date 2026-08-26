@@ -15,6 +15,7 @@ from scripts.run_v13_phase5_live_questions_gate import (
     _action_failures,
     _answer_oracle,
     _cancel_readability_failures,
+    _exact_frozen_rows_match,
     _sse_events,
     load_external_credentials,
     load_manifest,
@@ -23,6 +24,35 @@ from scripts.run_v13_phase5_live_questions_gate import (
     validate_backend_url,
     validate_controller_url,
 )
+
+
+def test_complex_frozen_rows_are_exact_but_unordered_only_when_order_is_unspecified():
+    manifest = load_manifest(
+        REPO_ROOT / "evaluation" / "golden" / "v13-phase5-complex-5.json",
+        expected_count=5,
+    )
+    by_id = {case["id"]: case for case in manifest["cases"]}
+    unordered = by_id["P5C03"]
+    contract = unordered["expected"]["expected_evidence"]["result"]
+    reversed_rows = list(reversed(contract["expected_rows"]))
+    assert _exact_frozen_rows_match(
+        question=unordered["question"], actual_rows=reversed_rows,
+        expected_rows=contract["expected_rows"], dimensions=contract["required_dimensions"],
+    )
+    corrupted = copy.deepcopy(reversed_rows)
+    corrupted[0]["profit"] += 0.01
+    assert not _exact_frozen_rows_match(
+        question=unordered["question"], actual_rows=corrupted,
+        expected_rows=contract["expected_rows"], dimensions=contract["required_dimensions"],
+    )
+
+    ordered = by_id["P5C01"]
+    ordered_contract = ordered["expected"]["expected_evidence"]["result"]
+    assert not _exact_frozen_rows_match(
+        question=ordered["question"], actual_rows=list(reversed(ordered_contract["expected_rows"])),
+        expected_rows=ordered_contract["expected_rows"],
+        dimensions=ordered_contract["required_dimensions"],
+    )
 
 
 def test_runtime_tested_sha_uses_validated_service_identity_without_git():

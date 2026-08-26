@@ -37,6 +37,16 @@ router = APIRouter(tags=["authenticated chat"])
 # received `accepted` and continue to receive heartbeats from reusable response
 # stream workers, preventing business work from starving TTFE scheduling.
 _CHAT_STREAM_EXECUTOR = ThreadPoolExecutor(max_workers=6, thread_name_prefix="chatbi-stream")
+# Give an explicit cancel sent immediately after ``run.started`` a short,
+# bounded chance to set the shared event before any database/model work starts.
+# The acknowledgement is already visible to the client, so this does not add
+# time-to-first-event latency and prevents an avoidable paid call race.
+_CHAT_CANCEL_PREEMPTION_WINDOW_SECONDS = 0.1
+
+
+def _submit_stream_worker_after_ack(lifecycle, worker) -> None:
+    lifecycle.cancel_event.wait(timeout=_CHAT_CANCEL_PREEMPTION_WINDOW_SECONDS)
+    _CHAT_STREAM_EXECUTOR.submit(worker)
 
 
 def _cleanup_cancelled_messages(conversation_id: str, client_message_id: str) -> None:
@@ -318,7 +328,7 @@ def chat_stream(
             # Reuse a bounded worker set. Creating an OS thread for every SSE
             # request leaves allocator arenas at an ever-rising RSS high-water
             # mark during sustained load, even after the threads exit.
-            _CHAT_STREAM_EXECUTOR.submit(worker)
+            _submit_stream_worker_after_ack(lifecycle, worker)
             while True:
                 try:
                     item = events.get(timeout=0.5)
