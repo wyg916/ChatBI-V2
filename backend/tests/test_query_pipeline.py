@@ -498,6 +498,52 @@ def test_result_oracle_accepts_semantic_relationship_join_shape() -> None:
     assert next(item for item in result.checks if item.name == "join_semantics").passed is True
 
 
+def test_result_oracle_reconciles_unique_qualified_selected_tables_with_provider_entities() -> None:
+    plan = DeterministicTestProvider().plan(question="按地区统计收入", context=semantic_context()).model_copy(update={
+        "selected_tables": ["demo_business.orders", "demo_business.regions"],
+        "joins": [{
+            "left_entity": "orders",
+            "right_entity": "regions",
+            "join_type": "INNER",
+            "join_keys": [{"left": "region_id", "right": "region_id"}],
+        }],
+    })
+    guard = GuardResult(allowed=True, dialect="postgresql", normalized_sql="SELECT ...", statement_type="SELECT")
+    execution = ExecutionResult(
+        status="SUCCEEDED", columns=["region", "revenue"], column_types=["text", "numeric"],
+        rows=[{"region": "华东", "revenue": 100.0}], row_count=1, datasource_id="d",
+        dialect="postgresql", normalized_sql="SELECT ...", result_signature="qualified-semantic-join",
+    )
+
+    result = ResultOracle().verify(plan=plan, guard=guard, execution=execution)
+
+    assert result.status == "PASSED"
+    assert next(item for item in result.checks if item.name == "join_semantics").passed is True
+
+
+def test_result_oracle_rejects_ambiguous_unqualified_provider_entity() -> None:
+    plan = DeterministicTestProvider().plan(question="按地区统计收入", context=semantic_context()).model_copy(update={
+        "selected_tables": ["tenant_a.orders", "tenant_b.orders", "demo_business.regions"],
+        "joins": [{
+            "left_entity": "orders",
+            "right_entity": "regions",
+            "join_type": "INNER",
+            "join_keys": [{"left": "region_id", "right": "region_id"}],
+        }],
+    })
+    guard = GuardResult(allowed=True, dialect="postgresql", normalized_sql="SELECT ...", statement_type="SELECT")
+    execution = ExecutionResult(
+        status="SUCCEEDED", columns=["region", "revenue"], column_types=["text", "numeric"],
+        rows=[{"region": "华东", "revenue": 100.0}], row_count=1, datasource_id="d",
+        dialect="postgresql", normalized_sql="SELECT ...", result_signature="ambiguous-semantic-join",
+    )
+
+    result = ResultOracle().verify(plan=plan, guard=guard, execution=execution)
+
+    assert result.status == "MISMATCH"
+    assert next(item for item in result.checks if item.name == "join_semantics").passed is False
+
+
 def test_result_oracle_accepts_validated_provider_join_shape() -> None:
     plan = DeterministicTestProvider().plan(question="按地区统计收入", context=semantic_context()).model_copy(update={
         "joins": [{

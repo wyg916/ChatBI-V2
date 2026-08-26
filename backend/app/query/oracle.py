@@ -69,18 +69,56 @@ def _valid_join_on(value: Any, left_table: str, right_table: str) -> bool:
     return valid(condition)
 
 
+def _identifier_parts(value: Any) -> tuple[str, ...]:
+    return tuple(
+        part.strip().strip('`"[]').casefold()
+        for part in str(value or "").split(".")
+        if part.strip().strip('`"[]')
+    )
+
+
+def _selected_table_identity(value: Any, selected_tables: set[str]) -> str | None:
+    candidate_parts = _identifier_parts(value)
+    if not candidate_parts:
+        return None
+    candidate = ".".join(candidate_parts)
+    selected = {
+        ".".join(parts)
+        for item in selected_tables
+        if (parts := _identifier_parts(item))
+    }
+    if candidate in selected:
+        return candidate
+    leaf = candidate_parts[-1]
+    matches = [item for item in selected if item.rsplit(".", 1)[-1] == leaf]
+    return matches[0] if len(matches) == 1 else None
+
+
+def _selected_column_table_identity(value: Any, selected_tables: set[str]) -> str | None:
+    parts = _identifier_parts(value)
+    if len(parts) < 2:
+        return None
+    return _selected_table_identity(".".join(parts[:-1]), selected_tables)
+
+
 def _join_uses_selected_entities(item: dict[str, Any], selected_tables: set[str]) -> bool:
     left = str(item.get("left") or "")
     right = str(item.get("right") or "")
     if left and right:
-        return left.split(".")[0] in selected_tables and right.split(".")[0] in selected_tables
+        return bool(
+            _selected_column_table_identity(left, selected_tables)
+            and _selected_column_table_identity(right, selected_tables)
+        )
 
     left_table = str(item.get("left_table") or "")
     right_table = str(item.get("right_table") or "")
     left_column = str(item.get("left_column") or "")
     right_column = str(item.get("right_column") or "")
     if any((left_table, right_table, left_column, right_column)):
-        endpoints_selected = left_table in selected_tables and right_table in selected_tables
+        endpoints_selected = bool(
+            _selected_table_identity(left_table, selected_tables)
+            and _selected_table_identity(right_table, selected_tables)
+        )
         if left_column or right_column:
             return endpoints_selected and bool(left_column) and bool(right_column)
         if item.get("join_keys") is not None:
@@ -91,8 +129,8 @@ def _join_uses_selected_entities(item: dict[str, Any], selected_tables: set[str]
     right_entity = str(item.get("right_entity") or "")
     join_keys = item.get("join_keys") or []
     return (
-        left_entity in selected_tables
-        and right_entity in selected_tables
+        _selected_table_identity(left_entity, selected_tables) is not None
+        and _selected_table_identity(right_entity, selected_tables) is not None
         and _valid_join_keys(join_keys)
     )
 

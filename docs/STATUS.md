@@ -203,3 +203,7 @@
   semantic and SQL AST identity, correlation scopes normalize to canonical
   years, DB-GPT is preloaded at startup, and Oracle/runtime terminal failures
   cannot trigger duplicate paid calls (ADR-073).
+- Phase5 final Provider P5C03 follow-up: Result Oracle now reconciles an
+  unqualified Provider Join entity with a schema-qualified selected table only
+  when its leaf name is unique; duplicate leaf names across schemas remain
+  ambiguous and fail closed (ADR-074).

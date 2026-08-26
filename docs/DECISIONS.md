@@ -467,3 +467,17 @@ Phase5 Live Runner 在 Level0/1/2 运行前已经通过唯一成本控制器验�
   current orchestration attempt; neither may launch a second paid query. The
   selected DB-GPT runtime import closure is preloaded during Backend lifespan
   startup so readiness reflects the exact runtime before requests are served.
+
+## ADR-074 — Provider Join identities reconcile only through unique table leaves
+
+- Status: Accepted (2026-08-27)
+- Result Oracle treats a Provider entity such as `orders` as the same selected
+  table as `demo_business.orders` only when that unqualified leaf identifies
+  exactly one selected table. Exact qualified identities continue to match
+  directly.
+- If two selected schemas expose the same leaf name, an unqualified Provider
+  entity is ambiguous and the Join fails closed. Join keys or a strict `ON`
+  expression remain mandatory; this reconciliation never authorizes a new
+  table, column, Join predicate, or SQL rewrite.
+- This keeps the Oracle aligned with the SQL Guard and Projection Contract for
+  live schema-qualified Provider plans without weakening cross-schema safety.
