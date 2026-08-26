@@ -6,6 +6,7 @@ import json
 import sqlite3
 from pathlib import Path
 from threading import Event, Thread
+from types import SimpleNamespace
 
 import pytest
 
@@ -105,6 +106,44 @@ def test_complex_query_tool_preserves_outer_paid_case_and_trace_identity(monkeyp
     assert bound.trace_id == "TRACE-P5C03-trusted"
     assert bound.datasource_id == "datasource-p5c03"
     assert bound.question == "tool question"
+
+
+def test_correlation_scope_consumes_canonical_order_date_year_grain(monkeypatch):
+    monkeypatch.setattr(
+        tool_executor_module,
+        "execute_selected_pandasai_runtime",
+        lambda *_args, **_kwargs: SimpleNamespace(output={
+            "status": "SUCCEEDED",
+            "runtime_verified": True,
+            "container_destroyed": True,
+            "output": {"correlation": 1.0, "sample_size": 2},
+        }),
+    )
+    executor = ChatBIToolExecutor(object(), object(), rag_adapter=None)
+    payload, error = executor._correlation_result(
+        {"execution": {"rows": [
+            {"order_date": 2025, "revenue": 100.0, "cost": 80.0},
+            {"order_date": 2026, "revenue": 120.0, "cost": 96.0},
+        ]}},
+        AgentExecutionContext(
+            workspace_id="workspace",
+            user_id="user",
+            roles=frozenset({"ADMIN"}),
+            allowed_datasources=frozenset(),
+            allowed_semantic_models=frozenset(),
+            allowed_tools=frozenset({"QUERY_DATA"}),
+            trace_id="TRACE-CANONICAL-YEAR-SCOPE",
+            timeout_ms=30_000,
+            token_budget=6_000,
+        ),
+    )
+
+    assert error is None
+    assert payload["answer_claims"] == [{
+        "metric": "correlation",
+        "scope": "ANNUAL_REVENUE_COST_2025_2026",
+        "value": 1.0,
+    }]
 
 
 def _generic_mimo_content() -> dict:

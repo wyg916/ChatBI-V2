@@ -295,6 +295,38 @@ def test_year_grain_dimension_without_matching_plan_group_by_fails_closed() -> N
         _validate(plan, context=_context(dialect="mysql"))
 
 
+def test_unique_cte_lineage_normalizes_recorded_deepseek_year_and_metric_aliases() -> None:
+    plan = _plan(
+        "WITH yearly AS (SELECT EXTRACT(YEAR FROM order_date) AS yr, "
+        "SUM(revenue) AS total_revenue, SUM(cost) AS total_cost "
+        "FROM demo_business.orders GROUP BY EXTRACT(YEAR FROM order_date)) "
+        "SELECT yr, total_revenue, total_cost FROM yearly ORDER BY yr",
+        dimensions=["order_date"],
+        metrics=["revenue", "cost"],
+        dialect="postgresql",
+    )
+
+    result = _validate(plan, context=_context(dialect="postgresql"))
+
+    assert "SELECT yr AS order_date, total_revenue AS revenue, total_cost AS cost FROM yearly" in result.plan.generated_sql
+    assert "ORDER BY order_date" in result.plan.generated_sql
+    assert {item["to"] for item in result.normalization_actions} == {"order_date", "revenue", "cost"}
+
+
+def test_cte_year_lineage_without_matching_group_expression_fails_closed() -> None:
+    plan = _plan(
+        "WITH yearly AS (SELECT EXTRACT(YEAR FROM order_date) AS yr, "
+        "SUM(revenue) AS total_revenue FROM demo_business.orders) "
+        "SELECT yr, total_revenue FROM yearly",
+        dimensions=["order_date"],
+        metrics=["revenue"],
+        dialect="postgresql",
+    )
+
+    with pytest.raises(ProjectionContractError, match="PROJECTION_MISSING_EXPECTED_OUTPUT"):
+        _validate(plan, context=_context(dialect="postgresql"))
+
+
 def test_unqualified_projection_resolves_only_with_one_visible_ast_owner() -> None:
     context = _context(shared_revenue_column=True)
     plan = _plan("SELECT SUM(revenue) AS total_revenue FROM orders", metrics=["revenue"])

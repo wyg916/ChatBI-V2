@@ -1,5 +1,11 @@
 # Architecture Decisions
 
+## ADR-067：Canonical Projection 只沿唯一 CTE 输出做 AST Lineage 证明
+
+外部 Provider 可以把聚合放入 CTE，再由根 SELECT 投影 CTE 输出列。Projection Contract 只在根 SELECT 的 FROM 恰为一个 CTE、没有 Join、根投影是该 CTE 的直接列引用、CTE 名与输出名都唯一且 CTE 本体是 SELECT 时，沿该列回溯一次到内层投影表达式；任何多来源、重复输出、嵌套歧义、未知 Relation 或非直接引用都保持原表达式并最终 fail closed。回溯只用于 SQL AST、SQLPlan 和 Semantic Contract 的结构指纹比较，规范化仍只修改根 SELECT 的输出 alias 及同层安全依赖，不修改 CTE、底层列、Filter、Join 或 Result Oracle。
+
+年度日期维度的 CTE 证明还要求内层表达式严格为 `YEAR(date_column)` 或 PostgreSQL 等价 `EXTRACT(YEAR FROM date_column)`，函数中只有一个与语义日期维度相同的源列，并且同一 AST 指纹存在于该 CTE 的 GROUP BY。该约束不能扩展为任意日期函数或按 `yr/year` 字符串猜测。证明成立后的 Canonical 列仍是 SQLPlan 声明的 `order_date`；下游相关性工具必须消费该 Canonical 列来构造年度 scope，不得要求 Provider 私有 alias `year/yr`。
+
 ## ADR-066：固定 Agent Tool 继承外层控制身份，取消在首事件后抢占工作提交
 
 Complex Analysis 的固定 `QUERY_DATA` 工具必须继承 Chat 创建的服务端 `RequestContext`，包括 `request_id`、`trace_id`、Workspace、User、Route、DataSource、权限签名和成本模式；工具只可把 `question` 更新为受控 ToolCall 的问题，不得自建新的 Case/Trace 身份。这样 Model Gateway、FINAL Case 计划、运营 Ledger、QueryRun 与 OrchestrationRun 对同一请求保持可追溯的一致身份。缺少外层上下文的非 Chat 独立工具测试仍可使用既有系统默认值，但不能冒充最终 Provider 认证。

@@ -57,6 +57,13 @@ class _ExpectedProjection:
     semantic_expression: str | None
 
 
+@dataclass(frozen=True)
+class _ProjectionLineage:
+    expression: exp.Expression
+    select: exp.Select
+    via_cte: bool = False
+
+
 def _trusted_server_plan(plan: SQLPlan) -> bool:
     provider = plan.provider.casefold()
     return provider.startswith(_TRUSTED_PROVIDER_PREFIXES)
@@ -166,6 +173,46 @@ def _projection_body(projection: exp.Expression) -> exp.Expression:
     return projection.this if isinstance(projection, exp.Alias) else projection
 
 
+def _resolve_projection_lineage(
+    statement: exp.Expression,
+    root: exp.Select,
+    projection: exp.Expression,
+) -> _ProjectionLineage:
+    """Resolve one direct outer CTE column to its uniquely declared AST expression."""
+
+    body = _projection_body(projection)
+    if not isinstance(body, exp.Column):
+        return _ProjectionLineage(expression=body, select=root)
+    source = root.args.get("from_")
+    joins = list(root.args.get("joins") or ())
+    relation = source.this if isinstance(source, exp.From) else None
+    if not isinstance(relation, exp.Table) or joins:
+        return _ProjectionLineage(expression=body, select=root)
+    if body.table and body.table.casefold() != relation.alias_or_name.casefold():
+        return _ProjectionLineage(expression=body, select=root)
+    with_clause = statement.args.get("with_")
+    if not isinstance(with_clause, exp.With):
+        return _ProjectionLineage(expression=body, select=root)
+    matches = [
+        item for item in with_clause.expressions
+        if isinstance(item, exp.CTE) and item.alias_or_name.casefold() == relation.name.casefold()
+    ]
+    if len(matches) != 1 or not isinstance(matches[0].this, exp.Select):
+        return _ProjectionLineage(expression=body, select=root)
+    cte_select = matches[0].this
+    cte_projections = [
+        item for item in cte_select.expressions
+        if _output_name(item).casefold() == body.name.casefold()
+    ]
+    if len(cte_projections) != 1:
+        return _ProjectionLineage(expression=body, select=root)
+    return _ProjectionLineage(
+        expression=_projection_body(cte_projections[0]),
+        select=cte_select,
+        via_cte=True,
+    )
+
+
 def _table_aliases(statement: exp.Expression) -> dict[str, str]:
     aliases: dict[str, str] = {}
     for table in statement.find_all(exp.Table):
@@ -249,7 +296,7 @@ def _semantic_fingerprint(
 
 
 def _is_bound_year_grain_projection(
-    projection: exp.Expression,
+    expression: exp.Expression,
     expected: _ExpectedProjection,
     *,
     plan: SQLPlan,
@@ -257,6 +304,7 @@ def _is_bound_year_grain_projection(
     dialect: str,
     aliases: dict[str, str],
     owners: dict[str, set[str]],
+    cte_lineage_proven: bool = False,
 ) -> bool:
     """Prove a YEAR(date_dimension) projection from SQL AST, plan, and semantics."""
 
@@ -266,8 +314,13 @@ def _is_bound_year_grain_projection(
         or expected.semantic_expression is None
     ):
         return False
-    body = _projection_body(projection)
-    if not isinstance(body, exp.Year):
+    body = _projection_body(expression)
+    is_year = isinstance(body, exp.Year)
+    is_extract_year = (
+        isinstance(body, exp.Extract)
+        and str(body.this).strip().casefold() == "year"
+    )
+    if not is_year and not is_extract_year:
         return False
     columns = list(body.find_all(exp.Column))
     if len(columns) != 1:
@@ -304,7 +357,7 @@ def _is_bound_year_grain_projection(
         plan_group_fingerprints.add(
             _fingerprint(parsed, dialect=dialect, aliases=aliases, owners=owners)
         )
-    return body_fingerprint in plan_group_fingerprints
+    return body_fingerprint in plan_group_fingerprints or cte_lineage_proven
 
 
 def _nearest_select(node: exp.Expression) -> exp.Select | None:
@@ -354,7 +407,9 @@ def _rewrite_dependent_alias(
         if _nearest_select(column) is not root or column.table or column.name.casefold() != old_key:
             continue
         argument = _root_argument(root, column)
-        if argument == "expressions" and column.find_ancestor(exp.Alias) is projection:
+        if argument == "expressions" and (
+            column is projection or column.find_ancestor(exp.Alias) is projection
+        ):
             continue
         if argument not in allowed_arguments:
             raise ProjectionContractError(
@@ -468,8 +523,9 @@ class ProjectionContractValidator:
 
         projection_candidates: dict[int, list[_ExpectedProjection]] = {}
         for index in remaining_indexes:
+            lineage = _resolve_projection_lineage(statement, root, projections[index])
             projection_fingerprint = _fingerprint(
-                _projection_body(projections[index]),
+                lineage.expression,
                 dialect=dialect,
                 aliases=aliases,
                 owners=owners,
@@ -478,13 +534,14 @@ class ProjectionContractValidator:
                 item for item in remaining_expected
                 if semantic_fingerprints.get(item.field.canonical_name.casefold()) == projection_fingerprint
                 or _is_bound_year_grain_projection(
-                    projections[index],
+                    lineage.expression,
                     item,
                     plan=plan,
-                    root=root,
+                    root=lineage.select,
                     dialect=dialect,
                     aliases=aliases,
                     owners=owners,
+                    cte_lineage_proven=lineage.via_cte,
                 )
             ]
 
