@@ -1,5 +1,11 @@
 # Architecture Decisions
 
+## ADR-070：复杂 Provider token 上限绑定请求 Route，失败回退复用已验证工具结果
+
+最终认证使用统一 `FINAL_REAL_PROVIDER_RECERTIFICATION` Gate 名称，因此不能再从全局 Gate 字符串推断当前模型调用是否属于 Complex/Agent。Model Gateway 在唯一网络边界把受信 `RequestContext.route` 传给测试成本控制器：`COMPLEX_ANALYSIS` 使用既有 1024-token 上限，其他路由保持 512；Provider 自报 Route 或正文不能改变该上限。这样避免合法复杂 SQLPlan 在 512 tokens 处截断并产生不必要修复调用，同时不放宽总调用、Provider、重试或预算上限。
+
+若 Agent 在 `QUERY_DATA` 已完成 SQL Guard、只读执行、Result Oracle 和结果签名后才超时，Fallback 必须直接复用该已验证 `data_evidence`，不得再次执行相同 QueryPipeline 或重复付费请求；工具结果不完整或未验证时仍走原有 fail-closed fallback。真实失败响应、Trace、账本与清理证据继续保留在失败 SHA 的外部 Evidence 中。
+
 ## ADR-069：Provider ON Join 只按端点列等值 AST 证明
 
 当结构化 Join 使用 `left_table/right_table + on` 而不是列字段或 `join_keys` 时，Result Oracle 使用 SQLGlot 解析 ON 表达式，并且只接受一个或由 AND 连接的多个 EQ 叶子；每个 EQ 两侧都必须是非空 Column、分别由左右已选端点表限定，且不能携带 Schema/Catalog。OR、常量比较、函数、算术、无表限定、同端点自比较、未知表和解析失败都 fail closed。不得用正则、字符串包含或 SQL 执行成功替代这项结构证明。

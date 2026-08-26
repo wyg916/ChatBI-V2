@@ -176,6 +176,28 @@ def test_level0_allows_mock_transport_and_preserves_recorded_contract(monkeypatc
     assert gateway.test_cost_control.summary()["paid_test_calls"] == 0
 
 
+def test_final_complex_route_uses_complex_output_cap_under_generic_gate(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("CHATBI_TEST_COST_CONTROL", "YES")
+    monkeypatch.setenv("CHATBI_TEST_EXECUTION_LEVEL", "FINAL")
+    monkeypatch.setenv("CHATBI_TEST_GATE", "FINAL_REAL_PROVIDER_RECERTIFICATION")
+    gateway = ModelGateway(
+        Settings(_env_file=None),
+        provider_overrides={"mimo": _provider()},
+    )
+    request = _request().model_copy(update={"max_output_tokens": 4096})
+    data_context = _context().model_copy(update={"route": "DATA_QUERY"})
+    complex_context = _context().model_copy(update={"route": "COMPLEX_ANALYSIS"})
+
+    assert gateway._payload(
+        _provider(), request, stream=False, context=data_context,
+    )["max_completion_tokens"] == 512
+    assert gateway._payload(
+        _provider(), request, stream=False, context=complex_context,
+    )["max_completion_tokens"] == 1024
+
+
 def test_level1_requires_explicit_authorization_and_scope(tmp_path: Path) -> None:
     environment = _level1_environment(tmp_path, CHATBI_PAID_GATE_AUTHORIZED="NO")
     controller = _cost_controller(environment)

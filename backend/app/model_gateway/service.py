@@ -151,10 +151,20 @@ class ModelGateway:
         explicit_provider = self.policy.resolve_alias(request.requested_alias)
         return provider.provider_id == "kimi" and explicit_provider != "kimi"
 
-    def _payload(self, provider: ResolvedProvider, request: ModelRequest, *, stream: bool) -> dict[str, Any]:
+    def _payload(
+        self,
+        provider: ResolvedProvider,
+        request: ModelRequest,
+        *,
+        stream: bool,
+        context: RequestContext | None = None,
+    ) -> dict[str, Any]:
         max_output_tokens = self.policy.max_output_tokens(request)
         if self.transport is None:
-            max_output_tokens = self.test_cost_control.limit_output_tokens(max_output_tokens)
+            max_output_tokens = self.test_cost_control.limit_output_tokens(
+                max_output_tokens,
+                context=context,
+            )
         payload: dict[str, Any] = {
             "model": provider.model_name,
             "stream": stream,
@@ -249,7 +259,12 @@ class ModelGateway:
                         response = client.post(
                             f"{provider.base_url}/chat/completions",
                             headers=self._headers(provider),
-                            json=self._payload(provider, request, stream=False),
+                            json=self._payload(
+                                provider,
+                                request,
+                                stream=False,
+                                context=context,
+                            ),
                         )
                         response.raise_for_status()
                     body = response.json()
@@ -499,7 +514,13 @@ class ModelGateway:
                     with httpx.Client(timeout=timeout, transport=self.transport) as client:
                         with client.stream(
                             "POST", f"{provider.base_url}/chat/completions",
-                            headers=self._headers(provider), json=self._payload(provider, request, stream=True),
+                            headers=self._headers(provider),
+                            json=self._payload(
+                                provider,
+                                request,
+                                stream=True,
+                                context=context,
+                            ),
                         ) as response:
                             response.raise_for_status()
                             for line in response.iter_lines():

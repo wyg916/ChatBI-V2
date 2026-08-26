@@ -160,16 +160,23 @@ class TestCostController:
     def gate(self) -> str:
         return self.environ.get("CHATBI_TEST_GATE", "unspecified").strip().lower()
 
-    def output_token_limit(self) -> int:
-        key = "complex_max_output_tokens" if any(
-            marker in self.gate for marker in ("complex", "agent")
+    def output_token_limit(self, *, context: RequestContext | None = None) -> int:
+        route = str(context.route or "").strip().upper() if context is not None else ""
+        key = "complex_max_output_tokens" if (
+            route == "COMPLEX_ANALYSIS"
+            or any(marker in self.gate for marker in ("complex", "agent"))
         ) else "default_max_output_tokens"
         return int(self.policy["limits"][key])
 
-    def limit_output_tokens(self, configured: int) -> int:
+    def limit_output_tokens(
+        self,
+        configured: int,
+        *,
+        context: RequestContext | None = None,
+    ) -> int:
         if not self.enabled:
             return configured
-        return min(configured, self.output_token_limit())
+        return min(configured, self.output_token_limit(context=context))
 
     def limit_attempts(self, configured_attempts: int) -> int:
         if not self.enabled:

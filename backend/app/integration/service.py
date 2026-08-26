@@ -265,13 +265,15 @@ class AnalysisService:
         )
         self._record_orchestration(db, principal, request, result, idempotency_key)
         if result.status not in {"SUCCEEDED", "PARTIAL"} and settings.agent_fallback_enabled:
-            try:
-                fallback = self._data(db, request, principal, cancellation_event=cancellation_event)
-            except (LookupError, ValueError):
-                fallback = {
-                    "status": "FAILED",
-                    "error_code": "AGENT_FALLBACK_QUERY_FAILED",
-                }
+            fallback = self._verified_orchestration_data(result)
+            if fallback is None:
+                try:
+                    fallback = self._data(db, request, principal, cancellation_event=cancellation_event)
+                except (LookupError, ValueError):
+                    fallback = {
+                        "status": "FAILED",
+                        "error_code": "AGENT_FALLBACK_QUERY_FAILED",
+                    }
             self._audit_route(db, principal, QuestionRoute.COMPLEX_ANALYSIS, trace_id, "FALLBACK", True)
             return self._response(
                 QuestionRoute.COMPLEX_ANALYSIS,
@@ -285,6 +287,18 @@ class AnalysisService:
         return self._response(
             QuestionRoute.COMPLEX_ANALYSIS, trace_id, self._orchestration_primary(result), settings=settings
         )
+
+    @staticmethod
+    def _verified_orchestration_data(result: OrchestrationResult) -> dict | None:
+        data = result.data_evidence or {}
+        if not (
+            data.get("status") == "SUCCEEDED"
+            and (data.get("guard") or {}).get("allowed") is True
+            and (data.get("oracle") or {}).get("status") == "PASSED"
+            and (data.get("execution") or {}).get("result_signature")
+        ):
+            return None
+        return data
 
     @staticmethod
     def _orchestration_primary(result) -> dict:
