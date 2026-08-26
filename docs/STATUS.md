@@ -193,3 +193,7 @@
 - Phase5 final Provider P5C04 follow-up: bound exact SQL-AST year-grain aliases
   can now satisfy the canonical output contract without a duplicate paid repair
   call; unbound plans remain fail-closed (ADR-071).
+- Phase5 final Provider P5C04 follow-up: live Provider literal predicates are
+  now fail-closed against structured filters/time range before execution, and
+  the prompt forbids inferred business filters; terminal query-contract
+  failures cannot trigger a duplicate paid fallback call (ADR-072).

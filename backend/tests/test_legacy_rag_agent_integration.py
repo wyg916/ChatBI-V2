@@ -13,6 +13,7 @@ from chatbi_agent_contracts import (
     AgentRole,
     OrchestrationRequest,
     OrchestrationResult,
+    OrchestrationStep,
     QuestionRoute,
     ToolCall,
     ToolResult,
@@ -604,6 +605,58 @@ def test_agent_timeout_reuses_verified_tool_result_without_duplicate_query(
     assert body["primary"]["id"] == "verified-tool-query"
     assert body["primary"]["execution"]["result_signature"] == "verified-signature"
     assert body["shadow"]["error_code"] == "AGENT_TIMEOUT"
+
+
+def test_failed_provider_contract_query_does_not_trigger_duplicate_query(
+    client, db_session, monkeypatch,
+):
+    datasource, model = prepare_catalog(db_session)
+
+    def failed_provider_query(_self, request, **_kwargs):
+        return OrchestrationResult(
+            status="FAILED",
+            route=QuestionRoute.COMPLEX_ANALYSIS,
+            trace_id=request.context.trace_id,
+            run_id="provider-contract-failure",
+            steps=(
+                OrchestrationStep(
+                    ordinal=1,
+                    code="QUERY_DATA",
+                    agent_role=AgentRole.DATA_ANALYST,
+                    tool_name=ToolName.QUERY_DATA.value,
+                    status="FAILED",
+                    detail={"error_code": "PROVIDER_UNDECLARED_FILTER"},
+                ),
+            ),
+            fallback_used=True,
+            error_code="PROVIDER_UNDECLARED_FILTER",
+            verification={"result_verified": False, "citation_verified": False},
+            performance={"ttft_ms": 0, "total_latency_ms": 1, "tool_latency_ms": 1},
+            trace_complete=True,
+        )
+
+    def duplicate_query_forbidden(*_args, **_kwargs):
+        raise AssertionError("failed QUERY_DATA contract must not execute a second paid query")
+
+    monkeypatch.setattr(BoundedAgentOrchestrator, "run", failed_provider_query)
+    monkeypatch.setattr(AnalysisService, "_data", duplicate_query_forbidden)
+    response = client.post("/api/v1/analysis", json={
+        "question": "请综合分析收入",
+        "route": "COMPLEX_ANALYSIS",
+        "datasource_id": datasource.id,
+        "semantic_model_id": model.id,
+        "idempotency_key": "provider-contract-no-retry-test",
+    })
+
+    assert response.status_code == 201
+    body = response.json()
+    assert body["status"] == "FAILED"
+    assert body["fallback_used"] is True
+    assert body["primary"] == {
+        "status": "FAILED",
+        "error_code": "PROVIDER_UNDECLARED_FILTER",
+    }
+    assert body["shadow"]["error_code"] == "PROVIDER_UNDECLARED_FILTER"
 
 
 def test_failed_complex_query_returns_structured_failed_fallback(db_session):

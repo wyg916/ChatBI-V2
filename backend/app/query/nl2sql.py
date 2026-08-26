@@ -777,6 +777,9 @@ class OpenAICompatibleProvider(ModelProviderAdapter):
                         "Return only one JSON object that validates against the supplied Provider SQL plan schema. "
                         "Use only authorized context objects. generated_sql must be exactly one read-only SELECT "
                         "or WITH ... SELECT statement. Never invent a table or column. "
+                        "Every literal WHERE predicate must be declared in filters or time_range, with the same "
+                        "field and scope; never infer a status or other business filter not stated by the question. "
+                        "group_by and order_by must describe the expressions used by generated_sql. "
                         "Runtime trace metadata is server-owned and must not be returned. "
                         f"ProviderSQLPlanPayload JSON Schema: {json.dumps(ProviderSQLPlanPayload.model_json_schema(), ensure_ascii=False)}"
                     ),
@@ -867,6 +870,9 @@ class GatewayNl2SqlProvider(ModelProviderAdapter):
                     "Return only one JSON object that validates against the supplied Provider SQL plan schema. "
                     "Use only authorized context objects. generated_sql must be exactly one read-only SELECT "
                     "or WITH ... SELECT statement. Never invent a table or column. "
+                    "Every literal WHERE predicate must be declared in filters or time_range, with the same "
+                    "field and scope; never infer a status or other business filter not stated by the question. "
+                    "group_by and order_by must describe the expressions used by generated_sql. "
                     "Runtime trace metadata is server-owned and must not be returned. "
                     f"ProviderSQLPlanPayload JSON Schema: {json.dumps(ProviderSQLPlanPayload.model_json_schema(), ensure_ascii=False)}"
                 ),

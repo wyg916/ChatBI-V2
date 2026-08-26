@@ -267,6 +267,8 @@ class AnalysisService:
         if result.status not in {"SUCCEEDED", "PARTIAL"} and settings.agent_fallback_enabled:
             fallback = self._verified_orchestration_data(result)
             if fallback is None:
+                fallback = self._non_retryable_query_failure(result)
+            if fallback is None:
                 try:
                     fallback = self._data(db, request, principal, cancellation_event=cancellation_event)
                 except (LookupError, ValueError):
@@ -299,6 +301,21 @@ class AnalysisService:
         ):
             return None
         return data
+
+    @staticmethod
+    def _non_retryable_query_failure(result: OrchestrationResult) -> dict | None:
+        error_code = str(result.error_code or "").strip()
+        query_failed = any(
+            step.tool_name == ToolName.QUERY_DATA.value and step.status == "FAILED"
+            for step in result.steps
+        )
+        non_retryable = (
+            error_code.startswith(("PROJECTION_", "PROVIDER_"))
+            or error_code == "SANDBOX_CODE_FAILED"
+        )
+        if not (query_failed and non_retryable):
+            return None
+        return {"status": "FAILED", "error_code": error_code}
 
     @staticmethod
     def _orchestration_primary(result) -> dict:

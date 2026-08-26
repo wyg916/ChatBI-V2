@@ -295,6 +295,107 @@ def _semantic_fingerprint(
     return _fingerprint(expression, dialect=dialect, aliases=aliases, owners=owners)
 
 
+def _server_bound_provider_plan(plan: SQLPlan) -> bool:
+    requested = str(plan.model_trace.get("requested_alias") or "").strip().casefold()
+    resolved = str(plan.model_trace.get("resolved_provider") or "").strip().casefold()
+    model = str(plan.model_trace.get("resolved_model") or "").strip()
+    return (
+        plan.model_trace.get("provider_response_bound") is True
+        and bool(requested)
+        and requested == resolved
+        and bool(model)
+    )
+
+
+def _qualified_field(column: exp.Column, aliases: dict[str, str]) -> tuple[str, str]:
+    table = aliases.get(column.table.casefold(), column.table) if column.table else ""
+    return table.casefold(), column.name.casefold()
+
+
+def _literal_predicate_fields(
+    statement: exp.Expression,
+    aliases: dict[str, str],
+) -> set[tuple[str, str]]:
+    predicate_types = (
+        exp.EQ,
+        exp.NEQ,
+        exp.GT,
+        exp.GTE,
+        exp.LT,
+        exp.LTE,
+        exp.In,
+        exp.Between,
+        exp.Like,
+        exp.ILike,
+    )
+    fields: set[tuple[str, str]] = set()
+    for where in statement.find_all(exp.Where):
+        for predicate in where.walk():
+            if not isinstance(predicate, predicate_types):
+                continue
+            has_literal = bool(list(predicate.find_all(exp.Literal))) or any(
+                isinstance(node, (exp.Boolean, exp.Null)) for node in predicate.walk()
+            )
+            if has_literal:
+                fields.update(
+                    _qualified_field(column, aliases)
+                    for column in predicate.find_all(exp.Column)
+                )
+    return fields
+
+
+def _declared_filter_fields(plan: SQLPlan) -> set[tuple[str, str]]:
+    fields = [str(item.field or "").strip() for item in plan.filters]
+    if plan.time_range is not None and (plan.time_range.start or plan.time_range.end_exclusive):
+        fields.append(str(plan.time_range.field or "").strip())
+    declared: set[tuple[str, str]] = set()
+    for field in fields:
+        parts = [part.strip().casefold() for part in field.split(".") if part.strip()]
+        if parts:
+            declared.add((parts[-2] if len(parts) > 1 else "", parts[-1]))
+    return declared
+
+
+def _validate_server_bound_filter_fields(
+    plan: SQLPlan,
+    statement: exp.Expression,
+    aliases: dict[str, str],
+) -> None:
+    if not _server_bound_provider_plan(plan):
+        return
+    actual = _literal_predicate_fields(statement, aliases)
+    declared = _declared_filter_fields(plan)
+
+    def covered(field: tuple[str, str], candidates: set[tuple[str, str]]) -> bool:
+        table, name = field
+        return any(
+            name == candidate_name
+            and (not table or not candidate_table or table == candidate_table)
+            for candidate_table, candidate_name in candidates
+        )
+
+    undeclared = sorted(
+        f"{table + '.' if table else ''}{name}"
+        for table, name in actual
+        if not covered((table, name), declared)
+    )
+    missing = sorted(
+        f"{table + '.' if table else ''}{name}"
+        for table, name in declared
+        if not covered((table, name), actual)
+    )
+    if undeclared:
+        raise ProjectionContractError(
+            "PROVIDER_UNDECLARED_FILTER",
+            details={"fields": undeclared},
+        )
+    if missing:
+        raise ProjectionContractError(
+            "PROVIDER_FILTER_NOT_APPLIED",
+            details={"fields": missing},
+        )
+
+
 def _is_bound_year_grain_projection(
     expression: exp.Expression,
     expected: _ExpectedProjection,
@@ -357,17 +458,10 @@ def _is_bound_year_grain_projection(
         plan_group_fingerprints.add(
             _fingerprint(parsed, dialect=dialect, aliases=aliases, owners=owners)
         )
-    server_bound_provider_plan = (
-        plan.model_trace.get("provider_response_bound") is True
-        and bool(str(plan.model_trace.get("resolved_provider") or "").strip())
-        and bool(str(plan.model_trace.get("resolved_model") or "").strip())
-        and str(plan.model_trace.get("resolved_provider") or "").casefold()
-        == plan.provider.casefold()
-    )
     return (
         body_fingerprint in plan_group_fingerprints
         or cte_lineage_proven
-        or server_bound_provider_plan
+        or _server_bound_provider_plan(plan)
     )
 
 
@@ -499,6 +593,8 @@ class ProjectionContractValidator:
         except ParseError as exc:
             raise ProjectionContractError("PROJECTION_SQL_PARSE_ERROR") from exc
         root = _root_select(statement)
+        aliases = _table_aliases(statement)
+        _validate_server_bound_filter_fields(plan, statement, aliases)
         projections = list(root.expressions)
         if not projections:
             raise ProjectionContractError("PROJECTION_MISSING_EXPECTED_OUTPUT")
@@ -508,7 +604,6 @@ class ProjectionContractValidator:
         if len(named_keys) != len(set(named_keys)):
             raise ProjectionContractError("PROJECTION_DUPLICATE_OUTPUT_ALIAS")
 
-        aliases = _table_aliases(statement)
         owners = _source_column_owners(context)
         expected_by_name = {item.field.canonical_name.casefold(): item for item in expected}
         assigned_expected: dict[str, int] = {}

@@ -13,6 +13,8 @@ from app.query.contracts import (
     ExecutionResult,
     ExpectedResult,
     QueryContext,
+    QueryFilter,
+    QueryTimeRange,
     SQLPlan,
     SecurityPolicy,
 )
@@ -303,11 +305,13 @@ def test_server_bound_provider_year_grain_uses_exact_ast_group_without_duplicate
         dimensions=["order_date"],
         metrics=["revenue", "cost"],
     ).model_copy(update={
+        "provider": "wrenai-upstream-runtime",
         "selected_tables": ["orders"],
         "model_trace": {
             "provider_response_bound": True,
-            "resolved_provider": "mimo",
-            "resolved_model": "mimo-v2.5",
+            "requested_alias": "deepseek",
+            "resolved_provider": "deepseek",
+            "resolved_model": "deepseek-v4-flash",
         },
     })
 
@@ -329,6 +333,7 @@ def test_unbound_provider_year_grain_cannot_claim_server_response_binding() -> N
         "selected_tables": ["orders"],
         "model_trace": {
             "provider_response_bound": True,
+            "requested_alias": "mimo",
             "resolved_provider": "deepseek",
             "resolved_model": "deepseek-v4-flash",
         },
@@ -336,6 +341,57 @@ def test_unbound_provider_year_grain_cannot_claim_server_response_binding() -> N
 
     with pytest.raises(ProjectionContractError, match="PROJECTION_MISSING_EXPECTED_OUTPUT"):
         _validate(plan)
+
+
+def test_server_bound_provider_undeclared_literal_filter_fails_closed() -> None:
+    plan = _plan(
+        "WITH yearly AS (SELECT EXTRACT(YEAR FROM o.order_date) AS year, "
+        "SUM(o.revenue) AS revenue FROM orders o "
+        "WHERE o.order_date >= '2025-01-01' AND o.order_date < '2027-01-01' "
+        "AND o.status = 'completed' GROUP BY EXTRACT(YEAR FROM o.order_date)) "
+        "SELECT year, revenue FROM yearly",
+        dimensions=["order_date"],
+        metrics=["revenue"],
+    ).model_copy(update={
+        "selected_tables": ["orders"],
+        "selected_columns": ["orders.order_date", "orders.revenue", "orders.status"],
+        "time_range": QueryTimeRange(
+            field="orders.order_date",
+            kind="ABSOLUTE",
+            start="2025-01-01",
+            end_exclusive="2027-01-01",
+        ),
+        "model_trace": {
+            "provider_response_bound": True,
+            "requested_alias": "deepseek",
+            "resolved_provider": "deepseek",
+            "resolved_model": "deepseek-v4-flash",
+        },
+    })
+
+    with pytest.raises(ProjectionContractError, match="PROVIDER_UNDECLARED_FILTER"):
+        _validate(plan)
+
+
+def test_server_bound_provider_declared_literal_filter_remains_strictly_accepted() -> None:
+    plan = _plan(
+        "SELECT SUM(o.revenue) AS revenue FROM orders o WHERE o.status = 'completed'",
+        metrics=["revenue"],
+    ).model_copy(update={
+        "selected_tables": ["orders"],
+        "selected_columns": ["orders.revenue", "orders.status"],
+        "filters": [QueryFilter(field="orders.status", operator="=", value="completed")],
+        "model_trace": {
+            "provider_response_bound": True,
+            "requested_alias": "deepseek",
+            "resolved_provider": "deepseek",
+            "resolved_model": "deepseek-v4-flash",
+        },
+    })
+
+    result = _validate(plan)
+
+    assert result.plan.generated_sql == plan.generated_sql
 
 
 def test_unique_cte_lineage_normalizes_recorded_deepseek_year_and_metric_aliases() -> None:

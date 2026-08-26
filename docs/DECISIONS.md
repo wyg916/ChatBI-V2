@@ -434,3 +434,17 @@ Phase5 Live Runner 在 Level0/1/2 运行前已经通过唯一成本控制器验�
   server-owned fields, and the runtime attaches the marker after capture.
 - This prevents a second paid NL2SQL call for an already valid grouped query
   without relaxing SQL Guard, Result Oracle, or ambiguous projection behavior.
+## ADR-072 — Server-bound Provider predicate alignment
+
+- Status: Accepted (2026-08-26)
+- For a server-bound live Provider plan, every SQL `WHERE` predicate that uses a
+  literal must be represented by the structured `filters` or bounded
+  `time_range` fields. Declared structured fields must also be present in SQL.
+- SQL AST table aliases are resolved before comparison. An undeclared business
+  predicate such as an inferred order status fails closed before SQL execution;
+  it is never treated as a harmless model preference.
+- The live NL2SQL prompt now explicitly requires predicate/plan parity and
+  forbids inferred business filters. SQL Guard and Result Oracle remain intact.
+- A failed `QUERY_DATA` projection/provider contract or sandbox validation is
+  terminal for that orchestration attempt. The API returns the structured
+  failure and never launches a second paid NL2SQL fallback call.
