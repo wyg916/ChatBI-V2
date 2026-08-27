@@ -12,11 +12,13 @@ $resolvedEnv = Resolve-ChatBIEnvFile -EnvFile $EnvFile
 Set-Location -LiteralPath $projectRoot
 
 try {
+  $bootstrapBuiltImages = $false
   if (-not $SkipBootstrap) {
     $arguments = @('-EnvFile', $resolvedEnv)
     if ($SkipBuild) { $arguments += '-SkipBuild' }
     & (Join-Path $PSScriptRoot 'bootstrap.ps1') @arguments
     if ($LASTEXITCODE -ne 0) { throw 'Bootstrap prerequisite failed' }
+    $bootstrapBuiltImages = -not $SkipBuild
   }
   $configuration = Assert-ChatBIConfiguration -EnvFile $resolvedEnv
   $backendHealth = "http://127.0.0.1:$($configuration.BackendPort)/health"
@@ -35,7 +37,7 @@ try {
 
   $compose = Get-ChatBIComposeArguments -EnvFile $resolvedEnv -ProjectName $configuration.ProjectName
   $up = @('up', '-d')
-  if (-not $SkipBuild) { $up += '--build' }
+  if (-not $SkipBuild -and -not $bootstrapBuiltImages) { $up += '--build' }
   & docker @compose @up
   if ($LASTEXITCODE -ne 0) { throw 'docker compose up failed' }
 

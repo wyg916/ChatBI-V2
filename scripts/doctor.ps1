@@ -83,11 +83,12 @@ if ($configuration) {
     $compose = Get-ChatBIComposeArguments -EnvFile $resolvedEnv -ProjectName $configuration.ProjectName
     $imageId = (& docker @compose images -q backend 2>$null | Select-Object -First 1)
     if ($LASTEXITCODE -eq 0 -and $imageId) {
-      & docker @compose run --rm --no-deps backend python -c "from sqlalchemy import text; from app.db.session import engine; c=engine.connect(); c.execute(text('SELECT 1')); c.close()" *> $null
-      if ($LASTEXITCODE -eq 0) { Add-DoctorResult PASS 'DB connectivity' 'authenticated SQL SELECT 1 succeeded' }
+      $probeScript = "python -c `"from sqlalchemy import text; from app.db.session import engine; c=engine.connect(); c.execute(text('SELECT 1')); c.close(); print('DATABASE_CONNECTION=PASS')`" && alembic current"
+      $probeOutput = & docker @compose run --rm --no-deps backend sh -c $probeScript 2>&1
+      $probeText = $probeOutput -join "`n"
+      if ($probeText -match 'DATABASE_CONNECTION=PASS') { Add-DoctorResult PASS 'DB connectivity' 'authenticated SQL SELECT 1 succeeded' }
       else { Add-DoctorResult FAIL 'DB connectivity' 'authenticated SQL connection failed' 'Correct CHATBI_DATABASE_URL credentials and database privileges.' }
-      $migrationOutput = & docker @compose run --rm --no-deps backend alembic current 2>&1
-      if ($LASTEXITCODE -eq 0 -and ($migrationOutput -join "`n") -match '\(head\)') {
+      if ($LASTEXITCODE -eq 0 -and $probeText -match '\(head\)') {
         Add-DoctorResult PASS 'Migration status' 'metadata database is at the Alembic head'
       } else {
         Add-DoctorResult WARN 'Migration status' 'metadata database is not yet verified at head' 'Run scripts/bootstrap.ps1.'

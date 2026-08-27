@@ -1,5 +1,9 @@
 # Architecture Decisions
 
+## ADR-078：部署构建与数据库引导各执行一次
+
+标准 `start.ps1` 先由 Bootstrap 一次构建 Backend、Frontend 和 Sandbox 三类镜像，再直接 `compose up`，不得为启动再次扫描和构建相同 context；显式 `-SkipBootstrap` 时仍可按调用者选择 build。数据库认证探针、Alembic upgrade/head 和幂等记录 seed 在同一个 `backend run --rm --no-deps` 容器中顺序 fail-fast，Doctor 的认证连接与 migration head 也共享一个临时容器。该合并只减少 Docker 容器创建与重复 context I/O，不合并错误判断、不跳过迁移或弱化任何门禁。
+
 ## ADR-077：固定上游文本的完整性以 canonical LF 字节校验
 
 Windows Git checkout 可以只改变文本换行而不改变上游源码语义。DB-GPT 与 PandasAI selected-source Bridge 因此在 SHA-256 与长度校验前仅把 CRLF 规范化为 LF；冻结 provenance、commit、path、license 和运行入口保持不变。任意非换行内容变化仍产生 checksum/size mismatch 并 fail closed，不允许通过忽略哈希、动态下载或宽松匹配恢复服务。

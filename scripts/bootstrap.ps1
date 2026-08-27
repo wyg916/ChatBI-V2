@@ -33,26 +33,18 @@ try {
   if ($LASTEXITCODE -ne 0) { throw 'Compose configuration validation failed before build' }
 
   if (-not $SkipBuild) {
-    Write-Host '[Bootstrap] Building the Backend migration image...'
-    & docker @compose build backend
-    if ($LASTEXITCODE -ne 0) { throw 'Backend image build failed' }
+    Write-Host '[Bootstrap] Building deployment images...'
+    & docker @compose build backend frontend sandbox-controller
+    if ($LASTEXITCODE -ne 0) { throw 'Deployment image build failed' }
   }
 
-  Write-Host '[Bootstrap] Checking authenticated PostgreSQL readiness...'
-  & docker @compose run --rm --no-deps backend python -c "from sqlalchemy import text; from app.db.session import engine; c=engine.connect(); c.execute(text('SELECT 1')); c.close(); print('DATABASE_READINESS=PASS')"
-  if ($LASTEXITCODE -ne 0) { throw 'PostgreSQL is unreachable or rejected the configured credentials' }
-
-  Write-Host '[Bootstrap] Applying Alembic migrations...'
-  & docker @compose run --rm --no-deps backend alembic upgrade head
-  if ($LASTEXITCODE -ne 0) { throw 'Alembic migration failed' }
-  & docker @compose run --rm --no-deps backend alembic current
-  if ($LASTEXITCODE -ne 0) { throw 'Unable to verify the current Alembic revision' }
-
-  Write-Host '[Bootstrap] Creating Workspace, login identities, and governed runtime records...'
-  $bootstrapCommand = @('run', '--rm', '--no-deps', 'backend', 'python', '-m', 'app.db.deployment_bootstrap')
-  if ($configuration.DemoSeed) { $bootstrapCommand += '--demo-seed' }
-  & docker @compose @bootstrapCommand
-  if ($LASTEXITCODE -ne 0) { throw 'Workspace/bootstrap initialization failed' }
+  Write-Host '[Bootstrap] Checking PostgreSQL, migrating, and creating baseline records...'
+  $demoArgument = if ($configuration.DemoSeed) { ' --demo-seed' } else { '' }
+  $bootstrapScript = "python -c `"from sqlalchemy import text; from app.db.session import engine; c=engine.connect(); c.execute(text('SELECT 1')); c.close(); print('DATABASE_READINESS=PASS')`" && alembic upgrade head && alembic current && python -m app.db.deployment_bootstrap$demoArgument"
+  & docker @compose run --rm --no-deps backend sh -c $bootstrapScript
+  if ($LASTEXITCODE -ne 0) {
+    throw 'Database readiness, migration, or deployment record bootstrap failed; inspect the preceding command output'
+  }
 
   Write-Host 'BOOTSTRAP=PASS' -ForegroundColor Green
   Write-Host 'MIGRATION=PASS'
