@@ -2,18 +2,23 @@ import type { ChatMessage, ChatResponse, ChartSpec, ResultSemantic } from '../ty
 
 export type AnswerRoute =
   | 'DATA_QUERY'
+  | 'DATA_FOLLOW_UP'
   | 'KNOWLEDGE_QUERY'
   | 'HYBRID_ANALYSIS'
   | 'COMPLEX_ANALYSIS'
   | 'FILE_QUERY'
   | 'VISION_QUERY'
   | 'GENERAL_CHAT'
+  | 'SYSTEM_CAPABILITY'
+  | 'MODEL_STATUS'
+  | 'ADMIN_QUERY'
   | 'CLARIFICATION'
   | 'UNSUPPORTED';
 
 export interface AnswerKpi { label: string; value: unknown; unit: string }
 export interface AnswerTable {
   columns: string[];
+  column_labels?: Record<string, string>;
   rows: Array<Record<string, unknown>>;
   row_count: number;
   result_signature?: string;
@@ -90,6 +95,9 @@ export interface AnswerEnvelope {
   answer_id: string;
   conversation_id: string;
   message_id: string;
+  source_question_id?: string;
+  request_id?: string;
+  workspace_id?: string;
   trace_id: string;
   route: AnswerRoute;
   status: string;
@@ -120,11 +128,12 @@ type JsonRecord = Record<string, unknown>;
 type PublicPart = { type: string; [key: string]: unknown };
 
 const ROUTES = new Set<AnswerRoute>([
-  'DATA_QUERY', 'KNOWLEDGE_QUERY', 'HYBRID_ANALYSIS', 'COMPLEX_ANALYSIS',
-  'FILE_QUERY', 'VISION_QUERY', 'GENERAL_CHAT', 'CLARIFICATION', 'UNSUPPORTED',
+  'DATA_QUERY', 'DATA_FOLLOW_UP', 'KNOWLEDGE_QUERY', 'HYBRID_ANALYSIS', 'COMPLEX_ANALYSIS',
+  'FILE_QUERY', 'VISION_QUERY', 'GENERAL_CHAT', 'SYSTEM_CAPABILITY', 'MODEL_STATUS', 'ADMIN_QUERY',
+  'CLARIFICATION', 'UNSUPPORTED',
 ]);
 const SEMANTICS = new Set<ResultSemantic>(['VALUE', 'ZERO', 'NO_ROWS', 'NULL_VALUE', 'FAILED']);
-const CHART_TYPES = new Set(['KPI', 'LINE', 'BAR', 'GROUPED_BAR', 'STACKED_BAR', 'DONUT', 'TABLE']);
+const CHART_TYPES = new Set(['KPI', 'LINE', 'BAR', 'HORIZONTAL_BAR', 'GROUPED_BAR', 'STACKED_BAR', 'DONUT', 'TABLE']);
 const SERIES_TYPES = new Set(['line', 'bar', 'pie', 'kpi', 'table']);
 
 function isRecord(value: unknown): value is JsonRecord {
@@ -238,6 +247,7 @@ function normalizeChart(value: unknown, table?: AnswerTable): ChartSpec | undefi
     series,
     aggregation: stringMap(source.aggregation),
     unit: stringMap(source.unit),
+    field_labels: stringMap(source.field_labels),
     sort: (Array.isArray(source.sort) ? source.sort : []).map((item) => text(item, 256)).filter(Boolean).slice(0, 20),
     limit: Math.min(500, Math.max(1, numberValue(source.limit, 20))),
     legend: { show: legend.show !== false },
@@ -262,6 +272,7 @@ function normalizeTable(value: unknown): AnswerTable | undefined {
   const rowCount = numberValue(source.row_count, rows.length);
   return {
     columns,
+    column_labels: Object.fromEntries(columns.map((column) => [column, stringMap(source.column_labels)[column] || column])),
     rows,
     row_count: Math.max(rowCount, rows.length),
     result_signature: text(source.result_signature, 256) || undefined,
@@ -513,6 +524,9 @@ function legacyEnvelope(message: ChatMessage): AnswerEnvelope {
     answer_id: message.id,
     conversation_id: message.conversation_id,
     message_id: message.id,
+    source_question_id: message.parent_message_id ?? message.id,
+    request_id: text(trace.request_id, 256) || message.parent_message_id || message.id,
+    workspace_id: text(trace.workspace_id, 256) || 'unknown',
     trace_id: text(trace.trace_id, 256) || `message-${message.id}`,
     route: normalizeRoute(message.route),
     status,
@@ -568,6 +582,9 @@ function normalizeCandidate(message: ChatMessage, value: unknown): AnswerEnvelop
     answer_id: text(source.answer_id, 256) || fallback.answer_id,
     conversation_id: text(source.conversation_id, 256) || fallback.conversation_id,
     message_id: text(source.message_id, 256) || fallback.message_id,
+    source_question_id: text(source.source_question_id, 256) || fallback.source_question_id,
+    request_id: text(source.request_id, 256) || fallback.request_id,
+    workspace_id: text(source.workspace_id, 256) || fallback.workspace_id,
     trace_id: text(source.trace_id, 256) || fallback.trace_id,
     route: normalizeRoute(source.route ?? fallback.route),
     status,

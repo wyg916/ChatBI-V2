@@ -15,19 +15,28 @@ export function buildControlledEChartsOption(spec: ChartSpec, execution: QueryEx
   if (spec.chart_type === 'DONUT') {
     const metric = spec.y_fields[0];
     return {
-      tooltip: { trigger: 'item' }, legend: { top: 0 },
+      tooltip: { trigger: 'item', valueFormatter: (value: unknown) => `${display(value)}${spec.unit[metric] ?? ''}` }, legend: { top: 0, type: 'scroll' },
       series: [{ type: 'pie', radius: ['42%', '68%'], data: rows.map((row) => ({ name: display(xField ? row[xField] : ''), value: Number(row[metric] ?? 0) })) }],
     };
   }
+  const categories = rows.map((row) => display(xField ? row[xField] : ''));
+  const horizontal = spec.chart_type === 'HORIZONTAL_BAR';
+  const categoryAxis = {
+    type: 'category' as const,
+    data: categories,
+    axisLabel: { color: '#7c8aa5', width: horizontal ? 126 : 88, overflow: 'truncate' as const, interval: 0, rotate: !horizontal && rows.length > 8 ? 26 : 0 },
+    axisPointer: { type: 'shadow' as const },
+  };
+  const valueAxis = { type: 'value' as const, axisLabel: { color: '#7c8aa5' }, splitLine: { lineStyle: { color: '#e8ecf4' } } };
   return {
     animationDuration: 350,
-    grid: { left: 58, right: 20, top: 38, bottom: 48 },
-    tooltip: { trigger: 'axis' },
-    legend: { show: spec.legend.show !== false, top: 0 },
-    xAxis: { type: 'category', data: rows.map((row) => display(xField ? row[xField] : '')), axisLabel: { color: '#7c8aa5', rotate: rows.length > 8 ? 26 : 0 } },
-    yAxis: { type: 'value', axisLabel: { color: '#7c8aa5' }, splitLine: { lineStyle: { color: '#e8ecf4' } } },
+    grid: { left: horizontal ? 18 : 24, right: 30, top: 50, bottom: 58, containLabel: true },
+    tooltip: { trigger: 'axis', confine: true },
+    legend: { show: spec.legend.show !== false, top: 0, type: 'scroll' },
+    xAxis: horizontal ? valueAxis : categoryAxis,
+    yAxis: horizontal ? categoryAxis : valueAxis,
     series: spec.series.map((series) => ({
-      name: series.name,
+      name: series.name || spec.field_labels?.[series.field] || series.field,
       type: series.type === 'line' ? 'line' : 'bar',
       data: rows.map((row) => row[series.field] == null ? null : Number(row[series.field])),
       stack: series.stack,
@@ -40,7 +49,7 @@ export function buildControlledEChartsOption(spec: ChartSpec, execution: QueryEx
 export function EChartsRenderer({ spec, execution, label }: { spec: ChartSpec; execution: QueryExecution; label?: string }) {
   const option = useMemo(() => buildControlledEChartsOption(spec, execution), [spec, execution]);
   const rows = execution.rows ?? [];
-  if (spec.chart_type === 'KPI') return <div className="controlled-kpi-chart" aria-label={label ?? spec.title}>{spec.y_fields.map((field) => <article key={field}><small>{field}</small><strong>{display(rows[0]?.[field])}{spec.unit[field] ?? ''}</strong></article>)}</div>;
+  if (spec.chart_type === 'KPI') return <div className="controlled-kpi-chart" aria-label={label ?? spec.title}>{spec.y_fields.map((field) => <article key={field}><small>{spec.field_labels?.[field] || field}</small><strong>{display(rows[0]?.[field])}{spec.unit[field] ?? ''}</strong></article>)}</div>;
   if (spec.chart_type === 'TABLE' || !option) return <div className="controlled-table-chart" aria-label={label ?? spec.title}>完整结果见明细数据</div>;
   return <EChart option={option} label={label ?? spec.title} className="analysis-chart" />;
 }

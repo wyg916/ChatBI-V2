@@ -2,22 +2,44 @@ export type DatasourceKind = 'postgresql' | 'mysql';
 
 export interface ModelProviderStatus {
   id: string;
+  provider_id?: string;
+  model_id?: string | null;
   display_name: string;
   model_name: string | null;
-  base_url: string | null;
   configured: boolean;
+  enabled?: boolean;
   active: boolean;
+  healthy?: boolean | null;
+  health_message?: string;
+  last_checked_at?: string | null;
+  capabilities?: string[];
+  priority?: number;
+  cost_policy?: string;
+  credential_source?: 'SERVER_ENVIRONMENT' | 'NOT_REQUIRED';
   external_model: boolean;
   structured_output: boolean;
   protocol: 'openai-chat-completions' | 'local';
-  credential_env: string | null;
+  base_url?: string | null;
+  credential_env?: string | null;
 }
 
 export interface ModelProviderCatalog {
   active_provider: string;
+  selection_strategy?: string;
   secrets_exposed: false;
   items: ModelProviderStatus[];
 }
+export interface QuerySecuritySettings {
+  query_timeout_ms: number; max_rows: number; read_only_query: true; dangerous_sql_block: true;
+  result_verification: true; sql_guard_policy: 'STRICT' | 'STANDARD'; allowed_schemas: string[]; blocked_schemas: string[];
+}
+export interface WorkspaceConfigSettings { workspace_name: string; default_datasource_id?: string | null; default_semantic_model_id?: string | null; status: 'ACTIVE' | 'READ_ONLY' }
+export interface AppearanceSettings { product_name: string; brand_tagline: string; logo_url: string; primary_color: string; theme: 'LIGHT' | 'SYSTEM' }
+export interface WorkspaceSettings {
+  query_security: QuerySecuritySettings; workspace: WorkspaceConfigSettings; appearance: AppearanceSettings; version: number; updated_at?: string;
+  workspace_summary: { id: string; name: string; member_count: number; roles: Record<string, number>; status: string; isolation: string; datasources: Array<{ id: string; name: string; status: string }>; semantic_models: Array<{ id: string; name: string; status: string; datasource_id: string }> };
+}
+export interface SystemInformation { app_version: string; git_sha: string; release_version: string; backend_health: string; frontend_build: string; database_status: string; migration_head: string; rag_status: string; sandbox_status: string; model_gateway_status: string }
 
 export interface SecurityUser {
   id: string; email: string; display_name: string; role: 'ADMIN' | 'ANALYST'; status: string; last_active_at?: string;
@@ -27,10 +49,12 @@ export interface SecurityAuditEvent {
   id: string; actor_email: string; action: string; resource_type: string; resource_id?: string;
   status: string; details: Record<string, unknown>; created_at: string;
 }
+export interface WorkspaceInvitation { id: string; email: string; role: 'ADMIN' | 'ANALYST'; status: string; expires_at: string; created_at: string; invite_url?: string }
 export interface SecurityOverview {
   current_actor?: SecurityUser; user_count: number; role_count: number; active_user_count: number; audit_event_count: number;
-  users: SecurityUser[]; roles: SecurityRole[]; audit_events: SecurityAuditEvent[];
+  users: SecurityUser[]; roles: SecurityRole[]; audit_events: SecurityAuditEvent[]; invitations?: WorkspaceInvitation[];
 }
+export interface AuditPage { items: SecurityAuditEvent[]; page: number; page_size: number; total: number }
 
 export interface Datasource {
   id: string;
@@ -177,11 +201,11 @@ export interface QueryExecution {
   row_count?: number; truncated?: boolean; duration_ms?: number; normalized_sql?: string;
   result_signature?: string; error_code?: string; error_message?: string;
 }
-export type ChartType = 'KPI' | 'LINE' | 'BAR' | 'GROUPED_BAR' | 'STACKED_BAR' | 'DONUT' | 'TABLE';
+export type ChartType = 'KPI' | 'LINE' | 'BAR' | 'HORIZONTAL_BAR' | 'GROUPED_BAR' | 'STACKED_BAR' | 'DONUT' | 'TABLE';
 export interface ChartSpec {
   version: string; chart_type: ChartType; title: string; x_field?: string; y_fields: string[];
   series: Array<{ name: string; field: string; type: 'line' | 'bar' | 'pie' | 'kpi' | 'table'; stack?: string }>;
-  aggregation: Record<string, string>; unit: Record<string, string>; sort: string[]; limit: number;
+  aggregation: Record<string, string>; unit: Record<string, string>; field_labels?: Record<string, string>; sort: string[]; limit: number;
   legend: Record<string, unknown>; axis: Record<string, unknown>; tooltip: Record<string, unknown>;
   data_source_query_id: string; result_signature?: string; bound_columns: string[]; bound_row_count: number;
   null_policy: string; warnings: string[];
@@ -214,7 +238,7 @@ export interface QueryResponse {
   recommended_questions: string[]; error_code?: string; error_message?: string;
 }
 
-export type QuestionRoute = 'DATA_QUERY' | 'KNOWLEDGE_QUERY' | 'HYBRID_ANALYSIS' | 'COMPLEX_ANALYSIS' | 'GENERAL_CHAT' | 'FILE_QUERY' | 'MULTIMODAL_QUERY' | 'CLARIFICATION' | 'UNSUPPORTED';
+export type QuestionRoute = 'DATA_QUERY' | 'DATA_FOLLOW_UP' | 'KNOWLEDGE_QUERY' | 'HYBRID_ANALYSIS' | 'COMPLEX_ANALYSIS' | 'GENERAL_CHAT' | 'SYSTEM_CAPABILITY' | 'MODEL_STATUS' | 'ADMIN_QUERY' | 'FILE_QUERY' | 'MULTIMODAL_QUERY' | 'CLARIFICATION' | 'UNSUPPORTED';
 export interface SessionUser { id: string; workspace_id: string; email: string; display_name: string; role: 'ADMIN' | 'ANALYST' }
 export interface SessionResponse { authenticated: true; user: SessionUser; expires_at: string }
 export interface LoginInput { email: string; password: string; remember: boolean }

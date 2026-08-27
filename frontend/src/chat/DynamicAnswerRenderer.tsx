@@ -61,7 +61,7 @@ function SortableAnswerTable({ table }: { table: AnswerTable }) {
         <table>
           <thead><tr>{table.columns.map((column) => (
             <th key={column} aria-sort={sort?.column === column ? (sort.direction === 'asc' ? 'ascending' : 'descending') : 'none'}>
-              <button type="button" onClick={() => changeSort(column)}>{column}{sort?.column === column ? (sort.direction === 'asc' ? ' ↑' : ' ↓') : ''}</button>
+              <button type="button" title={`原始字段：${column}`} onClick={() => changeSort(column)}>{table.column_labels?.[column] || column}{sort?.column === column ? (sort.direction === 'asc' ? ' ↑' : ' ↓') : ''}</button>
             </th>
           ))}</tr></thead>
           <tbody>{visibleRows.map(({ row, index }) => (

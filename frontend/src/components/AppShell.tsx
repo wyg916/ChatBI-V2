@@ -1,6 +1,9 @@
+import { useEffect, useState } from 'react';
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
 import onlineIcon from '../assets/semantic/online.svg';
+import { systemApi } from '../api/system';
 import { useAuth } from '../auth';
+import type { AppearanceSettings } from '../types/api';
 
 const navItems = [
   { to: '/', label: '问数据', icon: '问', exact: true },
@@ -23,6 +26,14 @@ const titles: Record<string, [string, string]> = {
 export function AppShell() {
   const { user, logout } = useAuth();
   const { pathname } = useLocation();
+  const [appearance, setAppearance] = useState<AppearanceSettings>({ product_name: 'ChatBI Studio', brand_tagline: 'AI NATIVE ANALYTICS', logo_url: '', primary_color: '#5B5CF6', theme: 'LIGHT' });
+  useEffect(() => {
+    let active = true;
+    systemApi.appearance().then((value) => { if (active) { setAppearance(value); document.documentElement.style.setProperty('--primary', value.primary_color); } }).catch(() => undefined);
+    const update = (event: Event) => { const value = (event as CustomEvent<AppearanceSettings>).detail; if (value) setAppearance(value); };
+    window.addEventListener('chatbi:appearance-updated', update);
+    return () => { active = false; window.removeEventListener('chatbi:appearance-updated', update); };
+  }, []);
   const key = Object.keys(titles).find((path) => path !== '/' && pathname.startsWith(path)) ?? '/';
   const [crumb, title] = titles[key];
   const isAskRoute = pathname === '/' || pathname.startsWith('/ask/');
@@ -69,7 +80,7 @@ export function AppShell() {
   return (
     <div className={isAskRoute ? 'app-shell ask-shell' : 'app-shell'}>
       <aside className="sidebar">
-        <div className="brand"><span className="brand-mark">BI</span><div><strong>ChatBI Studio</strong><small>AI NATIVE ANALYTICS</small></div></div>
+        <div className="brand">{appearance.logo_url ? <img className="brand-logo" style={{ width: 40, height: 40, objectFit: 'contain', borderRadius: 10 }} src={appearance.logo_url} alt="" /> : <span className="brand-mark">BI</span>}<div><strong>{appearance.product_name}</strong><small>{appearance.brand_tagline}</small></div></div>
         <div className="side-divider" />
         <div className="nav-caption">工作空间</div>
         <nav aria-label="一级导航">

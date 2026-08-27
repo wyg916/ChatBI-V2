@@ -298,6 +298,7 @@ export function AskPage({ results = false }: { results?: boolean }) {
   const [pendingTurn, setPendingTurn] = useState<PendingTurn | null>(null);
   const [lastQuestion, setLastQuestion] = useState('');
   const [isAtBottom, setIsAtBottom] = useState(true);
+  const [lastCompletedAnswerId, setLastCompletedAnswerId] = useState<string | null>(null);
   const [collapsed, setCollapsed] = useState(false);
   const [pageError, setPageError] = useState('');
   const abortRef = useRef<AbortController | null>(null);
@@ -307,6 +308,10 @@ export function AskPage({ results = false }: { results?: boolean }) {
   const listFiltersRef = useRef<ConversationListOptions>({ state: 'active' });
   const inputRef = useRef<HTMLInputElement | null>(null);
   const messageAreaRef = useRef<HTMLDivElement | null>(null);
+  const chatPanelRef = useRef<HTMLDivElement | null>(null);
+  const composerZoneRef = useRef<HTMLDivElement | null>(null);
+  const answerRefs = useRef(new Map<string, HTMLDivElement>());
+  const positionedAnswersRef = useRef(new Set<string>());
   const compositionRef = useRef(false);
   const initialQuestionRef = useRef('');
 
@@ -429,6 +434,32 @@ export function AskPage({ results = false }: { results?: boolean }) {
     messageArea.scrollTop = messageArea.scrollHeight;
   }, [detail?.messages.length, pendingTurn?.content, pendingTurn?.stage, isAtBottom]);
 
+  useEffect(() => {
+    const zone = composerZoneRef.current;
+    const panel = chatPanelRef.current;
+    if (!zone || !panel || typeof ResizeObserver === 'undefined') return;
+    const update = () => panel.style.setProperty('--composer-height', `${Math.ceil(zone.getBoundingClientRect().height)}px`);
+    update();
+    const observer = new ResizeObserver(update);
+    observer.observe(zone);
+    return () => observer.disconnect();
+  }, []);
+
+  function positionCompletedAnswer(messageId: string) {
+    if (positionedAnswersRef.current.has(messageId)) return;
+    positionedAnswersRef.current.add(messageId);
+    setLastCompletedAnswerId(messageId);
+    const position = (remainingAttempts: number) => requestAnimationFrame(() => {
+      const node = answerRefs.current.get(messageId);
+      if (node && typeof node.scrollIntoView === 'function') {
+        node.scrollIntoView({ block: 'start', behavior: 'smooth' });
+      } else if (remainingAttempts > 0) {
+        position(remainingAttempts - 1);
+      }
+    });
+    position(2);
+  }
+
   async function sendMessage(value = draft) {
     const question = value.trim();
     if (sending || interactionRef.current.submissionId || (!question && attachments.length === 0)) return;
@@ -516,6 +547,7 @@ export function AskPage({ results = false }: { results?: boolean }) {
         setDetail((current) => current?.id === target.id ? { ...response.conversation, messages: mergeFinalResponseMessages(current.messages, response) } : current);
         setConversations((items) => [response.conversation, ...items.filter((item) => item.id !== response.conversation.id)]);
         setPendingTurn((current) => current?.runId === clientMessageId ? null : current);
+        positionCompletedAnswer(response.assistant_message.id);
       } catch (reason) {
         if (!isCurrentSubmission()) return;
         const aborted = controller.signal.aborted || (reason as Error).name === 'AbortError';
@@ -749,7 +781,7 @@ export function AskPage({ results = false }: { results?: boolean }) {
         onRevokeShare={chatApi.revokeShare}
       />
 
-      <div className="chat-panel">
+      <div className="chat-panel" ref={chatPanelRef}>
         <div className="chat-message-area" ref={messageAreaRef} onScroll={(event) => {
           const node = event.currentTarget;
           setIsAtBottom(node.scrollHeight - node.scrollTop - node.clientHeight < 96);
@@ -758,7 +790,7 @@ export function AskPage({ results = false }: { results?: boolean }) {
             {isEmpty && <section className="chat-empty"><div className="hero-mark" aria-hidden="true">BI</div><h1>今天想了解哪些业务数据？</h1><p>直接提问、连续追问，或上传文件与图片开始分析。</p><div className="prompt-grid">{prompts.map(([icon, title, sub]) => <button key={title} type="button" onClick={() => void sendMessage(title)}><b aria-hidden="true">{icon}</b><span><strong>{title}</strong><small>{sub}</small></span></button>)}</div></section>}
             {messages.map((message) => message.role === 'user'
               ? <article className="chat-user-bubble" key={message.id}><p>{message.content}</p>{message.attachment_ids.length > 0 && <small>{message.attachment_ids.length} 个附件</small>}</article>
-              : <div className="chat-assistant-message" key={message.id}><AssistantMessage message={message} onAsk={(question) => void sendMessage(question)} onRetry={() => void sendMessage(messages.find((item) => item.id === message.parent_message_id)?.content || lastQuestion)} /></div>)}
+              : <div className="chat-assistant-message" data-message-id={message.id} ref={(node) => { if (node) answerRefs.current.set(message.id, node); else answerRefs.current.delete(message.id); }} key={message.id}><AssistantMessage message={message} onAsk={(question) => void sendMessage(question)} onRetry={() => void sendMessage(messages.find((item) => item.id === message.parent_message_id)?.content || lastQuestion)} /></div>)}
             {pendingForCurrent && <><article className="chat-user-bubble pending-user" key={pendingForCurrent.user.id}><p>{pendingForCurrent.user.content}</p>{pendingForCurrent.user.attachment_ids.length > 0 && <small>{pendingForCurrent.user.attachment_ids.length} 个附件</small>}</article><div className="chat-assistant-message"><PendingAssistant turn={pendingForCurrent} onRetry={() => void sendMessage(lastQuestion)} /></div></>}
             {pageError && <section className="page-chat-error" role="alert"><strong>会话暂时不可用</strong><p>{pageError}</p></section>}
           </div>
@@ -773,7 +805,9 @@ export function AskPage({ results = false }: { results?: boolean }) {
           }
         }}>回到最新消息 ↓</button>}
 
-        <div className="chat-composer-zone">
+        {lastCompletedAnswerId && !isAtBottom && <button className="back-to-answer-start" type="button" onClick={() => { const node = answerRefs.current.get(lastCompletedAnswerId); if (node && typeof node.scrollIntoView === 'function') node.scrollIntoView({ block: 'start', behavior: 'smooth' }); }}>回到本次回答开头 ↑</button>}
+
+        <div className="chat-composer-zone" ref={composerZoneRef}>
           <form className="chat-composer" onSubmit={(event: FormEvent<HTMLFormElement>) => { event.preventDefault(); void sendMessage(); }} onDragOver={(event) => event.preventDefault()} onDrop={onDrop}>
             {(attachments.length > 0 || uploading.length > 0) && <div className="attachment-strip">{attachments.map((item) => <span key={item.id} className={item.status === 'FAILED' ? 'failed' : ''}><b aria-hidden="true">{item.kind === 'IMAGE' ? '图' : item.kind === 'STRUCTURED' ? '表' : '文'}</b><em>{item.filename}</em><small>{item.status === 'PROCESSING' ? '处理中' : item.status === 'FAILED' ? '失败' : '就绪'}</small><button type="button" aria-label={`删除附件 ${item.filename}`} onClick={() => void removeAttachment(item)}>×</button></span>)}{uploading.map((item) => <span key={item.id} className={item.error ? 'failed' : ''}><b aria-hidden="true">传</b><em>{item.name}</em><small>{item.error ?? `${item.progress}%`}</small>{item.error && <button type="button" onClick={() => retryUpload(item)}>重试</button>}</span>)}</div>}
             <textarea

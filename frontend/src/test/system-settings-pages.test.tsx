@@ -22,24 +22,31 @@ describe('系统设置高保真页面', () => {
         { id: 'deterministic', display_name: 'Local Semantic Runtime', model_name: 'deterministic-semantic-v1', base_url: null, configured: true, active: false, external_model: false, structured_output: true, protocol: 'local', credential_env: null },
       ],
     });
+    vi.spyOn(systemApi, 'settings').mockResolvedValue({
+      query_security: { query_timeout_ms: 8000, max_rows: 500, read_only_query: true, dangerous_sql_block: true, result_verification: true, sql_guard_policy: 'STRICT', allowed_schemas: [], blocked_schemas: [] },
+      workspace: { workspace_name: '默认工作空间', default_datasource_id: null, default_semantic_model_id: null, status: 'ACTIVE' },
+      appearance: { product_name: 'ChatBI V2', brand_tagline: '可验证数据答案', logo_url: '', primary_color: '#5B5CF6', theme: 'LIGHT' },
+      workspace_summary: { id: 'w1', name: '默认工作空间', member_count: 2, roles: { ADMIN: 1, ANALYST: 1 }, status: 'ACTIVE', isolation: 'WORKSPACE_ID + BACKEND_RBAC', datasources: [], semantic_models: [] },
+      version: 1,
+    });
     render(<MemoryRouter><SettingsModelsPage /></MemoryRouter>);
 
     expect(screen.getByRole('heading', { name: '系统设置', level: 1 })).toBeInTheDocument();
     expect(await screen.findByText('Xiaomi MiMo')).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Moonshot Kimi', level: 3 })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'DeepSeek', level: 3 })).toBeInTheDocument();
-    expect(screen.getByText('3/3')).toBeInTheDocument();
+    expect(screen.getAllByText('已配置').length).toBeGreaterThanOrEqual(3);
     expect(screen.queryByText('UI 演示')).not.toBeInTheDocument();
 
-    const providerSwitch = screen.getByRole('switch', { name: 'Moonshot Kimi当前使用' });
+    const providerSwitch = screen.getByRole('switch', { name: 'Moonshot Kimi已启用' });
     expect(providerSwitch).toHaveAttribute('aria-checked', 'true');
-    expect(providerSwitch).toBeDisabled();
-    await user.click(screen.getAllByRole('button', { name: '配置方式 →' })[0]);
-    expect(screen.getByRole('status')).toHaveTextContent('浏览器不会接收或显示 API Key');
+    expect(providerSwitch).toBeEnabled();
+    await user.click(screen.getAllByRole('button', { name: '配置方式' })[0]);
+    expect(screen.getByRole('status')).toHaveTextContent('API Key 不会下发到浏览器');
 
-    expect(screen.getByRole('button', { name: '查询与安全' })).toBeDisabled();
-    expect(screen.getByRole('button', { name: '工作空间' })).toBeDisabled();
-    expect(screen.getByRole('button', { name: '外观与品牌' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: '查询与安全' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: '工作空间' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: '外观与品牌' })).toBeEnabled();
   });
 
   it('从 Backend API 展示 ADMIN/ANALYST、权限矩阵与审计事件', async () => {
@@ -68,7 +75,7 @@ describe('系统设置高保真页面', () => {
     render(<MemoryRouter><SecurityAuditPage /></MemoryRouter>);
 
     expect(screen.getByRole('heading', { name: '用户、角色与审计', level: 1 })).toBeInTheDocument();
-    const search = await screen.findByPlaceholderText('搜索姓名、邮箱或角色');
+    const search = await screen.findByPlaceholderText('搜索成员或审计');
     await user.type(search, 'analyst');
     await waitFor(() => expect(loadOverview).toHaveBeenCalledWith({ query: 'analyst', status: 'ALL' }));
     expect(await screen.findByText('analyst@chatbi.local')).toBeInTheDocument();
@@ -80,8 +87,9 @@ describe('系统设置高保真页面', () => {
 
     await user.click(screen.getByRole('tab', { name: '权限策略' }));
     expect(screen.getByText('query.ask')).toBeInTheDocument();
+    await user.click(screen.getByRole('tab', { name: '审计日志' }));
     expect(screen.getByText(/RESOURCE_ACCESS/)).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: '＋ 邀请成员' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: '＋ 邀请成员' })).toBeEnabled();
   });
 
   it('显示真实 Permission Denied 状态', async () => {
