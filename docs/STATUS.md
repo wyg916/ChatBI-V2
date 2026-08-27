@@ -221,3 +221,11 @@
   workflow-wide Level0 fallback so its explicit fake gateways remain active;
   real deterministic runners and every downstream remote Gate remain Level0
   with paid Provider calls disabled (ADR-075).
+
+## 2026-08-28：V1.3.1 功能体验、模型管理与全控件收口
+
+- 独立分支已完成聊天意图、答案语义展示、模型服务、系统设置、工作区安全、用户/角色/邀请/审计及控件闭环；Frontend 只经 Backend API 访问持久化元数据。
+- 自动验证已通过 Backend `681 passed, 7 skipped`（另以 exact repository object database 补跑 Git introspection `2/2`）、Frontend `60/60`、专项 `25/25`、TypeScript 和 991-module Vite build。
+- MiMo、DeepSeek、Kimi 已各完成一次生产 `ModelGateway` 实调，3 次 transport attempt、无 retry/fallback、合计估算成本 CNY `0.0005425`，持久化调用账本未包含密钥或认证头。
+- 当前状态为 `PARTIAL_BLOCKED_C_DATABASE_PROVISIONING`：应用角色无建库权限，独立数据库不存在；为保护 Track A，未对共享数据库启动 Compose。因此 2 次启停、浏览器全控件、RBAC 与持久化验收均未执行，远端未推送。
+- 详细证据与恢复条件见 `docs/status/V1_3_1_FUNCTIONAL_EXPERIENCE_CLOSURE_STATUS.md`（ADR-076）。

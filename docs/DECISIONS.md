@@ -500,3 +500,17 @@ Phase5 Live Runner 在 Level0/1/2 运行前已经通过唯一成本控制器验�
   credentials. Applying the runtime Level0 fallback to that step replaces the
   injected doubles and tests a different behavior; all later deterministic,
   security, Phase3 and IBM jobs continue to run with Level0 enforced.
+
+## ADR-076 — Functional certification fails closed without independent C-line databases
+
+- Status: Accepted (2026-08-28)
+- V1.3.1 Compose and browser certification may start only with an independent
+  metadata database and isolated demo schema/database. An isolated Compose
+  project name or container network alone is not sufficient database isolation.
+- If the application role cannot provision the required database, the result is
+  `PARTIAL_BLOCKED_C_DATABASE_PROVISIONING`. The workflow must not reuse,
+  migrate, seed, or otherwise mutate the Track A metadata or demo databases.
+- Browser/control counts, restart persistence, and start/stop-cycle results stay
+  `NOT_EXECUTED` until that prerequisite exists. Provider-only smoke evidence
+  may remain valid when it is bound to its exact implementation SHA and a
+  persistent sanitized invocation ledger.
