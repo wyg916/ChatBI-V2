@@ -6,7 +6,8 @@
 - 已落地显式配置校验、幂等 Bootstrap、Start/Stop/Status/Verify/Doctor、带 SHA-256 清单的 Backup/Restore、双重确认 Reset 和公共 API 企业主链路 Smoke；Compose 使用独立项目名、镜像名、端口、存储目录和既有本机 PostgreSQL 专用 Schema，不创建数据库容器或数据库卷。
 - 当前真实 B 线预验收：Bootstrap 连续两次 PASS（Workspace 1、用户 2、迁移 head `20260822_0012`）；五服务 healthy，缓存启动 106.7 秒；Doctor 0 failure/0 warning；登录、PostgreSQL 只读连接、9 表/56 字段同步、Catalog、语义发布、问数、RAG、文件和固定 Agent 全部 PASS。
 - Backup、Restore、Metadata Reset 均完成真实往返；缺必填、畸形配置、错误数据库和端口占用均按预期 fail-fast，错误演练后的运行容器为 0。维护工具已与本机 PostgreSQL 18.4 对齐，备份不含 Secret。
-- Windows checkout 下 DB-GPT 与 PandasAI selected-source 的完整性校验改为只规范化 CRLF 后核对冻结 SHA/长度；真实内容篡改仍 fail closed。部署/RAG/系统/数据源专项 14/14、多模态专项 20/20（退出码 0）通过；完整 Backend 套件因宿主 bind-mount 磁盘等待中止，不冒充 PASS，Fresh Clone 两轮结果以仓库外脱敏 Evidence 和最终交付为准。
+- Windows checkout 下 DB-GPT 与 PandasAI selected-source 的完整性校验改为只规范化 CRLF 后核对冻结 SHA/长度；真实内容篡改仍 fail closed。部署/RAG/系统/数据源专项 14/14、多模态专项 20/20（退出码 0）通过；完整 Backend 套件因宿主 bind-mount 磁盘等待中止，不冒充 PASS。
+- Fresh Clone #1 由浅克隆的 clean `5af33ee38f5830ea34900a041c54ce24a7da3090` 执行，确认 `.env`、`.venv`、`frontend/node_modules` 均不存在；Bootstrap、五服务 Start/Verify、Doctor 与 Enterprise Smoke 全部 PASS，总耗时 1612.7 秒。该冷构建因本轮 selected-runtime package 变更重建固定 DB-GPT 262 MB 与 OCR 系统库 220 MB，未达到 15 分钟目标；缓存复用的 Fresh Clone #2 结果以仓库外脱敏 Evidence 和最终交付为准。
 
 ## V1.3.0 Phase 5 发布加固候选（2026-08-22）
 
