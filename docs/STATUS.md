@@ -1,5 +1,13 @@
 # 项目状态
 
+## 2026-08-27：V1.3 Enterprise Quick Deploy 产品化候选
+
+- 本轮属于 P0 的部署稳定性、安全性与易用性收口，只在 `codex/v1.3-next-enterprise-productization` 推进；不改 main、V1.3.0 Final Tag/Release、A 线工作区、A 线数据库或 A 线 Compose 资源。
+- 已落地显式配置校验、幂等 Bootstrap、Start/Stop/Status/Verify/Doctor、带 SHA-256 清单的 Backup/Restore、双重确认 Reset 和公共 API 企业主链路 Smoke；Compose 使用独立项目名、镜像名、端口、存储目录和既有本机 PostgreSQL 专用 Schema，不创建数据库容器或数据库卷。
+- 当前真实 B 线预验收：Bootstrap 连续两次 PASS（Workspace 1、用户 2、迁移 head `20260822_0012`）；五服务 healthy，缓存启动 106.7 秒；Doctor 0 failure/0 warning；登录、PostgreSQL 只读连接、9 表/56 字段同步、Catalog、语义发布、问数、RAG、文件和固定 Agent 全部 PASS。
+- Backup、Restore、Metadata Reset 均完成真实往返；缺必填、畸形配置、错误数据库和端口占用均按预期 fail-fast，错误演练后的运行容器为 0。维护工具已与本机 PostgreSQL 18.4 对齐，备份不含 Secret。
+- Windows checkout 下 DB-GPT 与 PandasAI selected-source 的完整性校验改为只规范化 CRLF 后核对冻结 SHA/长度；真实内容篡改仍 fail closed。部署/RAG/系统/数据源专项 14/14、多模态专项 20/20（退出码 0）通过；完整 Backend 套件因宿主 bind-mount 磁盘等待中止，不冒充 PASS，Fresh Clone 两轮结果以仓库外脱敏 Evidence 和最终交付为准。
+
 ## V1.3.0 Phase 5 发布加固候选（2026-08-22）
 
 - 2026-08-26 `58536b5` 的 MiMo/DeepSeek NL2SQL 与 Kimi M04 均 PASS 后，P5C03 首个 MiMo SQLPlan 在固定 512 tokens 处以 `finish_reason=length` 截断，第二个修复响应正确完成 SQL Guard、EXPLAIN、Result Oracle 与冻结值匹配，但两次调用耗尽 30 秒 Agent 窗口；旧 fallback 又尝试重复 QueryPipeline，并由 `UNNECESSARY_DUPLICATE_PAID_CALL_BLOCKED` 正确阻断。该 SHA 的五条真实响应、账本、Trace、取消与清理证据完整脱敏保留。候选现按受信 `RequestContext.route` 让 `COMPLEX_ANALYSIS` 使用既有 1024-token 上限，并在 Agent 已持有完整 Guard/Oracle/签名结果时直接复用工具证据，禁止重复付费查询；必须形成新 successor，从空账本重新认证。
