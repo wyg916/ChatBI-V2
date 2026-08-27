@@ -14,9 +14,9 @@ Set-Location -LiteralPath $projectRoot
 try {
   $bootstrapBuiltImages = $false
   if (-not $SkipBootstrap) {
-    $arguments = @('-EnvFile', $resolvedEnv)
-    if ($SkipBuild) { $arguments += '-SkipBuild' }
-    & (Join-Path $PSScriptRoot 'bootstrap.ps1') @arguments
+    $bootstrapParameters = @{ EnvFile = $resolvedEnv }
+    if ($SkipBuild) { $bootstrapParameters.SkipBuild = $true }
+    & (Join-Path $PSScriptRoot 'bootstrap.ps1') @bootstrapParameters
     if ($LASTEXITCODE -ne 0) { throw 'Bootstrap prerequisite failed' }
     $bootstrapBuiltImages = -not $SkipBuild
   }

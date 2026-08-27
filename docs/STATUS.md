@@ -9,6 +9,7 @@
 - Windows checkout 下 DB-GPT 与 PandasAI selected-source 的完整性校验改为只规范化 CRLF 后核对冻结 SHA/长度；真实内容篡改仍 fail closed。部署/RAG/系统/数据源专项 14/14、多模态专项 20/20（退出码 0）通过；完整 Backend 套件因宿主 bind-mount 磁盘等待中止，不冒充 PASS。
 - Fresh Clone #1 由浅克隆的 clean `5af33ee38f5830ea34900a041c54ce24a7da3090` 执行，确认 `.env`、`.venv`、`frontend/node_modules` 均不存在；Bootstrap、五服务 Start/Verify、Doctor 与 Enterprise Smoke 全部 PASS，总耗时 1612.7 秒。该冷构建因本轮 selected-runtime package 变更重建固定 DB-GPT 262 MB 与 OCR 系统库 220 MB，未达到 15 分钟目标；缓存复用的 Fresh Clone #2 结果以仓库外脱敏 Evidence 和最终交付为准。
 - Fresh Clone #2 由 clean `e316e7f5f72d4a63dd3db027424439eb32452b25` 执行，同样没有本地环境或依赖缓存，功能门禁全部 PASS，但 Docker context 扫描和 7 个一次性探针容器使总耗时达到 1314.7 秒，未达到 10 分钟目标。候选随后把三类镜像构建统一到 Bootstrap、禁止 Start 重复 build，并把数据库认证/迁移/head/seed 合并为一个临时容器、Doctor 两个数据库容器合并为一个；优化后的幂等 Bootstrap 实测 45.0 秒，最终性能复验仍以仓库外 Evidence 和交付输出为准。
+- Final-SHA 标准 `start.ps1` 复验在配置门禁前发现内部 Bootstrap 数组 splat 把 `-EnvFile` 错当位置参数；该失败启动容器为 0。入口已改为命名参数 hashtable splat，禁止再用 `-SkipBootstrap` 绕过标准路径作为唯一通过证据。
 
 ## V1.3.0 Phase 5 发布加固候选（2026-08-22）
 
