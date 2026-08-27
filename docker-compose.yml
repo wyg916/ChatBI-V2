@@ -8,6 +8,9 @@ services:
       dockerfile: backend/Dockerfile
     environment:
       CHATBI_ENVIRONMENT: development
+      CHATBI_GIT_SHA: ${CHATBI_GIT_SHA:-UNAVAILABLE}
+      CHATBI_RELEASE_VERSION: ${CHATBI_RELEASE_VERSION:-v1.3.1}
+      CHATBI_FRONTEND_BUILD: ${CHATBI_FRONTEND_BUILD:-production}
       CHATBI_DATABASE_URL: ${CHATBI_DATABASE_URL:-postgresql+psycopg://chatbi_app:${CHATBI_META_PASSWORD:?Run scripts/bootstrap-local-databases.ps1 first}@host.docker.internal:5432/chatbi_v2}
       CHATBI_DATASOURCE_SECRET_KEY: ${CHATBI_DATASOURCE_SECRET_KEY:?Run scripts/bootstrap-local-databases.ps1 first}
       CHATBI_RAG_SHARED_SECRET: ${CHATBI_RAG_SHARED_SECRET:?Run scripts/bootstrap-local-databases.ps1 first}
