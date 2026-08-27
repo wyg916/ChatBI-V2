@@ -17,6 +17,7 @@ class LinkedObject(BaseModel):
 
 
 class SecurityPolicy(BaseModel):
+    guard_policy: Literal["STRICT", "STANDARD"] = "STRICT"
     read_only: bool = True
     single_statement: bool = True
     allowed_statement_types: list[str] = Field(default_factory=lambda: ["SELECT", "WITH_SELECT"])

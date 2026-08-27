@@ -159,7 +159,7 @@ class SqlGuard:
                     issues.append(GuardIssue(code="COLUMN_NOT_AUTHORIZED", message="Column is outside the datasource allowlist", object_name=name))
 
         for star in statement.find_all(exp.Star):
-            if not isinstance(star.parent, exp.Count):
+            if policy.guard_policy == "STRICT" and not isinstance(star.parent, exp.Count):
                 issues.append(GuardIssue(code="WILDCARD_NOT_ALLOWED", message="SELECT * is not allowed; columns must be explicit"))
         for function in statement.find_all(exp.Func):
             name = (function.name if isinstance(function, exp.Anonymous) else function.sql_name()).lower()

@@ -216,8 +216,15 @@ def _table(
         return None
     public_rows = [{column: row.get(column) for column in columns} for row in rows[:500]]
     row_count = _integer(source.get("row_count"), len(public_rows))
+    context = _record((query or {}).get("context"))
+    labels = {
+        _text(item.get("name"), limit=256): _text(item.get("label"), limit=256)
+        for item in [*_records(context.get("metrics")), *_records(context.get("dimensions"))]
+        if _text(item.get("name"), limit=256) and _text(item.get("label"), limit=256)
+    }
     return AnswerTable(
         columns=columns,
+        column_labels={column: labels.get(column, column) for column in columns},
         rows=public_rows,
         row_count=max(row_count, len(public_rows)),
         result_signature=_text(source.get("result_signature"), limit=256) or None,
@@ -304,6 +311,7 @@ def _chart(
         "series": series[:20],
         "aggregation": _string_map(source.get("aggregation")),
         "unit": _string_map(source.get("unit")),
+        "field_labels": _string_map(source.get("field_labels")),
         "sort": [
             _text(item, limit=256)
             for item in source.get("sort", [])
@@ -657,6 +665,9 @@ class AnswerEnvelopeAdapter:
         answer_id: str,
         conversation_id: str,
         message_id: str,
+        source_question_id: str | None = None,
+        request_id: str | None = None,
+        workspace_id: str | None = None,
         trace_id: str,
         route: Any,
         status: str,
@@ -687,6 +698,9 @@ class AnswerEnvelopeAdapter:
             answer_id=_text(answer_id, limit=256),
             conversation_id=_text(conversation_id, limit=256),
             message_id=_text(message_id, limit=256),
+            source_question_id=_text(source_question_id or message_id, limit=256),
+            request_id=_text(request_id or trace_id, limit=256),
+            workspace_id=_text(workspace_id or "SYSTEM", limit=256),
             trace_id=_text(trace_id or trace.get("trace_id"), limit=256),
             route=_route(route),
             status=normalized_status,

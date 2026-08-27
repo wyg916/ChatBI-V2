@@ -37,7 +37,7 @@ def execution(rows, columns=None, signature="a" * 64):
         (plan("各地区收入占比", ["revenue"], ["region"]), execution([{"region": "A", "revenue": 1}, {"region": "B", "revenue": 2}]), "DONUT"),
         (plan("明细", [], []), execution([{"name": "A", "value": 1}, {"name": "B", "value": 2}]), "BAR"),
         (plan("明细", [], []), execution([{"name": "A"}, {"name": "B"}]), "TABLE"),
-        (plan(), execution([{"region": str(index), "revenue": index} for index in range(25)]), "BAR"),
+        (plan(), execution([{"region": str(index), "revenue": index} for index in range(25)]), "HORIZONTAL_BAR"),
         (plan(), execution([{"region": "A", "revenue": None}, {"region": "B", "revenue": 2}]), "BAR"),
         (plan(), execution([{"region": "A", "revenue": -1}, {"region": "B", "revenue": 2}]), "BAR"),
         (plan("统计利润率", ["margin_percent"], []), execution([{"margin_percent": 12.34}]), "KPI"),
@@ -53,13 +53,27 @@ def test_chart_selector_rules(case_plan, case_execution, expected_type):
 def test_large_category_null_negative_and_units_are_explicit():
     engine = ChartEngine()
     large = engine.plan(query_id="q", plan=plan(), execution=execution([{"region": str(index), "revenue": index} for index in range(25)]))
-    assert large.limit == 20
+    assert large.limit == 15
     assert "类别超过" in large.warnings[0]
     nullable = engine.plan(query_id="q", plan=plan(), execution=execution([{"region": "A", "revenue": None}, {"region": "B", "revenue": -1}]))
     assert nullable.null_policy == "PRESERVE"
     assert any("空值" in item for item in nullable.warnings)
     assert any("负值" in item for item in nullable.warnings)
     assert nullable.unit["revenue"] == "元"
+
+
+def test_semantic_labels_drive_titles_series_and_narrative_text():
+    case_plan = {**plan(), "semantic_labels": {"region": "销售区域", "revenue": "销售收入"}}
+    result = execution([{"region": "华东", "revenue": 100}, {"region": "华南", "revenue": 80}])
+    spec = ChartEngine().plan(query_id="q-label", plan=case_plan, execution=result)
+    assert spec.title == "按销售区域查看销售收入"
+    assert spec.series[0].name == "销售收入"
+    narrative = NarrativeEngine().generate(
+        query_id="q-label", semantic_model_version=1, plan=case_plan, execution=result,
+        oracle={"status": "PASSED"}, chart_spec=spec,
+    )
+    assert "销售区域" in narrative.conclusion
+    assert any("销售收入" in item for item in narrative.insights)
 
 
 def test_chart_result_binding_detects_signature_or_query_drift():

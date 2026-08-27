@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class UserRead(BaseModel):
@@ -40,3 +40,36 @@ class SecurityOverview(BaseModel):
     users: list[UserRead]
     roles: list[RoleRead]
     audit_events: list[AuditEventRead]
+    invitations: list["InvitationRead"] = []
+
+
+class UserUpdate(BaseModel):
+    role: str | None = Field(default=None, pattern="^(ADMIN|ANALYST)$")
+    status: str | None = Field(default=None, pattern="^(ACTIVE|DISABLED)$")
+
+
+class InvitationCreate(BaseModel):
+    email: str = Field(min_length=3, max_length=255, pattern=r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
+    role: str = Field(pattern="^(ADMIN|ANALYST)$")
+    expires_in_days: int = Field(default=7, ge=1, le=30)
+
+
+class InvitationRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: str
+    email: str
+    role: str
+    status: str
+    expires_at: datetime
+    created_at: datetime
+
+
+class InvitationCreated(InvitationRead):
+    invite_url: str
+
+
+class AuditPage(BaseModel):
+    items: list[AuditEventRead]
+    page: int
+    page_size: int
+    total: int

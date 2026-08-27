@@ -59,6 +59,7 @@ from app.services.conversations import (
 from app.streaming import phase_for_stage
 from app.streaming.lifecycle import StreamCancelled, stream_registry
 from app.services.answer_envelope import build_answer_envelope
+from app.services.admin_settings import provider_catalog
 
 
 _VISUAL_EVIDENCE_CACHE = InMemoryVisualEvidenceCache()
@@ -358,7 +359,17 @@ class ChatService:
 
         prior_messages = list_messages(db, conversation.id)
         content = request.content.strip() or "请分析当前附件。"
-        slots, resolved_question = extract_slots(content, conversation.slot_state)
+        preliminary_decision = self.router.decide(
+            content,
+            request.route,
+            history_summary=conversation.summary,
+            attachment_kinds={item.kind for item in attachments},
+        )
+        inherit_data_context = preliminary_decision.route == QuestionRoute.DATA_FOLLOW_UP
+        slots, resolved_question = extract_slots(
+            content,
+            conversation.slot_state if inherit_data_context else {},
+        )
         resolved_question = normalize_common_input_typos(resolved_question)
         if request.datasource_id:
             slots["datasource"] = request.datasource_id
@@ -384,17 +395,11 @@ class ChatService:
             ).hexdigest(),
             budget_mode=BudgetMode(get_settings().model_budget_mode),
         )
-        router_decision = self.router.decide(
-            resolved_question,
-            request.route,
-            history_summary=conversation.summary,
-            attachment_kinds={item.kind for item in attachments},
-            context=request_context,
-        )
+        router_decision = preliminary_decision
         route = router_decision.route
         request_context = request_context.model_copy(update={"route": route.value})
         report("UNDERSTANDING", {"route": route.value})
-        if route in {QuestionRoute.DATA_QUERY, QuestionRoute.HYBRID_ANALYSIS, QuestionRoute.COMPLEX_ANALYSIS}:
+        if route in {QuestionRoute.DATA_QUERY, QuestionRoute.DATA_FOLLOW_UP, QuestionRoute.HYBRID_ANALYSIS, QuestionRoute.COMPLEX_ANALYSIS}:
             report("SCHEMA_LINKED", {"route": route.value})
             report("SEMANTIC_PARSING", {"route": route.value})
             report("SEMANTIC_COMPILING", {"route": route.value})
@@ -436,18 +441,19 @@ class ChatService:
         try:
             if route in {
                 QuestionRoute.DATA_QUERY,
+                QuestionRoute.DATA_FOLLOW_UP,
                 QuestionRoute.KNOWLEDGE_QUERY,
                 QuestionRoute.HYBRID_ANALYSIS,
                 QuestionRoute.COMPLEX_ANALYSIS,
             }:
-                report("QUERYING_DATA" if route == QuestionRoute.DATA_QUERY else "RETRIEVING_KNOWLEDGE", {})
+                report("QUERYING_DATA" if route in {QuestionRoute.DATA_QUERY, QuestionRoute.DATA_FOLLOW_UP} else "RETRIEVING_KNOWLEDGE", {})
                 workload = "agent" if route == QuestionRoute.COMPLEX_ANALYSIS else None
                 with stream_registry.workload(workload):
                     result = AnalysisService().execute(
                         db,
                         AnalysisRequest(
                             question=resolved_question,
-                            route=route,
+                            route=QuestionRoute.DATA_QUERY if route == QuestionRoute.DATA_FOLLOW_UP else route,
                             datasource_id=request.datasource_id,
                             semantic_model_id=request.semantic_model_id,
                             idempotency_key=request.client_message_id,
@@ -539,6 +545,44 @@ class ChatService:
                 report("RESULT_VALIDATING", {"route": route.value, "status": status})
                 if status not in {"SUCCEEDED", "PARTIAL"}:
                     error_code = str(primary.get("error_code") or status)
+            elif route == QuestionRoute.MODEL_STATUS:
+                report("GENERATING_INSIGHT", {"route": route.value})
+                catalog = provider_catalog(db, principal).model_dump(mode="json")
+                providers = [item for item in catalog.get("items", []) if item.get("external_model")]
+                lines = []
+                for item in providers:
+                    configured = "已配置" if item.get("configured") else "未配置"
+                    enabled = "已启用" if item.get("enabled", item.get("active")) else "未启用"
+                    health = str(item.get("health_message") or "未检查")
+                    capabilities = "、".join(item.get("capabilities") or ["文本", "结构化输出"])
+                    lines.append(
+                        f"{item.get('display_name')} / {item.get('model_name') or '未选择模型'}："
+                        f"{configured}，{enabled}，健康状态 {health}，能力 {capabilities}。"
+                    )
+                route_summary = str(catalog.get("selection_strategy") or "fixed")
+                answer = "当前模型状态如下：\n" + "\n".join(lines) + f"\n当前路由策略：{route_summary}；安全回退：Local Semantic Runtime。"
+                model_provider, model_name = "none", "none"
+                response_payload = {"answer": answer, "model_status": catalog}
+            elif route == QuestionRoute.SYSTEM_CAPABILITY:
+                report("GENERATING_INSIGHT", {"route": route.value})
+                settings = get_settings()
+                answer = (
+                    f"{settings.app_name} {settings.app_version}（{settings.environment}）支持数据源连接、Schema 同步、"
+                    "语义模型、自然语言问数、只读 SQL 校验、结果验证、图表与洞察、答案库、看板和评测中心。"
+                )
+                model_provider, model_name = "none", "none"
+                response_payload = {"answer": answer, "system_capability": {"version": settings.app_version}}
+            elif route == QuestionRoute.ADMIN_QUERY:
+                report("GENERATING_INSIGHT", {"route": route.value})
+                permissions = sorted(permission for permission in (
+                    "settings.read", "settings.manage", "audit.read", "query.ask"
+                ) if principal.allows(permission))
+                answer = (
+                    f"当前用户是 {principal.display_name}（{principal.email}），角色为 {principal.role}，"
+                    f"工作空间 ID 为 {principal.workspace_id}。权限摘要：{('、'.join(permissions) or '无管理权限')}。"
+                )
+                model_provider, model_name = "none", "none"
+                response_payload = {"answer": answer, "admin_context": {"role": principal.role, "permissions": permissions}}
             elif route == QuestionRoute.GENERAL_CHAT:
                 report("GENERATING_INSIGHT", {"route": route.value})
                 if router_decision.reason == "DATE_TIME_L0" and is_local_date_question(resolved_question):
@@ -670,7 +714,9 @@ class ChatService:
             "trace_id": trace_id,
             "request_id": request.client_message_id,
             "conversation_id": conversation.id,
-            "message_id": user_message.id,
+            "message_id": None,
+            "source_question_id": user_message.id,
+            "current_user_message_id": user_message.id,
             "workspace_id": principal.workspace_id,
             "user_id": principal.user_id,
             "route": route.value,
@@ -716,11 +762,16 @@ class ChatService:
         checkpoint()
         db.add(assistant)
         db.flush()
+        trace["message_id"] = assistant.id
+        assistant.trace_payload = trace
         checkpoint()
         answer_envelope = build_answer_envelope(
             answer_id=assistant.id,
             conversation_id=conversation.id,
             message_id=assistant.id,
+            source_question_id=user_message.id,
+            request_id=request.client_message_id,
+            workspace_id=principal.workspace_id or conversation.workspace_id,
             trace_id=trace_id,
             route=route,
             status=status,

@@ -24,6 +24,9 @@ from app.models.entities import (
     SemanticVersion,
     VerifiedAnswer,
     Workspace,
+    WorkspaceInvitation,
+    WorkspaceSetting,
+    ProviderRuntimeSetting,
 )
 from app.models.integration_entities import (
     Citation,
@@ -58,4 +61,5 @@ __all__ = [
     "OrchestrationRun", "OrchestrationStep", "ToolBinding", "ToolCall", "PromptTemplate", "PromptVersion",
     "Attachment", "AuthSession", "ChatMessage", "Conversation", "ConversationShare", "LoginAttempt", "Project", "SqlWorkspaceRun",
     "ModelInvocation",
+    "WorkspaceSetting", "ProviderRuntimeSetting", "WorkspaceInvitation",
 ]

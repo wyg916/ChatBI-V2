@@ -50,13 +50,16 @@ class FollowUpSuggestionEngine:
 class InsightGenerator:
     """Deterministic, evidence-bound insight extraction without causal claims."""
 
-    def generate(self, *, metrics: list[str], dimensions: list[str], rows: list[dict[str, Any]]) -> tuple[list[str], list[str], list[str], list[NarrativeEvidence]]:
+    def generate(self, *, metrics: list[str], dimensions: list[str], rows: list[dict[str, Any]], labels: Mapping[str, str] | None = None) -> tuple[list[str], list[str], list[str], list[NarrativeEvidence]]:
         trends: list[str] = []
         contributions: list[str] = []
         anomalies: list[str] = []
         evidence: list[NarrativeEvidence] = []
         metric = metrics[0] if metrics else None
         dimension = dimensions[0] if dimensions else None
+        labels = labels or {}
+        metric_label = labels.get(metric, metric) if metric else None
+        dimension_label = labels.get(dimension, dimension) if dimension else None
         numeric_rows = [(index, _numeric(row.get(metric))) for index, row in enumerate(rows)] if metric else []
         numeric_rows = [(index, value) for index, value in numeric_rows if value is not None]
         if metric and dimension and len(numeric_rows) >= 2:
@@ -65,16 +68,16 @@ class InsightGenerator:
             if first not in (None, 0) and last is not None:
                 change = (last - first) / abs(first) * 100
                 direction = "上升" if change > 0 else "下降" if change < 0 else "持平"
-                statement = f"{dimension}序列首尾相比{direction}{abs(change):.1f}%"
+                statement = f"{dimension_label}序列首尾相比{direction} {abs(change):.1f}%"
                 trends.append(statement)
                 evidence.append(NarrativeEvidence(statement=statement, fields=[dimension, metric], row_indexes=[first_index, last_index], evidence_type="TREND"))
             leader_index, leader_value = max(numeric_rows, key=lambda item: item[1])
             total = sum(value for _, value in numeric_rows)
             label = rows[leader_index].get(dimension)
             share = leader_value / total * 100 if total > 0 else 0
-            statement = f"{label}的{metric}最高，为{_format(leader_value)}"
+            statement = f"{label}的{metric_label}最高，为 {_format(leader_value)}"
             if total > 0:
-                statement += f"，占当前结果合计{share:.1f}%"
+                statement += f"，占当前结果合计 {share:.1f}%"
             contributions.append(statement)
             evidence.append(NarrativeEvidence(statement=statement, fields=[dimension, metric], row_indexes=[leader_index], evidence_type="CONTRIBUTION"))
         null_count = sum(value is None for row in rows for value in row.values())
@@ -103,6 +106,7 @@ class NarrativeEngine:
         rows = list(result.get("rows") or [])
         metrics = list(plan_value.get("metrics") or [])
         dimensions = list(plan_value.get("dimensions") or [])
+        labels = {str(key): str(value) for key, value in (plan_value.get("semantic_labels") or {}).items()}
         if oracle_value.get("status") != "PASSED":
             return Narrative(
                 conclusion="结果未通过 Result Oracle 校验，不生成业务洞察。",
@@ -114,14 +118,14 @@ class NarrativeEngine:
             key_metrics: list[dict[str, Any]] = []
             evidence = [NarrativeEvidence(statement=conclusion, fields=[], row_indexes=[], evidence_type="EMPTY_RESULT")]
         elif len(rows) == 1 and metrics:
-            key_metrics = [{"label": metric, "value": rows[0].get(metric), "unit": chart_value.get("unit", {}).get(metric, "")} for metric in metrics[:4]]
-            conclusion = "；".join(f"{item['label']}为{_format(item['value'])}{item['unit']}" for item in key_metrics) + "。"
+            key_metrics = [{"label": labels.get(metric, metric), "value": rows[0].get(metric), "unit": chart_value.get("unit", {}).get(metric, "")} for metric in metrics[:4]]
+            conclusion = "；".join(f"{item['label']}为 {_format(item['value'])}{item['unit']}" for item in key_metrics) + "。"
             evidence = [NarrativeEvidence(statement=conclusion, fields=metrics[:4], row_indexes=[0], evidence_type="KPI")]
         else:
             key_metrics = []
-            conclusion = f"查询返回 {len(rows)} 行按{'、'.join(dimensions) or '明细'}汇总的可验证结果。"
+            conclusion = f"查询返回 {len(rows)} 行按{'、'.join(labels.get(item, item) for item in dimensions) or '明细'}汇总的可验证结果。"
             evidence = [NarrativeEvidence(statement=conclusion, fields=dimensions + metrics, row_indexes=list(range(min(len(rows), 20))), evidence_type="RESULT_SHAPE")]
-        trends, contributions, anomalies, extracted = self.insight_generator.generate(metrics=metrics, dimensions=dimensions, rows=rows)
+        trends, contributions, anomalies, extracted = self.insight_generator.generate(metrics=metrics, dimensions=dimensions, rows=rows, labels=labels)
         evidence.extend(extracted)
         insights = [*trends, *contributions, *anomalies]
         return Narrative(

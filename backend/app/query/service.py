@@ -20,7 +20,7 @@ from app.models import (
     QueryRun,
     SemanticModel,
     VerifiedAnswer,
-    Workspace,
+    Workspace, WorkspaceSetting,
 )
 from app.chart import ChartEngine
 from app.insight import NarrativeEngine
@@ -101,6 +101,11 @@ def _summary(run: QueryRun) -> tuple[str, list[dict], list[str]]:
     plan = run.plan_payload or {}
     metrics = plan.get("metrics") or []
     dimensions = plan.get("dimensions") or []
+    labels = {
+        str(item.get("name")): str(item.get("label"))
+        for item in [*((run.context_payload or {}).get("metrics") or []), *((run.context_payload or {}).get("dimensions") or [])]
+        if item.get("name") and item.get("label")
+    }
     if run.status == "SECURITY_REJECTED":
         return "查询被安全策略拒绝，未访问数据库。", [], ["请改用只读业务问题"]
     if run.status == "FAILED":
@@ -112,11 +117,11 @@ def _summary(run: QueryRun) -> tuple[str, list[dict], list[str]]:
     kpis: list[dict] = []
     for metric in metrics[:4]:
         if metric in rows[0] and len(rows) == 1:
-            kpis.append({"label": metric, "value": rows[0][metric], "unit": ""})
+            kpis.append({"label": labels.get(metric, metric), "value": rows[0][metric], "unit": ""})
     if kpis:
-        summary = f"查询完成，{metrics[0]} 为 {rows[0].get(metrics[0])}。"
+        summary = f"查询完成，{labels.get(metrics[0], metrics[0])}为 {rows[0].get(metrics[0])}。"
     else:
-        summary = f"查询完成，共返回 {len(rows)} 行按 {', '.join(dimensions) or '明细'} 汇总的结果。"
+        summary = f"查询完成，共返回 {len(rows)} 行按 {', '.join(labels.get(item, item) for item in dimensions) or '明细'}汇总的结果。"
     recommended = [
         "按地区查看收入" if "region" not in dimensions else "查看各地区订单量",
         "查看最近30天趋势" if "month" not in dimensions else "对比收入与成本",
@@ -209,8 +214,13 @@ def _claim_summary(run: QueryRun, claims: list[dict], fallback: str) -> str:
     if not claims:
         return fallback
     claim = claims[0]
+    labels = {
+        str(item.get("name")): str(item.get("label"))
+        for item in [*((run.context_payload or {}).get("metrics") or []), *((run.context_payload or {}).get("dimensions") or [])]
+        if item.get("name") and item.get("label")
+    }
     label = f"{claim['dimension_value']}的" if claim.get("dimension_value") is not None else ""
-    return f"{label}{claim['metric']} 为 {claim['value']}。"
+    return f"{label}{labels.get(claim['metric'], claim['metric'])}为 {claim['value']}。"
 
 
 def query_response(run: QueryRun) -> QueryResponse:
@@ -268,11 +278,17 @@ class QueryPipeline:
     def _build_presentation(self, run: QueryRun) -> None:
         if not run.plan_payload or not run.execution_payload:
             return
-        chart = self.chart_engine.plan(query_id=run.id, plan=run.plan_payload, execution=run.execution_payload)
+        semantic_labels = {
+            str(item.get("name")): str(item.get("label"))
+            for item in [*((run.context_payload or {}).get("metrics") or []), *((run.context_payload or {}).get("dimensions") or [])]
+            if item.get("name") and item.get("label")
+        }
+        presentation_plan = {**run.plan_payload, "semantic_labels": semantic_labels}
+        chart = self.chart_engine.plan(query_id=run.id, plan=presentation_plan, execution=run.execution_payload)
         narrative = self.narrative_engine.generate(
             query_id=run.id,
             semantic_model_version=run.semantic_model_version,
-            plan=run.plan_payload,
+            plan=presentation_plan,
             execution=run.execution_payload,
             oracle=run.oracle_payload or {},
             chart_spec=chart,
@@ -300,6 +316,14 @@ class QueryPipeline:
         workspace = db.get(Workspace, principal.workspace_id) if principal and principal.workspace_id else default_workspace(db)
         if workspace is None:
             raise PermissionError("Workspace is unavailable")
+        workspace_setting = db.get(WorkspaceSetting, workspace.id)
+        workspace_config = (workspace_setting.workspace_config or {}) if workspace_setting else {}
+        query_security = (workspace_setting.query_security or {}) if workspace_setting else {}
+        if not request.datasource_id and not request.semantic_model_id:
+            request = request.model_copy(update={
+                "datasource_id": workspace_config.get("default_datasource_id"),
+                "semantic_model_id": workspace_config.get("default_semantic_model_id"),
+            })
         if principal is not None and request.datasource_id:
             ensure_resource_access(db, principal, resource_type="DATASOURCE", resource_id=request.datasource_id, query=True)
         if principal is not None and request.semantic_model_id:
@@ -308,7 +332,8 @@ class QueryPipeline:
         if principal is not None:
             ensure_resource_access(db, principal, resource_type="DATASOURCE", resource_id=datasource.id, query=True)
             ensure_resource_access(db, principal, resource_type="SEMANTIC_MODEL", resource_id=model.id, query=True)
-        row_limit = min(request.row_limit or settings.query_row_limit, settings.query_row_limit)
+        configured_row_limit = int(query_security.get("max_rows", settings.query_row_limit))
+        row_limit = min(request.row_limit or configured_row_limit, configured_row_limit)
         run = QueryRun(
             workspace_id=workspace.id,
             datasource_id=datasource.id,
@@ -345,6 +370,10 @@ class QueryPipeline:
             context = self.context_builder.build(
                 db, question=request.question, workspace=workspace, datasource=datasource,
                 semantic_model=model, row_limit=row_limit,
+                timeout_ms=int(query_security.get("query_timeout_ms", settings.query_timeout_ms)),
+                guard_policy=str(query_security.get("sql_guard_policy", "STRICT")),
+                allowed_schema_names=list(query_security.get("allowed_schemas") or []),
+                blocked_schema_names=list(query_security.get("blocked_schemas") or []),
                 cache_role=principal.role if principal is not None else "SYSTEM",
                 request_context=runtime_context,
             )

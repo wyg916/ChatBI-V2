@@ -9,12 +9,16 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 class AnswerRoute(StrEnum):
     DATA_QUERY = "DATA_QUERY"
+    DATA_FOLLOW_UP = "DATA_FOLLOW_UP"
     KNOWLEDGE_QUERY = "KNOWLEDGE_QUERY"
     HYBRID_ANALYSIS = "HYBRID_ANALYSIS"
     COMPLEX_ANALYSIS = "COMPLEX_ANALYSIS"
     FILE_QUERY = "FILE_QUERY"
     VISION_QUERY = "VISION_QUERY"
     GENERAL_CHAT = "GENERAL_CHAT"
+    SYSTEM_CAPABILITY = "SYSTEM_CAPABILITY"
+    MODEL_STATUS = "MODEL_STATUS"
+    ADMIN_QUERY = "ADMIN_QUERY"
     CLARIFICATION = "CLARIFICATION"
     UNSUPPORTED = "UNSUPPORTED"
 
@@ -39,6 +43,7 @@ class AnswerKpi(_EnvelopeModel):
 
 class AnswerTable(_EnvelopeModel):
     columns: list[str] = Field(default_factory=list, max_length=200)
+    column_labels: dict[str, str] = Field(default_factory=dict)
     rows: list[dict[str, Any]] = Field(default_factory=list, max_length=500)
     row_count: int = Field(default=0, ge=0)
     result_signature: str | None = Field(default=None, max_length=256)
@@ -165,6 +170,9 @@ class AnswerEnvelope(_EnvelopeModel):
     answer_id: str = Field(min_length=1, max_length=256)
     conversation_id: str = Field(min_length=1, max_length=256)
     message_id: str = Field(min_length=1, max_length=256)
+    source_question_id: str = Field(min_length=1, max_length=256)
+    request_id: str = Field(min_length=1, max_length=256)
+    workspace_id: str = Field(min_length=1, max_length=256)
     trace_id: str = Field(min_length=1, max_length=256)
     route: AnswerRoute
     status: str = Field(min_length=1, max_length=64)

@@ -102,6 +102,7 @@ class ModelGateway:
         provider_overrides: dict[str, ResolvedProvider] | None = None,
         sleeper: Callable[[float], None] = time.sleep,
         clock: Callable[[], float] = time.monotonic,
+        respect_runtime_enabled: bool = True,
     ) -> None:
         self.settings = settings or get_settings()
         self.transport = transport
@@ -111,6 +112,7 @@ class ModelGateway:
         self.health_config = load_control_config("provider_health.yaml")
         self.sleeper = sleeper
         self.clock = clock
+        self.respect_runtime_enabled = respect_runtime_enabled
         self.last_response: ModelResponse | None = None
         self._circuits = _CircuitRegistry(
             threshold=int(self.health_config["circuit_failure_threshold"]),
@@ -123,13 +125,25 @@ class ModelGateway:
         request_id = f"REQ-{uuid4()}"
         return RequestContext(request_id=request_id, trace_id=f"TRACE-{uuid4()}", question=question)
 
-    def _candidates(self, request: ModelRequest) -> list[ResolvedProvider]:
+    def _candidates(self, request: ModelRequest, context: RequestContext) -> list[ResolvedProvider]:
         configured = self.providers
+        disabled: set[str] = set()
+        if self.respect_runtime_enabled and context.workspace_id != "SYSTEM":
+            from sqlalchemy import select
+            from app.model_gateway.ledger import bound_model_invocation_session
+            from app.models import ProviderRuntimeSetting
+
+            db = bound_model_invocation_session()
+            if db is not None:
+                disabled = set(db.scalars(select(ProviderRuntimeSetting.provider_id).where(
+                    ProviderRuntimeSetting.workspace_id == context.workspace_id,
+                    ProviderRuntimeSetting.enabled.is_(False),
+                )))
         candidates: list[ResolvedProvider] = []
         over_budget = False
         for provider_id in self.policy.provider_candidates(request):
             provider = configured.get(provider_id)
-            if provider is None or not self.policy.supports(provider_id, request):
+            if provider is None or provider_id in disabled or not self.policy.supports(provider_id, request):
                 continue
             if not self.policy.within_budget(provider_id, request):
                 over_budget = True
@@ -226,7 +240,7 @@ class ModelGateway:
         started = perf_counter()
         retries_total = 0
         try:
-            candidates = self._candidates(request)
+            candidates = self._candidates(request, context)
         except ModelUnavailable as exc:
             record_model_invocation(
                 context, request, response=None, provider="none", status="FAILED",
@@ -478,7 +492,7 @@ class ModelGateway:
             max(1, int(self.health_config["retry_attempts"]))
         )
         try:
-            candidates = self._candidates(request)
+            candidates = self._candidates(request, context)
         except ModelUnavailable as exc:
             record_model_invocation(
                 context, request, response=None, provider="none", status="FAILED",
@@ -693,8 +707,11 @@ class ModelGateway:
         reply = self.complete(
             system=(
                 "Classify the request for an enterprise ChatBI router. Return JSON only with key route. "
-                "Allowed: DATA_QUERY, KNOWLEDGE_QUERY, HYBRID_ANALYSIS, COMPLEX_ANALYSIS, GENERAL_CHAT, "
-                "CLARIFICATION, UNSUPPORTED. DATA_QUERY requires database facts; KNOWLEDGE_QUERY requires "
+                "Allowed: DATA_QUERY, DATA_FOLLOW_UP, KNOWLEDGE_QUERY, HYBRID_ANALYSIS, COMPLEX_ANALYSIS, "
+                "GENERAL_CHAT, SYSTEM_CAPABILITY, MODEL_STATUS, ADMIN_QUERY, CLARIFICATION, UNSUPPORTED. "
+                "DATA_QUERY requires database facts; DATA_FOLLOW_UP explicitly depends on a prior data result; "
+                "MODEL_STATUS asks about configured or healthy models; SYSTEM_CAPABILITY asks about product/version; "
+                "ADMIN_QUERY asks about the current user, permissions, workspace, or settings; KNOWLEDGE_QUERY requires "
                 "governed knowledge; HYBRID combines both; COMPLEX needs bounded multi-step analysis."
             ),
             user=json.dumps({"question": question, "conversation_summary": history_summary}, ensure_ascii=False),
@@ -706,10 +723,11 @@ class ModelGateway:
         except (json.JSONDecodeError, KeyError, TypeError) as exc:
             raise ModelUnavailable("Model router returned invalid JSON") from exc
 
-    def probe(self, provider: str) -> dict[str, Any]:
+    def probe(self, provider: str, *, context: RequestContext | None = None) -> dict[str, Any]:
         reply = self.complete(
             system="Return OK only.", user="health probe", requested_alias=provider,
             complexity_score=0, budget_mode=BudgetMode.ECONOMY,
+            context=context,
         )
         return {"provider": reply.provider, "model": reply.model, "status": "PASS"}
 

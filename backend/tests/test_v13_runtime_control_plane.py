@@ -95,6 +95,31 @@ def test_unrelated_revenue_phrase_does_not_fall_into_data_query():
     assert decision.needs_sql is False
 
 
+@pytest.mark.parametrize(
+    ("question", "route"),
+    [
+        ("有哪些模型可用？", "MODEL_STATUS"),
+        ("当前系统版本和能力是什么？", "SYSTEM_CAPABILITY"),
+        ("我当前有哪些权限？", "ADMIN_QUERY"),
+    ],
+)
+def test_explicit_new_intents_do_not_inherit_prior_data_context(question, route):
+    decision = QuestionRouter(_ForbiddenGateway()).decide(
+        question, history_summary="指标=销售额；时间=今年；维度=地区",
+    )
+    assert decision.route.value == route
+    assert decision.needs_sql is False
+    assert decision.reason.startswith("EXPLICIT_NEW_INTENT")
+
+
+def test_short_data_follow_up_is_the_only_route_that_inherits_data_context():
+    decision = QuestionRouter(_ForbiddenGateway()).decide(
+        "那华南呢？", history_summary="指标=销售额；时间=今年；维度=地区",
+    )
+    assert decision.route.value == "DATA_FOLLOW_UP"
+    assert decision.needs_sql is True
+
+
 def test_unknown_intent_fails_safe_when_level0_blocks_model_router():
     decision = QuestionRouter(_Level0BlockedGateway()).decide("请处理这个不明确请求")
     assert decision.route.value == "GENERAL_CHAT"

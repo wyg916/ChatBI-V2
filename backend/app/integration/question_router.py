@@ -19,6 +19,24 @@ _COMPLEX_MARKERS = (
     "异常原因", "逐行验证", "生成图表和结论",
 )
 _GENERAL_MARKERS = ("你好", "你是谁", "谢谢", "帮助", "怎么使用", "hello", "hi")
+_MODEL_STATUS_MARKERS = (
+    "可用模型", "有哪些模型", "什么模型", "哪些模型", "模型状态", "模型健康", "正常调用的模型",
+    "当前模型", "默认模型", "模型路由", "mimo", "deepseek", "kimi", "moonshot",
+)
+_SYSTEM_CAPABILITY_MARKERS = (
+    "系统版本", "当前版本", "版本是什么", "系统信息", "系统能力", "你能做什么", "帮助中心",
+    "如何配置数据源", "怎么配置数据源", "解释这个系统", "介绍这个系统",
+)
+_ADMIN_QUERY_MARKERS = (
+    "当前用户", "我是谁", "我的权限", "当前权限", "有哪些权限", "用户权限", "角色权限", "系统配置", "工作空间设置",
+)
+_DATA_FOLLOW_UP = re.compile(
+    r"(?:^|[，,。；;\s])(?:其中|再|继续|然后|另外|刚才|上一条|上一个|前面|基于这个|基于上述)|"
+    r"(?:哪个|哪一个).*(?:最高|最低|最大|最小)|(?:去年|今年|本月|上月|下月|上季度|本季度|下季度)呢[？?。]?$|"
+    r"(?:按|换成|改成).*(?:拆分|分组|排序|排名|地区|区域|客户|产品|品类|月份|月度)|"
+    r"(?:两者|这些|它们|该指标|这个结果)|^那.{1,20}呢[？?。]?$",
+    re.IGNORECASE,
+)
 _NON_DATA_CONTEXT = ("写一首", "写诗", "诗歌", "翻译", "造句", "词语解释", "故事", "哲学角度")
 _PRODUCT_HELP_MARKERS = (
     "第一次使用", "通用聊天机器人", "可以在这里", "问数据页面",
@@ -90,7 +108,10 @@ class QuestionRouter:
             ),
             model_required=model_required,
             requested_alias=requested_alias,
-            needs_sql=route in {QuestionRoute.DATA_QUERY, QuestionRoute.HYBRID_ANALYSIS, QuestionRoute.COMPLEX_ANALYSIS},
+            needs_sql=route in {
+                QuestionRoute.DATA_QUERY, QuestionRoute.DATA_FOLLOW_UP,
+                QuestionRoute.HYBRID_ANALYSIS, QuestionRoute.COMPLEX_ANALYSIS,
+            },
             needs_rag=route in {QuestionRoute.KNOWLEDGE_QUERY, QuestionRoute.HYBRID_ANALYSIS, QuestionRoute.COMPLEX_ANALYSIS},
             needs_vision=route == QuestionRoute.MULTIMODAL_QUERY,
             needs_clarification=route == QuestionRoute.CLARIFICATION,
@@ -124,12 +145,37 @@ class QuestionRouter:
             )
         if _UNSUPPORTED.search(normalized):
             return self._decision(QuestionRoute.UNSUPPORTED, question=normalized, reason="SECURITY_POLICY")
+        lowered = normalized.lower()
+        if any(marker.lower() in lowered for marker in _MODEL_STATUS_MARKERS):
+            return self._decision(
+                QuestionRoute.MODEL_STATUS, question=normalized,
+                reason="EXPLICIT_NEW_INTENT_MODEL_STATUS", model_required=False,
+            )
+        if (
+            any(marker.lower() in lowered for marker in _SYSTEM_CAPABILITY_MARKERS)
+            and not any(marker.lower() in lowered for marker in ("你好", "hello", "hi", "谢谢"))
+        ):
+            return self._decision(
+                QuestionRoute.SYSTEM_CAPABILITY, question=normalized,
+                reason="EXPLICIT_NEW_INTENT_SYSTEM_CAPABILITY", model_required=False,
+            )
+        if any(marker.lower() in lowered for marker in _ADMIN_QUERY_MARKERS):
+            return self._decision(
+                QuestionRoute.ADMIN_QUERY, question=normalized,
+                reason="EXPLICIT_NEW_INTENT_ADMIN_QUERY", model_required=False,
+            )
         if _SQL_STATEMENT.search(normalized):
             return self._decision(QuestionRoute.DATA_QUERY, question=normalized, reason="READ_ONLY_SQL_SHAPE")
         if is_local_date_question(normalized):
             return self._decision(
                 QuestionRoute.GENERAL_CHAT, question=normalized, reason="DATE_TIME_L0",
                 confidence=1.0, model_required=False, requested_alias="none",
+            )
+        has_data_history = any(marker in history_summary for marker in ("指标=", "数据源=", "语义模型="))
+        if has_data_history and _DATA_FOLLOW_UP.search(normalized):
+            return self._decision(
+                QuestionRoute.DATA_FOLLOW_UP, question=normalized,
+                reason="EXPLICIT_DATA_FOLLOW_UP", model_required=False,
             )
         if any(marker in normalized for marker in _NON_DATA_CONTEXT):
             return self._decision(

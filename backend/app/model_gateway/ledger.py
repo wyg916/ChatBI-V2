@@ -12,6 +12,10 @@ from app.model_gateway.contracts import ModelRequest, ModelResponse, RequestCont
 _ledger_session: ContextVar[Session | None] = ContextVar("model_invocation_session", default=None)
 
 
+def bound_model_invocation_session() -> Session | None:
+    return _ledger_session.get()
+
+
 @contextmanager
 def bind_model_invocation_session(db: Session) -> Iterator[None]:
     """Bind the request transaction without making ModelGateway own DB lifecycle."""

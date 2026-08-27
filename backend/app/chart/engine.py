@@ -41,12 +41,14 @@ class ChartSelector:
             return "TABLE"
         if row_count == 1:
             return "KPI"
-        if any(token in question for token in ("占比", "比例", "份额", "构成")) and len(metrics) == 1:
+        if any(token in question for token in ("占比", "比例", "份额", "构成")) and len(metrics) == 1 and row_count <= 8:
             return "DONUT"
         if dimensions and _time_dimension(dimensions[0]):
             return "LINE"
         if len(metrics) > 1:
             return "STACKED_BAR" if any(token in question for token in ("堆叠", "构成", "累计")) else "GROUPED_BAR"
+        if row_count > 12:
+            return "HORIZONTAL_BAR"
         return "BAR"
 
 
@@ -72,26 +74,30 @@ class ChartEngine:
             dimensions = [field for field in columns if field not in metrics]
 
         question = str(plan_value.get("question") or "查询结果")
+        field_labels = {
+            str(key): str(value) for key, value in (plan_value.get("semantic_labels") or {}).items()
+            if key and value
+        }
         chart_type = self.selector.select(
             question=question, dimensions=dimensions, metrics=metrics, row_count=len(rows),
         )
         x_field = dimensions[0] if dimensions else None
-        limit = min(max(len(rows), 1), 20) if chart_type != "TABLE" else min(max(len(rows), 1), 500)
+        limit = min(max(len(rows), 1), 15) if chart_type != "TABLE" else min(max(len(rows), 1), 500)
         warnings: list[str] = []
-        if len(rows) > 20 and chart_type != "TABLE":
-            warnings.append("类别超过 20 个，图表仅展示按查询顺序排列的前 20 项；完整结果保留在明细表。")
+        if len(rows) > 15 and chart_type != "TABLE":
+            warnings.append("类别超过 15 个，图表仅展示按查询顺序排列的前 15 项；完整结果保留在明细表。")
         if any(any(value is None for value in row.values()) for row in rows):
             warnings.append("结果包含空值，图表保留空值且不推断为 0。")
         if any(_is_number(value) and value < 0 for row in rows for value in row.values()):
             warnings.append("结果包含负值，坐标轴保留零基线。")
 
         series_type = {
-            "LINE": "line", "BAR": "bar", "GROUPED_BAR": "bar", "STACKED_BAR": "bar",
+            "LINE": "line", "BAR": "bar", "HORIZONTAL_BAR": "bar", "GROUPED_BAR": "bar", "STACKED_BAR": "bar",
             "DONUT": "pie", "KPI": "kpi", "TABLE": "table",
         }[chart_type]
         series = [
             ChartSeries(
-                name=field,
+                name=field_labels.get(field, field),
                 field=field,
                 type=series_type,
                 stack="total" if chart_type == "STACKED_BAR" else None,
@@ -100,8 +106,8 @@ class ChartEngine:
         ]
         aggregation = {item: str(plan_value.get("aggregation", {}).get(item, "QUERY_RESULT")) for item in metrics}
         units = {item: _unit(item) for item in metrics}
-        title_subject = " / ".join(metrics) if metrics else "明细"
-        title_dimension = f"按{x_field}" if x_field else ""
+        title_subject = " / ".join(field_labels.get(item, item) for item in metrics) if metrics else "明细"
+        title_dimension = f"按{field_labels.get(x_field, x_field)}查看" if x_field else ""
         return ChartSpec(
             chart_type=chart_type,
             title=f"{title_dimension}{title_subject}",
@@ -110,6 +116,7 @@ class ChartEngine:
             series=series,
             aggregation=aggregation,
             unit=units,
+            field_labels=field_labels,
             sort=list(plan_value.get("order_by") or []),
             limit=limit,
             legend={"show": len(metrics) > 1 or chart_type == "DONUT", "position": "top"},

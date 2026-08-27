@@ -69,6 +69,10 @@ class ContextBuilder:
         datasource: DataSource,
         semantic_model: SemanticModel,
         row_limit: int,
+        timeout_ms: int | None = None,
+        guard_policy: str = "STRICT",
+        allowed_schema_names: list[str] | None = None,
+        blocked_schema_names: list[str] | None = None,
         cache_role: str = "SYSTEM",
         request_context: RequestContext | None = None,
     ) -> QueryContext:
@@ -79,6 +83,12 @@ class ContextBuilder:
         schema_rows = list(db.scalars(
             select(DataSourceSchema).where(DataSourceSchema.datasource_id == datasource.id).order_by(DataSourceSchema.name)
         ))
+        allowed = {item.lower() for item in (allowed_schema_names or [])}
+        blocked = {item.lower() for item in (blocked_schema_names or [])}
+        schema_rows = [
+            item for item in schema_rows
+            if (not allowed or item.name.lower() in allowed) and item.name.lower() not in blocked
+        ]
         schema_ids = [item.id for item in schema_rows]
         table_rows = list(db.scalars(
             select(DataSourceTable).where(DataSourceTable.schema_id.in_(schema_ids)).order_by(DataSourceTable.name)
@@ -242,8 +252,9 @@ class ContextBuilder:
             estimated_tokens=estimated_tokens,
             truncated=truncated,
             security_policy=SecurityPolicy(
+                guard_policy=guard_policy,
                 row_limit=row_limit,
-                timeout_ms=settings.query_timeout_ms,
+                timeout_ms=timeout_ms or settings.query_timeout_ms,
                 allowed_schemas=sorted({item.name.lower() for item in schema_rows}),
                 allowed_tables=sorted(item.name.lower() for item in table_rows),
                 allowed_columns=allowed_columns,

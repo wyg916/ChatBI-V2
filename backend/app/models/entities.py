@@ -64,6 +64,46 @@ class AuditEvent(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, index=True)
 
 
+class WorkspaceSetting(Base, TimestampMixin):
+    __tablename__ = "workspace_setting"
+    workspace_id: Mapped[str] = mapped_column(ForeignKey("workspace.id", ondelete="CASCADE"), primary_key=True)
+    query_security: Mapped[dict] = mapped_column(JSON, default=dict)
+    workspace_config: Mapped[dict] = mapped_column(JSON, default=dict)
+    appearance: Mapped[dict] = mapped_column(JSON, default=dict)
+    version: Mapped[int] = mapped_column(Integer, default=1)
+    updated_by: Mapped[str | None] = mapped_column(ForeignKey("app_user.id", ondelete="SET NULL"))
+
+
+class ProviderRuntimeSetting(Base, TimestampMixin):
+    __tablename__ = "provider_runtime_setting"
+    __table_args__ = (UniqueConstraint("workspace_id", "provider_id"),)
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uuid_str)
+    workspace_id: Mapped[str] = mapped_column(ForeignKey("workspace.id", ondelete="CASCADE"), index=True)
+    provider_id: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    enabled: Mapped[bool] = mapped_column(Boolean, default=False)
+    healthy: Mapped[bool | None] = mapped_column(Boolean)
+    health_message: Mapped[str | None] = mapped_column(String(255))
+    last_checked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    priority: Mapped[int] = mapped_column(Integer, default=100)
+    cost_policy: Mapped[str] = mapped_column(String(32), default="STANDARD")
+    updated_by: Mapped[str | None] = mapped_column(ForeignKey("app_user.id", ondelete="SET NULL"))
+
+
+class WorkspaceInvitation(Base):
+    __tablename__ = "workspace_invitation"
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uuid_str)
+    workspace_id: Mapped[str] = mapped_column(ForeignKey("workspace.id", ondelete="CASCADE"), index=True)
+    email: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
+    role: Mapped[str] = mapped_column(String(32), nullable=False)
+    token_hash: Mapped[str] = mapped_column(String(64), unique=True, nullable=False, index=True)
+    status: Mapped[str] = mapped_column(String(32), default="PENDING", index=True)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, index=True)
+    created_by: Mapped[str | None] = mapped_column(ForeignKey("app_user.id", ondelete="SET NULL"))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, index=True)
+    revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    accepted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
 class VerifiedAnswer(Base, TimestampMixin):
     __tablename__ = "verified_answer"
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uuid_str)

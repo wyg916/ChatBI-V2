@@ -1,0 +1,98 @@
+from sqlalchemy import select
+
+from app.api.routes import system as system_routes
+from app.core.access import Principal, get_principal
+from app.main import app
+from app.models import AppUser, AuditEvent, ProviderRuntimeSetting, Workspace, WorkspaceInvitation, WorkspaceSetting
+
+
+def test_settings_are_transactional_persisted_runtime_safe_and_audited(client, db_session):
+    baseline = client.get("/api/v1/settings")
+    assert baseline.status_code == 200
+    original = baseline.json()
+    response = client.patch("/api/v1/settings", json={
+        "expected_version": original["version"],
+        "query_security": {
+            **original["query_security"],
+            "query_timeout_ms": 12000,
+            "max_rows": 123,
+            "allowed_schemas": ["demo_business"],
+            "blocked_schemas": ["private"],
+        },
+        "appearance": {
+            **original["appearance"],
+            "product_name": "Verified ChatBI",
+            "primary_color": "#123ABC",
+        },
+    })
+    assert response.status_code == 200
+    assert response.json()["version"] == original["version"] + 1
+    assert response.json()["query_security"]["max_rows"] == 123
+    assert client.get("/api/v1/settings").json()["appearance"]["product_name"] == "Verified ChatBI"
+    row = db_session.scalar(select(WorkspaceSetting))
+    assert row.query_security["query_timeout_ms"] == 12000
+    assert db_session.scalar(select(AuditEvent).where(AuditEvent.action == "UPDATE_SETTINGS")) is not None
+
+    rejected = client.patch("/api/v1/settings", json={
+        "query_security": {**response.json()["query_security"], "dangerous_sql_block": False},
+    })
+    assert rejected.status_code == 422
+    assert client.get("/api/v1/settings").json()["version"] == original["version"] + 1
+
+
+def test_provider_disable_persists_affects_readback_and_never_exposes_secrets(client, db_session):
+    catalog = client.get("/api/v1/model-providers")
+    assert catalog.status_code == 200
+    encoded = catalog.text.lower()
+    assert "api_key" not in encoded and "base_url" not in encoded and "credential_env" not in encoded
+    response = client.patch("/api/v1/model-providers/mimo", json={"enabled": False})
+    assert response.status_code == 200
+    assert response.json()["enabled"] is False
+    persisted = db_session.scalar(select(ProviderRuntimeSetting).where(ProviderRuntimeSetting.provider_id == "mimo"))
+    assert persisted is not None and persisted.enabled is False
+    assert next(item for item in client.get("/api/v1/model-providers").json()["items"] if item["id"] == "mimo")["enabled"] is False
+    assert db_session.scalar(select(AuditEvent).where(AuditEvent.action == "TOGGLE_MODEL")) is not None
+
+
+def test_user_invitation_audit_and_workspace_isolation_controls(client, db_session):
+    workspace = db_session.scalar(select(Workspace))
+    admin = db_session.scalar(select(AppUser).where(AppUser.role == "ADMIN"))
+    analyst = AppUser(workspace_id=workspace.id, email="v131-analyst@chatbi.local", display_name="V131 Analyst", role="ANALYST", status="ACTIVE")
+    foreign_workspace = Workspace(name="V131 Foreign")
+    db_session.add_all([analyst, foreign_workspace])
+    db_session.flush()
+    foreign = AppUser(workspace_id=foreign_workspace.id, email="v131-foreign@chatbi.local", display_name="Foreign", role="ANALYST", status="ACTIVE")
+    db_session.add(foreign)
+    db_session.commit()
+
+    updated = client.patch(f"/api/v1/security/users/{analyst.id}", json={"role": "ADMIN"})
+    assert updated.status_code == 200 and updated.json()["role"] == "ADMIN"
+    assert client.patch(f"/api/v1/security/users/{admin.id}", json={"role": "ANALYST"}).status_code == 409
+    assert client.patch(f"/api/v1/security/users/{foreign.id}", json={"status": "DISABLED"}).status_code == 404
+
+    created = client.post("/api/v1/security/invitations", json={"email": "invitee@example.com", "role": "ANALYST", "expires_in_days": 3})
+    assert created.status_code == 201
+    invite_url = created.json()["invite_url"]
+    assert "/invite/" in invite_url
+    invitation = db_session.scalar(select(WorkspaceInvitation).where(WorkspaceInvitation.email == "invitee@example.com"))
+    assert invitation is not None and invitation.token_hash not in invite_url
+    revoked = client.post(f"/api/v1/security/invitations/{invitation.id}/revoke")
+    assert revoked.status_code == 200 and revoked.json()["status"] == "REVOKED"
+    page = client.get("/api/v1/security/audit", params={"action": "REVOKE_INVITATION", "page": 1, "page_size": 10})
+    assert page.status_code == 200 and page.json()["total"] == 1
+
+
+def test_analyst_cannot_call_admin_mutations(client, db_session):
+    workspace = db_session.scalar(select(Workspace))
+    analyst = AppUser(workspace_id=workspace.id, email="v131-rbac@chatbi.local", display_name="RBAC Analyst", role="ANALYST", status="ACTIVE")
+    db_session.add(analyst)
+    db_session.commit()
+    app.dependency_overrides[get_principal] = lambda: Principal(analyst.id, workspace.id, analyst.email, analyst.display_name, analyst.role)
+    try:
+        assert client.patch("/api/v1/settings", json={"appearance": {"product_name": "Denied"}}).status_code == 403
+        assert client.patch("/api/v1/model-providers/mimo", json={"enabled": False}).status_code == 403
+        assert client.post("/api/v1/security/invitations", json={"email": "denied@example.com", "role": "ANALYST", "expires_in_days": 7}).status_code == 403
+    finally:
+        # client fixture restores all overrides after the test; put its ADMIN override back now.
+        admin = db_session.scalar(select(AppUser).where(AppUser.email == "admin@chatbi.local"))
+        app.dependency_overrides[get_principal] = lambda: Principal(admin.id, workspace.id, admin.email, admin.display_name, admin.role)

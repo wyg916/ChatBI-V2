@@ -3,7 +3,7 @@ from typing import Any, Literal
 from pydantic import BaseModel, Field
 
 
-ChartType = Literal["KPI", "LINE", "BAR", "GROUPED_BAR", "STACKED_BAR", "DONUT", "TABLE"]
+ChartType = Literal["KPI", "LINE", "BAR", "HORIZONTAL_BAR", "GROUPED_BAR", "STACKED_BAR", "DONUT", "TABLE"]
 
 
 class ChartSeries(BaseModel):
@@ -22,6 +22,7 @@ class ChartSpec(BaseModel):
     series: list[ChartSeries] = Field(default_factory=list)
     aggregation: dict[str, str] = Field(default_factory=dict)
     unit: dict[str, str] = Field(default_factory=dict)
+    field_labels: dict[str, str] = Field(default_factory=dict)
     sort: list[str] = Field(default_factory=list)
     limit: int = Field(default=20, ge=1, le=500)
     legend: dict[str, Any] = Field(default_factory=dict)
