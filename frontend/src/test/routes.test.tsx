@@ -39,6 +39,6 @@ describe('UI route coverage', () => {
     expect(nav).not.toHaveTextContent('系统设置');
     expect(screen.getByRole('button', { name: '帮助' })).toBeDisabled();
     expect(document.querySelector('.context-pill')?.tagName).toBe('DIV');
-    expect(screen.getByText('v1.3.0 RC · 开源企业版')).toBeVisible();
+    expect(screen.getByText('v1.3.0 · 开源企业版')).toBeVisible();
   });
 });

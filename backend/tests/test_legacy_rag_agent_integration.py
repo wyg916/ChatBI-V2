@@ -31,9 +31,11 @@ from app.integration.service import AnalysisService
 from app.integration.tool_executor import ChatBIToolExecutor
 from app.core.access import Principal
 from app.core.config import get_settings
+from app.model_gateway import ModelUnavailable
 from app.models import DataSource, DataSourceColumn, DataSourceSchema, DataSourceTable, SemanticModel
 from app.query.contracts import ExecutionResult
 from app.query.executor import QueryExecutor
+from app.query.nl2sql import DeterministicTestProvider, Nl2SqlRouter
 from app.services.seed import DEMO_MODEL_NAME, seed_demo_semantic_model
 from sqlalchemy import select
 
@@ -110,6 +112,22 @@ def fake_query_execution(monkeypatch):
         )
 
     monkeypatch.setattr(QueryExecutor, "explain", explain)
+
+
+def fake_model_execution(monkeypatch):
+    """Keep integration unit tests independent from workstation provider keys."""
+
+    monkeypatch.setattr(
+        Nl2SqlRouter,
+        "__init__",
+        lambda self, provider=None, settings=None: setattr(
+            self, "provider", provider or DeterministicTestProvider()
+        ),
+    )
+    monkeypatch.setattr(
+        "app.integration.service.ModelGateway.complete",
+        lambda *args, **kwargs: (_ for _ in ()).throw(ModelUnavailable("offline unit test")),
+    )
 
 
 def test_rag_contract_requires_all_security_context_and_allowed_tool():
@@ -420,6 +438,7 @@ def test_legacy_golden_provenance_excludes_unlicensed_payloads_from_public_relea
 def test_analysis_api_data_query_never_enters_agent(client, db_session, monkeypatch):
     datasource, model = prepare_catalog(db_session)
     fake_query_execution(monkeypatch)
+    fake_model_execution(monkeypatch)
     monkeypatch.setattr(
         BoundedAgentOrchestrator,
         "run",
@@ -438,6 +457,7 @@ def test_analysis_api_data_query_never_enters_agent(client, db_session, monkeypa
 def test_complex_route_uses_v1_bounded_agents_by_default(client, db_session, monkeypatch):
     datasource, model = prepare_catalog(db_session)
     fake_query_execution(monkeypatch)
+    fake_model_execution(monkeypatch)
     monkeypatch.setattr(AnalysisService, "_rag_adapter_instance", lambda self: FakeRagAdapter())
     response = client.post("/api/v1/analysis", json={
         "question": "请综合分析收入",
@@ -526,6 +546,7 @@ def test_knowledge_rag_failure_falls_back_to_verified_query(db_session, monkeypa
 def test_agent_timeout_uses_verified_query_fallback(client, db_session, monkeypatch):
     datasource, model = prepare_catalog(db_session)
     fake_query_execution(monkeypatch)
+    fake_model_execution(monkeypatch)
 
     def timeout_result(_self, request):
         return OrchestrationResult(

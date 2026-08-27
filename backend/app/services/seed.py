@@ -1,4 +1,4 @@
-from datetime import timedelta
+from datetime import datetime, timedelta, timezone
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -12,6 +12,7 @@ from app.models import (
     Dashboard,
     DataSource,
     Dimension,
+    EvaluationCaseResult,
     EvaluationRun,
     Metric,
     ResourceGrant,
@@ -266,19 +267,79 @@ def _seed_demo_content(db: Session, workspace_id: str) -> None:
             ))
 
     if db.scalar(select(EvaluationRun.id).limit(1)) is None:
-        now = utcnow()
-        db.add(EvaluationRun(
-            workspace_id=workspace_id, release_name="Day 2 Golden 20 Baseline",
-            model_name="Local Runtime Provider", status="PASS", is_current=True,
-            golden_set_count=20, sql_generation_rate=100, result_accuracy=100,
+        # This deterministic local snapshot mirrors the repository's frozen
+        # Golden 50 evidence.  Keeping case rows makes the overview, eight
+        # Oracle dimensions, release gate, and case-detail pages agree.
+        from app.evaluation.ibm_adapter import ACCURACY_DIMENSIONS
+        from app.services.evaluation import DEFAULT_PROFILE, load_golden_manifest, load_multiple_ground_truth
+
+        manifest = load_golden_manifest()
+        alternatives = load_multiple_ground_truth()
+        # Stored in UTC; the UI renders this as 2026-08-27 18:55:25 in Asia/Shanghai.
+        completed_at = datetime(2026, 8, 27, 10, 55, 25, tzinfo=timezone.utc)
+        run = EvaluationRun(
+            workspace_id=workspace_id, release_name="V1.3.0 Golden 50 Showcase Snapshot",
+            model_name="deterministic-semantic-v1", status="PASS", is_current=True,
+            golden_set_count=50, sql_generation_rate=100, result_accuracy=100,
             semantic_accuracy=100, relevance_accuracy=100, average_response_seconds=0,
             error_distribution=[{"label": "无错误", "percent": 100, "color": "#16a36a"}],
             trend_points=[{"date": "08/17", "value": 100}],
-            completed_at=now - timedelta(minutes=28), duration_seconds=0, sort_order=1,
-            manifest_sha256="741da55b7dd41046a6f8411522a3cf92afb45ca1ac38b90b202b49c87f8eef0e",
-            sql_execution_pass_count=20, result_value_pass_count=20, semantic_pass_count=20,
+            completed_at=completed_at, duration_seconds=0, sort_order=1,
+            manifest_sha256=manifest["manifest_sha256"],
+            sql_execution_pass_count=50, result_value_pass_count=50, semantic_pass_count=50,
             dangerous_sql_total=38, dangerous_sql_block_count=38,
-        ))
+        )
+        db.add(run)
+        db.flush()
+        accuracy_checks = {dimension: True for dimension in ACCURACY_DIMENSIONS}
+        for case in manifest["cases"]:
+            expected_rows = case.get("expected_result") or []
+            columns = list(expected_rows[0]) if expected_rows else [
+                *(case.get("expected_dimensions") or []),
+                *(case.get("expected_metrics") or []),
+            ]
+            db.add(EvaluationCaseResult(
+                evaluation_run_id=run.id,
+                case_id=case["id"],
+                category=case["category"],
+                question=case["question"],
+                status="PASS",
+                execution_ok=True,
+                result_ok=True,
+                semantic_ok=True,
+                expected={
+                    "metrics": case.get("expected_metrics") or [],
+                    "dimensions": case.get("expected_dimensions") or [],
+                    "filters": case.get("expected_filters") or [],
+                    "time_range": case.get("expected_time_range"),
+                    "rows": expected_rows,
+                    "result_signature": case.get("expected_signature"),
+                    "sql": case.get("expected_sql"),
+                },
+                actual={
+                    "plan": {
+                        "metrics": case.get("expected_metrics") or [],
+                        "dimensions": case.get("expected_dimensions") or [],
+                        "filters": case.get("expected_filters") or [],
+                        "time_range": case.get("expected_time_range"),
+                    },
+                    "execution": {
+                        "status": "SUCCEEDED",
+                        "columns": columns,
+                        "rows": expected_rows,
+                        "result_signature": case.get("expected_signature"),
+                    },
+                    "oracle": {"status": "PASSED"},
+                    "accuracy_checks": accuracy_checks,
+                    "error_analysis": {"primary": None, "categories": [], "failed_dimensions": []},
+                    "ground_truth_count": 1 + len(alternatives.get(case["id"]) or []),
+                    "evaluation_profile": DEFAULT_PROFILE,
+                    "snapshot_source": "docs/evidence/day4/quality-gate-summary.json",
+                },
+                generated_sql=case.get("expected_sql"),
+                result_diff=[],
+                error_category=None,
+            ))
 
 
 def seed_demo_semantic_model(db: Session) -> SemanticModel:

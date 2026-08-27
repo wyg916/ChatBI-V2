@@ -1,5 +1,13 @@
 # Architecture Decisions
 
+## ADR-071：V1.3.0 发布后只保留本机求职 Showcase 维护面
+
+V1.3.0 的 annotated tag、peeled commit 与 GitHub Release 保持不可变；后续求职材料、启动脚本和本机演示稳定性修复只能作为 main 的 POST_RELEASE 提交，不回写 Release，不启动 V1.4、V2.0 或 Production Deployment。唯一本地可运行目录固定为 `E:\ChatBI V2 项目`，历史 worktree/clone/venv/node_modules/cache 只有在 dirty、untracked、unique commit 完成外部备份与恢复校验后才可删除。
+
+本机 Demo 继续使用 Windows PostgreSQL/MySQL 服务，不新增 Docker 数据库容器或数据库 volume。Frontend 只能通过 Backend API 读取数据；canonical Compose 只运行 Backend、RAG Runtime、Sandbox Controller/Proxy 和 Frontend，固定映射 `18080/18081/15173`。Nginx 通过 Docker DNS 动态解析 Backend，避免容器重建后缓存旧 IP；一键启动始终先验证前端代理版本接口、RAG 认证门禁和五组受保护 API 的匿名 401。
+
+Reset 是仅供本机脚本调用的显式破坏性命令，不暴露 HTTP 入口。它只接受 development、本机 Host、PostgreSQL、数据库 `chatbi_v2` 四重目标约束，重建 `public` 元数据 Schema 并保留只读 `demo_business`；演示业务日期固定为 `2026-08-17`，同时同步 PostgreSQL/MySQL Catalog，使 SQL Guard 在重置后立即拥有 2 Schema、18 表、112 字段和 24 关系的 allowlist。评测种子使用冻结 Golden 50 Evidence 的可下钻 Showcase Snapshot，八类准确率、Release Gate 与 Case Detail 必须表达同一组证据，不能用空 Case 伪造 UI PASS。
+
 ## ADR-070：复杂 Provider token 上限绑定请求 Route，失败回退复用已验证工具结果
 
 最终认证使用统一 `FINAL_REAL_PROVIDER_RECERTIFICATION` Gate 名称，因此不能再从全局 Gate 字符串推断当前模型调用是否属于 Complex/Agent。Model Gateway 在唯一网络边界把受信 `RequestContext.route` 传给测试成本控制器：`COMPLEX_ANALYSIS` 使用既有 1024-token 上限，其他路由保持 512；Provider 自报 Route 或正文不能改变该上限。这样避免合法复杂 SQLPlan 在 512 tokens 处截断并产生不必要修复调用，同时不放宽总调用、Provider、重试或预算上限。

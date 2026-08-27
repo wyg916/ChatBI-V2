@@ -111,15 +111,15 @@ FROM generate_series(1, 10) AS s(i);
 
 INSERT INTO orders
 SELECT i, ((i - 1) % 60) + 1, ((i - 1) % 5) + 1, ((i - 1) % 5) + 1,
-       current_date - 364 + ((i - 1) / 3), 1 + (i % 4),
+       date '2026-08-17' - 364 + ((i - 1) / 3), 1 + (i % 4),
        round((300 + (i % 70) * 37.5)::numeric, 2), round((210 + (i % 55) * 24.5)::numeric, 2),
        CASE WHEN i % 19 = 0 THEN 'REFUNDED' ELSE 'PAID' END
 FROM generate_series(1, 1095) AS s(i);
 
 INSERT INTO charging_sessions
 SELECT i, ((i - 1) % 10) + 1, ((i - 1) % 60) + 1,
-       (current_date - 364 + ((i - 1) / 2))::timestamp + ((i % 18) || ' hours')::interval,
-       (current_date - 364 + ((i - 1) / 2))::timestamp + (((i % 18) + 1) || ' hours')::interval,
+       (date '2026-08-17' - 364 + ((i - 1) / 2))::timestamp + ((i % 18) || ' hours')::interval,
+       (date '2026-08-17' - 364 + ((i - 1) / 2))::timestamp + (((i % 18) + 1) || ' hours')::interval,
        round((18 + (i % 45) * 1.37)::numeric, 4), 'COMPLETED'
 FROM generate_series(1, 730) AS s(i);
 
@@ -139,5 +139,5 @@ SELECT d::date, r.region_id,
        round((3200 + r.region_id * 350 + (extract(doy from d)::integer % 17) * 80)::numeric, 2),
        round((2100 + r.region_id * 230 + (extract(doy from d)::integer % 13) * 55)::numeric, 2),
        round((480 + r.region_id * 42 + (extract(doy from d)::integer % 19) * 9.5)::numeric, 4)
-FROM generate_series(current_date - 364, current_date, interval '1 day') d
+FROM generate_series(date '2026-08-17' - 364, date '2026-08-17', interval '1 day') d
 CROSS JOIN regions r;

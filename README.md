@@ -1,126 +1,136 @@
 # ChatBI V2
 
-ChatBI V2 是围绕“数据源 → Schema → 语义层 → 问数 → 可验证结果 → 图表与洞察 → 答案 → 看板 → 评测”构建的开源企业级 ChatBI 产品。V1.2.0 在完整、可验证的产品闭环、受控 Live RAG 与受限 Multi-Agent 基础上，正式发布 ChatGPT 风格 Chat-first 对话界面、真实 Streaming、停止生成、查询依据抽屉、结构化 Answer Composer 与五态结果语义；发布真实性以 annotated Tag 的 peeled SHA 和发布 Manifest 为准。
+> 面向企业数据分析的开源 ChatBI：把自然语言问题转换为受语义层约束的只读 SQL，返回可验证结果、图表、业务洞察，并沉淀为答案和看板。
 
-## 一键启动
+[![Release](https://img.shields.io/badge/release-v1.3.0-5b5bd6)](https://github.com/wyg916/ChatBI-V2/releases/tag/chatbi-v2-v1.3.0)
+[![License](https://img.shields.io/badge/license-Apache--2.0-2f855a)](LICENSE)
+[![Frontend](https://img.shields.io/badge/frontend-React%20%2B%20TypeScript-3178c6)](frontend)
+[![Backend](https://img.shields.io/badge/backend-FastAPI%20%2B%20SQLAlchemy-009688)](backend)
 
-前置条件：Windows PowerShell、Python 3.11、本机 PostgreSQL 15+、本机 MySQL 8+、Docker Desktop（仅运行 Backend/RAG Runtime/Frontend）。
+![ChatBI V2 可验证问数结果](artifacts/chat-ui-optimization-20260819/final-integration/chat-ui-result-1440x900.png)
 
-完成首次数据库初始化后，直接双击仓库根目录的 `一键启动-ChatBI-V2.cmd`。它会检查 Docker Desktop、构建并启动 Backend/RAG Runtime/Frontend、验证 PostgreSQL/MySQL 数据源，然后自动打开 <http://localhost:5173>。启动失败时窗口会保留错误提示，不会 reset、提交或修改当前 Git 工作树。
+## 这个项目解决什么问题
+
+传统 Text-to-SQL 只证明“生成了一条 SQL”，但企业问数真正关心的是：指标口径是否一致、SQL 是否只读、Join/时间/过滤是否正确、结果值是否可核验，以及答案能否继续沉淀和回归。
+
+ChatBI V2 把这条链路收敛为一个可审计闭环：
+
+```text
+数据源 → Schema Catalog → 语义模型 → 自然语言问数
+→ NL2SQL → SQLGlot Guard → 只读执行 → Result Oracle
+→ 图表与洞察 → Verified Answer → Dashboard → Golden Evaluation
+```
+
+它不是通用 AI 平台。产品边界始终围绕 ChatBI 的正确性、安全性、可验证性和业务使用闭环。
+
+## 适合在 7 个功能里看懂
+
+1. **Chat-first 登录与问数据**：登录后直接进入对话式分析，不从系统后台开始。
+2. **PostgreSQL / MySQL 数据源与 Schema**：连接测试、表字段关系与样例值同步。
+3. **轻量语义层**：Metric、Dimension、Entity、Relationship、Business Term、Synonym。
+4. **可验证自然语言问数**：Context → NL2SQL → SQL Guard → Query Executor → Result Oracle。
+5. **答案结构与查询依据**：一句话结论、KPI、ECharts、洞察、明细、追问和证据抽屉。
+6. **受控 RAG 与有限 Multi-Agent**：Workspace ACL、引用校验、固定五角色/六工具和硬预算 Trace。
+7. **答案、看板与评测闭环**：保存 Verified Answer、生成看板卡片、运行 Golden/安全回归。
+
+完整录屏顺序见 [Showcase 导航](docs/showcase/README.md)。
+
+## 启动本地求职 Demo
+
+前置条件：Windows PowerShell、Docker Desktop、本机 PostgreSQL 15+、MySQL 8+。数据库运行在本机；Docker 只运行 Backend、RAG Runtime、Sandbox Controller/Proxy 和 Frontend，不创建数据库容器或数据库 volume。
+
+首次初始化只执行一次，管理员口令仅在当前 PowerShell 进程中使用：
 
 ```powershell
 git clone https://github.com/wyg916/ChatBI-V2.git
-cd "ChatBI-V2"
+cd ChatBI-V2
 .\scripts\bootstrap-local-databases.ps1
-.\一键启动-ChatBI-V2.cmd
 ```
 
-命令行启动仍可使用 `.\scripts\start.ps1`；自动化检查可使用 `.\scripts\launch.ps1 -NoOpen`，已确认镜像无需重建时可再加 `-SkipBuild`。
-
-启动完成后访问：
-
-- 前端：<http://localhost:5173>
-- API：<http://localhost:8000/api/v1/version>
-- Swagger：<http://localhost:8000/docs>
-- 健康检查：<http://localhost:8000/health>
+之后使用根目录三个入口：
 
 ```powershell
-.\scripts\status.ps1
-.\scripts\verify.ps1
-.\scripts\stop.ps1
+.\一键启动-ChatBI-V2.cmd
+.\一键停止-ChatBI-V2.cmd
+.\一键重置-ChatBI-V2-演示数据.cmd
 ```
 
-首次初始化会安全提示输入本机 PostgreSQL/MySQL 管理员口令；口令仅用于当前进程，不写入文件。脚本在本机 PostgreSQL 创建 ChatBI 元数据库与主模拟业务 Schema，并在本机 MySQL 创建辅助兼容模拟库，同时生成 Git 忽略的项目账号配置。Compose 只运行 Backend/RAG Runtime/Frontend，数据库服务数和数据库数据卷数均为 0。
+首次启动需要构建本地镜像，耗时取决于网络和机器性能；后续启动会复用镜像缓存。
 
-仅在需要明确重建项目模拟数据时使用 `-ResetDemoData`；该开关只替换 `demo_business` / `chatbi_demo_business`，不会删除 ChatBI 元数据数据库。
+也可以使用命令行：
 
-模拟数据依据地区、客户、产品/站点、订单、收入、成本、状态和时间等真实经营关系生成，并实际写入数据库。前端通过 Backend API 调用这些数据，不直连数据库。PostgreSQL 是当前主开发/主测试路径，MySQL 用于辅助兼容验证。
+```powershell
+.\scripts\showcase.ps1 -Action Start -NoOpen
+.\scripts\showcase.ps1 -Action Status
+.\scripts\showcase.ps1 -Action Stop
+.\scripts\showcase.ps1 -Action Reset -NoOpen
+```
 
-## 工程结构
+启动后：
+
+- 浏览器：<http://127.0.0.1:15173/>
+- API：<http://127.0.0.1:18080/api/v1/version>
+- Swagger：<http://127.0.0.1:18080/docs>
+- Demo 账号：`admin@chatbi.local`
+- Demo 密码：`ChatBI-Showcase-2026!`
+
+Showcase 启动器强制使用 `deterministic / LEVEL0`，不会调用付费模型；一键重置会清空并重建本机 ChatBI 元数据、演示账号和会话，保留只读业务模拟 Schema。PostgreSQL/MySQL 种子日期冻结为 `2026-08-17`，确保录屏数字可重复。
+
+## V1.3 工程亮点
+
+- **统一模型控制平面**：MiMo、DeepSeek、Kimi 通过同一 Model Gateway 管理能力、成本、重试、熔断、回退与 Trace；Key 只存在于 Backend 本地环境。
+- **可替换语义运行时**：ChatBI 自有 Adapter 连接 Schema Linking、SemanticQuery、MDL/dry-plan、SQL Guard 和 Result Oracle。
+- **安全 SQL 边界**：只允许单条 `SELECT` / `WITH ... SELECT`，限制 Schema/Table/Column、危险函数、超时、并发、行数和估算成本。
+- **结果值验证**：Oracle 检查指标、维度、时间、过滤、Join、列集合、容差、结果签名、图表与叙述绑定，而不是比较 SQL 字符串。
+- **受控知识与编排**：RAG 使用 HMAC 身份、Workspace/角色映射、ACL、Citation/Answer Guard；Multi-Agent 固定五角色、六工具、8 步/12 次工具/30 秒预算。
+- **真实产品闭环**：会话、Streaming/取消、答案版本、看板、评测、反馈和 Verified SQL 均落在后端资源与审计边界内。
+- **开源与供应链治理**：第三方能力必须经 Adapter、路径级许可证审计、锁定版本/提交和 SBOM；不复制受限品牌或商业衍生代码。
+
+## 正式发布事实
+
+V1.3.0 的 annotated tag `chatbi-v2-v1.3.0` 固定指向：
 
 ```text
-frontend/     React + TypeScript + Vite
-backend/      FastAPI + SQLAlchemy + Alembic
-packages/     RAG、有限编排与 Prompt 的独立契约/Adapter 包
-database/     本机 PostgreSQL/MySQL 可复现模拟业务数据
-evaluation/   冻结 Golden Set 与评测资产
-scripts/      Windows 一键启动、停止、状态和验证
-docs/         产品、架构、验收、UI 与状态文档
+52db955fd67ebe592c289399a135528c13cb3e3d
 ```
 
-后端统一使用 `/api/v1`，语义层业务代码只依赖 ChatBI 自有接口。v2.1 Day 1 默认问数链为 `OpenChatBI-compatible Catalog/Schema Linking → SuperSonic-compatible SemanticQuery → Wren-compatible MDL/dry-plan/Semantic SQL → SQLGlot → QueryExecutor → ResultOracle`。三项兼容层均为仓库自有 clean-room Adapter，不复制上游内部代码；`CHATBI_SEMANTIC_RUNTIME_MODE=local` 是明确的事故回滚路径。
+[GitHub Release](https://github.com/wyg916/ChatBI-V2/releases/tag/chatbi-v2-v1.3.0) 记录了 DATA100、三 Provider、真实多模态、远端 Phase 3/4/5 和 Phase 6 审计结果。该 Release 是开源源码发布，不是生产部署认证；本 README 后续的 Showcase 文档和本地脚本属于 **POST_RELEASE** 维护提交，不移动 V1.3.0 tag。
 
-## V1 产品闭环
+## 项目结构
 
 ```text
-自然语言问题
-→ Schema Linking / QueryContext
-→ Nl2SqlRouter / SQLPlan
-→ SQLGlot AST Guard
-→ PostgreSQL/MySQL 只读执行
-→ Result Oracle
-→ 受控 ChartSpec / ECharts
-→ 证据绑定 Narrative / 推荐追问
-→ Verified Answer / AnswerVersion
-→ Dashboard Card
-→ Golden Evaluation / Case Detail
+frontend/          React + TypeScript + Vite + ECharts
+backend/           FastAPI + SQLAlchemy + Alembic + SQLGlot
+packages/          RAG、有限编排、Prompt 与上游 Adapter 契约
+database/          本机 PostgreSQL/MySQL 的可复现模拟业务数据
+evaluation/        Golden、复杂分析、文件/多模态与安全用例
+sandbox_runtime/   受限 Python/Docker 执行边界
+scripts/           初始化、Showcase、验证与发布门禁
+docs/showcase/     录屏、面试与本地演示材料
 ```
 
-V1.3 默认 `CHATBI_MODEL_PROVIDER=auto`，由统一 ModelGateway 按能力、复杂度、成本与预算在 MiMo、DeepSeek、Kimi 间选择；普通 Balanced 请求默认 MiMo，NL2SQL 默认 DeepSeek，Kimi 只在 Quality/Premium 资格或受控视觉回退时使用。离线演示可显式设置 `CHATBI_MODEL_PROVIDER=deterministic`。完整契约见 [`docs/runtime/MODEL_CONTROL_PLANE.md`](docs/runtime/MODEL_CONTROL_PLANE.md)。
+## 深入阅读
 
-```text
-CHATBI_MODEL_PROVIDER=auto
-CHATBI_MODEL_BUDGET_MODE=balanced
-CHATBI_MIMO_API_KEY=<LOCAL_SECRET_ONLY>
-CHATBI_DEEPSEEK_API_KEY=<LOCAL_SECRET_ONLY>
-CHATBI_KIMI_API_KEY=<LOCAL_SECRET_ONLY>
-```
-
-API Key 不得写入仓库。没有配置外部模型时，本地运行时仍可完成完整真实查询链路。
-
-核心 API：
-
-- `POST /api/v1/ask`
-- `GET /api/v1/queries/{id}`
-- `POST /api/v1/queries/{id}/verify`
-- `POST /api/v1/queries/{id}/feedback`
-- `POST /api/v1/queries/{id}/save`
-- `GET /api/v1/answers/{id}`
-- `POST /api/v1/answers/{id}/reuse`
-- `POST /api/v1/dashboards/{id}/cards`
-- `POST /api/v1/evaluation/runs`
-- `GET /api/v1/evaluation/cases/{case_id}`
-- `GET /api/v1/query-capabilities`
-- `POST /api/v1/analysis`
-- `POST /api/v1/analysis/stream`
-
-## V1 受控 RAG 与最小 Multi-Agent
-
-普通问数继续使用现有确定性 NL2SQL 主链路。专业知识检索通过 HMAC 签名的 Live RAG Bridge、Workspace ACL、Citation/Answer Guard；复杂分析使用固定五角色和六工具的有界编排。Agent 不持有数据源连接，数据工具仍必须经过 SQL Guard、Query Executor 和 Result Oracle。
-
-```text
-CHATBI_RAG_MODE=on
-CHATBI_AGENT_MODE=on
-CHATBI_AGENT_ALLOWED_ROUTES=COMPLEX_ANALYSIS
-CHATBI_RAG_FALLBACK_ENABLED=true
-CHATBI_AGENT_FALLBACK_ENABLED=true
-```
-
-模式仍支持 `off|shadow|canary|on` 供诊断和事故处置，但 V1 发布默认必须为 `on`。RAG 运行时和五角色编排均由当前仓库独立实现，旧项目生产源码复制数为 0；通用 Agent/RAG 平台继续禁止。详见 [`ADR-030`](docs/decisions/ADR_030_RAG_MULTIAGENT_V1_REQUIRED.md)。
+- [本地 Demo 操作手册](docs/showcase/DEMO_RUNBOOK.md)
+- [3～5 分钟视频脚本](docs/showcase/VIDEO_SCRIPT_3_TO_5_MIN.md)
+- [8～10 分钟视频脚本](docs/showcase/VIDEO_SCRIPT_8_TO_10_MIN.md)
+- [面试讲解稿](docs/showcase/INTERVIEW_TALK_TRACK.md)
+- [技术架构](docs/ARCHITECTURE.md)
+- [运行时与模型控制面](docs/runtime/MODEL_CONTROL_PLANE.md)
+- [V1.3.0 Release Notes](docs/releases/V1_3_0_RELEASE_NOTES.md)
+- [第三方声明](THIRD_PARTY_NOTICES.md)
 
 ## 本地验证
 
 ```powershell
 cd backend
 .\.venv\Scripts\python.exe -m pytest -q
-.\.venv\Scripts\python.exe scripts\run_day4_golden.py
 
 cd ..\frontend
 npm ci
 npm run typecheck
 npm test -- --run
 npm run build
-npm run e2e
 ```
 
-Golden 50 冻结清单位于 [`evaluation/golden/day4-golden-50.json`](evaluation/golden/day4-golden-50.json)。完整安装说明见 [`INSTALL.md`](INSTALL.md)，运行架构见 [`docs/ARCHITECTURE_RUNTIME.md`](docs/ARCHITECTURE_RUNTIME.md)，V1.2.0 发布说明见 [`docs/releases/V1_2_0_RELEASE_NOTES.md`](docs/releases/V1_2_0_RELEASE_NOTES.md)，许可证、SBOM 与第三方声明见 [`docs/OPEN_SOURCE_LICENSE_AUDIT.md`](docs/OPEN_SOURCE_LICENSE_AUDIT.md)、[`docs/sbom/`](docs/sbom/) 和 [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md)。
+完整发布门禁、许可证、远端 CI 和生产部署要求与求职 Demo 分离。当前维护模式只接受 Showcase 稳定性、文档和安全修复，不启动 V1.4、V2.0 或 Production Deployment。

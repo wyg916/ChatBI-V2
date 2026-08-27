@@ -22,6 +22,9 @@ def test_business_sql_execution_has_one_allowlisted_gateway() -> None:
         Path("model_gateway/test_cost_control.py"): {
             "_connect", "_schema_version", "reserve_attempt", "complete_attempt", "summary",
         },
+        # Explicitly confirmed, local-development-only DDL maintenance. This is
+        # not a business query path and preserves the read-only demo schema.
+        Path("showcase/rebuild_schema.py"): {"rebuild_local_metadata_schema"},
     }
     violations: list[str] = []
     query_executor_classes = 0

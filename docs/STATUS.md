@@ -1,5 +1,15 @@
 # 项目状态
 
+## V1.3.0 POST_RELEASE 求职 Showcase 维护模式（2026-08-27～28）
+
+- 正式发布事实保持不变：annotated tag `chatbi-v2-v1.3.0` 的 peeled commit 仍为 `52db955fd67ebe592c289399a135528c13cb3e3d`，GitHub Release 不覆盖、不重建、不移动。本节及对应脚本属于 main 上的 POST_RELEASE 维护提交，不启动 V1.4、V2.0 或 Production Deployment。
+- 唯一本地正式目录固定为 `E:\ChatBI V2 项目`；`scripts/showcase.ps1` 提供 `Start / Stop / Reset / Status`，根目录提供启动、停止、重置三个双击入口。正式端口为 Frontend `15173`、Backend `18080`、RAG `18081`，默认 deterministic / LEVEL0 / no-paid 模式。
+- Reset 只重建本机元数据库 `chatbi_v2.public` 并旋转两组公开演示账号；只读业务 Schema 不变。演示数据固定到 `2026-08-17`，PostgreSQL/MySQL `orders` 均为 1,095 行；元数据固定为 2 个数据源、18 张表、112 个字段、24 条关系、2 个语义模型、128 个答案、18 个看板、50 个可下钻 Golden Case 和 6 篇受控知识文档。
+- 浏览器现场验收已跑通：登录后默认进入六模块 Chat-first 问数据；“按地区统计订单收入”真实返回 5 行地区收入、ECharts、洞察与明细；数据源/语义模型与目录统计一致；评测中心 Golden 50、八类 Result Oracle、50/50 执行/结果/语义、38/38 危险 SQL 均显示 PASS。
+- 清理遵循先盘点、后备份、再删除：全 refs bundle、根 dirty patch/untracked ZIP、Enterprise 并发提交 bundle/WIP patch、IBM/临时 Evidence 清单均保存在 `E:\ChatBI_V2_Safety_Backup\20260827-170500-pre-showcase`。历史 worktree、重复 audit/release clone、Evidence 下 fresh clone、旧 ChatBI runtime/venv、Codex temp/tmp 缓存和 6 组旧 Uvicorn 进程均已退出运行链；正式本机数据库服务和 canonical Docker 栈保留。
+- README 与 `docs/showcase/` 已提供求职定位、演示 Runbook、3～5 分钟和 8～10 分钟视频脚本、面试讲解稿以及资源清理记录。最终 Backend 为 679 collected（672 passed、7 个条件性 skip、0 failed），Frontend Vitest 15 files / 60 tests、Vite 994 modules，Playwright 求职核心闭环 45/45；停止态启动连续 2/2，均完成 5/5 healthy、登录、代理、RAG 和匿名 401 门禁。
+- 最终本机只注册 `E:\ChatBI V2 项目` 一个 worktree、本地只保留 `main`；并发 Enterprise 最终 `656496a` 与仓库内 `tmp/phase3-edit` 均先生成可恢复外部归档并校验后清理。全仓 `node_modules/.venv/__pycache__/.pytest_cache/test-results/playwright-report` 匹配数为 0；Docker 只保留 canonical 5 容器、3 images、3 networks、0 volumes，并保持 Demo 运行态。
+
 ## V1.3.0 Phase 5 发布加固候选（2026-08-22）
 
 - 2026-08-26 `58536b5` 的 MiMo/DeepSeek NL2SQL 与 Kimi M04 均 PASS 后，P5C03 首个 MiMo SQLPlan 在固定 512 tokens 处以 `finish_reason=length` 截断，第二个修复响应正确完成 SQL Guard、EXPLAIN、Result Oracle 与冻结值匹配，但两次调用耗尽 30 秒 Agent 窗口；旧 fallback 又尝试重复 QueryPipeline，并由 `UNNECESSARY_DUPLICATE_PAID_CALL_BLOCKED` 正确阻断。该 SHA 的五条真实响应、账本、Trace、取消与清理证据完整脱敏保留。候选现按受信 `RequestContext.route` 让 `COMPLEX_ANALYSIS` 使用既有 1024-token 上限，并在 Agent 已持有完整 Guard/Oracle/签名结果时直接复用工具证据，禁止重复付费查询；必须形成新 successor，从空账本重新认证。

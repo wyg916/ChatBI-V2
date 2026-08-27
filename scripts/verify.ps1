@@ -19,6 +19,7 @@ function Get-AnonymousStatus {
 $backend = Invoke-WebRequest -UseBasicParsing -Uri "http://127.0.0.1:${backendPort}/health" -TimeoutSec 5
 $frontend = Invoke-WebRequest -UseBasicParsing -Uri "http://127.0.0.1:${frontendPort}/" -TimeoutSec 5
 $version = Invoke-RestMethod -Uri "$apiBase/version" -TimeoutSec 5
+$proxiedVersion = Invoke-RestMethod -Uri "http://127.0.0.1:${frontendPort}/api/v1/version" -TimeoutSec 5
 $rag = Invoke-RestMethod -Uri "http://127.0.0.1:${ragPort}/health" -TimeoutSec 5
 if($rag.status -ne 'ok') { throw 'Live RAG runtime is not ready' }
 
@@ -32,6 +33,7 @@ foreach ($path in $protectedPaths) {
   frontend_http = $frontend.StatusCode
   backend_http = $backend.StatusCode
   backend_version = $version.version
+  frontend_backend_proxy = if($proxiedVersion.version -eq $version.version) { 'READY' } else { 'VERSION_MISMATCH' }
   live_rag = 'HEALTHY_AUTH_REQUIRED'
   protected_api_auth = '5_OF_5_RETURN_401'
   local_metadata_postgres = 'READY'

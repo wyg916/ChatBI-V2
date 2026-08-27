@@ -122,8 +122,8 @@ def test_evaluation_overview_is_database_backed(client, db_session):
     response = client.get("/api/v1/evaluation/overview")
     assert response.status_code == 200
     payload = response.json()
-    assert payload["current"]["release_name"] == "Day 2 Golden 20 Baseline"
-    assert payload["current"]["golden_set_count"] == 20
+    assert payload["current"]["release_name"] == "V1.3.0 Golden 50 Showcase Snapshot"
+    assert payload["current"]["golden_set_count"] == 50
     assert payload["current"]["dangerous_sql_block_count"] == 38
     assert len(payload["metrics"]) == 4
     assert len(payload["comparisons"]) == 1

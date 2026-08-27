@@ -21,6 +21,15 @@ RUN pip install --no-cache-dir \
     ./packages/agent-orchestrator \
     ./packages/prompt-registry \
     && pip check
+
+# RapidOCR 3.9.2 installs the GUI OpenCV wheel. The slim runtime does not
+# provide its native GLib/XCB/OpenGL dependencies, so importing cv2 otherwise
+# fails before scanned-PDF OCR can start. Keep this stable OS layer before
+# application COPY so documentation and Python source edits retain the cache.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends libgl1 libglib2.0-0 libxcb1 \
+    && rm -rf /var/lib/apt/lists/*
+
 COPY backend/alembic.ini ./
 COPY backend/alembic ./alembic
 COPY backend/app ./app
@@ -30,13 +39,6 @@ COPY backend/scripts ./scripts
 COPY evaluation/golden/day2-golden-20.json ./evaluation/golden/day2-golden-20.json
 COPY evaluation/golden/day4-golden-50.json ./evaluation/golden/day4-golden-50.json
 COPY evaluation/golden/v2.1-multiple-ground-truth.json ./evaluation/golden/v2.1-multiple-ground-truth.json
-
-# RapidOCR 3.9.2 installs the GUI OpenCV wheel. The slim runtime does not
-# provide its native GLib/XCB/OpenGL dependencies, so importing cv2 otherwise
-# fails before scanned-PDF OCR can start.
-RUN apt-get update \
-    && apt-get install -y --no-install-recommends libgl1 libglib2.0-0 libxcb1 \
-    && rm -rf /var/lib/apt/lists/*
 
 EXPOSE 8000
 CMD ["sh", "-c", "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000 --timeout-keep-alive 30"]
