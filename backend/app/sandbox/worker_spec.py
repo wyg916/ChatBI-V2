@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+import os
+from dataclasses import dataclass, field
 from typing import Any
 
 from .contracts import SandboxLimits
@@ -8,7 +9,11 @@ from .contracts import SandboxLimits
 
 @dataclass(frozen=True)
 class DockerWorkerSpec:
-    image: str = "chatbi-sandbox-runtime:phase3"
+    image: str = field(
+        default_factory=lambda: os.environ.get(
+            "CHATBI_SANDBOX_WORKER_IMAGE", "chatbi-sandbox-runtime:phase3"
+        )
+    )
     user: str = "65532:65532"
 
     def create_kwargs(

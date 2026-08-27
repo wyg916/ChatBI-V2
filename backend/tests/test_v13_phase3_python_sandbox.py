@@ -409,13 +409,11 @@ def test_compose_backend_has_no_docker_socket_and_controller_is_private_fixed_bo
         "http://sandbox-controller:8765"
     )
     assert backend["depends_on"]["sandbox-controller"]["condition"] == "service_healthy"
-    assert controller["image"] == DockerWorkerSpec().image
+    assert controller["environment"]["CHATBI_SANDBOX_WORKER_IMAGE"] == controller["image"]
     assert "volumes" not in controller
     assert "ports" not in controller
     assert controller["user"] == "65532:65532"
-    assert controller["environment"] == {
-        "DOCKER_HOST": "tcp://sandbox-docker-proxy:2375"
-    }
+    assert controller["environment"]["DOCKER_HOST"] == "tcp://sandbox-docker-proxy:2375"
     assert controller["networks"] == ["sandbox-control", "sandbox-docker-control"]
     assert controller["depends_on"]["sandbox-docker-proxy"]["condition"] == "service_healthy"
     assert compose["networks"]["sandbox-control"]["internal"] is True
@@ -425,6 +423,7 @@ def test_compose_backend_has_no_docker_socket_and_controller_is_private_fixed_bo
     assert "no-new-privileges:true" in controller["security_opt"]
     assert "ports" not in proxy
     assert proxy["networks"] == ["sandbox-docker-control"]
+    assert proxy["environment"]["CHATBI_SANDBOX_WORKER_IMAGE"] == proxy["image"]
     assert proxy["read_only"] is True
     assert proxy["cap_drop"] == ["ALL"]
     assert "no-new-privileges:true" in proxy["security_opt"]
@@ -442,6 +441,11 @@ def test_compose_backend_has_no_docker_socket_and_controller_is_private_fixed_bo
         if "docker.sock" in json.dumps(service.get("volumes") or [])
     ]
     assert socket_services == ["sandbox-docker-proxy"]
+
+
+def test_worker_spec_uses_the_project_scoped_compose_image(monkeypatch):
+    monkeypatch.setenv("CHATBI_SANDBOX_WORKER_IMAGE", "chatbi-isolated-sandbox:test")
+    assert DockerWorkerSpec().image == "chatbi-isolated-sandbox:test"
 
 
 def test_missing_docker_fails_closed_as_unavailable():

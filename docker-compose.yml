@@ -128,6 +128,7 @@ services:
     command: ["python", "-m", "app.sandbox.controller_server"]
     environment:
       DOCKER_HOST: tcp://sandbox-docker-proxy:2375
+      CHATBI_SANDBOX_WORKER_IMAGE: ${CHATBI_SANDBOX_IMAGE:-${COMPOSE_PROJECT_NAME:-chatbi-v2}-sandbox}
     read_only: true
     tmpfs:
       - /tmp:rw,noexec,nosuid,nodev,size=8m,mode=1777
@@ -152,6 +153,8 @@ services:
     image: ${CHATBI_SANDBOX_IMAGE:-${COMPOSE_PROJECT_NAME:-chatbi-v2}-sandbox}
     user: "0:0"
     command: ["python", "/opt/chatbi/docker_control_proxy.py"]
+    environment:
+      CHATBI_SANDBOX_WORKER_IMAGE: ${CHATBI_SANDBOX_IMAGE:-${COMPOSE_PROJECT_NAME:-chatbi-v2}-sandbox}
     volumes:
       - type: bind
         source: ${CHATBI_DOCKER_SOCKET_PATH:-/var/run/docker.sock}

@@ -1,0 +1,4 @@
+# Hash-locked selected source must remain byte-identical on Windows checkouts.
+packages/pandasai-selected-runtime/src/pandasai_selected_runtime/_upstream/pandasai/sandbox/sandbox.py text eol=lf
+backend/vendor/legacy_energy_rag/**/app/knowledge/*.py text eol=lf
+backend/tests/fixtures/v13_phase5_file_db.csv text eol=lf
