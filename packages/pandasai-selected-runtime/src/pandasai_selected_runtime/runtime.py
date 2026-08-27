@@ -16,7 +16,10 @@ _PROVENANCE_FILE = _ROOT / "provenance.json"
 
 def _verified_provenance() -> dict[str, Any]:
     provenance = json.loads(_PROVENANCE_FILE.read_text(encoding="utf-8"))
-    source = _UPSTREAM_FILE.read_bytes()
+    # Git may materialize text with CRLF on Windows. The frozen provenance is
+    # bound to the canonical LF bytes, while every non-newline content change
+    # must still fail closed.
+    source = _UPSTREAM_FILE.read_bytes().replace(b"\r\n", b"\n")
     if hashlib.sha256(source).hexdigest() != provenance.get("sha256"):
         raise RuntimeError("PANDASAI_SELECTED_SOURCE_SHA256_MISMATCH")
     if len(source) != provenance.get("size_bytes"):

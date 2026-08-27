@@ -149,9 +149,14 @@ def _verify_integrity() -> dict[str, Any]:
     for item in manifest.get("files", []):
         path = SOURCE_ROOT / str(item["vendored_path"])
         try:
-            digest = hashlib.sha256(path.read_bytes()).hexdigest()
+            source_bytes = path.read_bytes()
         except OSError as exc:
             raise SelectedSourceIntegrityError(f"missing selected source: {path.name}") from exc
+        # Git may materialize a text blob with CRLF in a fresh Windows clone.
+        # The lock SHA is over the canonical LF source. Canonicalizing only CRLF
+        # preserves cross-platform integrity while every content-byte change still
+        # fails closed. Lone CR bytes are deliberately not normalized.
+        digest = hashlib.sha256(source_bytes.replace(b"\r\n", b"\n")).hexdigest()
         if digest != item.get("sha256"):
             raise SelectedSourceIntegrityError(f"selected source checksum mismatch: {path.name}")
     return manifest

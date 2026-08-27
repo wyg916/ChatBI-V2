@@ -1,55 +1,67 @@
+[CmdletBinding()]
 param(
-  [switch]$SkipBuild
+  [string]$EnvFile = '',
+  [switch]$SkipBuild,
+  [switch]$SkipBootstrap
 )
 
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'deployment\ChatBI.Deployment.ps1')
 $projectRoot = Split-Path -Parent $PSScriptRoot
+$resolvedEnv = Resolve-ChatBIEnvFile -EnvFile $EnvFile
 Set-Location -LiteralPath $projectRoot
-$backendPort = if($env:CHATBI_BACKEND_PORT) { $env:CHATBI_BACKEND_PORT } else { '8000' }
-$frontendPort = if($env:CHATBI_FRONTEND_PORT) { $env:CHATBI_FRONTEND_PORT } else { '5173' }
-$ragPort = if($env:CHATBI_RAG_PORT) { $env:CHATBI_RAG_PORT } else { '8001' }
-$backendHealth = "http://127.0.0.1:${backendPort}/health"
-$frontendHealth = "http://127.0.0.1:${frontendPort}/"
-$ragHealth = "http://127.0.0.1:${ragPort}/health"
 
-if (-not (Test-Path -LiteralPath (Join-Path $projectRoot '.env'))) {
-  $requiredEnvironment = @(
-    'CHATBI_META_PASSWORD', 'CHATBI_DATASOURCE_SECRET_KEY', 'CHATBI_RAG_SHARED_SECRET',
-    'CHATBI_BOOTSTRAP_ADMIN_PASSWORD', 'CHATBI_BOOTSTRAP_ANALYST_PASSWORD'
-  )
-  $missingEnvironment = @($requiredEnvironment | Where-Object { -not [Environment]::GetEnvironmentVariable($_, 'Process') })
-  if ($missingEnvironment.Count -gt 0) {
-    throw 'Missing local .env and required process environment. Run scripts/bootstrap-local-databases.ps1 first.'
+try {
+  if (-not $SkipBootstrap) {
+    $arguments = @('-EnvFile', $resolvedEnv)
+    if ($SkipBuild) { $arguments += '-SkipBuild' }
+    & (Join-Path $PSScriptRoot 'bootstrap.ps1') @arguments
+    if ($LASTEXITCODE -ne 0) { throw 'Bootstrap prerequisite failed' }
   }
-}
-foreach ($port in 5432, 3306) {
-  if (-not (Test-NetConnection -ComputerName '127.0.0.1' -Port $port -InformationLevel Quiet)) {
-    throw "Required local database port $port is not reachable"
+  $configuration = Assert-ChatBIConfiguration -EnvFile $resolvedEnv
+  $backendHealth = "http://127.0.0.1:$($configuration.BackendPort)/health"
+  $frontendHealth = "http://127.0.0.1:$($configuration.FrontendPort)/healthz"
+  $ragHealth = "http://127.0.0.1:$($configuration.RagPort)/health"
+
+  foreach ($probe in @(
+    @($configuration.BackendPort, $backendHealth),
+    @($configuration.FrontendPort, $frontendHealth),
+    @($configuration.RagPort, $ragHealth)
+  )) {
+    if ((Test-ChatBIPortListening -Port $probe[0]) -and -not (Test-ChatBIUrl -Uri $probe[1])) {
+      throw "Port $($probe[0]) is already used by another process. ACTION: Stop that process or change the corresponding CHATBI_*_PORT value."
+    }
   }
-}
 
-$composeArgs = @('compose', 'up', '-d')
-if (-not $SkipBuild) { $composeArgs += '--build' }
-& docker @composeArgs
-if ($LASTEXITCODE -ne 0) { throw 'docker compose up failed' }
+  $compose = Get-ChatBIComposeArguments -EnvFile $resolvedEnv -ProjectName $configuration.ProjectName
+  $up = @('up', '-d')
+  if (-not $SkipBuild) { $up += '--build' }
+  & docker @compose @up
+  if ($LASTEXITCODE -ne 0) { throw 'docker compose up failed' }
 
-$deadline = (Get-Date).AddMinutes(4)
-do {
+  if (-not (Wait-ChatBIUrl -Uri $backendHealth)) { throw "Backend health timed out: $backendHealth" }
+  if (-not (Wait-ChatBIUrl -Uri $ragHealth)) { throw "RAG health timed out: $ragHealth" }
+  if (-not (Wait-ChatBIUrl -Uri $frontendHealth)) { throw "Frontend readiness timed out: $frontendHealth" }
+  & (Join-Path $PSScriptRoot 'verify.ps1') -EnvFile $resolvedEnv
+  if ($LASTEXITCODE -ne 0) { throw 'Post-start verification failed' }
+
+  Write-Host '========================================' -ForegroundColor Green
+  Write-Host 'ChatBI V2 Ready' -ForegroundColor Green
+  Write-Host "Frontend: http://127.0.0.1:$($configuration.FrontendPort)/"
+  Write-Host "Backend: http://127.0.0.1:$($configuration.BackendPort)/"
+  Write-Host "RAG: http://127.0.0.1:$($configuration.RagPort)/"
+  Write-Host "Deployment Mode: $($configuration.DeploymentMode)"
+  Write-Host '========================================' -ForegroundColor Green
+  Write-Host 'START=PASS'
+  exit 0
+} catch {
+  Write-Host 'START=FAIL' -ForegroundColor Red
+  Write-Host $_.Exception.Message
   try {
-    $backend = Invoke-WebRequest -UseBasicParsing -Uri $backendHealth -TimeoutSec 3
-    $frontend = Invoke-WebRequest -UseBasicParsing -Uri $frontendHealth -TimeoutSec 3
-    $rag = Invoke-RestMethod -Uri $ragHealth -TimeoutSec 3
-    if ($backend.StatusCode -eq 200 -and $frontend.StatusCode -eq 200 -and $rag.status -eq 'ok') { break }
-  } catch {
-    Start-Sleep -Seconds 3
-  }
-} while ((Get-Date) -lt $deadline)
-
-if ((Get-Date) -ge $deadline) {
-  docker compose ps
-  throw 'ChatBI services did not become healthy before the deadline'
+    if ($configuration) {
+      $compose = Get-ChatBIComposeArguments -EnvFile $resolvedEnv -ProjectName $configuration.ProjectName
+      & docker @compose ps
+    }
+  } catch { }
+  exit 1
 }
-
-$seedScript = Join-Path $PSScriptRoot 'seed-demo.ps1'
-if (Test-Path -LiteralPath $seedScript) { & $seedScript }
-& (Join-Path $PSScriptRoot 'verify.ps1')

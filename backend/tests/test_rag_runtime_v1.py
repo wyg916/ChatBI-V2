@@ -6,6 +6,7 @@ import json
 import time
 from contextlib import nullcontext
 
+import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import func, select
 
@@ -29,6 +30,8 @@ from app.models import (
     Citation,
 )
 from app.rag_runtime.main import app as rag_app
+from app.rag_runtime import legacy_selected_source
+from app.rag_runtime.legacy_selected_source import SelectedSourceIntegrityError
 from app.rag_runtime.service import RuntimeIdentity, retrieve
 from app.services.runtime_seed import PROMPTS, V1_TOOLS, seed_v1_runtime
 from app.services.seed import seed_demo_semantic_model
@@ -67,6 +70,29 @@ def test_runtime_seed_uses_all_15_governance_tables(db_session):
         db_session.scalar(select(func.count()).select_from(table)) == 0
         for table in (KnowledgeRetrievalRun, Citation, OrchestrationRun, OrchestrationStep, ToolCall)
     )
+
+
+def test_selected_source_integrity_accepts_windows_crlf_and_rejects_tamper(tmp_path, monkeypatch):
+    source_root = tmp_path / "selected"
+    source_path = source_root / "app" / "knowledge" / "indexer.py"
+    source_path.parent.mkdir(parents=True)
+    canonical = b"def selected_source():\n    return 'locked'\n"
+    source_path.write_bytes(canonical.replace(b"\n", b"\r\n"))
+    lock_path = source_root / "LOCK.json"
+    lock_path.write_text(json.dumps({
+        "source_commit": legacy_selected_source.SOURCE_COMMIT,
+        "files": [{
+            "vendored_path": "app/knowledge/indexer.py",
+            "sha256": hashlib.sha256(canonical).hexdigest(),
+        }],
+    }), encoding="utf-8")
+    monkeypatch.setattr(legacy_selected_source, "SOURCE_ROOT", source_root)
+    monkeypatch.setattr(legacy_selected_source, "LOCK_PATH", lock_path)
+
+    assert legacy_selected_source._verify_integrity()["source_commit"] == legacy_selected_source.SOURCE_COMMIT
+    source_path.write_bytes(source_path.read_bytes() + b"tampered")
+    with pytest.raises(SelectedSourceIntegrityError, match="checksum mismatch"):
+        legacy_selected_source._verify_integrity()
 
 
 def test_acl_retrieval_is_workspace_bound_and_injection_free(db_session):

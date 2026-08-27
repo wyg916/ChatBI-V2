@@ -1,0 +1,285 @@
+Set-StrictMode -Version Latest
+
+$script:ChatBIProjectRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
+
+function Resolve-ChatBIEnvFile {
+  param([string]$EnvFile)
+  if ([string]::IsNullOrWhiteSpace($EnvFile)) {
+    return [IO.Path]::GetFullPath((Join-Path $script:ChatBIProjectRoot '.env'))
+  }
+  if ([IO.Path]::IsPathRooted($EnvFile)) { return [IO.Path]::GetFullPath($EnvFile) }
+  return [IO.Path]::GetFullPath((Join-Path $script:ChatBIProjectRoot $EnvFile))
+}
+
+function Read-ChatBIEnv {
+  param([Parameter(Mandatory = $true)][string]$EnvFile)
+  if (-not (Test-Path -LiteralPath $EnvFile -PathType Leaf)) {
+    throw "Environment file not found: $EnvFile`nACTION: Copy .env.example to .env and configure the required PostgreSQL connection."
+  }
+  $values = [ordered]@{}
+  $lineNumber = 0
+  foreach ($rawLine in [IO.File]::ReadAllLines($EnvFile)) {
+    $lineNumber++
+    $line = $rawLine.Trim()
+    if (-not $line -or $line.StartsWith('#')) { continue }
+    if ($line -notmatch '^([A-Za-z_][A-Za-z0-9_]*)=(.*)$') {
+      throw "Malformed environment entry at ${EnvFile}:$lineNumber`nACTION: Use NAME=value with no leading 'export'."
+    }
+    $name = $matches[1]
+    $value = $matches[2].Trim()
+    if ($value.Length -ge 2 -and (($value.StartsWith('"') -and $value.EndsWith('"')) -or ($value.StartsWith("'") -and $value.EndsWith("'")))) {
+      $value = $value.Substring(1, $value.Length - 2)
+    }
+    if ($values.Contains($name)) {
+      throw "Duplicate environment key $name at ${EnvFile}:$lineNumber`nACTION: Keep exactly one definition for each key."
+    }
+    $values[$name] = $value
+  }
+  return $values
+}
+
+function Get-ChatBIValue {
+  param(
+    [Parameter(Mandatory = $true)][System.Collections.IDictionary]$Values,
+    [Parameter(Mandatory = $true)][string]$Name,
+    [string]$Default = ''
+  )
+  $processValue = [Environment]::GetEnvironmentVariable($Name, 'Process')
+  if (-not [string]::IsNullOrWhiteSpace($processValue)) { return $processValue }
+  if ($Values.Contains($Name)) { return [string]$Values[$Name] }
+  return $Default
+}
+
+function Import-ChatBIProcessEnvironment {
+  param([Parameter(Mandatory = $true)][System.Collections.IDictionary]$Values)
+  foreach ($entry in $Values.GetEnumerator()) {
+    [Environment]::SetEnvironmentVariable([string]$entry.Key, [string]$entry.Value, 'Process')
+  }
+}
+
+function Test-ChatBIPlaceholder {
+  param([AllowEmptyString()][string]$Value)
+  if ([string]::IsNullOrWhiteSpace($Value)) { return $true }
+  return $Value -match '^(<.*>|CHANGE_ME.*|REPLACE_ME.*|GENERATED_LOCAL_.*)$'
+}
+
+function New-ChatBISecret {
+  param([int]$Bytes = 36)
+  $buffer = New-Object byte[] $Bytes
+  [Security.Cryptography.RandomNumberGenerator]::Fill($buffer)
+  return [Convert]::ToBase64String($buffer).TrimEnd('=').Replace('+', '-').Replace('/', '_')
+}
+
+function Set-ChatBIEnvValues {
+  param(
+    [Parameter(Mandatory = $true)][string]$EnvFile,
+    [Parameter(Mandatory = $true)][System.Collections.IDictionary]$Updates
+  )
+  $lines = [Collections.Generic.List[string]]::new()
+  $seen = [Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
+  foreach ($line in [IO.File]::ReadAllLines($EnvFile)) {
+    if ($line -match '^([A-Za-z_][A-Za-z0-9_]*)=') {
+      $name = $matches[1]
+      if ($Updates.Contains($name)) {
+        $lines.Add("$name=$($Updates[$name])")
+        [void]$seen.Add($name)
+        continue
+      }
+    }
+    $lines.Add($line)
+  }
+  foreach ($entry in $Updates.GetEnumerator()) {
+    if (-not $seen.Contains([string]$entry.Key)) { $lines.Add("$($entry.Key)=$($entry.Value)") }
+  }
+  $temporary = "$EnvFile.$([Guid]::NewGuid().ToString('N')).tmp"
+  [IO.File]::WriteAllText($temporary, (($lines -join [Environment]::NewLine) + [Environment]::NewLine), [Text.UTF8Encoding]::new($false))
+  Move-Item -LiteralPath $temporary -Destination $EnvFile -Force
+}
+
+function Initialize-ChatBISecrets {
+  param([Parameter(Mandatory = $true)][string]$EnvFile)
+  $values = Read-ChatBIEnv -EnvFile $EnvFile
+  $updates = [ordered]@{}
+  foreach ($name in @(
+    'CHATBI_DATASOURCE_SECRET_KEY',
+    'CHATBI_RAG_SHARED_SECRET',
+    'CHATBI_BOOTSTRAP_ADMIN_PASSWORD',
+    'CHATBI_BOOTSTRAP_ANALYST_PASSWORD'
+  )) {
+    if (Test-ChatBIPlaceholder -Value (Get-ChatBIValue -Values $values -Name $name)) {
+      $updates[$name] = New-ChatBISecret
+    }
+  }
+  if ($updates.Count -gt 0) {
+    Set-ChatBIEnvValues -EnvFile $EnvFile -Updates $updates
+    Write-Host "CONFIG_SECRETS_GENERATED=$($updates.Count)" -ForegroundColor Yellow
+    Write-Host "ACTION: Protect $EnvFile and do not commit or share it."
+  } else {
+    Write-Host 'CONFIG_SECRETS_GENERATED=0'
+  }
+}
+
+function Assert-ChatBIConfiguration {
+  param([Parameter(Mandatory = $true)][string]$EnvFile)
+  $values = Read-ChatBIEnv -EnvFile $EnvFile
+  Import-ChatBIProcessEnvironment -Values $values
+  $errors = [Collections.Generic.List[string]]::new()
+
+  $secretMinimums = [ordered]@{
+    CHATBI_DATASOURCE_SECRET_KEY = 32
+    CHATBI_RAG_SHARED_SECRET = 32
+    CHATBI_BOOTSTRAP_ADMIN_PASSWORD = 12
+    CHATBI_BOOTSTRAP_ANALYST_PASSWORD = 12
+  }
+  foreach ($entry in $secretMinimums.GetEnumerator()) {
+    $name = [string]$entry.Key
+    $secretValue = Get-ChatBIValue -Values $values -Name $name
+    if (Test-ChatBIPlaceholder -Value $secretValue) {
+      $errors.Add("$name is missing or still a placeholder")
+    } elseif ($secretValue.Length -lt [int]$entry.Value) {
+      $errors.Add("$name must contain at least $($entry.Value) characters")
+    }
+  }
+
+  $databaseUrl = Get-ChatBIValue -Values $values -Name 'CHATBI_DATABASE_URL'
+  $metaPassword = Get-ChatBIValue -Values $values -Name 'CHATBI_META_PASSWORD'
+  if (Test-ChatBIPlaceholder -Value $databaseUrl) {
+    if (Test-ChatBIPlaceholder -Value $metaPassword) {
+      $errors.Add('CHATBI_DATABASE_URL is required for enterprise deployment (or CHATBI_META_PASSWORD for the legacy local default)')
+    }
+  } elseif ($databaseUrl -notmatch '^postgresql\+psycopg://') {
+    $errors.Add('CHATBI_DATABASE_URL must use postgresql+psycopg://')
+  } elseif ($databaseUrl -match 'postgresql\+psycopg://[^/]*(localhost|127\.0\.0\.1)') {
+    $errors.Add('CHATBI_DATABASE_URL cannot use localhost from Docker; use host.docker.internal or a reachable database hostname')
+  }
+  $databaseSchema = Get-ChatBIValue -Values $values -Name 'CHATBI_DATABASE_SCHEMA'
+  if ($databaseSchema -and $databaseSchema -notmatch '^[A-Za-z_][A-Za-z0-9_]*$') {
+    $errors.Add('CHATBI_DATABASE_SCHEMA must be one unquoted PostgreSQL identifier')
+  }
+
+  $ports = [ordered]@{}
+  foreach ($entry in @(
+    @('CHATBI_FRONTEND_PORT', '5173'),
+    @('CHATBI_BACKEND_PORT', '8000'),
+    @('CHATBI_RAG_PORT', '8001')
+  )) {
+    $raw = Get-ChatBIValue -Values $values -Name $entry[0] -Default $entry[1]
+    $port = 0
+    if (-not [int]::TryParse($raw, [ref]$port) -or $port -lt 1 -or $port -gt 65535) {
+      $errors.Add("$($entry[0]) must be an integer from 1 to 65535")
+    } else { $ports[$entry[0]] = $port }
+  }
+  if (($ports.Values | Select-Object -Unique).Count -ne $ports.Count) {
+    $errors.Add('Frontend, Backend, and RAG ports must be distinct')
+  }
+
+  foreach ($name in @('CHATBI_KIMI_BASE_URL', 'CHATBI_MIMO_BASE_URL', 'CHATBI_DEEPSEEK_BASE_URL')) {
+    $value = Get-ChatBIValue -Values $values -Name $name
+    if ($value -and $value -notmatch '^https?://[^\s]+$') { $errors.Add("$name must be an absolute HTTP(S) URL") }
+  }
+
+  $demoSeed = (Get-ChatBIValue -Values $values -Name 'CHATBI_SEED_DEMO_SEMANTIC_MODEL' -Default 'false').ToLowerInvariant()
+  if ($demoSeed -notin @('true', 'false')) { $errors.Add('CHATBI_SEED_DEMO_SEMANTIC_MODEL must be true or false') }
+  if ($demoSeed -eq 'true') {
+    foreach ($name in @('CHATBI_DEMO_POSTGRES_PASSWORD', 'CHATBI_DEMO_MYSQL_PASSWORD')) {
+      if (Test-ChatBIPlaceholder -Value (Get-ChatBIValue -Values $values -Name $name)) {
+        $errors.Add("$name is required when Demo Seed is enabled")
+      }
+    }
+  }
+
+  $projectName = (Get-ChatBIValue -Values $values -Name 'COMPOSE_PROJECT_NAME' -Default 'chatbi-v2').ToLowerInvariant()
+  if ($projectName -notmatch '^[a-z0-9][a-z0-9_-]+$') {
+    $errors.Add('COMPOSE_PROJECT_NAME must contain only lowercase letters, digits, underscore, or hyphen')
+  }
+  if ($errors.Count -gt 0) {
+    throw "CONFIG_VALIDATION=FAIL`n$($errors | ForEach-Object { "- $_" } | Out-String)ACTION: Correct the environment file and rerun scripts/config.ps1."
+  }
+  return [pscustomobject]@{
+    Values = $values
+    ProjectName = $projectName
+    FrontendPort = $ports['CHATBI_FRONTEND_PORT']
+    BackendPort = $ports['CHATBI_BACKEND_PORT']
+    RagPort = $ports['CHATBI_RAG_PORT']
+    DeploymentMode = Get-ChatBIValue -Values $values -Name 'CHATBI_DEPLOYMENT_MODE' -Default 'local'
+    DatabaseUrl = $databaseUrl
+    DatabaseSchema = $databaseSchema
+    StorageRoot = Get-ChatBIValue -Values $values -Name 'CHATBI_STORAGE_ROOT' -Default './.chatbi/storage'
+    BackupRoot = Get-ChatBIValue -Values $values -Name 'CHATBI_BACKUP_ROOT' -Default './.chatbi/backups'
+    DemoSeed = ($demoSeed -eq 'true')
+  }
+}
+
+function Get-ChatBIComposeArguments {
+  param(
+    [Parameter(Mandatory = $true)][string]$EnvFile,
+    [Parameter(Mandatory = $true)][string]$ProjectName
+  )
+  return @('compose', '--env-file', $EnvFile, '--project-name', $ProjectName)
+}
+
+function Resolve-ChatBIDataPath {
+  param([Parameter(Mandatory = $true)][string]$Path)
+  if ([IO.Path]::IsPathRooted($Path)) { return [IO.Path]::GetFullPath($Path) }
+  return [IO.Path]::GetFullPath((Join-Path $script:ChatBIProjectRoot $Path))
+}
+
+function Test-ChatBIUrl {
+  param([Parameter(Mandatory = $true)][string]$Uri, [int]$TimeoutSec = 2)
+  try {
+    $response = Invoke-WebRequest -UseBasicParsing -Uri $Uri -TimeoutSec $TimeoutSec
+    return $response.StatusCode -ge 200 -and $response.StatusCode -lt 400
+  } catch { return $false }
+}
+
+function Wait-ChatBIUrl {
+  param(
+    [Parameter(Mandatory = $true)][string]$Uri,
+    [int]$TimeoutSeconds = 240,
+    [int]$IntervalSeconds = 3
+  )
+  $deadline = (Get-Date).AddSeconds($TimeoutSeconds)
+  do {
+    if (Test-ChatBIUrl -Uri $Uri -TimeoutSec 3) { return $true }
+    Start-Sleep -Seconds $IntervalSeconds
+  } while ((Get-Date) -lt $deadline)
+  return $false
+}
+
+function Test-ChatBIPortListening {
+  param([Parameter(Mandatory = $true)][int]$Port)
+  try { return $null -ne (Get-NetTCPConnection -State Listen -LocalPort $Port -ErrorAction Stop | Select-Object -First 1) }
+  catch { return $false }
+}
+
+function Get-ChatBIDatabaseEndpoint {
+  param([Parameter(Mandatory = $true)]$Configuration)
+  if ([string]::IsNullOrWhiteSpace($Configuration.DatabaseUrl)) {
+    return [pscustomobject]@{ Host = '127.0.0.1'; Port = 5432 }
+  }
+  if ($Configuration.DatabaseUrl -notmatch '^postgresql\+psycopg://(?:[^@/]+@)?([^/:?]+)(?::(\d+))?') {
+    return $null
+  }
+  $hostName = $matches[1]
+  if ($hostName -eq 'host.docker.internal') { $hostName = '127.0.0.1' }
+  $port = if ($matches[2]) { [int]$matches[2] } else { 5432 }
+  return [pscustomobject]@{ Host = $hostName; Port = $port }
+}
+
+function ConvertTo-ChatBIPgToolsUrl {
+  param([Parameter(Mandatory = $true)][string]$DatabaseUrl)
+  if ($DatabaseUrl -notmatch '^postgresql\+psycopg://') { throw 'A PostgreSQL SQLAlchemy URL is required' }
+  return $DatabaseUrl -replace '^postgresql\+psycopg://', 'postgresql://'
+}
+
+function Write-ChatBICheck {
+  param(
+    [ValidateSet('PASS', 'WARN', 'FAIL')][string]$Status,
+    [Parameter(Mandatory = $true)][string]$Name,
+    [Parameter(Mandatory = $true)][string]$Message,
+    [string]$Action = ''
+  )
+  $color = @{ PASS = 'Green'; WARN = 'Yellow'; FAIL = 'Red' }[$Status]
+  Write-Host "${Status}: $Name - $Message" -ForegroundColor $color
+  if ($Action) { Write-Host "ACTION: $Action" }
+}

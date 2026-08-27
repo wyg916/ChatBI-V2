@@ -1,13 +1,17 @@
 [CmdletBinding()]
 param(
   [switch]$NoOpen,
-  [switch]$SkipBuild
+  [switch]$SkipBuild,
+  [string]$EnvFile = ''
 )
 
 $ErrorActionPreference = 'Stop'
 $projectRoot = Split-Path -Parent $PSScriptRoot
-$frontendUrl = 'http://127.0.0.1:5173/'
-$apiDocsUrl = 'http://127.0.0.1:8000/docs'
+. (Join-Path $PSScriptRoot 'deployment\ChatBI.Deployment.ps1')
+$resolvedEnv = Resolve-ChatBIEnvFile -EnvFile $EnvFile
+$configuration = Assert-ChatBIConfiguration -EnvFile $resolvedEnv
+$frontendUrl = "http://127.0.0.1:$($configuration.FrontendPort)/"
+$apiDocsUrl = "http://127.0.0.1:$($configuration.BackendPort)/docs"
 
 function Write-Stage {
   param([string]$Message)
@@ -30,12 +34,12 @@ try {
   Write-Stage 'Starting Backend, governed RAG Runtime, and Frontend...'
   $startScript = Join-Path $PSScriptRoot 'start.ps1'
   if ($SkipBuild) {
-    & $startScript -SkipBuild
+    & $startScript -SkipBuild -EnvFile $resolvedEnv
   } else {
-    & $startScript
+    & $startScript -EnvFile $resolvedEnv
   }
 
-  $version = Invoke-RestMethod -Uri 'http://127.0.0.1:8000/api/v1/version' -TimeoutSec 5
+  $version = Invoke-RestMethod -Uri "http://127.0.0.1:$($configuration.BackendPort)/api/v1/version" -TimeoutSec 5
   $frontend = Invoke-WebRequest -UseBasicParsing -Uri $frontendUrl -TimeoutSec 5
   if ($frontend.StatusCode -ne 200) {
     throw "Frontend health check returned HTTP $($frontend.StatusCode)."

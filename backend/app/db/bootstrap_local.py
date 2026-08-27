@@ -47,6 +47,10 @@ def _project_secrets() -> dict[str, str]:
         "CHATBI_BOOTSTRAP_ADMIN_PASSWORD": values.get("CHATBI_BOOTSTRAP_ADMIN_PASSWORD") or secrets.token_urlsafe(24),
         "CHATBI_BOOTSTRAP_ANALYST_PASSWORD": values.get("CHATBI_BOOTSTRAP_ANALYST_PASSWORD") or secrets.token_urlsafe(24),
     })
+    values["CHATBI_DATABASE_URL"] = values.get("CHATBI_DATABASE_URL") or (
+        "postgresql+psycopg://chatbi_app:"
+        f"{values['CHATBI_META_PASSWORD']}@host.docker.internal:5432/chatbi_v2"
+    )
     return values
 
 
