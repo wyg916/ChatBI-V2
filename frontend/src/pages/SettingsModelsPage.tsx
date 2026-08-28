@@ -1,5 +1,6 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
+import { ApiError } from '../api/client';
 import { systemApi } from '../api/system';
 import type { ModelProviderCatalog, ModelProviderStatus, SystemInformation, WorkspaceSettings } from '../types/api';
 import { GovernanceCenterPage, type GovernanceView } from './GovernanceCenterPage';
@@ -34,13 +35,21 @@ export function SettingsModelsPage() {
   const [busy, setBusy] = useState('');
   const [notice, setNotice] = useState('');
   const [error, setError] = useState('');
+  const [permissionDenied, setPermissionDenied] = useState(false);
 
   useEffect(() => {
     let active = true;
     Promise.all([systemApi.modelProviders(), systemApi.settings()]).then(([providers, settings]) => {
       if (!active) return;
       setCatalog(providers); setSaved(settings); setDraft(structuredClone(settings));
-    }).catch((reason) => { if (active) setError(reason instanceof Error ? reason.message : '系统设置加载失败'); });
+    }).catch((reason) => {
+      if (!active) return;
+      if (reason instanceof ApiError && reason.status === 403) {
+        setPermissionDenied(true);
+        return;
+      }
+      setError(reason instanceof Error ? reason.message : '系统设置加载失败');
+    });
     return () => { active = false; };
   }, []);
 
@@ -84,6 +93,12 @@ export function SettingsModelsPage() {
   }
 
   const governanceView = searchParams.get('view');
+  if (permissionDenied) {
+    return <div className="settings-surface-page" data-testid="settings-models-page"><div className="settings-provider-state" role="alert" data-testid="permission-denied">权限不足：仅 ADMIN 可以管理系统设置与模型治理。</div></div>;
+  }
+  if (governanceView && !catalog && !error) {
+    return <div className="settings-surface-page" data-testid="settings-models-page"><div className="settings-provider-state">正在验证管理权限…</div></div>;
+  }
   if (governanceView && ['cost', 'trace', 'model', 'evaluation'].includes(governanceView)) return <GovernanceCenterPage view={governanceView as GovernanceView} />;
   const activeProvider = catalog?.items.find((provider) => provider.id === catalog.active_provider);
 

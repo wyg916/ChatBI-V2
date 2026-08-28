@@ -108,9 +108,15 @@ class ChartEngine:
         units = {item: _unit(item) for item in metrics}
         title_subject = " / ".join(field_labels.get(item, item) for item in metrics) if metrics else "明细"
         title_dimension = f"按{field_labels.get(x_field, x_field)}查看" if x_field else ""
+        question = str(plan_value.get("question") or "")
+        if x_field and metrics and any(token in question.lower() for token in ("排名", "排行", "最高", "最低", "top")):
+            contribution = "贡献" if "贡献" in question else ""
+            title = f"{field_labels.get(x_field, x_field)}{title_subject}{contribution}排名"
+        else:
+            title = f"{title_dimension}{title_subject}"
         return ChartSpec(
             chart_type=chart_type,
-            title=f"{title_dimension}{title_subject}",
+            title=title,
             x_field=x_field,
             y_fields=metrics,
             series=series,

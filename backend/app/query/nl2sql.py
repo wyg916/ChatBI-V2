@@ -18,7 +18,7 @@ from app.model_gateway.configuration import (
     resolve_provider,
 )
 from app.model_gateway.contracts import BudgetMode, ModelCapability, ModelRequest, RequestContext
-from app.model_gateway.service import ModelGateway
+from app.model_gateway.service import ModelGateway, ModelUnavailable
 from app.query.contracts import QueryContext, QueryFilter, QueryTimeRange, SQLPlan
 from app.query.nl2sql_response import (
     ProviderSQLPlanPayload,
@@ -929,23 +929,43 @@ class GatewayNl2SqlProvider(ModelProviderAdapter):
                 "canonical_output_guidance": _provider_output_contract_guidance(question, context),
             }, ensure_ascii=False)},
         )
-        response = self.gateway.execute(
-            ModelRequest(
-                capability=ModelCapability.NL2SQL, messages=messages, json_mode=True,
-                complexity_score=60, budget_mode=BudgetMode(self.settings.model_budget_mode),
-                thinking=True,
-                max_output_tokens=4096,
-            ),
-            RequestContext(
-                request_id=context.request_id, trace_id=context.trace_id,
-                conversation_id=context.conversation_id, user_id=context.user_id,
-                route=context.route,
-                workspace_id=context.workspace_id, datasource_id=context.datasource_id,
-                roles=frozenset({context.cache_role}), permission_hash=context.permission_hash,
-                question=question, context_hash=context.input_signature or "none",
-                budget_mode=BudgetMode(self.settings.model_budget_mode),
-            ),
-        )
+        try:
+            response = self.gateway.execute(
+                ModelRequest(
+                    capability=ModelCapability.NL2SQL, messages=messages, json_mode=True,
+                    complexity_score=60, budget_mode=BudgetMode(self.settings.model_budget_mode),
+                    thinking=True,
+                    max_output_tokens=4096,
+                ),
+                RequestContext(
+                    request_id=context.request_id, trace_id=context.trace_id,
+                    conversation_id=context.conversation_id, user_id=context.user_id,
+                    route=context.route,
+                    workspace_id=context.workspace_id, datasource_id=context.datasource_id,
+                    roles=frozenset({context.cache_role}), permission_hash=context.permission_hash,
+                    question=question, context_hash=context.input_signature or "none",
+                    budget_mode=BudgetMode(self.settings.model_budget_mode),
+                ),
+            )
+        except ModelUnavailable as exc:
+            # Runtime provider toggles are workspace-scoped and intentionally
+            # evaluated inside ModelGateway.  When every external provider is
+            # disabled, keep DATA_QUERY usable through the advertised local
+            # semantic runtime instead of failing the query outright.
+            if str(exc) != "No configured model provider is available":
+                raise
+            fallback = DeterministicTestProvider().plan(question=question, context=context)
+            return fallback.model_copy(update={
+                "model_trace": {
+                    **fallback.model_trace,
+                    "fallback_from": self.name,
+                    "fallback_reason": "NO_ENABLED_PROVIDER",
+                },
+                "warnings": [
+                    *fallback.warnings,
+                    "No enabled external model provider; used Local Semantic Runtime",
+                ],
+            })
         normalized = normalize_nl2sql_response_with_metadata(response.content)
         plan = normalized.plan
         model_trace = response.trace_payload()

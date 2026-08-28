@@ -45,6 +45,7 @@ export function AppShell() {
   const isDatasourceDetail = Boolean(datasourceId);
   const isEvaluationDetail = /^\/evaluation\/[^/]+$/.test(pathname);
   const isSettings = pathname.startsWith('/settings/');
+  const isAdmin = user.role === 'ADMIN';
   const headerCrumb = isSemanticEditor
     ? '语义模型 / 模型管理'
     : isDashboardDetail
@@ -86,10 +87,9 @@ export function AppShell() {
         <nav aria-label="一级导航">
           {navItems.map((item) => <NavLink key={item.to} to={item.to} end={'exact' in item && item.exact} className={({ isActive }) => isActive ? 'nav-item active' : 'nav-item'}><span>{item.icon}</span>{item.label}</NavLink>)}
         </nav>
-        <div className="nav-caption manage">管理</div>
-        <NavLink to="/settings/models" className={isSettings ? 'nav-item active' : 'nav-item'}><span>设</span>系统设置</NavLink>
+        {isAdmin && <><div className="nav-caption manage">管理</div><NavLink to="/settings/models" className={isSettings ? 'nav-item active' : 'nav-item'}><span>设</span>系统设置</NavLink></>}
         <div className="side-spacer" />
-        <div className="user-card"><NavLink to="/settings/security"><span>{user.display_name.slice(0, 1)}</span><div><strong>{user.display_name}</strong><small>{user.role} · 当前工作空间</small></div></NavLink><button type="button" aria-label="退出登录" onClick={() => void logout()}>退出</button></div>
+        <div className="user-card">{isAdmin ? <NavLink to="/settings/security"><span>{user.display_name.slice(0, 1)}</span><div><strong>{user.display_name}</strong><small>{user.role} · 当前工作空间</small></div></NavLink> : <><span>{user.display_name.slice(0, 1)}</span><div><strong>{user.display_name}</strong><small>{user.role} · 当前工作空间</small></div></>}<button type="button" aria-label="退出登录" onClick={() => void logout()}>退出</button></div>
         <small className="version">v1.3.0 · 开源企业版</small>
       </aside>
       <div className="app-frame">

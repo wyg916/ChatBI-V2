@@ -3,7 +3,9 @@ from sqlalchemy import select
 from app.api.routes import system as system_routes
 from app.core.access import Principal, get_principal
 from app.main import app
+from app.model_gateway.configuration import ResolvedProvider
 from app.models import AppUser, AuditEvent, ProviderRuntimeSetting, Workspace, WorkspaceInvitation, WorkspaceSetting
+from app.services import admin_settings
 
 
 def test_settings_are_transactional_persisted_runtime_safe_and_audited(client, db_session):
@@ -52,6 +54,28 @@ def test_provider_disable_persists_affects_readback_and_never_exposes_secrets(cl
     assert persisted is not None and persisted.enabled is False
     assert next(item for item in client.get("/api/v1/model-providers").json()["items"] if item["id"] == "mimo")["enabled"] is False
     assert db_session.scalar(select(AuditEvent).where(AuditEvent.action == "TOGGLE_MODEL")) is not None
+
+
+def test_provider_enable_persists_without_an_implicit_paid_probe(client, db_session, monkeypatch):
+    provider = ResolvedProvider(
+        provider_id="mimo",
+        display_name="Xiaomi MiMo",
+        base_url="https://example.invalid",
+        api_key="redacted-test-key",
+        model_name="mimo-test",
+    )
+    monkeypatch.setattr(admin_settings, "configured_providers", lambda _settings: {"mimo": provider})
+
+    def unexpected_probe(*_args, **_kwargs):
+        raise AssertionError("enabling a provider must not perform a paid connectivity probe")
+
+    monkeypatch.setattr(admin_settings, "test_provider", unexpected_probe)
+    response = client.patch("/api/v1/model-providers/mimo", json={"enabled": True})
+    assert response.status_code == 200
+    assert response.json()["enabled"] is True
+    persisted = db_session.scalar(select(ProviderRuntimeSetting).where(ProviderRuntimeSetting.provider_id == "mimo"))
+    assert persisted is not None and persisted.enabled is True
+    assert db_session.scalar(select(AuditEvent).where(AuditEvent.action == "TEST_MODEL")) is None
 
 
 def test_user_invitation_audit_and_workspace_isolation_controls(client, db_session):

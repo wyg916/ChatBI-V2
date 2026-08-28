@@ -21,13 +21,18 @@ export function buildControlledEChartsOption(spec: ChartSpec, execution: QueryEx
   }
   const categories = rows.map((row) => display(xField ? row[xField] : ''));
   const horizontal = spec.chart_type === 'HORIZONTAL_BAR';
+  const primaryMetricUnit = spec.unit[spec.y_fields[0]] ?? '';
   const categoryAxis = {
     type: 'category' as const,
     data: categories,
     axisLabel: { color: '#7c8aa5', width: horizontal ? 126 : 88, overflow: 'truncate' as const, interval: 0, rotate: !horizontal && rows.length > 8 ? 26 : 0 },
     axisPointer: { type: 'shadow' as const },
   };
-  const valueAxis = { type: 'value' as const, axisLabel: { color: '#7c8aa5' }, splitLine: { lineStyle: { color: '#e8ecf4' } } };
+  const valueAxis = {
+    type: 'value' as const,
+    axisLabel: { color: '#7c8aa5', formatter: (value: unknown) => `${display(value)}${primaryMetricUnit}` },
+    splitLine: { lineStyle: { color: '#e8ecf4' } },
+  };
   return {
     animationDuration: 350,
     grid: { left: horizontal ? 18 : 24, right: 30, top: 50, bottom: 58, containLabel: true },
@@ -40,6 +45,7 @@ export function buildControlledEChartsOption(spec: ChartSpec, execution: QueryEx
       type: series.type === 'line' ? 'line' : 'bar',
       data: rows.map((row) => row[series.field] == null ? null : Number(row[series.field])),
       stack: series.stack,
+      tooltip: { valueFormatter: (value: unknown) => `${display(value)}${spec.unit[series.field] ?? ''}` },
       itemStyle: { color: series.type === 'line' ? '#5b5cf6' : undefined },
       lineStyle: { color: '#5b5cf6', width: 3 },
     })),

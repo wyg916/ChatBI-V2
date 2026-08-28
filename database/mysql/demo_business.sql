@@ -70,7 +70,10 @@ SELECT n FROM seq;
 ALTER TABLE sequence_numbers ADD PRIMARY KEY (n);
 
 INSERT INTO customers
-SELECT n + 1, CONCAT('客户-', LPAD(n + 1,3,'0')), MOD(n,5)+1,
+SELECT n + 1,
+       CASE WHEN n + 1 = 9 THEN '华东新能源综合服务集团股份有限公司上海运营中心'
+            ELSE CONCAT('客户-', LPAD(n + 1,3,'0')) END,
+       MOD(n,5)+1,
        ELT(MOD(n,3)+1,'企业','个人','渠道'), DATE_ADD('2025-01-01', INTERVAL MOD((n + 1)*7,365) DAY)
 FROM sequence_numbers WHERE n < 60;
 

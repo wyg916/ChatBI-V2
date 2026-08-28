@@ -222,9 +222,10 @@ def test_provider(db: Session, principal: Principal, provider_id: str) -> Provid
 
 def set_provider_enabled(db: Session, principal: Principal, provider_id: str, enabled: bool) -> ProviderStatus:
     if enabled:
-        checked = test_provider(db, principal, provider_id)
-        if not checked.healthy:
-            raise RuntimeError(checked.health_message)
+        if provider_id not in {definition.provider_id for definition in PROVIDER_DEFINITIONS}:
+            raise ValueError("UNKNOWN_PROVIDER")
+        if provider_id not in configured_providers(get_settings()):
+            raise RuntimeError("CREDENTIAL_MISSING")
     state = db.scalar(select(ProviderRuntimeSetting).where(
         ProviderRuntimeSetting.workspace_id == principal.workspace_id,
         ProviderRuntimeSetting.provider_id == provider_id,

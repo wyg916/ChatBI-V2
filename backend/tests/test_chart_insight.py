@@ -76,6 +76,19 @@ def test_semantic_labels_drive_titles_series_and_narrative_text():
     assert any("销售收入" in item for item in narrative.insights)
 
 
+def test_ranking_question_uses_business_contribution_title():
+    case_plan = {
+        **plan("按客户统计客户收入贡献排名前20", ["revenue"], ["customer_name"]),
+        "semantic_labels": {"customer_name": "客户", "revenue": "收入"},
+    }
+    result = execution(
+        [{"customer_name": f"客户-{index:03d}", "revenue": 100 - index} for index in range(20)]
+    )
+    spec = ChartEngine().plan(query_id="q-ranking", plan=case_plan, execution=result)
+    assert spec.title == "客户收入贡献排名"
+    assert spec.chart_type == "HORIZONTAL_BAR"
+
+
 def test_chart_result_binding_detects_signature_or_query_drift():
     spec = ChartEngine().plan(query_id="q1", plan=plan(), execution=execution([{"region": "A", "revenue": 1}]))
     assert ChartEngine.binding_matches(spec, query_id="q1", result_signature="a" * 64)

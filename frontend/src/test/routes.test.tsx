@@ -41,4 +41,15 @@ describe('UI route coverage', () => {
     expect(document.querySelector('.context-pill')?.tagName).toBe('DIV');
     expect(screen.getByText('v1.3.0 · 开源企业版')).toBeVisible();
   });
+
+  it('hides every system and user-management entry from analysts', () => {
+    const router = createMemoryRouter([{ element: <AppShell/>, children: [{ path: '/', element: <div>首页</div> }] }], { initialEntries: ['/'] });
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(<AuthContext.Provider value={{ user: { id: 'u2', workspace_id: 'w1', email: 'analyst@chatbi.local', display_name: 'Analyst', role: 'ANALYST' }, logout: async () => {} }}><QueryClientProvider client={queryClient}><RouterProvider router={router}/></QueryClientProvider></AuthContext.Provider>);
+
+    expect(screen.queryByRole('link', { name: /系统设置/ })).not.toBeInTheDocument();
+    expect(document.querySelector('a[href="/settings/models"]')).toBeNull();
+    expect(document.querySelector('a[href="/settings/security"]')).toBeNull();
+    expect(screen.getByText('ANALYST · 当前工作空间')).toBeVisible();
+  });
 });

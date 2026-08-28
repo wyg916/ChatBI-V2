@@ -18,11 +18,13 @@ from app.query.contracts import (
 )
 from app.query.nl2sql import (
     DeterministicTestProvider,
+    GatewayNl2SqlProvider,
     Nl2SqlRouter,
     OpenAICompatibleProvider,
     _provider_output_contract_guidance,
     model_provider_catalog,
 )
+from app.model_gateway.service import ModelUnavailable
 from app.query.oracle import ResultOracle
 from app.query.sql_guard import SqlGuard
 
@@ -429,6 +431,25 @@ def test_provider_catalog_reports_configuration_without_exposing_secrets():
     assert {item["id"] for item in catalog["items"]} >= {"kimi", "mimo", "deepseek", "deterministic"}
     assert all(item["configured"] for item in catalog["items"] if item["id"] in {"kimi", "mimo", "deepseek"})
     assert "catalog-secret" not in serialized
+
+
+def test_gateway_uses_local_semantic_runtime_when_all_external_providers_are_disabled(monkeypatch):
+    provider = GatewayNl2SqlProvider(Settings(
+        _env_file=None,
+        model_provider="auto",
+        mimo_api_key="configured-but-runtime-disabled",
+    ))
+
+    def no_enabled_provider(*_args, **_kwargs):
+        raise ModelUnavailable("No configured model provider is available")
+
+    monkeypatch.setattr(provider.gateway, "execute", no_enabled_provider)
+    plan = provider.generate(question="按地区统计收入", context=semantic_context())
+
+    assert plan.provider == "deterministic-semantic-v1"
+    assert plan.model_trace["fallback_from"] == "model-gateway"
+    assert plan.model_trace["fallback_reason"] == "NO_ENABLED_PROVIDER"
+    assert any("Local Semantic Runtime" in warning for warning in plan.warnings)
 
 
 def test_result_oracle_compares_values_not_sql_text():

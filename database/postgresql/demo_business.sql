@@ -99,7 +99,10 @@ INSERT INTO products VALUES
   (5, '运维服务包', '服务', 3600, 1200);
 
 INSERT INTO customers
-SELECT i, '客户-' || lpad(i::text, 3, '0'), ((i - 1) % 5) + 1,
+SELECT i,
+       CASE WHEN i = 9 THEN '华东新能源综合服务集团股份有限公司上海运营中心'
+            ELSE '客户-' || lpad(i::text, 3, '0') END,
+       ((i - 1) % 5) + 1,
        (ARRAY['企业','个人','渠道'])[((i - 1) % 3) + 1],
        date '2025-01-01' + ((i * 7) % 365)
 FROM generate_series(1, 60) AS s(i);

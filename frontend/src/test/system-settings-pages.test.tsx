@@ -96,5 +96,18 @@ describe('系统设置高保真页面', () => {
     vi.spyOn(securityApi, 'overview').mockRejectedValue(new ApiError(403, 'Permission denied: audit.read'));
     render(<MemoryRouter><SecurityAuditPage /></MemoryRouter>);
     expect(await screen.findByTestId('permission-denied')).toHaveTextContent('仅 ADMIN');
+    expect(screen.queryByRole('button', { name: '＋ 邀请成员' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('tab', { name: '角色' })).not.toBeInTheDocument();
+  });
+
+  it('模型设置直达 403 后只保留权限不足状态', async () => {
+    vi.spyOn(systemApi, 'modelProviders').mockRejectedValue(new ApiError(403, 'Permission denied: settings.manage'));
+    vi.spyOn(systemApi, 'settings').mockRejectedValue(new ApiError(403, 'Permission denied: settings.manage'));
+    render(<MemoryRouter initialEntries={['/settings/models']}><SettingsModelsPage /></MemoryRouter>);
+
+    expect(await screen.findByTestId('permission-denied')).toHaveTextContent('仅 ADMIN');
+    expect(screen.queryByRole('button', { name: '保存全部设置' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '模型治理' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('navigation', { name: '系统设置分区' })).not.toBeInTheDocument();
   });
 });

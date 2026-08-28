@@ -229,3 +229,11 @@
 - MiMo、DeepSeek、Kimi 已各完成一次生产 `ModelGateway` 实调，3 次 transport attempt、无 retry/fallback、合计估算成本 CNY `0.0005425`，持久化调用账本未包含密钥或认证头。
 - 当前状态为 `PARTIAL_BLOCKED_C_DATABASE_PROVISIONING`：应用角色无建库权限，独立数据库不存在；为保护 Track A，未对共享数据库启动 Compose。因此 2 次启停、浏览器全控件、RBAC 与持久化验收均未执行，远端未推送。
 - 详细证据与恢复条件见 `docs/status/V1_3_1_FUNCTIONAL_EXPERIENCE_CLOSURE_STATUS.md`（ADR-076）。
+
+## 2026-08-28：V1.3.1 C 线数据库解阻与最终候选前收口
+
+- 已以独立本机 PostgreSQL 数据库 `chatbi_v131_functional` 解阻；owner 为 `chatbi_app`，应用角色继续保持 `CREATEDB=false`、`SUPERUSER=false`，未新增 Docker 数据库服务或卷。
+- Cycle 1 已完成真实 Chat、设置持久化、Admin/Analyst RBAC、角色切换、停用/启用、邀请创建/复制/重启读回/撤销、审计、成员移除、最后管理员保护和完整停止；Track A 全程保持 healthy。
+- Cycle 2 已从空 schema 正式迁移到唯一 head `20260828_0013`，并由正式 seed 重建 9 张业务表、1,095 条订单和 1,825 条日 KPI。
+- 浏览器发现并最小修复：全外部 Provider 关闭时 DATA_QUERY 走 Local Semantic Runtime；Provider 开关不再隐式产生付费探测；排名图表业务化标题、金额单位与长名称展示；Analyst 管理入口/直达 URL 前端 fail-closed。
+- 最终 forward commit 之后才执行同 SHA 全回归、三 Provider 各一次显式连接测试、最终 UI 控件清单与 SHA-256 manifest；这些自引用证据只写入仓库外 `E:/ChatBI_V2_Evidence/PostRelease/Functional_Experience_Closure/`。
