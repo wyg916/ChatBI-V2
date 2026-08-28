@@ -414,6 +414,7 @@ class ModelGateway:
         requested_alias: str | None = None,
         premium_triggers: frozenset[str] | None = None,
         cancellation_event: Event | None = None,
+        max_output_tokens: int | None = None,
     ) -> ModelReply:
         messages: list[dict[str, Any]] = [{"role": "system", "content": system}, *(history or [])]
         if image_data_urls:
@@ -437,6 +438,7 @@ class ModelGateway:
             reasoning_effort="high" if complexity_score >= 80 else "medium",
             image_count=len(image_data_urls or ()),
             premium_triggers=frozenset(governed_triggers),
+            max_output_tokens=max_output_tokens,
         )
         result = self.execute(request, context or self._default_context(user), cancellation_event=cancellation_event)
         return ModelReply(
@@ -727,7 +729,7 @@ class ModelGateway:
         reply = self.complete(
             system="Return OK only.", user="health probe", requested_alias=provider,
             complexity_score=0, budget_mode=BudgetMode.ECONOMY,
-            context=context,
+            context=context, max_output_tokens=8,
         )
         return {"provider": reply.provider, "model": reply.model, "status": "PASS"}
 

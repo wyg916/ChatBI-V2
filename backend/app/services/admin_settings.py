@@ -192,7 +192,14 @@ def test_provider(db: Session, principal: Principal, provider_id: str) -> Provid
         ProviderRuntimeSetting.provider_id == provider_id,
     ))
     if state is None:
-        state = ProviderRuntimeSetting(workspace_id=principal.workspace_id, provider_id=provider_id)
+        # A connectivity check is observational.  On the first check preserve
+        # the catalog's configured-by-default routing state instead of letting
+        # the model default (False) silently disable the provider.
+        state = ProviderRuntimeSetting(
+            workspace_id=principal.workspace_id,
+            provider_id=provider_id,
+            enabled=True,
+        )
         db.add(state)
     now = datetime.now(timezone.utc)
     try:

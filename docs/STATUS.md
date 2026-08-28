@@ -236,4 +236,5 @@
 - Cycle 1 已完成真实 Chat、设置持久化、Admin/Analyst RBAC、角色切换、停用/启用、邀请创建/复制/重启读回/撤销、审计、成员移除、最后管理员保护和完整停止；Track A 全程保持 healthy。
 - Cycle 2 已从空 schema 正式迁移到唯一 head `20260828_0013`，并由正式 seed 重建 9 张业务表、1,095 条订单和 1,825 条日 KPI。
 - 浏览器发现并最小修复：全外部 Provider 关闭时 DATA_QUERY 走 Local Semantic Runtime；Provider 开关不再隐式产生付费探测；排名图表业务化标题、金额单位与长名称展示；Analyst 管理入口/直达 URL 前端 fail-closed。
+- 第二轮最终浏览器又发现并修复：首次显式连接测试不得把已配置 Provider 的默认启用态反转为禁用；三家健康探针统一限制为 8 个输出 Token，Kimi 不再因普通 2,048 Token 请求预算而在实际连接前被误拒绝。
 - 最终 forward commit 之后才执行同 SHA 全回归、三 Provider 各一次显式连接测试、最终 UI 控件清单与 SHA-256 manifest；这些自引用证据只写入仓库外 `E:/ChatBI_V2_Evidence/PostRelease/Functional_Experience_Closure/`。

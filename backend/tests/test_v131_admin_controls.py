@@ -78,6 +78,57 @@ def test_provider_enable_persists_without_an_implicit_paid_probe(client, db_sess
     assert db_session.scalar(select(AuditEvent).where(AuditEvent.action == "TEST_MODEL")) is None
 
 
+def test_first_provider_check_preserves_configured_default_enabled_state(client, db_session, monkeypatch):
+    provider = ResolvedProvider(
+        provider_id="mimo",
+        display_name="Xiaomi MiMo",
+        base_url="https://example.invalid",
+        api_key="redacted-test-key",
+        model_name="mimo-test",
+    )
+    monkeypatch.setattr(admin_settings, "configured_providers", lambda _settings: {"mimo": provider})
+    monkeypatch.setattr(admin_settings.ModelGateway, "probe", lambda *_args, **_kwargs: {
+        "provider": "mimo", "model": "mimo-test", "status": "PASS",
+    })
+
+    response = client.post("/api/v1/model-providers/mimo/test")
+
+    assert response.status_code == 200
+    assert response.json()["enabled"] is True
+    persisted = db_session.scalar(select(ProviderRuntimeSetting).where(ProviderRuntimeSetting.provider_id == "mimo"))
+    assert persisted is not None and persisted.enabled is True
+    assert persisted.healthy is True
+
+
+def test_provider_check_preserves_an_existing_disabled_state(client, db_session, monkeypatch):
+    provider = ResolvedProvider(
+        provider_id="mimo",
+        display_name="Xiaomi MiMo",
+        base_url="https://example.invalid",
+        api_key="redacted-test-key",
+        model_name="mimo-test",
+    )
+    workspace = db_session.scalar(select(Workspace))
+    db_session.add(ProviderRuntimeSetting(
+        workspace_id=workspace.id,
+        provider_id="mimo",
+        enabled=False,
+    ))
+    db_session.commit()
+    monkeypatch.setattr(admin_settings, "configured_providers", lambda _settings: {"mimo": provider})
+    monkeypatch.setattr(admin_settings.ModelGateway, "probe", lambda *_args, **_kwargs: {
+        "provider": "mimo", "model": "mimo-test", "status": "PASS",
+    })
+
+    response = client.post("/api/v1/model-providers/mimo/test")
+
+    assert response.status_code == 200
+    assert response.json()["enabled"] is False
+    persisted = db_session.scalar(select(ProviderRuntimeSetting).where(ProviderRuntimeSetting.provider_id == "mimo"))
+    assert persisted is not None and persisted.enabled is False
+    assert persisted.healthy is True
+
+
 def test_user_invitation_audit_and_workspace_isolation_controls(client, db_session):
     workspace = db_session.scalar(select(Workspace))
     admin = db_session.scalar(select(AppUser).where(AppUser.role == "ADMIN"))

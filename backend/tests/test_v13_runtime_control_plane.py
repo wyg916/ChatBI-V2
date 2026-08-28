@@ -217,6 +217,28 @@ def test_quality_premium_trigger_selects_kimi_once():
     assert len(calls) == 1
 
 
+def test_kimi_health_probe_uses_a_bounded_output_budget():
+    payloads = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        payloads.append(json.loads(request.content))
+        return httpx.Response(200, json={
+            "model": "kimi-k2.6",
+            "choices": [{"finish_reason": "stop", "message": {"content": "OK"}}],
+            "usage": {"prompt_tokens": 8, "completion_tokens": 1, "total_tokens": 9},
+        })
+
+    gateway = ModelGateway(Settings(
+        _env_file=None, mimo_api_key="", deepseek_api_key="", kimi_api_key="unit-test-only",
+    ), transport=httpx.MockTransport(handler))
+
+    result = gateway.probe("kimi", context=_context())
+
+    assert result == {"provider": "kimi", "model": "kimi-k2.6", "status": "PASS"}
+    assert len(payloads) == 1
+    assert payloads[0]["max_completion_tokens"] == 8
+
+
 def test_kimi_hard_budget_never_retries_within_one_request():
     calls = []
 

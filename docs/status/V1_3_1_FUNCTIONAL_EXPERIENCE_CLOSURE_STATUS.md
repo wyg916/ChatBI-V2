@@ -21,6 +21,7 @@
 
 - When every external provider is disabled, `DATA_QUERY` now uses the advertised Local Semantic Runtime instead of failing with `No configured model provider is available`; unrelated gateway failures remain fail-closed.
 - Provider enable/disable is now a persistence-only control. A paid network probe occurs only through the explicit `测试连接` action, preventing duplicate charges and keeping test-cost behavior observable.
+- A first explicit connection check preserves the configured Provider's enabled state instead of creating a disabled runtime row. Health probes cap output at eight tokens, so Kimi is checked within the economy safety budget rather than being rejected before network dispatch.
 - Ranking charts use business labels such as `客户收入贡献排名`. Value-axis labels and series tooltips include thousands separators and semantic units, while long category values remain intact for tooltip access and are truncated only on the axis.
 - Analyst navigation hides system/user-management entry points. A direct settings URL that receives Backend 403 renders only a permission-denied state and no management controls.
 
