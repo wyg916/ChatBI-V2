@@ -1,6 +1,6 @@
 {
   "schema_version": "chatbi-v1.3-phase5-supply-policy-v1",
-  "project_version": "1.3.0",
+  "project_version": "1.3.1",
   "source_date_epoch": 1787397616,
   "allowed_license_ids": [
     "0BSD",

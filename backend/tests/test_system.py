@@ -8,6 +8,7 @@ def test_version_and_openapi(client):
     version = client.get("/api/v1/version")
     assert version.status_code == 200
     assert version.json()["name"] == "ChatBI V2"
+    assert version.json()["version"] == "1.3.1"
     assert client.get("/openapi.json").status_code == 200
 
 

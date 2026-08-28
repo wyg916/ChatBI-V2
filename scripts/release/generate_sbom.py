@@ -21,7 +21,7 @@ from urllib.parse import quote
 
 ROOT = Path(__file__).resolve().parents[2]
 PROJECT_NAME = "ChatBI V2"
-PROJECT_VERSION = "1.3.0"
+PROJECT_VERSION = "1.3.1"
 PROJECT_LICENSE = "Apache-2.0"
 
 

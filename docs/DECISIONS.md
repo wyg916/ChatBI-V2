@@ -1,5 +1,11 @@
 # Architecture Decisions
 
+## ADR-093：正式发布身份必须形成单一 Successor 并重新绑定 Exact-SHA Provider 证据
+
+V1.3.1 已认证 Integration Candidate 如果仍在后端 `/version`、前端壳层、Showcase runtime identity、SBOM 或公开 README 中显示 `1.3.0`/`candidate`，不得直接晋升 main、Tag 或 GitHub Release。只允许创建一个不改变业务行为的版本身份 successor，统一当前产品版本、发布元数据、必要文档和版本契约；V1.3.0 Tag/SHA、Phase 文档、Golden Snapshot、旧 migration head 与第三方组件版本等历史事实必须原样保留。
+
+Successor 是新的发布 SHA，因此必须重新执行版本、Backend/Frontend affected、TypeScript、production build、System Information、Showcase 与 Enterprise Doctor smoke，并在 tracked files 冻结后通过唯一 Model Gateway 对 MiMo、DeepSeek、Kimi 各执行一次。旧候选的付费证据不能冒充 successor 证据。最终发布只允许 `main` fast-forward、annotated Tag 和 normal non-force push；包含自身 SHA、Tag object、GitHub Release ID/URL 与时间戳的 Final Release Manifest 保持仓库外生成，避免 Git 自引用。
+
 ## ADR-092：V1.3.1 候选以双父受控合并统一三种运行模式
 
 V1.3.1 Integration Candidate 必须从 C 线 Exact SHA `fbb42a48568985808dbbc12d07728abcb59febc9` 创建独立 worktree，再以 `--no-ff` 合并 B 线 Exact SHA `656496a470404390d0324b8cdddd4666e4423b6c`；A/main、V1.3.0 正式基线、B 与 C 的既有提交均必须保持祖先关系。候选不 rebase、不 squash、不 force push，也不修改 main、Tag 或 Release。

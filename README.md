@@ -2,7 +2,7 @@
 
 > 面向企业数据分析的开源 ChatBI / NL2SQL 产品，支持本地部署、私有化部署、Enterprise PoC 与二次开发；把自然语言问题转换为受语义层约束的只读 SQL，并返回可验证结果、图表、业务洞察与审计证据。
 
-[![Release](https://img.shields.io/badge/release-v1.3.0-5b5bd6)](https://github.com/wyg916/ChatBI-V2/releases/tag/chatbi-v2-v1.3.0)
+[![Release](https://img.shields.io/badge/release-v1.3.1-5b5bd6)](https://github.com/wyg916/ChatBI-V2/releases/tag/chatbi-v2-v1.3.1)
 [![License](https://img.shields.io/badge/license-Apache--2.0-2f855a)](LICENSE)
 [![Frontend](https://img.shields.io/badge/frontend-React%20%2B%20TypeScript-3178c6)](frontend)
 [![Backend](https://img.shields.io/badge/backend-FastAPI%20%2B%20SQLAlchemy-009688)](backend)
@@ -180,7 +180,7 @@ FastAPI ── Auth / Workspace / RBAC / Audit
 
 ## 发布事实与限制
 
-正式发布基线仍是 annotated tag `chatbi-v2-v1.3.0`，peeled SHA 为 `52db955fd67ebe592c289399a135528c13cb3e3d`；[GitHub Release](https://github.com/wyg916/ChatBI-V2/releases/tag/chatbi-v2-v1.3.0) 不移动、不覆盖。V1.3.1 是后续候选版本，只有负责人最终授权后才能合并 main、创建 Tag 或发布 Release。
+当前正式开源 Source Release 为 [ChatBI V2 v1.3.1](https://github.com/wyg916/ChatBI-V2/releases/tag/chatbi-v2-v1.3.1)，对应 annotated tag `chatbi-v2-v1.3.1`。历史 `chatbi-v2-v1.3.0` 继续固定在 peeled SHA `52db955fd67ebe592c289399a135528c13cb3e3d`，不移动、不覆盖。V1.3.1 支持本地部署、Enterprise PoC、私有部署验证与二次开发，但不构成生产部署认证；详见 [V1.3.1 Release Notes](docs/releases/V1_3_1_RELEASE_NOTES.md)。
 
 当前支持本地部署、文档化私有部署、Enterprise PoC 和二次开发，但不宣称生产认证。Kubernetes、Helm、HA PostgreSQL、多节点灾备、生产 Key 轮换、不可变生产 OCI 签名、生产监控与正式 SLA 仍属于未来工作。
 

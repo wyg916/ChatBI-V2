@@ -402,7 +402,7 @@ def test_deterministic_sbom_and_license_gate(sbom, gate, tmp_path):
     assert check["failures"] == []
     assert check["component_count"] > 100
     cyclonedx = json.loads(first[0])
-    assert cyclonedx["metadata"]["component"]["version"] == "1.3.0"
+    assert cyclonedx["metadata"]["component"]["version"] == "1.3.1"
     assert first[2]["unknown_or_denied_license_count"] == 0
 
 

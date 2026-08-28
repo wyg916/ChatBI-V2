@@ -87,6 +87,26 @@ def test_candidate_migration_and_backup_contracts_are_version_aware():
     assert "RESTORED_METADATA=SETTINGS_PROVIDER_INVITATION_RBAC_WORKSPACE_PERSISTENCE_PASS" in restore
 
 
+def test_current_product_release_identity_is_v131_and_v130_history_remains_immutable():
+    backend_config = _read("backend/app/core/config.py")
+    app_shell = _read("frontend/src/components/AppShell.tsx")
+    showcase = _read("scripts/showcase.ps1")
+    release_sbom = _read("scripts/release/generate_sbom.py")
+    supply_policy = _read("supply-chain/v1.3-phase5-policy.json")
+    readme = _read("README.md")
+
+    assert 'app_version: str = "1.3.1"' in backend_config
+    assert "v1.3.1 · 开源企业版" in app_shell
+    assert "$env:CHATBI_RELEASE_VERSION = 'v1.3.1'" in showcase
+    assert "v1.3.1-candidate" not in showcase
+    assert 'PROJECT_VERSION = "1.3.1"' in release_sbom
+    assert '"project_version": "1.3.1"' in supply_policy
+    assert "release-v1.3.1" in readme
+    assert "chatbi-v2-v1.3.1" in readme
+    assert "chatbi-v2-v1.3.0" in readme
+    assert "52db955fd67ebe592c289399a135528c13cb3e3d" in readme
+
+
 def test_architecture_decision_ids_and_references_are_unambiguous():
     decisions = _read("docs/DECISIONS.md")
     ids = re.findall(r"^## ADR-(\d+)\b", decisions, re.MULTILINE)

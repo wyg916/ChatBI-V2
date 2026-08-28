@@ -1,5 +1,11 @@
 # 项目状态
 
+## 2026-08-29：V1.3.1 最终发布身份 Successor
+
+- 本轮属于 P0 发布身份与正式发布收口，不新增功能、页面、API、Migration、Agent、RAG、NL2SQL、部署能力或 UI 优化。对已认证候选 `51f130df635e2199208952333ed184191a96091a` 的发布前只读审计发现后端默认版本、前端壳层、Showcase release identity 与 SBOM 元数据仍含 `1.3.0`/`candidate` 当前身份，因此禁止直接发布原候选。
+- 唯一 successor 只统一当前产品身份为 V1.3.1，更新公开 README、Release Notes、Rollback、SBOM 元数据和版本契约测试；历史 V1.3.0 Tag/SHA、Phase 文档、Golden Snapshot、workflow 分支名、迁移 `0012` 与依赖组件版本保持不变。
+- Successor 必须重新完成版本/Backend/Frontend/TypeScript/build/System Information/Showcase/Enterprise Doctor 门禁，并在冻结新 SHA 后通过唯一 Model Gateway 对 MiMo、DeepSeek、Kimi 各执行一次受控 live smoke。全部通过前不得晋升 main、创建 Tag 或 GitHub Release。
+
 ## 2026-08-28：V1.3.1 A/B/C 受控整合候选
 
 - 本轮属于 P0 的发布候选整合与验证，不新增 P2 范围。候选从 C `fbb42a48568985808dbbc12d07728abcb59febc9` 建立，以 `--no-ff --no-commit` 合入 B `656496a470404390d0324b8cdddd4666e4423b6c`；正式 merge commit 为 `9d2dbef8841cfbfab22fb685e58163612e85debe`，A `8f0326b59759e2549e7f684f0a3e40e3b6faffdf` 与 V1.3.0 release `52db955fd67ebe592c289399a135528c13cb3e3d` 均保持祖先关系。main、Tag、Release 均未修改。

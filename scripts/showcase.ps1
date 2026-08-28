@@ -69,7 +69,7 @@ function Set-ShowcaseEnvironment {
   $env:CHATBI_STORAGE_ROOT = './.chatbi/showcase-storage'
   $env:CHATBI_BACKUP_ROOT = './.chatbi/showcase-backups'
   $env:CHATBI_GIT_SHA = (& git -C $projectRoot rev-parse HEAD).Trim()
-  $env:CHATBI_RELEASE_VERSION = 'v1.3.1-candidate'
+  $env:CHATBI_RELEASE_VERSION = 'v1.3.1'
   $env:CHATBI_FRONTEND_BUILD = 'production'
   if ([string]::IsNullOrWhiteSpace($env:CHATBI_SHOWCASE_DATABASE_NAME)) {
     $env:CHATBI_SHOWCASE_DATABASE_NAME = 'chatbi_v2'
