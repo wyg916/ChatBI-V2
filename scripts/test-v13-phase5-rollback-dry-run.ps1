@@ -4,7 +4,9 @@ param(
   [string]$CandidateSha = '',
   [string]$RollbackSha = '89bdc12936be0555bdad8a85f06932fb7dc476ee',
   [string]$SourceEnv = '',
-  [string]$Python = ''
+  [string]$Python = '',
+  [string]$CandidateMigrationHead = '20260828_0013',
+  [string]$RollbackMigrationHead = '20260822_0012'
 )
 
 $ErrorActionPreference = 'Stop'
@@ -240,10 +242,10 @@ try {
   $activeRoot = $candidateRoot
   Start-IsolatedVersion -Root $candidateRoot -Project $candidateProject -BackendPort $candidateBackendPort -FrontendPort $candidateFrontendPort -RagPort $candidateRagPort
   $result.candidate_start = 'PASS_5_SERVICE_HEALTH'
-  $candidateImage = (& docker image inspect --format '{{.Id}}' chatbi-v2-backend:latest).Trim()
+  $candidateImage = (& docker compose --project-directory $candidateRoot -f (Join-Path $candidateRoot 'docker-compose.yml') -p $candidateProject images -q backend | Select-Object -First 1).Trim()
   $candidateMigration = (& docker compose --project-directory $candidateRoot -f (Join-Path $candidateRoot 'docker-compose.yml') -p $candidateProject exec -T backend alembic current | Out-String).Trim()
-  if($candidateMigration -notmatch '20260822_0012') { throw 'Candidate migration head mismatch' }
-  $result.candidate_migration = '20260822_0012'
+  if($candidateMigration -notmatch [regex]::Escape($CandidateMigrationHead)) { throw 'Candidate migration head mismatch' }
+  $result.candidate_migration = $CandidateMigrationHead
   $candidateFingerprint = Invoke-ApiFingerprint -BackendPort $candidateBackendPort
   $result.candidate_api_smoke = 'PASS_AUTHENTICATED_DASHBOARD_READBACK'
   Invoke-BrowserSmoke -BackendPort $candidateBackendPort -FrontendPort $candidateFrontendPort
@@ -254,17 +256,22 @@ try {
   $result.rollback_stop = 'PASS'
   $activeProject = ''
   $activeRoot = ''
-  $result.migration_rollback = 'NOT_APPLICABLE_SAME_HEAD_20260822_0012'
+  $result.stage = 'MIGRATION_DOWNGRADE'
+  & docker compose --project-directory $candidateRoot -f (Join-Path $candidateRoot 'docker-compose.yml') -p $candidateProject run --rm --no-deps backend alembic downgrade $RollbackMigrationHead
+  if($LASTEXITCODE -ne 0) { throw "Candidate migration downgrade to $RollbackMigrationHead failed" }
+  $downgradedMigration = (& docker compose --project-directory $candidateRoot -f (Join-Path $candidateRoot 'docker-compose.yml') -p $candidateProject run --rm --no-deps backend alembic current | Out-String).Trim()
+  if($downgradedMigration -notmatch [regex]::Escape($RollbackMigrationHead)) { throw 'Downgraded migration head mismatch' }
+  $result.migration_rollback = "PASS_${CandidateMigrationHead}_TO_${RollbackMigrationHead}"
 
   $result.stage = 'ROLLBACK_START'
   $activeProject = $rollbackProject
   $activeRoot = $rollbackRoot
   Start-IsolatedVersion -Root $rollbackRoot -Project $rollbackProject -BackendPort $rollbackBackendPort -FrontendPort $rollbackFrontendPort -RagPort $rollbackRagPort
   $result.rollback_start = 'PASS_5_SERVICE_HEALTH'
-  $rollbackImage = (& docker image inspect --format '{{.Id}}' chatbi-v2-backend:latest).Trim()
+  $rollbackImage = (& docker compose --project-directory $rollbackRoot -f (Join-Path $rollbackRoot 'docker-compose.yml') -p $rollbackProject images -q backend | Select-Object -First 1).Trim()
   $rollbackMigration = (& docker compose --project-directory $rollbackRoot -f (Join-Path $rollbackRoot 'docker-compose.yml') -p $rollbackProject exec -T backend alembic current | Out-String).Trim()
-  if($rollbackMigration -notmatch '20260822_0012') { throw 'Rollback migration head mismatch' }
-  $result.rollback_migration = '20260822_0012'
+  if($rollbackMigration -notmatch [regex]::Escape($RollbackMigrationHead)) { throw 'Rollback migration head mismatch' }
+  $result.rollback_migration = $RollbackMigrationHead
   $rollbackFingerprint = Invoke-ApiFingerprint -BackendPort $rollbackBackendPort
   $result.rollback_api_smoke = 'PASS_AUTHENTICATED_DASHBOARD_READBACK'
   Invoke-BrowserSmoke -BackendPort $rollbackBackendPort -FrontendPort $rollbackFrontendPort

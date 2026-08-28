@@ -9,6 +9,7 @@ Set-Location -LiteralPath $projectRoot
 $failures = 0
 $warnings = 0
 $configuration = $null
+$providerStates = @()
 
 function Add-DoctorResult {
   param([string]$Status, [string]$Name, [string]$Message, [string]$Action = '')
@@ -83,7 +84,7 @@ if ($configuration) {
     $compose = Get-ChatBIComposeArguments -EnvFile $resolvedEnv -ProjectName $configuration.ProjectName
     $imageId = (& docker @compose images -q backend 2>$null | Select-Object -First 1)
     if ($LASTEXITCODE -eq 0 -and $imageId) {
-      $probeScript = "python -c `"from sqlalchemy import text; from app.db.session import engine; c=engine.connect(); c.execute(text('SELECT 1')); c.close(); print('DATABASE_CONNECTION=PASS')`" && alembic current"
+      $probeScript = "python -c `"from sqlalchemy import text; from app.db.session import engine; c=engine.connect(); c.execute(text('SELECT 1')); c.close(); print('DATABASE_CONNECTION=PASS')`" && alembic current && python -m app.db.deployment_state providers"
       $probeOutput = & docker @compose run --rm --no-deps backend sh -c $probeScript 2>&1
       $probeText = $probeOutput -join "`n"
       if ($probeText -match 'DATABASE_CONNECTION=PASS') { Add-DoctorResult PASS 'DB connectivity' 'authenticated SQL SELECT 1 succeeded' }
@@ -92,6 +93,11 @@ if ($configuration) {
         Add-DoctorResult PASS 'Migration status' 'metadata database is at the Alembic head'
       } else {
         Add-DoctorResult WARN 'Migration status' 'metadata database is not yet verified at head' 'Run scripts/bootstrap.ps1.'
+      }
+      $providerJson = $probeOutput | Where-Object { ([string]$_).Trim().StartsWith('[') } | Select-Object -Last 1
+      if ($providerJson) {
+        try { $providerStates = @(([string]$providerJson | ConvertFrom-Json)) }
+        catch { Add-DoctorResult WARN 'Provider state' 'runtime configuration state could not be parsed' 'Rerun Doctor after rebuilding the Backend image.' }
       }
     } else {
       Add-DoctorResult WARN 'DB connectivity' 'Backend image is not built; authenticated probe is deferred' 'Run scripts/bootstrap.ps1, then rerun doctor.ps1.'
@@ -106,9 +112,32 @@ if ($configuration) {
   }
 
   $provider = (Get-ChatBIValue -Values $configuration.Values -Name 'CHATBI_MODEL_PROVIDER' -Default 'auto').ToLowerInvariant()
-  $providerKeys = @('CHATBI_KIMI_API_KEY', 'CHATBI_MIMO_API_KEY', 'CHATBI_DEEPSEEK_API_KEY') | Where-Object {
-    -not (Test-ChatBIPlaceholder -Value (Get-ChatBIValue -Values $configuration.Values -Name $_))
+  $providerDefinitions = @(
+    @('mimo', 'CHATBI_MIMO_API_KEY'),
+    @('deepseek', 'CHATBI_DEEPSEEK_API_KEY'),
+    @('kimi', 'CHATBI_KIMI_API_KEY')
+  )
+  if ($providerStates.Count -eq 0) {
+    $providerStates = @($providerDefinitions | ForEach-Object {
+      $providerId = $_[0]
+      $configured = -not (Test-ChatBIPlaceholder -Value (Get-ChatBIValue -Values $configuration.Values -Name $_[1]))
+      [pscustomobject]@{
+        provider = $providerId
+        configured = $configured
+        enabled = $configured -and $provider -ne 'deterministic' -and ($provider -eq 'auto' -or $provider -eq $providerId)
+        health = if($configured) { 'NOT_CHECKED' } else { 'CREDENTIAL_MISSING' }
+        reachability = 'NOT_TESTED'
+      }
+    })
   }
+  foreach ($state in $providerStates) {
+    $configuredText = if($state.configured) { 'YES' } else { 'NO' }
+    $enabledText = if($state.enabled) { 'YES' } else { 'NO' }
+    Add-DoctorResult PASS "Provider $($state.provider)" "Configured=$configuredText Enabled=$enabledText Health=$($state.health) Reachability=$($state.reachability)"
+  }
+  Add-DoctorResult PASS 'Provider deterministic' 'Configured=YES Enabled=YES Health=LOCAL_READY Reachability=LOCAL'
+  Write-Host 'PROVIDER_LIVE_CALLS=0'
+  $providerKeys = @($providerStates | Where-Object { $_.configured })
   if ($provider -eq 'deterministic') {
     Add-DoctorResult PASS 'Provider configuration' 'deterministic local mode; no external key is required'
   } elseif ($providerKeys.Count -gt 0) {

@@ -53,7 +53,11 @@ function Get-ChatBIValue {
 function Import-ChatBIProcessEnvironment {
   param([Parameter(Mandatory = $true)][System.Collections.IDictionary]$Values)
   foreach ($entry in $Values.GetEnumerator()) {
-    [Environment]::SetEnvironmentVariable([string]$entry.Key, [string]$entry.Value, 'Process')
+    $name = [string]$entry.Key
+    $explicitProcessValue = [Environment]::GetEnvironmentVariable($name, 'Process')
+    if ([string]::IsNullOrWhiteSpace($explicitProcessValue)) {
+      [Environment]::SetEnvironmentVariable($name, [string]$entry.Value, 'Process')
+    }
   }
 }
 

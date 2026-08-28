@@ -28,6 +28,9 @@ $version = Invoke-RestMethod -Uri "$apiBase/version" -TimeoutSec 5
 $proxiedVersion = Invoke-RestMethod -Uri "http://127.0.0.1:${frontendPort}/api/v1/version" -TimeoutSec 5
 $rag = Invoke-RestMethod -Uri "http://127.0.0.1:${ragPort}/health" -TimeoutSec 5
 if($rag.status -ne 'ok') { throw 'Live RAG runtime is not ready' }
+if($proxiedVersion.version -ne $version.version) {
+  throw "Frontend Backend proxy version mismatch: frontend=$($proxiedVersion.version) backend=$($version.version)"
+}
 
 $protectedPaths = @('/auth/me', '/query-capabilities', '/datasources', '/semantic-models', '/conversations')
 foreach ($path in $protectedPaths) {
@@ -39,7 +42,7 @@ foreach ($path in $protectedPaths) {
   frontend_http = $frontend.StatusCode
   backend_http = $backend.StatusCode
   backend_version = $version.version
-  frontend_backend_proxy = if($proxiedVersion.version -eq $version.version) { 'READY' } else { 'VERSION_MISMATCH' }
+  frontend_backend_proxy = 'READY_VERSION_MATCH'
   live_rag = 'HEALTHY_AUTH_REQUIRED'
   protected_api_auth = '5_OF_5_RETURN_401'
   local_metadata_postgres = 'READY'

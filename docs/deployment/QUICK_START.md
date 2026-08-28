@@ -89,3 +89,5 @@ Every deployment script accepts `-EnvFile`:
 ```
 
 Keep the same file and Compose project name for all lifecycle commands.
+
+Process/CLI values take precedence over the selected EnvFile, the selected EnvFile takes precedence over the default repository `.env`, and hard-coded values are safe fallbacks only. This makes a dedicated Enterprise PoC EnvFile and the isolated Local Showcase mode coexist without overwriting one another.

@@ -8,6 +8,8 @@ database targets.  The read-only ``demo_business`` schema is not touched.
 from __future__ import annotations
 
 import argparse
+import os
+import re
 
 from sqlalchemy import text
 from sqlalchemy.engine import make_url
@@ -17,25 +19,50 @@ from app.db.session import engine
 
 
 LOCAL_HOSTS = frozenset({"127.0.0.1", "localhost", "host.docker.internal"})
+LOCAL_SHOWCASE_DATABASE = re.compile(r"^chatbi_v2(?:_[a-z0-9_]+)?$")
+LOCAL_SHOWCASE_SCHEMA = re.compile(r"^(?:public|chatbi_[a-z0-9_]+)$")
 
 
-def validate_local_showcase_target(database_url: str, *, environment: str) -> None:
+def validate_local_showcase_target(
+    database_url: str,
+    *,
+    environment: str,
+    expected_database: str = "chatbi_v2",
+    expected_schema: str = "public",
+) -> None:
     url = make_url(database_url)
     if environment != "development":
         raise RuntimeError("Showcase schema rebuild requires development environment")
     if not url.drivername.startswith("postgresql"):
         raise RuntimeError("Showcase schema rebuild requires PostgreSQL metadata")
-    if url.host not in LOCAL_HOSTS or url.database != "chatbi_v2":
+    if not LOCAL_SHOWCASE_DATABASE.fullmatch(expected_database):
+        raise RuntimeError("Showcase database name is outside the local ChatBI allowlist")
+    if not LOCAL_SHOWCASE_SCHEMA.fullmatch(expected_schema):
+        raise RuntimeError("Showcase schema name is outside the local ChatBI allowlist")
+    if url.host not in LOCAL_HOSTS or url.database != expected_database:
         raise RuntimeError("Refusing to rebuild a non-local ChatBI metadata target")
+    options = str(url.query.get("options", ""))
+    if expected_schema != "public" and not re.search(
+        rf"(?:^|\s)-c\s*search_path={re.escape(expected_schema)}(?:\s|$)",
+        options,
+    ):
+        raise RuntimeError("Showcase database URL search_path does not match the isolated schema")
 
 
 def rebuild_local_metadata_schema() -> None:
     settings = get_settings()
-    validate_local_showcase_target(settings.database_url, environment=settings.environment)
+    expected_schema = os.getenv("CHATBI_DATABASE_SCHEMA", "").strip() or "public"
+    validate_local_showcase_target(
+        settings.database_url,
+        environment=settings.environment,
+        expected_database=os.getenv("CHATBI_SHOWCASE_DATABASE_NAME", "chatbi_v2"),
+        expected_schema=expected_schema,
+    )
     with engine.begin() as connection:
-        connection.execute(text("DROP SCHEMA public CASCADE"))
-        connection.execute(text("CREATE SCHEMA public AUTHORIZATION CURRENT_USER"))
+        connection.execute(text(f'DROP SCHEMA "{expected_schema}" CASCADE'))
+        connection.execute(text(f'CREATE SCHEMA "{expected_schema}" AUTHORIZATION CURRENT_USER'))
     print("SHOWCASE_METADATA_SCHEMA_REBUILD=PASS")
+    print(f"METADATA_SCHEMA={expected_schema}")
     print("BUSINESS_SCHEMA_PRESERVED=YES")
 
 

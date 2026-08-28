@@ -3,6 +3,7 @@ param(
   [string]$EvidencePath = 'docs/evidence/day5/cold-start.json',
   [string]$SourceEnv = '',
   [string]$Python = '',
+  [string]$ExpectedMigrationHead = '20260828_0013',
   [ValidateRange(30, 300)]
   [int]$AskTimeoutSeconds = 120,
   [ValidateRange(120, 900)]
@@ -150,8 +151,10 @@ try {
   $result.runtime_dependency = 'HTTPX2_2_12_0_AIOHTTP_3_14_3_DBGPT_AWEL_PASS'
 
   $migration = (& docker compose exec -T backend sh -c 'alembic current 2>&1' | Out-String)
-  if($LASTEXITCODE -ne 0 -or $migration -notmatch '20260822_0012') { throw 'Migration head mismatch' }
-  $result.migration = '20260822_0012_HEAD'
+  if($LASTEXITCODE -ne 0 -or $migration -notmatch [regex]::Escape($ExpectedMigrationHead)) {
+    throw "Migration head mismatch; expected $ExpectedMigrationHead"
+  }
+  $result.migration = "${ExpectedMigrationHead}_HEAD"
 
   $adminPassword = $localEnv['CHATBI_BOOTSTRAP_ADMIN_PASSWORD']
   if(-not $adminPassword) { throw 'CHATBI_BOOTSTRAP_ADMIN_PASSWORD is missing from local .env' }

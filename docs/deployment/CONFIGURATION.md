@@ -11,8 +11,12 @@ ChatBI reads server-side values from `.env` or an explicit `-EnvFile`. The Brows
 | `CHATBI_BOOTSTRAP_ADMIN_PASSWORD` | REQUIRED | Initial local administrator password; generated locally |
 | `CHATBI_BOOTSTRAP_ANALYST_PASSWORD` | REQUIRED | Initial local analyst password; generated locally |
 | `COMPOSE_PROJECT_NAME` | DEFAULT | Scopes all Compose resources |
-| `CHATBI_BACKEND_IMAGE` / `CHATBI_SANDBOX_IMAGE` | ENTERPRISE_OVERRIDE | Optional immutable/private image names; defaults are project-scoped |
+| `CHATBI_BACKEND_IMAGE` / `CHATBI_FRONTEND_IMAGE` / `CHATBI_SANDBOX_IMAGE` | ENTERPRISE_OVERRIDE | Optional immutable/private image names; defaults are project-scoped |
 | `CHATBI_DEPLOYMENT_MODE` | DEFAULT | `local` or operator-defined private mode label |
+| `CHATBI_ENVIRONMENT` | DEFAULT | Runtime safety mode; Showcase sets `development`, enterprise defaults to `local` |
+| `CHATBI_GIT_SHA` | DEFAULT | Exact candidate/runtime source identity; never a credential |
+| `CHATBI_RELEASE_VERSION` | DEFAULT | Candidate/release display identity |
+| `CHATBI_FRONTEND_BUILD` | DEFAULT | Frontend build identity reported by System Info |
 | `CHATBI_FRONTEND_PORT` | DEFAULT | Frontend published port, default 5173 |
 | `CHATBI_BACKEND_PORT` | DEFAULT | Backend published port, default 8000 |
 | `CHATBI_RAG_PORT` | DEFAULT | RAG published port, default 8001 |
@@ -29,6 +33,19 @@ ChatBI reads server-side values from `.env` or an explicit `-EnvFile`. The Brows
 | `CHATBI_DOCKER_SOCKET_PATH` | LOCAL_DEPLOYMENT | Docker socket used by the restricted Sandbox proxy |
 
 The full copy-ready list with safe defaults is in `.env.example`.
+
+## Configuration precedence
+
+Lifecycle scripts use one deterministic order:
+
+```text
+explicit Process / CLI value
+> explicitly selected mode EnvFile (-EnvFile)
+> default repository .env
+> hard-coded safe default
+```
+
+Importing an EnvFile fills only process variables that are not already set. This is required so Local Showcase can pin its project name, ports, credentials, Demo Seed, development guard, image identities, and deterministic/LEVEL0 mode even when the selected `.env` also contains enterprise defaults. Default and Enterprise commands should prefer a dedicated `-EnvFile` rather than mutating a shared file.
 
 ## PostgreSQL URL
 
@@ -50,7 +67,7 @@ No secret is printed. Protect `.env`, use restrictive filesystem permissions on 
 
 ## Provider behavior
 
-No Provider key is required for health, login, datasource onboarding, Schema Sync, or deterministic NL2SQL. `auto` uses a configured Provider when one is available and otherwise keeps the local deterministic route. UI and API capability responses must state when live Provider configuration is required.
+No Provider key is required for health, login, datasource onboarding, Schema Sync, or deterministic NL2SQL. `auto` uses a configured and runtime-enabled Provider when one is available and otherwise keeps the local deterministic route. Doctor reports Configured, Enabled, last recorded Health, and Reachability state without issuing a Provider request; reachability stays `NOT_TESTED` until an explicit model test or real call. UI and API capability responses must state when live Provider configuration is required.
 
 ## Fail-fast checks
 

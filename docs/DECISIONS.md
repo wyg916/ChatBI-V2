@@ -1,6 +1,14 @@
 # Architecture Decisions
 
-## ADR-071：V1.3.0 发布后只保留本机求职 Showcase 维护面
+## ADR-092：V1.3.1 候选以双父受控合并统一三种运行模式
+
+V1.3.1 Integration Candidate 必须从 C 线 Exact SHA `fbb42a48568985808dbbc12d07728abcb59febc9` 创建独立 worktree，再以 `--no-ff` 合并 B 线 Exact SHA `656496a470404390d0324b8cdddd4666e4423b6c`；A/main、V1.3.0 正式基线、B 与 C 的既有提交均必须保持祖先关系。候选不 rebase、不 squash、不 force push，也不修改 main、Tag 或 Release。
+
+一个 canonical Compose 通过 EnvFile、`COMPOSE_PROJECT_NAME`、端口、存储和 Backend/Frontend/Sandbox 镜像变量支持 Default Open Source、Local Showcase 与 Enterprise PoC。配置优先级固定为显式 Process/CLI 值高于所选模式 EnvFile，所选 EnvFile 高于默认 `.env`，最后才使用安全默认值；导入 dotenv 不得覆盖已设置的 Process 值。Showcase 必须显式使用 development、独立项目名、固定本机端口、Demo Seed、local-only 凭据和 deterministic/LEVEL0，Enterprise 默认关闭 Demo Seed。Compose 继续禁止 PostgreSQL/MySQL 服务与数据库 volume，Frontend 只调用 Backend API。
+
+当前唯一 Alembic head 是 `20260828_0013`，V1.3.0 回滚目标保持 `20260822_0012`；历史 V1.3.0 清单与事实不改写。全部免费 Gate 通过并提交冻结后，三 Provider live smoke 才能绑定同一 Exact SHA 经唯一 Model Gateway 各执行一次；若发现代码缺陷，必须形成 successor 并重跑受影响 Gate。
+
+## ADR-079：V1.3.0 发布后只保留本机求职 Showcase 维护面
 
 V1.3.0 的 annotated tag、peeled commit 与 GitHub Release 保持不可变；后续求职材料、启动脚本和本机演示稳定性修复只能作为 main 的 POST_RELEASE 提交，不回写 Release，不启动 V1.4、V2.0 或 Production Deployment。唯一本地可运行目录固定为 `E:\ChatBI V2 项目`，历史 worktree/clone/venv/node_modules/cache 只有在 dirty、untracked、unique commit 完成外部备份与恢复校验后才可删除。
 
@@ -8,15 +16,15 @@ V1.3.0 的 annotated tag、peeled commit 与 GitHub Release 保持不可变；�
 
 Reset 是仅供本机脚本调用的显式破坏性命令，不暴露 HTTP 入口。它只接受 development、本机 Host、PostgreSQL、数据库 `chatbi_v2` 四重目标约束，重建 `public` 元数据 Schema 并保留只读 `demo_business`；演示业务日期固定为 `2026-08-17`，同时同步 PostgreSQL/MySQL Catalog，使 SQL Guard 在重置后立即拥有 2 Schema、18 表、112 字段和 24 关系的 allowlist。评测种子使用冻结 Golden 50 Evidence 的可下钻 Showcase Snapshot，八类准确率、Release Gate 与 Case Detail 必须表达同一组证据，不能用空 Case 伪造 UI PASS。
 
-## ADR-078：部署构建与数据库引导各执行一次
+## ADR-082：部署构建与数据库引导各执行一次
 
 标准 `start.ps1` 先由 Bootstrap 一次构建 Backend、Frontend 和 Sandbox 三类镜像，再直接 `compose up`，不得为启动再次扫描和构建相同 context；显式 `-SkipBootstrap` 时仍可按调用者选择 build。数据库认证探针、Alembic upgrade/head 和幂等记录 seed 在同一个 `backend run --rm --no-deps` 容器中顺序 fail-fast，Doctor 的认证连接与 migration head 也共享一个临时容器。该合并只减少 Docker 容器创建与重复 context I/O，不合并错误判断、不跳过迁移或弱化任何门禁。
 
-## ADR-077：固定上游文本的完整性以 canonical LF 字节校验
+## ADR-081：固定上游文本的完整性以 canonical LF 字节校验
 
 Windows Git checkout 可以只改变文本换行而不改变上游源码语义。DB-GPT 与 PandasAI selected-source Bridge 因此在 SHA-256 与长度校验前仅把 CRLF 规范化为 LF；冻结 provenance、commit、path、license 和运行入口保持不变。任意非换行内容变化仍产生 checksum/size mismatch 并 fail closed，不允许通过忽略哈希、动态下载或宽松匹配恢复服务。
 
-## ADR-076：Enterprise Quick Deploy 复用外部 PostgreSQL并以项目命名空间隔离
+## ADR-080：Enterprise Quick Deploy 复用外部 PostgreSQL并以项目命名空间隔离
 
 Quick Deploy 不创建 PostgreSQL/MySQL 容器或数据库卷。元数据使用明确的 `CHATBI_DATABASE_URL` 和专用 Schema，业务数据源只能在登录后通过 Backend API 以只读账号添加；Frontend 不读取连接凭据。Compose 项目、Backend/Sandbox 镜像、端口、附件存储和备份目录都显式可配置，B 线验收必须使用独立命名空间，Stop/Reset/Restore 只能作用于该项目。
 
@@ -162,7 +170,7 @@ Phase 3 的独立 Controller 虽不把 Docker Socket 暴露给 Backend 或一次
 
 正式路径保持 `Question → ChatBI Workspace/RBAC → LiveRagAdapter/HMAC → ChatBI ACL/scenario → selected-source BM25/vector/RRF/rerank → Citation → 唯一 ModelGateway → Answer Guard → AnswerEnvelope → ChatBI SSE`。旧项目不得获得数据库连接、Provider Key、Conversation、SQL Executor、外部 SSE 或动态工具。锁校验失败必须 fail closed；回滚只需 revert Successor commit，不含 Schema 或数据迁移。完整清单见 `docs/runtime/V1_3_PHASE3_OWNER_AUTHORIZED_LEGACY_RAG_LOCK.md`。
 
-## ADR-050：Phase 3 仅引入窄范围上游运行时，并保持单一安全与证据控制面
+## ADR-091：Phase 3 仅引入窄范围上游运行时，并保持单一安全与证据控制面
 
 DB-GPT 只允许固定提交 `db580e952e544acf9f6c6c153da29dc67e9e40d7` 的 `dbgpt-core/AWEL` 执行 `DAG`、`MapOperator` 与 `BaseOperator.call`；AWEL 输入不包含原始问题、SQL、数据源/模型标识、连接器、密钥、RAG 状态或工具结果。它只承载路由、Trace ID 和硬预算，并回调现有 ChatBI 固定五角色六工具编排。任何来源校验失败、运行时缺失或预算越界均 fail closed，不得回落后再记为真实 DB-GPT 调用。
 
@@ -172,19 +180,19 @@ Vision 先执行方向归一化、元数据清除、尺寸约束、必要分块�
 
 正式 Trace 只记录实际执行的 `rag.retrieve`、`agent.step`、`file.parse`、`python.execute`、`model.invoke`、`sql.execute`、`oracle.verify`、`answer.compose` 和 `sse.stream`。同步入口不得记录 `sse.stream`，失败或回滚不得冒充已完成 span。Legacy RAG 的历史 `BLOCKED` 结论已被项目负责人授权和 ADR-051 的最小 selected-source lock 覆盖；ACL、Citation、Answer Guard 与单一控制平面要求不变。
 
-## ADR-049：V1.3.0 以自包含 IBM 远端 Gate 和受控 SQLBot 例外收口 Phase 2
+## ADR-090：V1.3.0 以自包含 IBM 远端 Gate 和受控 SQLBot 例外收口 Phase 2
 
 V1.2.0 Runtime Architecture 的架构、能力、测试、安全、性能、许可证、Evidence 与 Git 原则继续约束 V1.3.0；旧版本号、分支、Tag 和历史基线 SHA 仅作历史字段。正式映射由 `docs/runtime/V1_3_RUNTIME_ARCHITECTURE_REQUIREMENT_DELTA.md` 控制。IBM 远端 Gate 不再依赖外部 `api_base` 或长期仓库 Secret：GitHub-hosted Runner 创建临时 PostgreSQL 和一次性主体，应用迁移与固定 seed，只启动 localhost Backend，再从固定 checkout 的隔离 Python 调用 Apache-2.0 selected source。生产数据库、生产用户、Provider Key 和数据库连接均不提供给 IBM；任何初始化、Golden 50、官方 compare、error analysis、脱敏或 artifact 步骤失败都必须非零退出。
 
 SQLBot 固定提交的根 modified-GPLv3/附加品牌条件没有路径级宽松授权；官方启动又必经许可证/公开源码未闭合的 XPack，且没有可固定到目标提交的公开完整运行时。因此 V1.3.0 接受 `docs/opensource/V1_3_SQLBOT_LICENSE_EXCEPTION.md`：直接源码、官方服务和 XPack 运行继续阻断，真实调用与加载均为 0；项目自有 feedback/Verified SQL replay 保持 PASS，但不得改写为 SQLBot 集成或计入上游复用。Phase 2 的真实复用数固定为 3，本例外只适用于 V1.3.0，并在上游许可证、XPack 来源、不可变 artifact、分发边界或项目授权变化时强制复审。这是工程合规决策，不是法律意见。
 
-## ADR-048：IBM 只允许固定 checkout 的 Apache-2.0 selected-source 离线评测
+## ADR-089：IBM 只允许固定 checkout 的 Apache-2.0 selected-source 离线评测
 
 IBM `60dd451...` 的 package/wheel/sdist 继续因根 `LICENSE=Apache-2.0` 与发行 metadata `MIT` 冲突而阻断；这不自动扩展为所有源码路径均不可用。实际运行闭包只包含 11 个固定文件：执行文件均有 IBM Copyright 与 Apache-2.0 SPDX，唯一无 SPDX 的包初始化文件由根 Apache-2.0 许可证治理，依赖许可证也逐项闭合。ChatBI 因此只从外部精确 checkout 的隔离 Python 调用官方 `evaluate_prediction` 与 `get_failed_records`，每次执行前核对 commit 和逐文件 SHA-256，不安装/复制/分发冲突 package，也不给官方工具数据库连接或 Provider 密钥。
 
 IBM 工具只评测 QueryPipeline 已执行并经 Oracle 校验的结果。Golden 50 的官方 execution accuracy 为 50/50；G50 双方一致空结果仍原样保留官方 `subset_non_empty_execution_accuracy=0`，仅分类为不适用诊断，不修改官方结果。现有在线 IBM-compatible adapter 保持 `chatbi-clean-room`，因此禁用离线任务即可回滚。共享 CI 已 fail-closed 接线，但在真实远端 workflow 成功前状态只能是 `WIRED_PENDING_REMOTE_RUN`。SQLBot 的强制 xpack 许可证闭包仍不成立，不能借服务边界绕过，Phase 2 因真实复用 3/目标 4 保持 PARTIAL。
 
-## ADR-047：V1.3.0 Phase 2 只计可验真的最小上游源码复用，许可证冲突保持阻断
+## ADR-088：V1.3.0 Phase 2 只计可验真的最小上游源码复用，许可证冲突保持阻断
 
 OpenChatBI/WrenAI 整包依赖闭包分别会引入自己的 LLM、向量/数据库运行时或重型执行依赖，破坏 ChatBI 的单一 Router、Model Gateway 和 SQL 执行入口。Phase 2 因此只 vendoring 固定 commit 下三个字节等同的最小源文件：OpenChatBI CatalogStore 的名称投影函数，以及 WrenAI 类型映射和 SQLGlot Wren dialect。每次运行在统一 Trace 中记录 adapter、commit、source SHA 与调用数；`selected_source|clean_room` 进入缓存键并可用环境变量 A/B，完整回滚仍为 `local`。
 
@@ -192,7 +200,7 @@ SuperSonic 继续 clean-room。IBM 同一发行物的根 LICENSE 与 package/whe
 
 所有 SQL 继续进入 SQLGlot、Workspace/RBAC、EXPLAIN Cost Guard、只读 QueryExecutor 和 ResultOracle。关键指标及多 Join 查询额外执行第二条经同一 Guard 的只读一致性查询；它只能证明执行结果稳定，不冒充独立业务口径验证。Chart/Narrative 必须绑定 Query ID、列、行数、结果签名及证据字段。
 
-## ADR-046：V1.3.0 采用单一三模型控制平面并把密钥轮换延期为生产发布门禁
+## ADR-087：V1.3.0 采用单一三模型控制平面并把密钥轮换延期为生产发布门禁
 
 V1.3.0 将 General、Intent、Vision 和 NL2SQL 的 Provider 网络调用收敛到 `app/model_gateway/service.py`。业务调用方只构造项目自有 `RequestContext`、`RouterDecision`、`ModelRequest` 与 `ModelResponse`；旧 `integration/model_gateway.py` 仅保留兼容导入，NL2SQL Adapter 不再直接创建 HTTP Client。MiMo 作为 Balanced 普通路由默认，DeepSeek 作为 NL2SQL/Structured 默认，Kimi 只在 Quality 预算与 Premium 资格满足时升级，或作为受控 Vision 回退。价格、能力、路由和健康策略存放于可审计配置，真实 Provider usage 才能计入成本。
 
@@ -226,7 +234,7 @@ Wren runtime 未进入 Day 1 运行镜像。Adapter 的 capabilities 明确报�
 
 Figma 只作为布局、视觉层级和交互意图的批准参考，不作为业务数据来源。语义模型列表接口返回模型及其真实语义资源集合，前端据此计算实体、度量、关系和状态统计；编辑器通过现有语义资源 API 读取与保存配置。缓存策略尚无持久化 DTO 时仅保留为明确提示的界面草稿，不伪装为已写入数据库。
 
-## ADR-007：登录页不伪装生产认证
+## ADR-083：登录页不伪装生产认证
 
 Day 1 登录页只承担进入 ChatBI 工作空间的高保真界面与前端演示路由。表单通过原生必填校验后进入默认“问数据”页，但不在前端伪造令牌、用户会话或 SSO/OIDC 成功状态；页面中的 SSO/OIDC 文案属于批准设计内容，不作为认证能力已完成的验收证据。真实认证接入必须由后端身份能力、会话安全与审计共同实现。
 
@@ -262,15 +270,15 @@ Oracle 从 SQLPlan、授权结果、执行结构与冻结期望契约独立验�
 
 ADR-008 的固定 UI 演示态只适用于 Day 1。Day 2 起，问数据结果页必须由 `/api/v1/ask` 返回的 QueryRun、SQLPlan、Guard、Execution 与 Oracle 数据驱动；Loading、Empty、Error、SecurityRejected、OracleMismatch 分别展示，SQL 默认折叠，反馈与答案保存写入 Backend API。前端不得保留固定业务数值作为查询结果。
 
-## ADR-011：评测用例详情在证据 API 完成前只作为显式 UI 演示
+## ADR-084：评测用例详情在证据 API 完成前只作为显式 UI 演示
 
 评测用例详情属于 P1 范围，本轮仅按用户明确优先级落地批准的界面结构。设计稿中的问题、SQL、准确率、响应时间、结果差异、错误分类和修复建议均只用于视觉与交互参考；在单用例详情、执行记录、Result Oracle 对比、重跑和修复任务 API 完成前，页面必须标明“UI 演示 · 未执行”，并阻止未接入写操作产生虚假成功状态。后续真实数据只能经 Backend API 绑定查询运行、语义模型版本、结果签名和审计证据，前端不得直连数据库或自行推导 PASS。
 
-## ADR-012：P1 系统设置与安全审计页面先落地显式演示壳
+## ADR-085：P1 系统设置与安全审计页面先落地显式演示壳
 
 模型服务、细粒度 RBAC 和审计页面属于 P1，当前 P0 主链路尚未全部通过。本轮因用户明确要求，只实现批准 Figma 的前端信息架构、响应式布局和本地交互，不新增或伪装后端能力。模型健康指标、成员、角色、权限和审计事件仅为标明“UI 演示/静态样例”的视觉数据；所有保存、启停、邀请、编辑和导出入口必须提示尚未接入，不能产生虚假成功。后续接入时统一使用 `Frontend → Backend API → PostgreSQL/Provider Adapter`，不得在浏览器保存模型密钥、数据库凭据或管理员凭据。
 
-## ADR-013：经营看板查询复用只读数据源连接，评测总览只展示持久化运行证据
+## ADR-086：经营看板查询复用只读数据源连接，评测总览只展示持久化运行证据
 
 经营看板详情的业务指标必须通过 `Frontend → Backend API → DataSource Connector → Read-only PostgreSQL` 查询真实业务数据，不能使用权限仅覆盖元数据表的应用会话跨权读取业务 Schema，也不能让浏览器持有数据源凭据。Backend 只执行服务端定义的单条 `SELECT`/`WITH ... SELECT` 聚合语句，并在 DTO 中返回计算口径、数据日期与查询范围。评测中心总览只展示已持久化的评测运行、Golden Set 数量和指标快照；在评测执行器与 Result Oracle 证据链未接入前，运行、导入和新建入口不得生成虚假评测记录或 PASS 状态。
 

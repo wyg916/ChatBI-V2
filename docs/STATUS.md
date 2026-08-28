@@ -1,5 +1,15 @@
 # 项目状态
 
+## 2026-08-28：V1.3.1 A/B/C 受控整合候选
+
+- 本轮属于 P0 的发布候选整合与验证，不新增 P2 范围。候选从 C `fbb42a48568985808dbbc12d07728abcb59febc9` 建立，以 `--no-ff --no-commit` 合入 B `656496a470404390d0324b8cdddd4666e4423b6c`；正式 merge commit 为 `9d2dbef8841cfbfab22fb685e58163612e85debe`，A `8f0326b59759e2549e7f684f0a3e40e3b6faffdf` 与 V1.3.0 release `52db955fd67ebe592c289399a135528c13cb3e3d` 均保持祖先关系。main、Tag、Release 均未修改。
+- A Showcase：PASS。独立 `chatbi_v131_showcase` Schema 上完成当前正式一键 Stop/Reset/Start/Status，固定端口、固定本地演示账号、Demo Seed 与 deterministic/LEVEL0/no-paid 语义未受 Enterprise Env 污染；Playwright 核心体验目标 45/45。门禁结束后 A 已恢复为固定端口 15173/18080/18081、5/5 healthy，A 自身 Status/Verify/Login PASS，main 仍精确等于 origin/main 且 clean。
+- B Enterprise Productization：PASS（冻结前门禁）。唯一 canonical Compose 支持 Default/Showcase/Enterprise/Integration 四种参数化运行形态，活动数据库服务 0、数据库 volume 0；配置优先级统一为 Process/CLI > 指定 EnvFile > 默认 `.env` > 安全默认值。Doctor 0 failure/0 warning，Bootstrap、RAG、Sandbox Worker、统一镜像、两次完全停止后启动、配置负例、备份恢复均通过。
+- C Functional Experience：PASS（继承完整 894/894 控件基线并执行整合增量）。整合未修改 Frontend UI 结构；45/45 浏览器主链路与额外管理员写入/重启回读验证覆盖设置、Workspace、Appearance、System Info、User、Role、Invite、Audit、RBAC、Provider Toggle，Analyst API/UI 管理访问均 403，console/page/request error 为 0。
+- Integration 免费门禁：Backend 704 collected、697 passed、7 条设计性 skip、0 failed；Frontend 16 files / 64 tests、TypeScript 0 diagnostics、production build 991 modules；迁移唯一 head `20260828_0013`，empty→head、0013→0012→0013、existing 0012→0013 均 PASS；Golden50 的 execution/result/semantic 均 50/50，危险 SQL 56/56；PostgreSQL 与 MySQL 均完成只读连接、9 表/56 字段/12 关系同步及代表查询。
+- 元数据备份恢复使用隔离 Schema `chatbi_v131_integration`，V2 manifest 记录迁移头、候选版本、Git SHA、脱敏计数与 SHA-256；备份时 settings/provider/invitation/RBAC/workspace 均为非零。故意修改使指纹变化，恢复后严格回到原指纹。两次停止退出仍观察到 Backend/Sandbox Proxy exit 137 且 `OOMKilled=false`，未见数据损坏、资源泄漏或重启失败，按既有 ADR 保持 registered non-blocking。
+- tracked files 冻结后的两套 Enterprise Fresh、Security、exact-SHA Provider 与远端分支核验只写入仓库外受控 Evidence；若任一门禁失败，本候选不得推送或宣称 Integration PASS。
+
 ## V1.3.0 POST_RELEASE 求职 Showcase 维护模式（2026-08-27～28）
 
 - 正式发布事实保持不变：annotated tag `chatbi-v2-v1.3.0` 的 peeled commit 仍为 `52db955fd67ebe592c289399a135528c13cb3e3d`，GitHub Release 不覆盖、不重建、不移动。本节及对应脚本属于 main 上的 POST_RELEASE 维护提交，不启动 V1.4、V2.0 或 Production Deployment。

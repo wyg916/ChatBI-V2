@@ -58,6 +58,11 @@ def test_schema_rebuild_guard_accepts_only_local_development_metadata() -> None:
         "postgresql+psycopg://chatbi_app@host.docker.internal:5432/chatbi_v2",
         environment="development",
     )
+    validate_local_showcase_target(
+        "postgresql+psycopg://chatbi_app@host.docker.internal:5432/chatbi_v2?options=-csearch_path%3Dchatbi_v131_integration",
+        environment="development",
+        expected_schema="chatbi_v131_integration",
+    )
 
     for database_url, environment in (
         ("postgresql+psycopg://chatbi_app@db.example.com:5432/chatbi_v2", "development"),
@@ -71,3 +76,27 @@ def test_schema_rebuild_guard_accepts_only_local_development_metadata() -> None:
             pass
         else:
             raise AssertionError(f"unsafe showcase schema target was accepted: {database_url}")
+
+    for unsafe_name in ("postgres", "chatbi_v2-unsafe", "chatbi_v2/unsafe"):
+        try:
+            validate_local_showcase_target(
+                "postgresql+psycopg://chatbi_app@127.0.0.1:5432/chatbi_v2",
+                environment="development",
+                expected_database=unsafe_name,
+            )
+        except RuntimeError:
+            pass
+        else:
+            raise AssertionError(f"unsafe showcase database name was accepted: {unsafe_name}")
+
+    for unsafe_schema in ("private", "chatbi-v131", "public;drop schema public"):
+        try:
+            validate_local_showcase_target(
+                "postgresql+psycopg://chatbi_app@127.0.0.1:5432/chatbi_v2",
+                environment="development",
+                expected_schema=unsafe_schema,
+            )
+        except RuntimeError:
+            pass
+        else:
+            raise AssertionError(f"unsafe showcase schema name was accepted: {unsafe_schema}")
