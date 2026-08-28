@@ -524,3 +524,10 @@ Phase5 Live Runner 在 Level0/1/2 运行前已经通过唯一成本控制器验�
 - Non-ADMIN users do not receive navigation into system/user administration. Direct URL access still relies on Backend RBAC as the authority and renders only a permission-denied state after 403, never inactive-looking management controls.
 - Chart display uses semantic labels and units from the validated result binding. Axis truncation is presentation-only: the original category value remains available to ECharts tooltip rendering, and numeric axes/tooltips use thousands separators plus the declared unit.
 - The final commit cannot self-record its own SHA. Exact-SHA runtime, Browser, Provider, regression, cost, and digest evidence remains external and must be generated only after the forward commit is frozen.
+
+## ADR-078 — Answer actions expose only Backend-complete capabilities
+
+- Status: Accepted (2026-08-28)
+- A `VERIFIED` status alone does not make an answer reusable or dashboard-ready. Reuse additionally requires both datasource and semantic-model bindings; dashboard insertion additionally requires a passed Result Oracle, a persisted query run, and a non-empty chart specification.
+- The answer list and detail panel apply the same predicate and expose the precise missing prerequisite through the disabled control title. The UI must not advertise an action that can only terminate in a deterministic Backend 422 response.
+- Backend validation remains authoritative. This UI gate only mirrors its stable prerequisites and does not synthesize missing metadata, weaken Oracle checks, or convert incomplete SQL Workspace answers into dashboard cards.

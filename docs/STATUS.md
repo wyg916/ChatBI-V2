@@ -238,3 +238,4 @@
 - 浏览器发现并最小修复：全外部 Provider 关闭时 DATA_QUERY 走 Local Semantic Runtime；Provider 开关不再隐式产生付费探测；排名图表业务化标题、金额单位与长名称展示；Analyst 管理入口/直达 URL 前端 fail-closed。
 - 第二轮最终浏览器又发现并修复：首次显式连接测试不得把已配置 Provider 的默认启用态反转为禁用；三家健康探针统一限制为 8 个输出 Token，Kimi 不再因普通 2,048 Token 请求预算而在实际连接前被误拒绝。
 - 最终 forward commit 之后才执行同 SHA 全回归、三 Provider 各一次显式连接测试、最终 UI 控件清单与 SHA-256 manifest；这些自引用证据只写入仓库外 `E:/ChatBI_V2_Evidence/PostRelease/Functional_Experience_Closure/`。
+- C 线浏览器全控件验收发现 SQL Workspace 保存的 `VERIFIED` 答案可能不具备语义模型、查询运行或图表绑定；答案库现按 Backend 的真实前置条件分别门禁“复用”和“加入看板”，列表与详情均显示禁用原因，避免可点击后返回 422 的假可用控件（ADR-078）。

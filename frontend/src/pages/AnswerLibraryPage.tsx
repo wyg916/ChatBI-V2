@@ -10,6 +10,19 @@ import './content-library.css';
 const number = new Intl.NumberFormat('zh-CN');
 const statusLabel: Record<AnswerStatus, string> = { VERIFIED: '已验证', REJECTED: '已拒绝', DRAFT: '草稿', DEPRECATED: '已弃用' };
 
+function reuseUnavailableReason(answer: VerifiedAnswer): string | undefined {
+  if (answer.status !== 'VERIFIED') return '仅已验证答案可复用。';
+  const missing = [!answer.datasource_id && '数据源', !answer.semantic_model_id && '语义模型'].filter(Boolean);
+  return missing.length > 0 ? `缺少${missing.join('和')}，无法复用。` : undefined;
+}
+
+function dashboardUnavailableReason(answer: VerifiedAnswer): string | undefined {
+  if (answer.status !== 'VERIFIED') return '仅已验证答案可加入看板。';
+  if (answer.oracle_status !== 'PASSED') return '仅 Oracle 校验通过的答案可加入看板。';
+  const missing = [!answer.query_run_id && '查询结果', Object.keys(answer.chart_spec ?? {}).length === 0 && '图表配置'].filter(Boolean);
+  return missing.length > 0 ? `缺少${missing.join('和')}，无法加入看板。` : undefined;
+}
+
 export function AnswerLibraryPage() {
   const navigate = useNavigate();
   const client = useQueryClient();
@@ -68,17 +81,21 @@ export function AnswerLibraryPage() {
       <ErrorNotice error={result.error} />
       {result.isLoading ? <Loading /> : <div className="answer-table-scroll"><table className="answer-table">
         <thead><tr><th>标准问题</th><th>模型</th><th>责任人</th><th>状态</th><th>平均准确率</th><th>采纳数</th><th>操作</th></tr></thead>
-        <tbody>{result.data?.items.map((answer) => <tr key={answer.id} data-testid="answer-row">
-          <td><strong>{answer.question}</strong><small>{answer.module} · SQL {answer.sql_synced ? '已同步' : '待同步'}</small></td>
-          <td>{answer.model_name}</td><td>{answer.owner_name}</td>
-          <td><span className={`content-status status-${answer.status.toLowerCase()}`}>{statusLabel[answer.status]}</span></td>
-          <td>{answer.accuracy_percent.toFixed(0)}%</td><td>{number.format(answer.adoption_count)}</td>
-          <td><div className="answer-row-actions"><button className="content-link" type="button" onClick={() => setSelected(answer)}>查看</button><button className="content-link" type="button" disabled={answer.status !== 'VERIFIED'} onClick={() => reuse(answer)}>复用</button><button className="content-link" type="button" disabled={answer.status !== 'VERIFIED'} onClick={() => addToDashboard(answer)}>加入看板</button></div></td>
-        </tr>)}</tbody>
+        <tbody>{result.data?.items.map((answer) => {
+          const reuseReason = reuseUnavailableReason(answer);
+          const dashboardReason = dashboardUnavailableReason(answer);
+          return <tr key={answer.id} data-testid="answer-row">
+            <td><strong>{answer.question}</strong><small>{answer.module} · SQL {answer.sql_synced ? '已同步' : '待同步'}</small></td>
+            <td>{answer.model_name}</td><td>{answer.owner_name}</td>
+            <td><span className={`content-status status-${answer.status.toLowerCase()}`}>{statusLabel[answer.status]}</span></td>
+            <td>{answer.accuracy_percent.toFixed(0)}%</td><td>{number.format(answer.adoption_count)}</td>
+            <td><div className="answer-row-actions"><button className="content-link" type="button" onClick={() => setSelected(answer)}>查看</button><button className="content-link" type="button" disabled={Boolean(reuseReason)} title={reuseReason} onClick={() => reuse(answer)}>复用</button><button className="content-link" type="button" disabled={Boolean(dashboardReason)} title={dashboardReason} onClick={() => addToDashboard(answer)}>加入看板</button></div></td>
+          </tr>;
+        })}</tbody>
       </table>{result.data?.items.length === 0 && <div className="content-empty">没有匹配的标准答案</div>}</div>}
       <footer className="content-pagination"><span>共 {number.format(result.data?.total ?? 0)} 条，当前显示 {result.data?.items.length ?? 0} 条</span><div><button type="button" aria-label="上一页" disabled={page <= 1} onClick={() => setPage((value) => Math.max(1, value - 1))}>‹</button><b>{page}</b><button type="button" aria-label="下一页" disabled={!result.data || page * result.data.page_size >= result.data.total} onClick={() => setPage((value) => value + 1)}>›</button></div></footer>
     </section>
-    {selected && <section className="answer-detail-panel" aria-label="答案详情"><header><div><small>来源问题</small><h2>{selected.question}</h2></div><button type="button" aria-label="关闭答案详情" onClick={() => setSelected(null)}>×</button></header><div className="answer-detail-grid"><article><small>状态 / Oracle</small><strong>{statusLabel[selected.status]} / {selected.oracle_status ?? '未验证'}</strong></article><article><small>结果签名</small><strong>{selected.result_signature ?? '—'}</strong></article><article><small>语义模型版本</small><strong>v{selected.semantic_model_version ?? '—'}</strong></article></div><h3>业务结论</h3><p>{'conclusion' in selected.narrative ? String(selected.narrative.conclusion) : '草稿尚未生成可验证结论。'}</p><h3>查询依据</h3><pre><code>{selected.sql_text ?? '草稿尚未绑定 SQL。'}</code></pre><footer><button type="button" disabled={selected.status !== 'VERIFIED'} onClick={() => reuse(selected)}>复用问数</button><button type="button" disabled={selected.status !== 'VERIFIED'} onClick={() => addToDashboard(selected)}>保存为看板卡片</button></footer></section>}
+    {selected && <section className="answer-detail-panel" aria-label="答案详情"><header><div><small>来源问题</small><h2>{selected.question}</h2></div><button type="button" aria-label="关闭答案详情" onClick={() => setSelected(null)}>×</button></header><div className="answer-detail-grid"><article><small>状态 / Oracle</small><strong>{statusLabel[selected.status]} / {selected.oracle_status ?? '未验证'}</strong></article><article><small>结果签名</small><strong>{selected.result_signature ?? '—'}</strong></article><article><small>语义模型版本</small><strong>v{selected.semantic_model_version ?? '—'}</strong></article></div><h3>业务结论</h3><p>{'conclusion' in selected.narrative ? String(selected.narrative.conclusion) : '草稿尚未生成可验证结论。'}</p><h3>查询依据</h3><pre><code>{selected.sql_text ?? '草稿尚未绑定 SQL。'}</code></pre><footer><button type="button" disabled={Boolean(reuseUnavailableReason(selected))} title={reuseUnavailableReason(selected)} onClick={() => reuse(selected)}>复用问数</button><button type="button" disabled={Boolean(dashboardUnavailableReason(selected))} title={dashboardUnavailableReason(selected)} onClick={() => addToDashboard(selected)}>保存为看板卡片</button></footer></section>}
     {dialog === 'new' && <NewAnswerDialog onClose={() => setDialog(null)} onSaved={refresh} />}
     {dialog === 'import' && <ContentImportDialog kind="answers" onClose={() => setDialog(null)} onSaved={refresh} />}
   </div>;
