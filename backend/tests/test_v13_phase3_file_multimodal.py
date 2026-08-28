@@ -119,7 +119,9 @@ def test_pandasai_selected_source_is_exact_hash_locked_mit_and_stdlib_only():
     )
     assert provenance["commit"] == "bbbb771d31062d81f6fa19bafb40620d5cbe48f4"
     assert provenance["git_blob"] == "6f31f9dfd3dbd023c7f82a1533bb3c577efd19fd"
-    assert hashlib.sha256(selected_file.read_bytes()).hexdigest() == provenance["sha256"]
+    canonical_source = selected_file.read_bytes().replace(b"\r\n", b"\n")
+    assert hashlib.sha256(canonical_source).hexdigest() == provenance["sha256"]
+    assert len(canonical_source) == provenance["size_bytes"]
     imports = {
         alias.name
         for node in ast.walk(ast.parse(selected_file.read_text(encoding="utf-8")))

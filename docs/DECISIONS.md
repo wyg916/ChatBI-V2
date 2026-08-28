@@ -8,6 +8,20 @@ V1.3.0 的 annotated tag、peeled commit 与 GitHub Release 保持不可变；�
 
 Reset 是仅供本机脚本调用的显式破坏性命令，不暴露 HTTP 入口。它只接受 development、本机 Host、PostgreSQL、数据库 `chatbi_v2` 四重目标约束，重建 `public` 元数据 Schema 并保留只读 `demo_business`；演示业务日期固定为 `2026-08-17`，同时同步 PostgreSQL/MySQL Catalog，使 SQL Guard 在重置后立即拥有 2 Schema、18 表、112 字段和 24 关系的 allowlist。评测种子使用冻结 Golden 50 Evidence 的可下钻 Showcase Snapshot，八类准确率、Release Gate 与 Case Detail 必须表达同一组证据，不能用空 Case 伪造 UI PASS。
 
+## ADR-078：部署构建与数据库引导各执行一次
+
+标准 `start.ps1` 先由 Bootstrap 一次构建 Backend、Frontend 和 Sandbox 三类镜像，再直接 `compose up`，不得为启动再次扫描和构建相同 context；显式 `-SkipBootstrap` 时仍可按调用者选择 build。数据库认证探针、Alembic upgrade/head 和幂等记录 seed 在同一个 `backend run --rm --no-deps` 容器中顺序 fail-fast，Doctor 的认证连接与 migration head 也共享一个临时容器。该合并只减少 Docker 容器创建与重复 context I/O，不合并错误判断、不跳过迁移或弱化任何门禁。
+
+## ADR-077：固定上游文本的完整性以 canonical LF 字节校验
+
+Windows Git checkout 可以只改变文本换行而不改变上游源码语义。DB-GPT 与 PandasAI selected-source Bridge 因此在 SHA-256 与长度校验前仅把 CRLF 规范化为 LF；冻结 provenance、commit、path、license 和运行入口保持不变。任意非换行内容变化仍产生 checksum/size mismatch 并 fail closed，不允许通过忽略哈希、动态下载或宽松匹配恢复服务。
+
+## ADR-076：Enterprise Quick Deploy 复用外部 PostgreSQL并以项目命名空间隔离
+
+Quick Deploy 不创建 PostgreSQL/MySQL 容器或数据库卷。元数据使用明确的 `CHATBI_DATABASE_URL` 和专用 Schema，业务数据源只能在登录后通过 Backend API 以只读账号添加；Frontend 不读取连接凭据。Compose 项目、Backend/Sandbox 镜像、端口、附件存储和备份目录都显式可配置，B 线验收必须使用独立命名空间，Stop/Reset/Restore 只能作用于该项目。
+
+Bootstrap 只在迁移后幂等创建默认 Workspace、ADMIN/ANALYST 身份和受控 RAG/Agent 运行记录；Demo Seed 默认关闭。配置门禁拒绝占位 Secret、弱 Secret、非法 Schema、重复端口和 Docker 内 localhost 数据库地址。备份使用与目标 PostgreSQL 18.4 同主版本的官方客户端，custom dump 绑定 SHA-256 清单且永不包含 Secret；Restore/Metadata Reset 必须显式确认并校验项目自有 Schema。确定性 Provider 不要求外部 Key，缺 Key 的商业 Provider 不得被误报为部署失败。
+
 ## ADR-070：复杂 Provider token 上限绑定请求 Route，失败回退复用已验证工具结果
 
 最终认证使用统一 `FINAL_REAL_PROVIDER_RECERTIFICATION` Gate 名称，因此不能再从全局 Gate 字符串推断当前模型调用是否属于 Complex/Agent。Model Gateway 在唯一网络边界把受信 `RequestContext.route` 传给测试成本控制器：`COMPLEX_ANALYSIS` 使用既有 1024-token 上限，其他路由保持 512；Provider 自报 Route 或正文不能改变该上限。这样避免合法复杂 SQLPlan 在 512 tokens 处截断并产生不必要修复调用，同时不放宽总调用、Provider、重试或预算上限。

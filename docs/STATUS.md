@@ -10,6 +10,17 @@
 - README 与 `docs/showcase/` 已提供求职定位、演示 Runbook、3～5 分钟和 8～10 分钟视频脚本、面试讲解稿以及资源清理记录。最终 Backend 为 679 collected（672 passed、7 个条件性 skip、0 failed），Frontend Vitest 15 files / 60 tests、Vite 994 modules，Playwright 求职核心闭环 45/45；停止态启动连续 2/2，均完成 5/5 healthy、登录、代理、RAG 和匿名 401 门禁。
 - 最终本机只注册 `E:\ChatBI V2 项目` 一个 worktree、本地只保留 `main`；并发 Enterprise 最终 `656496a` 与仓库内 `tmp/phase3-edit` 均先生成可恢复外部归档并校验后清理。全仓 `node_modules/.venv/__pycache__/.pytest_cache/test-results/playwright-report` 匹配数为 0；Docker 只保留 canonical 5 容器、3 images、3 networks、0 volumes，并保持 Demo 运行态。
 
+## 2026-08-27：V1.3 Enterprise Quick Deploy 产品化候选
+
+- 本轮属于 P0 的部署稳定性、安全性与易用性收口，只在 `codex/v1.3-next-enterprise-productization` 推进；不改 main、V1.3.0 Final Tag/Release、A 线工作区、A 线数据库或 A 线 Compose 资源。
+- 已落地显式配置校验、幂等 Bootstrap、Start/Stop/Status/Verify/Doctor、带 SHA-256 清单的 Backup/Restore、双重确认 Reset 和公共 API 企业主链路 Smoke；Compose 使用独立项目名、镜像名、端口、存储目录和既有本机 PostgreSQL 专用 Schema，不创建数据库容器或数据库卷。
+- 当前真实 B 线预验收：Bootstrap 连续两次 PASS（Workspace 1、用户 2、迁移 head `20260822_0012`）；五服务 healthy，缓存启动 106.7 秒；Doctor 0 failure/0 warning；登录、PostgreSQL 只读连接、9 表/56 字段同步、Catalog、语义发布、问数、RAG、文件和固定 Agent 全部 PASS。
+- Backup、Restore、Metadata Reset 均完成真实往返；缺必填、畸形配置、错误数据库和端口占用均按预期 fail-fast，错误演练后的运行容器为 0。维护工具已与本机 PostgreSQL 18.4 对齐，备份不含 Secret。
+- Windows checkout 下 DB-GPT 与 PandasAI selected-source 的完整性校验改为只规范化 CRLF 后核对冻结 SHA/长度；真实内容篡改仍 fail closed。部署/RAG/系统/数据源专项 14/14、多模态专项 20/20（退出码 0）通过；完整 Backend 套件因宿主 bind-mount 磁盘等待中止，不冒充 PASS。
+- Fresh Clone #1 由浅克隆的 clean `5af33ee38f5830ea34900a041c54ce24a7da3090` 执行，确认 `.env`、`.venv`、`frontend/node_modules` 均不存在；Bootstrap、五服务 Start/Verify、Doctor 与 Enterprise Smoke 全部 PASS，总耗时 1612.7 秒。该冷构建因本轮 selected-runtime package 变更重建固定 DB-GPT 262 MB 与 OCR 系统库 220 MB，未达到 15 分钟目标；缓存复用的 Fresh Clone #2 结果以仓库外脱敏 Evidence 和最终交付为准。
+- Fresh Clone #2 由 clean `e316e7f5f72d4a63dd3db027424439eb32452b25` 执行，同样没有本地环境或依赖缓存，功能门禁全部 PASS，但 Docker context 扫描和 7 个一次性探针容器使总耗时达到 1314.7 秒，未达到 10 分钟目标。候选随后把三类镜像构建统一到 Bootstrap、禁止 Start 重复 build，并把数据库认证/迁移/head/seed 合并为一个临时容器、Doctor 两个数据库容器合并为一个；优化后的幂等 Bootstrap 实测 45.0 秒，最终性能复验仍以仓库外 Evidence 和交付输出为准。
+- Final-SHA 标准 `start.ps1` 复验在配置门禁前发现内部 Bootstrap 数组 splat 把 `-EnvFile` 错当位置参数；该失败启动容器为 0。入口已改为命名参数 hashtable splat，禁止再用 `-SkipBootstrap` 绕过标准路径作为唯一通过证据。
+
 ## V1.3.0 Phase 5 发布加固候选（2026-08-22）
 
 - 2026-08-26 `58536b5` 的 MiMo/DeepSeek NL2SQL 与 Kimi M04 均 PASS 后，P5C03 首个 MiMo SQLPlan 在固定 512 tokens 处以 `finish_reason=length` 截断，第二个修复响应正确完成 SQL Guard、EXPLAIN、Result Oracle 与冻结值匹配，但两次调用耗尽 30 秒 Agent 窗口；旧 fallback 又尝试重复 QueryPipeline，并由 `UNNECESSARY_DUPLICATE_PAID_CALL_BLOCKED` 正确阻断。该 SHA 的五条真实响应、账本、Trace、取消与清理证据完整脱敏保留。候选现按受信 `RequestContext.route` 让 `COMPLEX_ANALYSIS` 使用既有 1024-token 上限，并在 Agent 已持有完整 Guard/Oracle/签名结果时直接复用工具证据，禁止重复付费查询；必须形成新 successor，从空账本重新认证。

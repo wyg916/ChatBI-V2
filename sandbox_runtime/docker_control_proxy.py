@@ -17,7 +17,7 @@ from urllib.parse import parse_qs, unquote, urlsplit
 MAX_HEADER_BYTES = 32 * 1024
 MAX_REQUEST_BYTES = 2 * 1024 * 1024
 MAX_RESPONSE_BYTES = 4 * 1024 * 1024
-WORKER_IMAGE = "chatbi-sandbox-runtime:phase3"
+WORKER_IMAGE = os.environ.get("CHATBI_SANDBOX_WORKER_IMAGE", "chatbi-sandbox-runtime:phase3")
 WORKER_USER = "65532:65532"
 WORKER_COMMAND = ["tail", "-f", "/dev/null"]
 EXEC_COMMAND = ["python", "/opt/chatbi/sandbox_runner.py"]

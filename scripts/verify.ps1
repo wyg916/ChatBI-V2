@@ -1,9 +1,15 @@
+[CmdletBinding()]
+param([string]$EnvFile = '')
+
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'deployment\ChatBI.Deployment.ps1')
 $projectRoot = Split-Path -Parent $PSScriptRoot
+$resolvedEnv = Resolve-ChatBIEnvFile -EnvFile $EnvFile
 Set-Location -LiteralPath $projectRoot
-$backendPort = if($env:CHATBI_BACKEND_PORT) { $env:CHATBI_BACKEND_PORT } else { '8000' }
-$frontendPort = if($env:CHATBI_FRONTEND_PORT) { $env:CHATBI_FRONTEND_PORT } else { '5173' }
-$ragPort = if($env:CHATBI_RAG_PORT) { $env:CHATBI_RAG_PORT } else { '8001' }
+$configuration = Assert-ChatBIConfiguration -EnvFile $resolvedEnv
+$backendPort = $configuration.BackendPort
+$frontendPort = $configuration.FrontendPort
+$ragPort = $configuration.RagPort
 $apiBase = "http://127.0.0.1:${backendPort}/api/v1"
 
 function Get-AnonymousStatus {
@@ -17,7 +23,7 @@ function Get-AnonymousStatus {
 }
 
 $backend = Invoke-WebRequest -UseBasicParsing -Uri "http://127.0.0.1:${backendPort}/health" -TimeoutSec 5
-$frontend = Invoke-WebRequest -UseBasicParsing -Uri "http://127.0.0.1:${frontendPort}/" -TimeoutSec 5
+$frontend = Invoke-WebRequest -UseBasicParsing -Uri "http://127.0.0.1:${frontendPort}/healthz" -TimeoutSec 5
 $version = Invoke-RestMethod -Uri "$apiBase/version" -TimeoutSec 5
 $proxiedVersion = Invoke-RestMethod -Uri "http://127.0.0.1:${frontendPort}/api/v1/version" -TimeoutSec 5
 $rag = Invoke-RestMethod -Uri "http://127.0.0.1:${ragPort}/health" -TimeoutSec 5
@@ -40,3 +46,4 @@ foreach ($path in $protectedPaths) {
   local_demo_postgres = 'PORT_REACHABLE_STARTUP_CHECK'
   local_demo_mysql = 'PORT_REACHABLE_STARTUP_CHECK'
 } | Format-List
+Write-Host 'VERIFY=PASS' -ForegroundColor Green
