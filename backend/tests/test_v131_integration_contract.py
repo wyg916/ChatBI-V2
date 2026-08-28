@@ -71,6 +71,16 @@ def test_showcase_and_deployment_precedence_are_project_scoped():
     assert "Get-ChatBIComposeArguments -EnvFile $resolvedEnv -ProjectName $configuration.ProjectName" in stop
 
 
+def test_bootstrap_is_safe_for_the_windows_powershell_one_click_launcher():
+    bootstrap = _read("scripts/bootstrap.ps1")
+
+    assert "sh -c $bootstrapScript" not in bootstrap
+    assert "backend python -c $databaseReadinessProbe" in bootstrap
+    assert "backend alembic upgrade head" in bootstrap
+    assert "backend alembic current" in bootstrap
+    assert "'backend', 'python', '-m', 'app.db.deployment_bootstrap'" in bootstrap
+
+
 def test_candidate_migration_and_backup_contracts_are_version_aware():
     cold_start = _read("scripts/test-release-cold-start.ps1")
     rollback = _read("scripts/test-v13-phase5-rollback-dry-run.ps1")

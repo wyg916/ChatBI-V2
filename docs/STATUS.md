@@ -2,6 +2,8 @@
 
 ## 2026-08-29：V1.3.1 最终发布身份 Successor
 
+- P0 Windows 一键启动兼容性已修复：根目录 `一键启动-ChatBI-V2.cmd` 固定使用 Windows PowerShell 5.1，而 `bootstrap.ps1` 曾把 `python -c`、Alembic 与 deployment bootstrap 嵌入同一条 `sh -c` 字符串；WinPS 5.1 在 PowerShell → Docker → Linux shell 边界重写嵌套引号，使 Python 实际只收到 `from` 并报 `SyntaxError`。Bootstrap 现改为四个原生参数调用并逐步 fail-fast，保留单次镜像构建优化。
+- 修复后已在 Windows PowerShell 5.1 下从 `0` 个 Showcase 容器连续完成两次停止态启动，其中第一次直接执行根目录 CMD；两次均为 `BOOTSTRAP=PASS`、migration head `20260828_0013`、`VERIFY=PASS`、`START=PASS`，最终 Backend/RAG/Frontend/Sandbox Controller/Sandbox Proxy `5/5 healthy`，版本 `1.3.1`，匿名受保护 API `5/5` 返回 401，外部 Provider 调用 `0`。V1.3.1 部署契约测试 `7/7 PASS`，相关 deployment/system/showcase/migration 定向回归合计 `20/20 PASS`。
 - 本轮属于 P0 发布身份与正式发布收口，不新增功能、页面、API、Migration、Agent、RAG、NL2SQL、部署能力或 UI 优化。对已认证候选 `51f130df635e2199208952333ed184191a96091a` 的发布前只读审计发现后端默认版本、前端壳层、Showcase release identity 与 SBOM 元数据仍含 `1.3.0`/`candidate` 当前身份，因此禁止直接发布原候选。
 - 唯一 successor 只统一当前产品身份为 V1.3.1，更新公开 README、Release Notes、Rollback、SBOM 元数据和版本契约测试；历史 V1.3.0 Tag/SHA、Phase 文档、Golden Snapshot、workflow 分支名、迁移 `0012` 与依赖组件版本保持不变。
 - Successor 必须重新完成版本/Backend/Frontend/TypeScript/build/System Information/Showcase/Enterprise Doctor 门禁，并在冻结新 SHA 后通过唯一 Model Gateway 对 MiMo、DeepSeek、Kimi 各执行一次受控 live smoke。全部通过前不得晋升 main、创建 Tag 或 GitHub Release。

@@ -1,5 +1,11 @@
 # Architecture Decisions
 
+## ADR-094：Windows 一键启动的 Bootstrap 子命令必须保持原生参数边界
+
+根目录 Showcase CMD 是正式 Windows 一键入口，并明确由 Windows PowerShell 5.1 执行。PowerShell AST 解析成功不能证明后续原生进程参数完整：把带引号的 `python -c` 再嵌入 `sh -c`，经过 PowerShell → Docker CLI → Linux shell 后可能被 WinPS 5.1 重写为不完整的 Python 程序。
+
+数据库 readiness、Alembic upgrade、Alembic current 与幂等 deployment bootstrap 必须分别作为 Docker 原生参数调用，并在每一步检查退出码、立即 fail closed；禁止为了少建临时容器而重新拼接多层 shell 字符串。该决定只取代 ADR-082 的“数据库引导共享一个临时容器”优化，Backend/Frontend/Sandbox 镜像仍只构建一次，数据库仍使用本机 PostgreSQL，Compose 不新增数据库服务或 volume。发布门禁必须至少包含 Windows PowerShell 5.1 的根 CMD 实跑和从完全停止状态连续启动两次。
+
 ## ADR-093：正式发布身份必须形成单一 Successor 并重新绑定 Exact-SHA Provider 证据
 
 V1.3.1 已认证 Integration Candidate 如果仍在后端 `/version`、前端壳层、Showcase runtime identity、SBOM 或公开 README 中显示 `1.3.0`/`candidate`，不得直接晋升 main、Tag 或 GitHub Release。只允许创建一个不改变业务行为的版本身份 successor，统一当前产品版本、发布元数据、必要文档和版本契约；V1.3.0 Tag/SHA、Phase 文档、Golden Snapshot、旧 migration head 与第三方组件版本等历史事实必须原样保留。
