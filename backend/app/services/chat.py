@@ -535,7 +535,11 @@ class ChatService:
                 response_payload = {"analysis": result.model_dump(mode="json")}
                 status = result.status
                 primary = result.primary
-                data_payload = primary.get("data", primary) if isinstance(primary, dict) else {}
+                data_payload = (
+                    primary.get("data")
+                    or primary.get("data_evidence")
+                    or primary
+                ) if isinstance(primary, dict) else {}
                 query_run_id = data_payload.get("id") if isinstance(data_payload, dict) else None
                 model_provider = data_payload.get("provider") if isinstance(data_payload, dict) else None
                 model_trace = ((data_payload.get("plan") or {}).get("model_trace") or {}) if isinstance(data_payload, dict) else {}

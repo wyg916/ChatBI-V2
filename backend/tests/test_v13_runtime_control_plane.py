@@ -292,6 +292,8 @@ def test_unrestricted_provider_mode_removes_cost_routing_caps_and_allows_kimi_re
 
     premium_request = request.model_copy(update={"complexity_score": 90})
     assert gateway.policy.provider_candidates(premium_request)[0] == "kimi"
+    unrestricted_balanced = premium_request.model_copy(update={"budget_mode": BudgetMode.BALANCED})
+    assert gateway.policy.provider_candidates(unrestricted_balanced)[0] == "kimi"
 
     reply = gateway.complete(
         system="system",

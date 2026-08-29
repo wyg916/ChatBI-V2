@@ -31,11 +31,13 @@ ChatBI V2 v1.3.1 is an **Enterprise-oriented Open-source ChatBI / NL2SQL Platfor
 
 These totals and claims certify only the immutable published tag above. They must not be reused as evidence for later `main` changes. The annotated-tag object, GitHub Release ID/URL, checksums and exact publication timestamp remain recorded in the external V1.3.1 Final Release Manifest.
 
-## Unreleased `0014` main successor
+## Unreleased `0015` main successor
 
-The current working-tree successor is not part of `chatbi-v2-v1.3.1` and has not been published as a release. It introduces Alembic head `20260829_0014` for managed spreadsheet datasource metadata, with direct downgrade target `20260828_0013`; it also moves new backups to the `chatbi-enterprise-backup-v3` contract and requires matching-source restore semantics.
+The current working-tree successor is not part of `chatbi-v2-v1.3.1` and has not been published as a release. It introduces migration `20260829_0014` for managed spreadsheet datasource metadata and head `20260829_0015` for nullable `SQLWorkspaceRun → Datasource` history links with `ON DELETE SET NULL`; the direct downgrade target is `20260829_0014`. It also moves new backups to the `chatbi-enterprise-backup-v3` contract and requires matching-source restore semantics.
 
-Current source regression covers empty database to `0014`, existing `0013 → 0014`, and the managed-datasource downgrade guard. That incremental regression does not inherit the tag's Backend, Frontend, browser, Provider or fresh-deployment totals. The successor requires its own complete release gates and evidence before any new release claim; current progress and remaining gates are tracked in `docs/STATUS.md`.
+Current source regression covers empty database to `0015`, existing `0013 → 0014 → 0015`, managed-datasource deletion with preserved SQL-workspace history, and fail-closed downgrade guards for both managed storage and detached history. That incremental regression does not inherit the tag's Backend, Frontend, browser, Provider or fresh-deployment totals. The successor requires its own complete release gates and evidence before any new release claim; current progress and remaining gates are tracked in `docs/STATUS.md`.
+
+The successor also unifies guarded final presentation across the authenticated `/chat/stream`, `/analysis` and `/analysis/stream` contracts. Presentation runs only after deterministic publication evidence is valid, preserves the exact source answer, records the resolved Provider/Model, and falls back to the verified source without changing a successful analysis into a failure.
 
 ## Known risks
 

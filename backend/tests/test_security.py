@@ -263,6 +263,42 @@ def test_revoked_datasource_runs_disappear_from_history_and_cannot_be_replayed(
     ).status_code == 403
 
 
+def test_detached_datasource_history_is_fail_closed_for_analyst(
+    raw_client, db_session,
+):
+    _, analyst = _seed_users(db_session)
+    run = SqlWorkspaceRun(
+        workspace_id=analyst.workspace_id,
+        user_id=analyst.id,
+        datasource_id=None,
+        operation="EXECUTE",
+        sql_text="SELECT 1",
+        normalized_sql="SELECT 1 LIMIT 1",
+        status="SUCCEEDED",
+        guard_payload={"allowed": True, "dialect": "postgresql"},
+        execution_payload={
+            "status": "SUCCEEDED", "columns": ["value"],
+            "rows": [{"value": 1}], "result_signature": "a" * 64,
+        },
+        oracle_payload={"status": "PASSED"},
+    )
+    db_session.add(run)
+    db_session.commit()
+    _login(raw_client, analyst.email)
+
+    history = raw_client.get("/api/v1/data-workspace/sql/history")
+    assert history.status_code == 200
+    assert history.json()["total"] == 0
+    assert history.json()["items"] == []
+    replay = raw_client.post(f"/api/v1/data-workspace/sql/history/{run.id}/replay")
+    verify = raw_client.post(
+        f"/api/v1/data-workspace/sql/history/{run.id}/verify",
+        json={"owner_name": "Detached Analyst", "status": "VERIFIED"},
+    )
+    assert replay.status_code == 403
+    assert verify.status_code == 403
+
+
 def test_sensitive_sql_literal_is_absent_from_run_history_and_shared_answer_reads(
     raw_client, db_session, monkeypatch,
 ):

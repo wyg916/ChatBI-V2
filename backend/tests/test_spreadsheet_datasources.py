@@ -9,7 +9,17 @@ from sqlalchemy import inspect, select
 
 from app.api.routes import datasources as datasource_routes
 from app.core.config import get_settings
-from app.models import DataSource, DataSourceColumn, DataSourceImport
+from app.core.data_safety import SENSITIVE_COMMENT_MARKER
+from app.models import (
+    AppUser,
+    AuditEvent,
+    DataSource,
+    DataSourceColumn,
+    DataSourceImport,
+    QueryRun,
+    SqlWorkspaceRun,
+    Workspace,
+)
 from app.services.datasources import runtime_dialect
 from app.services.spreadsheet_datasources import _safe_identifier
 
@@ -159,6 +169,167 @@ def test_spreadsheet_import_materializes_catalog_and_deletes_only_its_owned_tabl
     assert db_session.get(DataSource, datasource["id"]) is None
     assert db_session.scalar(select(DataSourceImport).where(DataSourceImport.datasource_id == datasource["id"])) is None
     assert storage_table not in inspect(db_session.get_bind()).get_table_names()
+
+
+def test_spreadsheet_delete_detaches_workspace_history_and_keeps_sensitive_sql_private(client, db_session):
+    imported = client.post(
+        "/api/v1/datasources/import",
+        data={"name": "可删除的历史数据源"},
+        files={"file": (
+            "history.csv",
+            b"order_id,segment_code\n1,confidential-value\n2,public-value\n",
+            "text/csv",
+        )},
+    )
+    assert imported.status_code == 201, imported.text
+    datasource_id = imported.json()["datasource"]["id"]
+    import_row = db_session.scalar(
+        select(DataSourceImport).where(DataSourceImport.datasource_id == datasource_id),
+    )
+    assert import_row is not None
+    table_name = import_row.sheet_metadata[0]["table_name"]
+    sensitive_column = db_session.scalar(
+        select(DataSourceColumn).where(DataSourceColumn.name == "segment_code"),
+    )
+    assert sensitive_column is not None
+    sensitive_column.comment = SENSITIVE_COMMENT_MARKER
+    db_session.commit()
+
+    executed = client.post("/api/v1/data-workspace/sql/execute", json={
+        "datasource_id": datasource_id,
+        "sql": (
+            f'SELECT order_id FROM main."{table_name}" '
+            "WHERE segment_code = 'confidential-value'"
+        ),
+        "row_limit": 20,
+    })
+    assert executed.status_code == 201, executed.text
+    run_id = executed.json()["id"]
+    assert "confidential-value" not in executed.text
+    stored_before = db_session.get(SqlWorkspaceRun, run_id)
+    assert stored_before is not None
+    assert stored_before.datasource_id == datasource_id
+    assert "segment_code" in stored_before.guard_payload["_sensitive_columns_snapshot"]
+
+    deleted = client.delete(f"/api/v1/datasources/{datasource_id}")
+    assert deleted.status_code == 204, deleted.text
+    db_session.expire_all()
+    stored_after = db_session.get(SqlWorkspaceRun, run_id)
+    assert stored_after is not None
+    assert stored_after.datasource_id is None
+    assert db_session.get(DataSource, datasource_id) is None
+
+    history = client.get("/api/v1/data-workspace/sql/history")
+    assert history.status_code == 200, history.text
+    historical = next(item for item in history.json()["items"] if item["id"] == run_id)
+    assert historical["datasource_id"] is None
+    assert "confidential-value" not in history.text
+    assert "_sensitive_columns_snapshot" not in history.text
+
+    replay = client.post(f"/api/v1/data-workspace/sql/history/{run_id}/replay")
+    verify = client.post(
+        f"/api/v1/data-workspace/sql/history/{run_id}/verify",
+        json={"owner_name": "History owner", "status": "VERIFIED"},
+    )
+    assert replay.status_code == 409
+    assert replay.json()["detail"] == "SQL_WORKSPACE_DATASOURCE_DELETED"
+    assert verify.status_code == 409
+    assert verify.json()["detail"] == "SQL_WORKSPACE_DATASOURCE_DELETED"
+    audit = db_session.scalar(select(AuditEvent).where(
+        AuditEvent.action == "DELETE",
+        AuditEvent.resource_type == "DATASOURCE",
+        AuditEvent.resource_id == datasource_id,
+        AuditEvent.status == "SUCCESS",
+    ))
+    assert audit is not None
+    assert audit.details["detached_workspace_runs"] == 1
+
+
+def test_spreadsheet_delete_fails_closed_before_storage_cleanup_for_cross_workspace_history(client, db_session):
+    imported = client.post(
+        "/api/v1/datasources/import",
+        data={"name": "跨工作空间保护"},
+        files={"file": ("scope.csv", b"id,value\n1,10\n", "text/csv")},
+    )
+    assert imported.status_code == 201, imported.text
+    datasource_id = imported.json()["datasource"]["id"]
+    import_row = db_session.scalar(
+        select(DataSourceImport).where(DataSourceImport.datasource_id == datasource_id),
+    )
+    assert import_row is not None
+    storage_table = import_row.sheet_metadata[0]["storage_table"]
+    other_workspace = Workspace(name="Other spreadsheet workspace")
+    db_session.add(other_workspace)
+    db_session.flush()
+    other_user = AppUser(
+        workspace_id=other_workspace.id,
+        email="other-spreadsheet@example.test",
+        display_name="Other spreadsheet user",
+        role="ADMIN",
+        status="ACTIVE",
+    )
+    db_session.add(other_user)
+    db_session.flush()
+    db_session.add(SqlWorkspaceRun(
+        workspace_id=other_workspace.id,
+        user_id=other_user.id,
+        datasource_id=datasource_id,
+        operation="EXECUTE",
+        sql_text="SELECT 1",
+        normalized_sql="SELECT 1",
+        status="SUCCEEDED",
+        guard_payload={},
+        execution_payload={},
+        oracle_payload={},
+    ))
+    db_session.commit()
+
+    rejected = client.delete(f"/api/v1/datasources/{datasource_id}")
+    assert rejected.status_code == 409
+    assert rejected.json()["detail"] == "DATASOURCE_HISTORY_SCOPE_MISMATCH"
+    assert db_session.get(DataSource, datasource_id) is not None
+    assert storage_table in inspect(db_session.get_bind()).get_table_names()
+
+
+def test_spreadsheet_delete_returns_conflict_before_query_history_or_storage_is_removed(client, db_session):
+    imported = client.post(
+        "/api/v1/datasources/import",
+        data={"name": "问数历史保护"},
+        files={"file": ("query-history.csv", b"id,value\n1,10\n", "text/csv")},
+    )
+    assert imported.status_code == 201, imported.text
+    datasource_id = imported.json()["datasource"]["id"]
+    import_row = db_session.scalar(
+        select(DataSourceImport).where(DataSourceImport.datasource_id == datasource_id),
+    )
+    assert import_row is not None
+    storage_table = import_row.sheet_metadata[0]["storage_table"]
+    semantic = client.post("/api/v1/semantic-models", json={
+        "name": "受保护的 Excel 语义模型",
+        "description": "Query history delete protection",
+        "datasource_id": datasource_id,
+    })
+    assert semantic.status_code == 201, semantic.text
+    workspace = db_session.scalar(select(Workspace).order_by(Workspace.created_at))
+    assert workspace is not None
+    run = QueryRun(
+        workspace_id=workspace.id,
+        datasource_id=datasource_id,
+        semantic_model_id=semantic.json()["id"],
+        semantic_model_version=1,
+        question="Protected historical query",
+        status="SUCCEEDED",
+        provider="test",
+    )
+    db_session.add(run)
+    db_session.commit()
+
+    rejected = client.delete(f"/api/v1/datasources/{datasource_id}")
+    assert rejected.status_code == 409
+    assert rejected.json()["detail"] == "DATASOURCE_HAS_PERSISTED_QUERY_ARTIFACTS"
+    assert db_session.get(DataSource, datasource_id) is not None
+    assert db_session.get(QueryRun, run.id) is not None
+    assert storage_table in inspect(db_session.get_bind()).get_table_names()
 
 
 def test_spreadsheet_import_rejects_formulas_active_content_and_formula_like_csv(client):

@@ -135,7 +135,7 @@ try {
   $snapshotJson = $snapshotOutput | Where-Object { ([string]$_).Trim().StartsWith('{') } | Select-Object -Last 1
   if (-not $snapshotJson) { throw 'Restored deployment metadata snapshot was not returned' }
   $snapshot = [string]$snapshotJson | ConvertFrom-Json
-  if ($snapshot.migration_head -ne '20260829_0014' -or $snapshot.migration_head -ne $manifest.migration_head) {
+  if ($snapshot.migration_head -ne '20260829_0015' -or $snapshot.migration_head -ne $manifest.migration_head) {
     throw "Restored migration head mismatch: expected=$($manifest.migration_head) actual=$($snapshot.migration_head)"
   }
   if ($snapshot.metadata_sha256 -ne $manifest.metadata.sha256) {

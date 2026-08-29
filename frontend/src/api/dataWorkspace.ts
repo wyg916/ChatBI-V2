@@ -10,7 +10,7 @@ export interface DataRelationship {
   target_schema?: string; target_table: string; target_columns: string[];
 }
 export interface SqlWorkspaceRun {
-  id: string; datasource_id: string; operation: string; sql_text: string; normalized_sql?: string;
+  id: string; datasource_id: string | null; operation: string; sql_text: string; normalized_sql?: string;
   status: string; guard: Record<string, unknown>; execution: {
     columns?: string[]; rows?: Array<Record<string, unknown>>; row_count?: number; duration_ms?: number;
     result_signature?: string; error_code?: string; error_message?: string;

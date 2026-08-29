@@ -155,7 +155,14 @@ def execute_sql(
         workspace_id=principal.workspace_id or "", user_id=principal.user_id or "",
         datasource_id=datasource.id, operation=operation, sql_text=sql,
         normalized_sql=guard.normalized_sql, status="SECURITY_REJECTED" if not guard.allowed else "PLANNING",
-        guard_payload=guard.model_dump(mode="json"), execution_payload={}, oracle_payload={},
+        guard_payload={
+            **guard.model_dump(mode="json"),
+            # Private server-side snapshot: the catalog may later be deleted,
+            # but historical public SQL must retain the policy that applied at
+            # execution time.  The API projection removes this key.
+            "_sensitive_columns_snapshot": sorted(set(policy.sensitive_columns)),
+        },
+        execution_payload={}, oracle_payload={},
     )
     db.add(run)
     db.flush()
@@ -266,6 +273,8 @@ def save_verified_sql(
     execution = run.execution_payload or {}
     if run.workspace_id != principal.workspace_id or run.user_id != principal.user_id:
         raise PermissionError("SQL workspace run access denied")
+    if run.datasource_id is None:
+        raise ValueError("SQL_WORKSPACE_DATASOURCE_DELETED")
     if run.status != "SUCCEEDED" or (run.oracle_payload or {}).get("status") != "PASSED":
         raise ValueError("Only a successful, Oracle-passed SQL run can be saved")
     if not execution.get("result_signature"):
@@ -277,13 +286,15 @@ def save_verified_sql(
         security_policy(db, run.datasource_id, get_settings().query_row_limit).sensitive_columns,
         dialect=dialect,
     ) or ""
+    public_guard = dict(run.guard_payload or {})
+    public_guard.pop("_sensitive_columns_snapshot", None)
     answer = VerifiedAnswer(
         workspace_id=principal.workspace_id or "", question=f"SQL 工作台验证：{public_sql[:180]}", module="数据源",
         sql_synced=True, model_name="SQL Workspace", owner_name=owner_name, status=status,
         accuracy_percent=100, sort_order=sort_order, query_run_id=None, sql_text=run.normalized_sql,
         result_signature=execution["result_signature"], semantic_model_version=None,
         semantic_intent={"intent": "MANUAL_SQL", "datasource_id": run.datasource_id},
-        sql_plan={"provider": "data-workspace", "guard": run.guard_payload}, result_snapshot=execution,
+        sql_plan={"provider": "data-workspace", "guard": public_guard}, result_snapshot=execution,
         chart_spec={}, narrative={"conclusion": "该 SQL 已通过只读校验并保存为 Verified SQL。"},
         datasource_id=run.datasource_id, semantic_model_id=None, oracle_status="PASSED",
         feedback={"source": "SQL_WORKSPACE", "verified_by": principal.user_id},

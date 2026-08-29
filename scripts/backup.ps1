@@ -70,8 +70,8 @@ try {
   $snapshotJson = $snapshotOutput | Where-Object { ([string]$_).Trim().StartsWith('{') } | Select-Object -Last 1
   if (-not $snapshotJson) { throw 'Deployment metadata snapshot was not returned' }
   $snapshot = [string]$snapshotJson | ConvertFrom-Json
-  if ($snapshot.migration_head -ne '20260829_0014') {
-    throw "Backup requires migration head 20260829_0014; actual=$($snapshot.migration_head)"
+  if ($snapshot.migration_head -ne '20260829_0015') {
+    throw "Backup requires migration head 20260829_0015; actual=$($snapshot.migration_head)"
   }
   $countProperties = @($snapshot.counts.PSObject.Properties.Name)
   if ($countProperties -notcontains 'datasource_import' -or $countProperties -notcontains 'excel_datasource') {

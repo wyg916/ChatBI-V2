@@ -17,10 +17,10 @@ $certifiedCandidateMigrationHead = '20260828_0013'
 $certifiedRollbackMigrationHead = '20260822_0012'
 
 if($CandidateSha -ne $certifiedCandidateSha -or $RollbackSha -ne $certifiedRollbackSha) {
-  throw 'This historical V1.3.1 runner accepts only candidate 852d8aa35a6ec0a31bed34ba695ec6a17034b457 and rollback 89bdc12936be0555bdad8a85f06932fb7dc476ee; use a separate current-version runner for migration 0014.'
+  throw 'This historical V1.3.1 runner accepts only candidate 852d8aa35a6ec0a31bed34ba695ec6a17034b457 and rollback 89bdc12936be0555bdad8a85f06932fb7dc476ee; use a separate current-version runner for migrations 0014 or 0015.'
 }
 if($CandidateMigrationHead -ne $certifiedCandidateMigrationHead -or $RollbackMigrationHead -ne $certifiedRollbackMigrationHead) {
-  throw 'This historical V1.3.1 runner accepts only migration 20260828_0013 to 20260822_0012; it must not be reused for migration 0014.'
+  throw 'This historical V1.3.1 runner accepts only migration 20260828_0013 to 20260822_0012; it must not be reused for migrations 0014 or 0015.'
 }
 
 function Test-RollbackPythonRuntime {

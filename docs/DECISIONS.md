@@ -579,3 +579,24 @@ Phase5 Live Runner 在 Level0/1/2 运行前已经通过唯一成本控制器验�
 - A `VERIFIED` status alone does not make an answer reusable or dashboard-ready. Reuse additionally requires both datasource and semantic-model bindings; dashboard insertion additionally requires a passed Result Oracle, a persisted query run, and a non-empty chart specification.
 - The answer list and detail panel apply the same predicate and expose the precise missing prerequisite through the disabled control title. The UI must not advertise an action that can only terminate in a deterministic Backend 422 response.
 - Backend validation remains authoritative. This UI gate only mirrors its stable prerequisites and does not synthesize missing metadata, weaken Oracle checks, or convert incomplete SQL Workspace answers into dashboard cards.
+
+## ADR-096 — Managed datasource deletion preserves workspace SQL history
+
+- Status: Accepted (2026-08-29)
+- `SqlWorkspaceRun.datasource_id` is nullable with `ON DELETE SET NULL`. Deleting a managed Excel/CSV datasource detaches only runs from the same workspace and preserves their already-masked result, SQL, Guard, Oracle and audit evidence. Deletion locks the datasource and its current SemanticModel rows in that order; grant/revoke operations acquire the same datasource-first locks. A concurrent model migration is therefore re-evaluated before grant/default cleanup, and a concurrent permission write cannot leave an orphaned grant.
+- The execution-time sensitive-column policy is stored as a private server snapshot so detached historical SQL remains redacted; this snapshot is removed from every public API and Verified Answer projection. Until a durable archived-ACL snapshot exists, detached runs are visible only to their original ADMIN owner; Analyst list and single-run reads fail closed. Detached runs cannot be replayed or promoted without a live datasource.
+- QueryRun, VerifiedAnswer, cross-workspace history or cross-workspace grants fail closed before any owned PostgreSQL schema or reader role is removed. Migration `0015` refuses a lossy downgrade while detached history exists.
+
+## ADR-097 — Unrestricted local routing is limited to three named providers
+
+- Status: Accepted (2026-08-29)
+- `provider_usage_unrestricted` removes ChatBI internal cost admission and call caps only for MiMo, DeepSeek and Kimi. It does not disable credential, health, SQL, result, citation, visual or answer publication guards, and it never applies to OpenAI-compatible or future providers automatically.
+- General chat normally uses MiMo, NL2SQL normally uses DeepSeek, and verified high-complexity `COMPLEX_ANALYSIS` presentation raises the routing score so Kimi is preferred while automatic MiMo/DeepSeek fallback remains available.
+- A Provider may improve presentation only after the deterministic evidence boundary passes. The exact verified source answer must remain unchanged and contiguous; model failure or guard rejection returns the source answer instead of weakening publication safety.
+
+## ADR-098 — Every formal answer endpoint shares the guarded final Presenter
+
+- Status: Accepted (2026-08-30)
+- `/chat/stream`, `/analysis` and `/analysis/stream` are formal authenticated answer endpoints. Each applies `AnswerPresenter` only after its route-specific SQL/Result/Citation/Answer publication guards; `AnalysisService` remains presentation-neutral so Chat does not run the stage twice.
+- Synchronous Analysis binds the presentation call to its ModelInvocation session before composing the canonical AnswerEnvelope. Streaming Analysis performs the same call in its worker before the first `answer.delta`, records the resolved route in RequestContext, and exposes the same provider/model trace without changing primary evidence, Agent steps or result signatures.
+- Presenter/provider failure, cancellation or exact-source guard rejection preserves the validated source answer. Presentation can add latency but cannot turn a successful analysis into a failed result or change facts.

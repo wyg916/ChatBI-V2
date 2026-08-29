@@ -4,6 +4,7 @@ import json
 
 from chatbi_agent_contracts import QuestionRoute
 
+import app.services.answer_presentation as answer_presentation_module
 from app.core.access import Principal
 from app.core.config import get_settings
 from app.integration.question_router import QuestionRouter
@@ -77,6 +78,26 @@ def test_verified_answer_is_presented_only_with_exact_source_anchor() -> None:
     assert gateway.calls[0]["requested_alias"] == "auto"
     assert gateway.calls[0]["json_mode"] is True
     assert gateway.calls[0]["budget_mode"].value == get_settings().model_budget_mode
+
+
+def test_unrestricted_complex_answer_uses_kimi_for_guarded_final_presentation(monkeypatch) -> None:
+    source = "已验证的复杂分析结论保持原样。"
+    gateway = _Gateway(f"下面是核验后的结果：{source}")
+    settings = get_settings().model_copy(update={"provider_usage_unrestricted": True})
+    monkeypatch.setattr(answer_presentation_module, "get_settings", lambda: settings)
+
+    result = AnswerPresenter(gateway).present(
+        route=QuestionRoute.COMPLEX_ANALYSIS,
+        status="SUCCEEDED",
+        answer=source,
+        response_payload=_verified_payload(),
+        request_context=_context(),
+    )
+
+    assert result.applied is True
+    assert source in result.content
+    assert gateway.calls[0]["requested_alias"] == "auto"
+    assert gateway.calls[0]["complexity_score"] == 90
 
 
 def test_presentation_rejects_changed_or_new_facts_and_keeps_verified_source() -> None:

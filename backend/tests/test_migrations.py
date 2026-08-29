@@ -90,3 +90,79 @@ def test_spreadsheet_migration_upgrades_existing_0013_and_blocks_unsafe_downgrad
         assert connection.execute(
             "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='datasource_import'"
         ).fetchone()[0] == 0
+
+
+def test_workspace_history_migration_detaches_runs_and_blocks_lossy_downgrade(tmp_path):
+    database_path = tmp_path / "workspace-history-migration.db"
+    database_url = f"sqlite+pysqlite:///{database_path.as_posix()}"
+
+    previous = run_alembic(database_url, "upgrade", "20260829_0014")
+    assert previous.returncode == 0, previous.stderr
+    now = datetime.now(timezone.utc).isoformat()
+    with sqlite3.connect(database_path) as connection:
+        connection.execute("PRAGMA foreign_keys=ON")
+        connection.execute(
+            "INSERT INTO workspace(id, name, created_at, updated_at) VALUES (?, ?, ?, ?)",
+            ("ws-history", "History workspace", now, now),
+        )
+        connection.execute(
+            """INSERT INTO app_user(
+                id, workspace_id, email, display_name, role, status,
+                last_active_at, created_at, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            (
+                "user-history", "ws-history", "history@example.test", "History user",
+                "ADMIN", "ACTIVE", None, now, now,
+            ),
+        )
+        connection.execute(
+            """INSERT INTO datasource(
+                id, workspace_id, name, type, host, port, database, username,
+                password_encrypted, ssl, schema, status, last_sync_at, created_at, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            (
+                "ds-history", "ws-history", "Historical source", "postgresql", "localhost",
+                5432, "chatbi_v2", "reader", "encrypted", 0, "public", "SYNCED",
+                None, now, now,
+            ),
+        )
+        connection.execute(
+            """INSERT INTO sql_workspace_run(
+                id, workspace_id, user_id, datasource_id, operation, sql_text,
+                normalized_sql, status, guard_payload, execution_payload,
+                oracle_payload, duration_ms, error_code, error_message,
+                verified_answer_id, created_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            (
+                "run-history", "ws-history", "user-history", "ds-history", "EXECUTE",
+                "SELECT 1", "SELECT 1", "SUCCEEDED", "{}", "{}", "{}", 1,
+                None, None, None, now,
+            ),
+        )
+        connection.commit()
+
+    upgraded = run_alembic(database_url, "upgrade", "20260829_0015")
+    assert upgraded.returncode == 0, upgraded.stderr
+    with sqlite3.connect(database_path) as connection:
+        connection.execute("PRAGMA foreign_keys=ON")
+        datasource_column = next(
+            row for row in connection.execute("PRAGMA table_info(sql_workspace_run)")
+            if row[1] == "datasource_id"
+        )
+        assert datasource_column[3] == 0
+        datasource_fk = next(
+            row for row in connection.execute("PRAGMA foreign_key_list(sql_workspace_run)")
+            if row[3] == "datasource_id"
+        )
+        assert datasource_fk[6] == "SET NULL"
+        connection.execute("DELETE FROM datasource WHERE id = 'ds-history'")
+        connection.commit()
+        assert connection.execute(
+            "SELECT datasource_id FROM sql_workspace_run WHERE id = 'run-history'"
+        ).fetchone()[0] is None
+
+    blocked = run_alembic(database_url, "downgrade", "20260829_0014")
+    assert blocked.returncode != 0
+    assert "detached SQL workspace history exists" in blocked.stderr
+    with sqlite3.connect(database_path) as connection:
+        assert connection.execute("SELECT version_num FROM alembic_version").fetchone()[0] == "20260829_0015"

@@ -17,10 +17,13 @@ from app.core.config import Settings
 from app.integration.model_gateway import ModelGateway, ModelReply
 from app.integration.contracts import AnalysisResponse
 from app.main import app
-from app.models import AppUser, ChatMessage, Conversation, Workspace
+from app.model_gateway.contracts import ModelCapability, ModelRequest, ModelResponse
+from app.model_gateway.ledger import record_model_invocation
+from app.models import AppUser, ChatMessage, Conversation, ModelInvocation, Workspace
 from app.schemas.chat import ChatRequest, ChatResponse
 from app.services.chat import ChatService
 from app.services.conversations import refresh_conversation_summary
+from app.services.answer_presentation import AnswerPresentation
 from app.streaming import REQUIRED_EVENTS, StreamCancelled, stream_registry
 
 
@@ -35,6 +38,30 @@ def _events(response_text: str) -> list[dict]:
         assert event_name == payload["event_type"]
         events.append(payload)
     return events
+
+
+def _record_test_presenter_invocation(kwargs) -> None:
+    context = kwargs["request_context"]
+    request = ModelRequest(
+        capability=ModelCapability.GENERAL,
+        messages=({"role": "user", "content": "test presentation request"},),
+    )
+    response = ModelResponse(
+        content="test presentation response",
+        requested_alias="auto",
+        resolved_provider="mimo",
+        resolved_model="mimo-v2.5",
+        latency_ms=9,
+    )
+    record_model_invocation(
+        context,
+        request,
+        response=response,
+        provider="mimo",
+        model="mimo-v2.5",
+        status="SUCCEEDED",
+        latency_ms=9,
+    )
 
 
 def test_run_started_cancel_window_sets_event_before_worker_submission(monkeypatch):
@@ -470,6 +497,57 @@ def test_automatic_conversation_title_removes_newlines_and_is_bounded():
     assert 1 <= len(conversation.title) <= 40
 
 
+def test_analysis_sync_uses_guarded_final_presenter(client, db_session, monkeypatch):
+    query = _query_payload_for_analysis(42)
+
+    class _AnalysisService:
+        def execute(self, _db, _data, _principal):
+            return AnalysisResponse(
+                status="SUCCEEDED",
+                route=QuestionRoute.DATA_QUERY,
+                trace_id="TRACE-analysis-sync-presentation",
+                primary=query,
+                feature_modes={"rag": "on", "agent": "on"},
+                security={"CROSS_WORKSPACE_LEAK": 0},
+            )
+
+    class _Presenter:
+        def present(self, **kwargs):
+            _record_test_presenter_invocation(kwargs)
+            source = kwargs["answer"]
+            assert kwargs["response_payload"]["analysis"]["primary"]["guard"]["allowed"] is True
+            assert kwargs["request_context"].route == "DATA_QUERY"
+            return AnswerPresentation(
+                f"下面是核验后的结果：\n{source}",
+                "APPLIED",
+                applied=True,
+                source_verified=True,
+                provider="mimo",
+                model="mimo-v2.5",
+                trace={"resolved_provider": "mimo", "resolved_model": "mimo-v2.5"},
+            )
+
+    monkeypatch.setattr(analysis_route, "AnalysisService", _AnalysisService)
+    monkeypatch.setattr(analysis_route, "AnswerPresenter", _Presenter)
+    response = client.post("/api/v1/analysis", json={
+        "question": "今年收入是多少",
+        "route": "DATA_QUERY",
+        "idempotency_key": "analysis-sync-presentation-001",
+    })
+    assert response.status_code == 201
+    envelope = response.json()["answer_envelope"]
+    assert envelope["markdown"].startswith("下面是核验后的结果：")
+    assert envelope["provider"] == "mimo"
+    assert envelope["model"] == "mimo-v2.5"
+    db_session.expire_all()
+    invocation = db_session.scalar(select(ModelInvocation).where(
+        ModelInvocation.trace_id == "TRACE-analysis-sync-presentation",
+        ModelInvocation.provider == "mimo",
+    ))
+    assert invocation is not None
+    assert invocation.status == "SUCCEEDED"
+
+
 def test_analysis_stream_uses_same_canonical_contract(client, db_session, monkeypatch):
     factory = sessionmaker(bind=db_session.get_bind(), autoflush=False, expire_on_commit=False)
     monkeypatch.setattr(analysis_route, "SessionLocal", factory)
@@ -491,7 +569,25 @@ def test_analysis_stream_uses_same_canonical_contract(client, db_session, monkey
                 security={"CROSS_WORKSPACE_LEAK": 0},
             )
 
+    class _Presenter:
+        def present(self, **kwargs):
+            _record_test_presenter_invocation(kwargs)
+            source = kwargs["answer"]
+            assert kwargs["route"] == "DATA_QUERY"
+            assert kwargs["request_context"].route == "DATA_QUERY"
+            assert kwargs["response_payload"]["analysis"]["primary"]["oracle"]["status"] == "PASSED"
+            return AnswerPresentation(
+                f"先看结论：\n{source}",
+                "APPLIED",
+                applied=True,
+                source_verified=True,
+                provider="mimo",
+                model="mimo-v2.5",
+                trace={"resolved_provider": "mimo", "resolved_model": "mimo-v2.5"},
+            )
+
     monkeypatch.setattr(analysis_route, "AnalysisService", _AnalysisService)
+    monkeypatch.setattr(analysis_route, "AnswerPresenter", _Presenter)
     response = client.post("/api/v1/analysis/stream", json={
         "question": "今年收入是多少",
         "route": "DATA_QUERY",
@@ -527,9 +623,180 @@ def test_analysis_stream_uses_same_canonical_contract(client, db_session, monkey
     assert assistant_message["conversation_id"] == conversation["id"]
     assert assistant_message["parent_message_id"] == user_message["id"]
     assert assistant_message["response_payload"]["analysis"]["primary"]["id"] == "query-analysis"
+    assert assistant_message["response_payload"]["analysis"]["presentation_status"] == "APPLIED"
+    assert assistant_message["trace_payload"]["presentation_status"] == "APPLIED"
+    assert assistant_message["trace_payload"]["answer_presentation"]["provider"] == "mimo"
+    assert assistant_message["response_payload"]["answer_envelope"]["provider"] == "mimo"
+    assert assistant_message["response_payload"]["answer_envelope"]["model"] == "mimo-v2.5"
     assert assistant_message["response_payload"]["message_parts"] == terminal["message_parts"]
     assert "".join(deltas) == assistant_message["content"]
+    assert assistant_message["content"].startswith("先看结论：")
     assert terminal["result_semantic"] == response_payload["result_semantic"] == "VALUE"
+    db_session.expire_all()
+    invocation = db_session.scalar(select(ModelInvocation).where(
+        ModelInvocation.trace_id == assistant_message["trace_payload"]["trace_id"],
+        ModelInvocation.provider == "mimo",
+    ))
+    assert invocation is not None
+    assert invocation.status == "SUCCEEDED"
+
+
+def test_analysis_presenter_rejection_keeps_primary_model_attribution(client, monkeypatch):
+    query = _query_payload_for_analysis(42)
+    query["plan"]["model_trace"] = {
+        "resolved_provider": "deepseek",
+        "resolved_model": "deepseek-v4-flash",
+        "latency_ms": 7,
+    }
+
+    class _AnalysisService:
+        def execute(self, _db, _data, _principal):
+            return AnalysisResponse(
+                status="SUCCEEDED",
+                route=QuestionRoute.DATA_QUERY,
+                trace_id="TRACE-analysis-presenter-rejected",
+                primary=query,
+                feature_modes={"rag": "on", "agent": "on"},
+                security={"CROSS_WORKSPACE_LEAK": 0},
+            )
+
+    class _RejectedPresenter:
+        def present(self, **kwargs):
+            return AnswerPresentation(
+                kwargs["answer"],
+                "FALLBACK_PRESENTATION_GUARD_REJECTED",
+                applied=False,
+                source_verified=True,
+                provider="kimi",
+                model="kimi-k2.5",
+                trace={"resolved_provider": "kimi", "resolved_model": "kimi-k2.5"},
+            )
+
+    monkeypatch.setattr(analysis_route, "AnalysisService", _AnalysisService)
+    monkeypatch.setattr(analysis_route, "AnswerPresenter", _RejectedPresenter)
+    response = client.post("/api/v1/analysis", json={
+        "question": "今年收入是多少",
+        "route": "DATA_QUERY",
+        "idempotency_key": "analysis-presenter-rejected-001",
+    })
+    assert response.status_code == 201
+    envelope = response.json()["answer_envelope"]
+    assert envelope["provider"] == "deepseek"
+    assert envelope["model"] == "deepseek-v4-flash"
+    assert envelope["provider"] != "kimi"
+
+
+def test_analysis_presentation_ledger_commit_failure_does_not_replace_result(
+    client, db_session, monkeypatch,
+):
+    query = _query_payload_for_analysis(42)
+
+    class _AnalysisService:
+        def execute(self, _db, _data, _principal):
+            return AnalysisResponse(
+                status="SUCCEEDED",
+                route=QuestionRoute.DATA_QUERY,
+                trace_id="TRACE-analysis-ledger-failure",
+                primary=query,
+                feature_modes={"rag": "on", "agent": "on"},
+                security={"CROSS_WORKSPACE_LEAK": 0},
+            )
+
+    class _Presenter:
+        def present(self, **kwargs):
+            return AnswerPresentation(kwargs["answer"], "FALLBACK_NO_AVAILABLE_PROVIDER")
+
+    def _commit_failure():
+        raise RuntimeError("simulated ledger outage")
+
+    monkeypatch.setattr(analysis_route, "AnalysisService", _AnalysisService)
+    monkeypatch.setattr(analysis_route, "AnswerPresenter", _Presenter)
+    monkeypatch.setattr(db_session, "commit", _commit_failure)
+    response = client.post("/api/v1/analysis", json={
+        "question": "今年收入是多少",
+        "route": "DATA_QUERY",
+        "idempotency_key": "analysis-ledger-failure-001",
+    })
+    assert response.status_code == 201
+    assert response.json()["answer_envelope"]["markdown"] == "查询完成，revenue 为 42。"
+
+
+def test_analysis_sync_presenter_exception_falls_back_to_primary_answer(client, monkeypatch):
+    query = _query_payload_for_analysis(42)
+    query["plan"]["model_trace"] = {
+        "resolved_provider": "deepseek",
+        "resolved_model": "deepseek-v4-flash",
+    }
+
+    class _AnalysisService:
+        def execute(self, _db, _data, _principal):
+            return AnalysisResponse(
+                status="SUCCEEDED",
+                route=QuestionRoute.DATA_QUERY,
+                trace_id="TRACE-analysis-presenter-exception",
+                primary=query,
+                feature_modes={"rag": "on", "agent": "on"},
+                security={"CROSS_WORKSPACE_LEAK": 0},
+            )
+
+    class _BrokenPresenter:
+        def __init__(self):
+            raise RuntimeError("simulated presenter construction failure")
+
+    monkeypatch.setattr(analysis_route, "AnalysisService", _AnalysisService)
+    monkeypatch.setattr(analysis_route, "AnswerPresenter", _BrokenPresenter)
+    response = client.post("/api/v1/analysis", json={
+        "question": "今年收入是多少",
+        "route": "DATA_QUERY",
+        "idempotency_key": "analysis-presenter-exception-001",
+    })
+    assert response.status_code == 201
+    envelope = response.json()["answer_envelope"]
+    assert envelope["markdown"] == "查询完成，revenue 为 42。"
+    assert envelope["provider"] == "deepseek"
+    assert envelope["model"] == "deepseek-v4-flash"
+
+
+def test_analysis_stream_presenter_exception_still_completes(client, db_session, monkeypatch):
+    factory = sessionmaker(bind=db_session.get_bind(), autoflush=False, expire_on_commit=False)
+    monkeypatch.setattr(analysis_route, "SessionLocal", factory)
+    query = _query_payload_for_analysis(42)
+    query["plan"]["model_trace"] = {
+        "resolved_provider": "deepseek",
+        "resolved_model": "deepseek-v4-flash",
+    }
+
+    class _AnalysisService:
+        def execute(self, _db, _data, _principal, **kwargs):
+            kwargs["progress_callback"](ProgressStage.VERIFYING, {})
+            return AnalysisResponse(
+                status="SUCCEEDED",
+                route=QuestionRoute.DATA_QUERY,
+                trace_id=kwargs["request_context"].trace_id,
+                primary=query,
+                feature_modes={"rag": "on", "agent": "on"},
+                security={"CROSS_WORKSPACE_LEAK": 0},
+            )
+
+    class _BrokenPresenter:
+        def __init__(self):
+            raise RuntimeError("simulated presenter construction failure")
+
+    monkeypatch.setattr(analysis_route, "AnalysisService", _AnalysisService)
+    monkeypatch.setattr(analysis_route, "AnswerPresenter", _BrokenPresenter)
+    response = client.post("/api/v1/analysis/stream", json={
+        "question": "今年收入是多少",
+        "route": "DATA_QUERY",
+        "idempotency_key": "analysis-stream-presenter-exception-001",
+    })
+    assert response.status_code == 200
+    events = _events(response.text)
+    assert events[-1]["event_type"] == "run.completed"
+    assistant = events[-1]["response"]["assistant_message"]
+    assert assistant["content"] == "查询完成，revenue 为 42。"
+    assert assistant["trace_payload"]["presentation_status"] == "FALLBACK_PRESENTATION_ERROR"
+    assert assistant["response_payload"]["answer_envelope"]["provider"] == "deepseek"
+    assert assistant["response_payload"]["answer_envelope"]["model"] == "deepseek-v4-flash"
 
 
 def _query_payload_for_analysis(value):

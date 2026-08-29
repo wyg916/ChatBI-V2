@@ -45,14 +45,23 @@ def _datasource(db: Session, principal: Principal, datasource_id: str, *, query_
 
 def _run_read(db: Session, run: SqlWorkspaceRun) -> WorkspaceRunRead:
     dialect = str((run.guard_payload or {}).get("dialect") or "postgresql")
-    try:
-        sensitive_columns = service.security_policy(
-            db, run.datasource_id, get_settings().query_row_limit,
-        ).sensitive_columns
-    except (LookupError, ValueError):
-        # A historical run must remain safe to read even if its catalog has
-        # since been removed or is no longer available.
-        sensitive_columns = []
+    guard_payload = dict(run.guard_payload or {})
+    snapshot = guard_payload.pop("_sensitive_columns_snapshot", [])
+    snapshot_columns = [
+        item for item in snapshot if isinstance(item, str)
+    ] if isinstance(snapshot, list) else []
+    if run.datasource_id is None:
+        sensitive_columns = snapshot_columns
+    else:
+        try:
+            current_columns = service.security_policy(
+                db, run.datasource_id, get_settings().query_row_limit,
+            ).sensitive_columns
+            sensitive_columns = sorted(set(current_columns) | set(snapshot_columns))
+        except (LookupError, ValueError):
+            # A historical run must remain safe to read even if its catalog has
+            # since been removed or is no longer available.
+            sensitive_columns = snapshot_columns
     public_error = redact_public_sql_payload({
         "error_code": run.error_code,
         "error_message": run.error_message,
@@ -67,7 +76,7 @@ def _run_read(db: Session, run: SqlWorkspaceRun) -> WorkspaceRunRead:
         ),
         status=run.status,
         guard=redact_public_sql_payload(
-            run.guard_payload or {}, sensitive_columns, dialect=dialect,
+            guard_payload, sensitive_columns, dialect=dialect,
         ),
         execution=redact_public_sql_payload(
             run.execution_payload or {}, sensitive_columns, dialect=dialect,
@@ -87,10 +96,23 @@ def _run_or_404(db: Session, principal: Principal, run_id: str) -> SqlWorkspaceR
         raise HTTPException(status_code=404, detail="SQL workspace run not found")
     if run.workspace_id != principal.workspace_id or run.user_id != principal.user_id:
         raise HTTPException(status_code=403, detail="SQL workspace run access denied")
-    ensure_resource_access(
-        db, principal, resource_type="DATASOURCE", resource_id=run.datasource_id, query=True,
-    )
+    if run.datasource_id is None:
+        # Once the live source and grants are gone, there is no revocable ACL to
+        # evaluate. Detached evidence therefore remains admin-only until a
+        # durable historical entitlement snapshot is introduced.
+        if principal.role != "ADMIN":
+            raise HTTPException(status_code=403, detail="SQL workspace run access denied")
+    else:
+        ensure_resource_access(
+            db, principal, resource_type="DATASOURCE", resource_id=run.datasource_id, query=True,
+        )
     return run
+
+
+def _attached_datasource_id(run: SqlWorkspaceRun) -> str:
+    if run.datasource_id is None:
+        raise HTTPException(status_code=409, detail="SQL_WORKSPACE_DATASOURCE_DELETED")
+    return run.datasource_id
 
 
 @router.get("/datasources/{datasource_id}/search", response_model=CatalogSearchResponse)
@@ -226,7 +248,9 @@ def replay_workspace_sql(
     principal: Principal = Depends(require_permission("query.ask")),
 ):
     previous = _run_or_404(db, principal, run_id)
-    datasource = _datasource(db, principal, previous.datasource_id, query_access=True)
+    datasource = _datasource(
+        db, principal, _attached_datasource_id(previous), query_access=True,
+    )
     return _run_read(db, service.execute_sql(
         db, principal, datasource, previous.sql_text, row_limit=get_settings().query_row_limit,
         operation="EXPLAIN" if previous.operation == "EXPLAIN" else "REPLAY",
@@ -241,7 +265,7 @@ def verify_workspace_sql(
     principal: Principal = Depends(require_permission("answer.manage")),
 ):
     run = _run_or_404(db, principal, run_id)
-    _datasource(db, principal, run.datasource_id, query_access=True)
+    _datasource(db, principal, _attached_datasource_id(run), query_access=True)
     try:
         answer = service.save_verified_sql(
             db, principal, run, owner_name=data.owner_name, status=data.status,

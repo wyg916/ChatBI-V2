@@ -43,7 +43,7 @@ class WorkspaceRunRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: str
-    datasource_id: str
+    datasource_id: str | None
     operation: str
     sql_text: str
     normalized_sql: str | None

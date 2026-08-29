@@ -13,7 +13,23 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Callable
 
-from sqlalchemy import BigInteger, Boolean, Column, DateTime, Float, MetaData, Table, Text, inspect, text
+from sqlalchemy import (
+    BigInteger,
+    Boolean,
+    Column,
+    DateTime,
+    Float,
+    MetaData,
+    Table,
+    Text,
+    and_,
+    delete,
+    func,
+    inspect,
+    or_,
+    select,
+    text,
+)
 from sqlalchemy.engine import URL
 from sqlalchemy.orm import Session
 from sqlalchemy.schema import CreateSchema, DropSchema
@@ -26,7 +42,20 @@ from app.core.security import encrypt_secret
 from app.file_multimodal.contracts import AttachmentKind, ParsedAttachment, TableData
 from app.file_multimodal.parsers import FileParseError, PromptInjectionDetected, parse_attachment
 from app.file_multimodal.security import reject_prompt_injection
-from app.models import DataSource, DataSourceImport
+from app.models import (
+    AppUser,
+    DataSource,
+    DataSourceColumn,
+    DataSourceImport,
+    DataSourceSchema,
+    DataSourceTable,
+    QueryRun,
+    ResourceGrant,
+    SemanticModel,
+    SqlWorkspaceRun,
+    VerifiedAnswer,
+    WorkspaceSetting,
+)
 from app.services.datasources import store_metadata
 
 
@@ -569,7 +598,144 @@ def import_spreadsheet(
     return datasource, preview
 
 
-def delete_managed_datasource(db: Session, datasource: DataSource) -> None:
+def delete_managed_datasource(
+    db: Session,
+    datasource: DataSource,
+    *,
+    commit: bool = True,
+) -> dict[str, int]:
+    """Delete a datasource without erasing auditable SQL-workspace history.
+
+    The row lock and dependency preflight run before any owned schema or role is
+    removed.  Historical SQL-workspace runs are detached only inside their
+    original workspace.  QueryPipeline runs and verified answers have broader
+    public contracts whose datasource/model identifiers are still required, so
+    those dependencies fail closed with a deterministic conflict instead of
+    allowing a late foreign-key 500 or cascading business evidence away.
+    """
+
+    locked = db.scalar(
+        select(DataSource).where(DataSource.id == datasource.id).with_for_update()
+    )
+    if locked is None:
+        raise SpreadsheetImportError("DATASOURCE_NOT_FOUND", status_code=404)
+    datasource = locked
+
+    # Lock dependent models after their datasource parent. A concurrent model
+    # migration that wins its row lock is then re-evaluated by PostgreSQL and is
+    # excluded from this delete; a migration that loses waits for deletion. This
+    # prevents stale model IDs from driving grant/default cleanup.
+    semantic_rows = list(db.scalars(
+        select(SemanticModel).where(
+            SemanticModel.datasource_id == datasource.id,
+        ).order_by(SemanticModel.id).with_for_update()
+    ))
+    semantic_model_ids = [row.id for row in semantic_rows]
+    if any(row.workspace_id != datasource.workspace_id for row in semantic_rows):
+        raise SpreadsheetImportError("DATASOURCE_RESOURCE_SCOPE_MISMATCH", status_code=409)
+
+    sql_workspace_scope_mismatch = db.scalar(
+        select(SqlWorkspaceRun.id).where(
+            SqlWorkspaceRun.datasource_id == datasource.id,
+            SqlWorkspaceRun.workspace_id != datasource.workspace_id,
+        ).limit(1)
+    )
+    query_reference = or_(
+        QueryRun.datasource_id == datasource.id,
+        QueryRun.semantic_model_id.in_(semantic_model_ids),
+    )
+    answer_reference = or_(
+        VerifiedAnswer.datasource_id == datasource.id,
+        VerifiedAnswer.semantic_model_id.in_(semantic_model_ids),
+    )
+    query_scope_mismatch = db.scalar(
+        select(QueryRun.id).where(
+            query_reference,
+            QueryRun.workspace_id != datasource.workspace_id,
+        ).limit(1)
+    )
+    answer_scope_mismatch = db.scalar(
+        select(VerifiedAnswer.id).where(
+            answer_reference,
+            VerifiedAnswer.workspace_id != datasource.workspace_id,
+        ).limit(1)
+    )
+    if sql_workspace_scope_mismatch or query_scope_mismatch or answer_scope_mismatch:
+        raise SpreadsheetImportError("DATASOURCE_HISTORY_SCOPE_MISMATCH", status_code=409)
+    if db.scalar(select(QueryRun.id).where(query_reference).limit(1)) is not None:
+        raise SpreadsheetImportError("DATASOURCE_HAS_PERSISTED_QUERY_ARTIFACTS", status_code=409)
+    if db.scalar(select(VerifiedAnswer.id).where(answer_reference).limit(1)) is not None:
+        raise SpreadsheetImportError("DATASOURCE_HAS_PERSISTED_QUERY_ARTIFACTS", status_code=409)
+
+    grant_target = or_(
+        and_(
+            ResourceGrant.resource_type == "DATASOURCE",
+            ResourceGrant.resource_id == datasource.id,
+        ),
+        and_(
+            ResourceGrant.resource_type == "SEMANTIC_MODEL",
+            ResourceGrant.resource_id.in_(semantic_model_ids),
+        ),
+    )
+    cross_workspace_grant = db.scalar(
+        select(ResourceGrant.id)
+        .join(AppUser, AppUser.id == ResourceGrant.user_id)
+        .where(grant_target, AppUser.workspace_id != datasource.workspace_id)
+        .limit(1)
+    )
+    if cross_workspace_grant is not None:
+        raise SpreadsheetImportError("DATASOURCE_RESOURCE_SCOPE_MISMATCH", status_code=409)
+
+    catalog_sensitive_columns = {
+        column_name.lower()
+        for column_name, comment in db.execute(
+            select(DataSourceColumn.name, DataSourceColumn.comment)
+            .join(DataSourceTable, DataSourceColumn.table_id == DataSourceTable.id)
+            .join(DataSourceSchema, DataSourceTable.schema_id == DataSourceSchema.id)
+            .where(DataSourceSchema.datasource_id == datasource.id)
+        )
+        if is_sensitive_column(column_name) or SENSITIVE_COMMENT_MARKER in (comment or "")
+    }
+    workspace_runs = list(db.scalars(
+        select(SqlWorkspaceRun).where(
+            SqlWorkspaceRun.datasource_id == datasource.id,
+            SqlWorkspaceRun.workspace_id == datasource.workspace_id,
+        )
+    ))
+    for run in workspace_runs:
+        guard_payload = dict(run.guard_payload or {})
+        existing_snapshot = guard_payload.get("_sensitive_columns_snapshot", [])
+        snapshot = {
+            item.lower() for item in existing_snapshot if isinstance(item, str)
+        } if isinstance(existing_snapshot, list) else set()
+        guard_payload["_sensitive_columns_snapshot"] = sorted(
+            snapshot | catalog_sensitive_columns
+        )
+        run.guard_payload = guard_payload
+        run.datasource_id = None
+    detached_workspace_runs = len(workspace_runs)
+
+    removed_resource_grants = int(db.scalar(
+        select(func.count(ResourceGrant.id))
+        .join(AppUser, AppUser.id == ResourceGrant.user_id)
+        .where(grant_target, AppUser.workspace_id == datasource.workspace_id)
+    ) or 0)
+    db.execute(delete(ResourceGrant).where(grant_target))
+
+    setting = db.get(WorkspaceSetting, datasource.workspace_id)
+    if setting is not None:
+        workspace_config = dict(setting.workspace_config or {})
+        changed = False
+        if workspace_config.get("default_datasource_id") == datasource.id:
+            workspace_config["default_datasource_id"] = None
+            changed = True
+        if workspace_config.get("default_semantic_model_id") in semantic_model_ids:
+            workspace_config["default_semantic_model_id"] = None
+            changed = True
+        if changed:
+            setting.workspace_config = workspace_config
+            setting.version += 1
+
     import_record = db.get(DataSourceImport, datasource.spreadsheet_import.id) if datasource.spreadsheet_import else None
     if import_record is not None:
         expected_schema = f"excel_{datasource.id.replace('-', '')[:12]}"
@@ -604,7 +770,15 @@ def delete_managed_datasource(db: Session, datasource: DataSource) -> None:
                 if table_name in inspector.get_table_names():
                     Table(table_name, MetaData()).drop(bind=db.connection())
     db.delete(datasource)
-    db.commit()
+    db.flush()
+    result = {
+        "detached_workspace_runs": detached_workspace_runs,
+        "removed_resource_grants": removed_resource_grants,
+        "removed_semantic_models": len(semantic_model_ids),
+    }
+    if commit:
+        db.commit()
+    return result
 
 
 __all__ = [

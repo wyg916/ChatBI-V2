@@ -113,12 +113,12 @@ def test_candidate_migration_and_backup_contracts_are_version_aware():
     restore = _read("scripts/restore.ps1")
     deployment = _read("scripts/deployment/ChatBI.Deployment.ps1")
 
-    assert "ExpectedMigrationHead = '20260829_0014'" in cold_start
+    assert "ExpectedMigrationHead = '20260829_0015'" in cold_start
     assert "CandidateMigrationHead = '20260828_0013'" in rollback
     assert "RollbackMigrationHead = '20260822_0012'" in rollback
     assert "CandidateSha = '852d8aa35a6ec0a31bed34ba695ec6a17034b457'" in rollback
     assert "$certifiedCandidateSha = '852d8aa35a6ec0a31bed34ba695ec6a17034b457'" in rollback
-    assert "use a separate current-version runner for migration 0014" in rollback
+    assert "use a separate current-version runner for migrations 0014 or 0015" in rollback
     assert "import psycopg; import pydantic; import pydantic_settings" in rollback
     assert "Pass -Python <path-to-backend-venv-python> explicitly" in rollback
     assert "Join-Path $projectRoot '.env'" in rollback
@@ -132,7 +132,7 @@ def test_candidate_migration_and_backup_contracts_are_version_aware():
     assert "chatbi-enterprise-backup-v2" in restore
     assert "chatbi-v2-v1.3.1" in restore
     assert "metadata_sha256" in backup
-    assert "20260829_0014" in restore
+    assert "20260829_0015" in restore
     assert "datasource_import" in backup
     assert "excel_datasource" in backup
     assert "datasource_import" in restore
@@ -187,21 +187,23 @@ def test_current_product_release_identity_is_v131_and_v130_history_remains_immut
     assert "52db955fd67ebe592c289399a135528c13cb3e3d" in readme
 
 
-def test_release_docs_separate_published_tag_from_unreleased_0014_successor():
+def test_release_docs_separate_published_tag_from_unreleased_0015_successor():
     release_notes = _read("docs/releases/V1_3_1_RELEASE_NOTES.md")
-    published, successor = release_notes.split("## Unreleased `0014` main successor", 1)
+    published, successor = release_notes.split("## Unreleased `0015` main successor", 1)
     rollback = _read("docs/releases/V1_3_1_ROLLBACK.md")
     backup_restore = _read("docs/deployment/BACKUP_RESTORE.md")
 
     assert "dddca12d3f4a337c51a12ce5cd9a880239b8429d" in published
     assert "20260828_0013" in published
     assert "20260829_0014" not in published
+    assert "20260829_0015" not in published
     assert "704 collected" in published
     assert "20260829_0014" in successor
+    assert "20260829_0015" in successor
     assert "704 collected" not in successor
     assert "must not be reused as evidence for later `main` changes" in published
     assert "test-v131-historical-rollback-dry-run.ps1" in rollback
-    assert "must not be used for `0014`" in rollback
+    assert "must not be used for migrations `0014` or `0015`" in rollback
     assert "chatbi-enterprise-backup-v3" in backup_restore
     assert "chatbi-v2-v1.3.1" in backup_restore
 

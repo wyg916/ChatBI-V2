@@ -230,9 +230,30 @@ def update_datasource(datasource_id: str, data: DataSourceUpdate, db: Session = 
 def delete_datasource(datasource_id: str, db: Session = Depends(get_db), principal: Principal = Depends(require_permission("datasource.manage"))):
     ensure_resource_access(db, principal, resource_type="DATASOURCE", resource_id=datasource_id)
     try:
-        delete_managed_datasource(db, _get_or_404(db, datasource_id))
+        details = delete_managed_datasource(
+            db, _get_or_404(db, datasource_id), commit=False,
+        )
+        record_audit(
+            db,
+            principal,
+            action="DELETE",
+            resource_type="DATASOURCE",
+            resource_id=datasource_id,
+            details=details,
+        )
+        db.commit()
     except SpreadsheetImportError as exc:
         db.rollback()
+        record_audit(
+            db,
+            principal,
+            action="DELETE",
+            resource_type="DATASOURCE",
+            resource_id=datasource_id,
+            status="FAILED",
+            details={"error_code": exc.code},
+        )
+        db.commit()
         raise HTTPException(status_code=exc.status_code, detail=exc.code) from exc
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 

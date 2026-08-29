@@ -6,6 +6,7 @@ from app.models import (
     DataSourceRelation,
     DataSourceSchema,
     DataSourceTable,
+    VerifiedAnswer,
     Workspace,
 )
 from app.core.data_safety import (
@@ -289,6 +290,9 @@ def test_sql_workspace_guard_execute_explain_history_replay_and_verified_sql(
     assert verified.status_code == 201
     assert verified.json()["status"] == "VERIFIED"
     assert verified.json()["result_signature"] == "a" * 64
+    saved_answer = db_session.get(VerifiedAnswer, verified.json()["answer_id"])
+    assert saved_answer is not None
+    assert "_sensitive_columns_snapshot" not in str(saved_answer.sql_plan)
 
 
 def test_sample_values_are_lazy_paginated_and_sensitive_fields_are_masked(

@@ -351,6 +351,11 @@ class AnswerPresenter:
         if error_code == "MODEL_UNAVAILABLE" or not self._provider_available():
             return AnswerPresentation(source, "FALLBACK_NO_AVAILABLE_PROVIDER", source_verified=source_verified)
 
+        settings = get_settings()
+        unrestricted_complex_route = (
+            settings.provider_usage_unrestricted
+            and normalized_route == QuestionRoute.COMPLEX_ANALYSIS
+        )
         try:
             reply = self.gateway.complete(
                 system=(
@@ -378,9 +383,9 @@ class AnswerPresenter:
                 ),
                 json_mode=True,
                 context=request_context,
-                complexity_score=15,
-                budget_mode=BudgetMode(get_settings().model_budget_mode),
-                requested_alias=get_settings().general_model_provider or "auto",
+                complexity_score=90 if unrestricted_complex_route else 15,
+                budget_mode=BudgetMode(settings.model_budget_mode),
+                requested_alias=settings.general_model_provider or "auto",
                 cancellation_event=cancellation_event,
                 max_output_tokens=min(512, max(96, len(source) * 2)),
             )

@@ -152,7 +152,7 @@ class RoutingPolicy:
                 candidates.remove("kimi")
         else:
             premium_eligible = request.complexity_score >= 80 or bool(request.premium_triggers)
-            if premium and premium_eligible and "kimi" in candidates:
+            if (premium or self.unrestricted) and premium_eligible and "kimi" in candidates:
                 candidates.remove("kimi")
                 candidates.insert(0, "kimi")
             elif not self.unrestricted and not premium and "kimi" in candidates:

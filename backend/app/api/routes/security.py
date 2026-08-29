@@ -125,8 +125,40 @@ def _permission_resource(
     }.get(resource_type)
     if resource_class is None:
         raise HTTPException(status_code=422, detail="RESOURCE_TYPE_NOT_MANAGEABLE")
-    resource = db.get(resource_class, resource_id)
-    if resource is None or resource.workspace_id != principal.workspace_id:
+
+    # Grant changes and managed-resource deletion share this lock protocol.
+    # Otherwise a concurrent grant can commit after deletion removed the old
+    # grants and leave an orphaned polymorphic ResourceGrant row.
+    if resource_type == "SEMANTIC_MODEL":
+        datasource_id = db.scalar(select(SemanticModel.datasource_id).where(
+            SemanticModel.id == resource_id,
+            SemanticModel.workspace_id == principal.workspace_id,
+        ))
+        if datasource_id is None:
+            raise HTTPException(status_code=404, detail="Permission resource not found")
+        parent = db.scalar(
+            select(DataSource).where(
+                DataSource.id == datasource_id,
+                DataSource.workspace_id == principal.workspace_id,
+            ).with_for_update()
+        )
+        if parent is None:
+            raise HTTPException(status_code=404, detail="Permission resource not found")
+        resource = db.scalar(
+            select(SemanticModel).where(
+                SemanticModel.id == resource_id,
+                SemanticModel.workspace_id == principal.workspace_id,
+                SemanticModel.datasource_id == parent.id,
+            ).with_for_update()
+        )
+    else:
+        resource = db.scalar(
+            select(resource_class).where(
+                resource_class.id == resource_id,
+                resource_class.workspace_id == principal.workspace_id,
+            ).with_for_update()
+        )
+    if resource is None:
         raise HTTPException(status_code=404, detail="Permission resource not found")
     return resource
 
