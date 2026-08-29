@@ -441,7 +441,7 @@ def test_model_gateway_normalizes_provider_sse_chunks():
         deepseek_api_key="",
         general_model_provider="kimi",
     ), transport=httpx.MockTransport(handler))
-    chunks = list(gateway.stream(system="system", user="hello"))
+    chunks = list(gateway.stream(system="system", user="hello", json_mode=False))
     assert [item.content for item in chunks] == ["第一段", "第二段"]
     assert {item.provider for item in chunks} == {"kimi"}
 

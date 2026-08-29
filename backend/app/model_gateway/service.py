@@ -485,6 +485,7 @@ class ModelGateway:
         requested_alias: str | None = None,
         premium_triggers: frozenset[str] | None = None,
         cancellation_event: Event | None = None,
+        json_mode: bool = False,
     ) -> Iterator[ModelReply]:
         context = context or self._default_context(user)
         self.last_response = None
@@ -503,7 +504,7 @@ class ModelGateway:
         request = ModelRequest(
             capability=ModelCapability.VISION if vision else capability,
             modality=ModelModality.VISION if vision else ModelModality.TEXT,
-            messages=tuple(messages), requested_alias=alias,
+            messages=tuple(messages), requested_alias=alias, json_mode=json_mode,
             complexity_score=complexity_score,
             budget_mode=budget_mode or BudgetMode(self.settings.model_budget_mode),
             thinking=complexity_score >= 55,
