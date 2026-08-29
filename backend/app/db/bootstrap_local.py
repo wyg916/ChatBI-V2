@@ -68,8 +68,10 @@ def _admin_password(variable: str, prompt: str) -> str:
 
 
 def _bootstrap_postgres(admin_password: str, values: dict[str, str], reset_demo: bool) -> tuple[int, int]:
+    postgres_host = os.getenv("CHATBI_LOCAL_POSTGRES_HOST", "127.0.0.1")
+    postgres_port = int(os.getenv("CHATBI_LOCAL_POSTGRES_PORT", "5432"))
     with psycopg.connect(
-        host="127.0.0.1", port=5432, dbname="postgres", user="postgres",
+        host=postgres_host, port=postgres_port, dbname="postgres", user="postgres",
         password=admin_password, autocommit=True,
     ) as admin:
         with admin.cursor() as cursor:
@@ -87,10 +89,90 @@ def _bootstrap_postgres(admin_password: str, values: dict[str, str], reset_demo:
                 cursor.execute(sql.SQL("ALTER DATABASE {} OWNER TO {}").format(sql.Identifier("chatbi_v2"), sql.Identifier("chatbi_app")))
 
     with psycopg.connect(
-        host="127.0.0.1", port=5432, dbname="chatbi_v2", user="postgres",
+        host=postgres_host, port=postgres_port, dbname="chatbi_v2", user="postgres",
         password=admin_password, autocommit=True,
     ) as database:
         with database.cursor() as cursor:
+            # The application role must not receive CREATEROLE.  These tightly
+            # scoped SECURITY DEFINER helpers are the only privileged path used
+            # by managed spreadsheet imports.  Both arguments are validated
+            # against application-owned identifiers before any dynamic SQL is
+            # executed, and callers cannot grant access outside the matching
+            # excel_<id> schema.
+            cursor.execute(
+                """
+                CREATE SCHEMA IF NOT EXISTS chatbi_admin AUTHORIZATION postgres;
+                REVOKE ALL ON SCHEMA chatbi_admin FROM PUBLIC;
+                GRANT USAGE ON SCHEMA chatbi_admin TO chatbi_app;
+
+                CREATE OR REPLACE FUNCTION chatbi_admin.provision_excel_reader(
+                    role_name text,
+                    role_password text,
+                    schema_name text
+                ) RETURNS void
+                LANGUAGE plpgsql
+                SECURITY DEFINER
+                SET search_path = pg_catalog, pg_temp
+                AS $function$
+                BEGIN
+                    IF role_name !~ '^chatbi_excel_[0-9a-f]{12}$'
+                       OR schema_name !~ '^excel_[0-9a-f]{12}$'
+                       OR substring(role_name from 14) <> substring(schema_name from 7)
+                       OR role_password IS NULL
+                       OR length(role_password) < 32 THEN
+                        RAISE EXCEPTION 'invalid managed spreadsheet reader request';
+                    END IF;
+                    IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = role_name) THEN
+                        RAISE EXCEPTION 'managed spreadsheet reader already exists';
+                    END IF;
+                    EXECUTE format(
+                        'CREATE ROLE %I LOGIN PASSWORD %L NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOREPLICATION',
+                        role_name,
+                        role_password
+                    );
+                    EXECUTE format('GRANT USAGE ON SCHEMA %I TO %I', schema_name, role_name);
+                    EXECUTE format('GRANT SELECT ON ALL TABLES IN SCHEMA %I TO %I', schema_name, role_name);
+                END;
+                $function$;
+
+                CREATE OR REPLACE FUNCTION chatbi_admin.drop_excel_reader(
+                    role_name text,
+                    schema_name text
+                ) RETURNS void
+                LANGUAGE plpgsql
+                SECURITY DEFINER
+                SET search_path = pg_catalog, pg_temp
+                AS $function$
+                BEGIN
+                    IF role_name !~ '^chatbi_excel_[0-9a-f]{12}$'
+                       OR schema_name !~ '^excel_[0-9a-f]{12}$'
+                       OR substring(role_name from 14) <> substring(schema_name from 7) THEN
+                        RAISE EXCEPTION 'invalid managed spreadsheet reader request';
+                    END IF;
+                    IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = role_name) THEN
+                        IF EXISTS (SELECT 1 FROM pg_namespace WHERE nspname = schema_name) THEN
+                            EXECUTE format(
+                                'REVOKE ALL PRIVILEGES ON ALL TABLES IN SCHEMA %I FROM %I',
+                                schema_name,
+                                role_name
+                            );
+                            EXECUTE format('REVOKE ALL PRIVILEGES ON SCHEMA %I FROM %I', schema_name, role_name);
+                        END IF;
+                        EXECUTE format('DROP ROLE %I', role_name);
+                    END IF;
+                END;
+                $function$;
+
+                REVOKE ALL ON FUNCTION chatbi_admin.provision_excel_reader(text, text, text) FROM PUBLIC;
+                REVOKE ALL ON FUNCTION chatbi_admin.drop_excel_reader(text, text) FROM PUBLIC;
+                GRANT EXECUTE ON FUNCTION chatbi_admin.provision_excel_reader(text, text, text) TO chatbi_app;
+                GRANT EXECUTE ON FUNCTION chatbi_admin.drop_excel_reader(text, text) TO chatbi_app;
+
+                DROP FUNCTION IF EXISTS public.chatbi_provision_excel_reader(text, text, text);
+                DROP FUNCTION IF EXISTS public.chatbi_drop_excel_reader(text, text);
+                """,
+                prepare=False,
+            )
             cursor.execute("SELECT 1 FROM information_schema.schemata WHERE schema_name = 'demo_business'")
             schema_exists = cursor.fetchone() is not None
             if reset_demo and schema_exists:
@@ -145,6 +227,11 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--reset-demo", action="store_true", help="replace only the simulated demo schemas")
     parser.add_argument("--auth-only", action="store_true", help="add missing local application login secrets without touching databases")
+    parser.add_argument(
+        "--spreadsheet-helpers-only",
+        action="store_true",
+        help="install scoped PostgreSQL spreadsheet-reader helpers without requiring MySQL administration",
+    )
     args = parser.parse_args()
     values = _project_secrets()
     if args.auth_only:
@@ -153,6 +240,13 @@ def main() -> None:
         print("PROJECT_ENV_WRITTEN=YES SESSION_TOKEN_GENERATED=NO")
         return
     postgres_password = _admin_password("CHATBI_LOCAL_POSTGRES_ADMIN_PASSWORD", "Local PostgreSQL administrator password: ")
+    if args.spreadsheet_helpers_only:
+        pg_orders, pg_kpis = _bootstrap_postgres(postgres_password, values, False)
+        _write_env(values)
+        print("SPREADSHEET_READER_HELPERS=PASS")
+        print(f"POSTGRES_ORDERS={pg_orders} POSTGRES_DAILY_KPI={pg_kpis}")
+        print("PROJECT_ENV_WRITTEN=YES ADMIN_CREDENTIALS_PERSISTED=NO")
+        return
     mysql_password = _admin_password("CHATBI_LOCAL_MYSQL_ADMIN_PASSWORD", "Local MySQL administrator password: ")
     pg_orders, pg_kpis = _bootstrap_postgres(postgres_password, values, args.reset_demo)
     my_orders, my_kpis = _bootstrap_mysql(mysql_password, values, args.reset_demo)

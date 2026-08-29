@@ -1,5 +1,16 @@
 # 项目状态
 
+## 2026-08-29：问数体验、Excel 数据源与管理控制收口候选
+
+- 本轮严格限定在 ChatBI 主链路与既有 P1 管理体验：P0 完成真实 SSE 增量输出、校验后答案呈现、受控自然化兜底、Excel/CSV 导入为可查询数据源、评测趋势从 Backend API 读取；P1 修复语义节点拖动与防重叠、差异化看板、全局返回导航、模型卡片、成员创建和权限管理。未引入 P2 平台化功能。
+- MiMo、DeepSeek、Kimi 在本机开发 Showcase 的 `Auto` 模式下全部进入统一 ModelGateway 自动能力路由；检测到任一有效凭据时使用 `quality` 预算并关闭测试计费控制器，普通启动不覆盖管理员保存的 Provider 启停状态。根目录唯一启动入口为 `一键启动-ChatBI-V2.cmd`；显式 `Deterministic` 仍保留为无外部凭据的可复现模式。
+- 本机 Showcase 的 Backend、RAG 与 Frontend 端口强制只绑定 `127.0.0.1`，固定演示账号不再发布到局域网；Default/Enterprise 仍可通过 `CHATBI_BIND_HOST` 显式控制监听地址。Backup/Restore 在任何停止服务或数据库变更前双向拒绝共享元数据库的其他 canonical Compose 写栈，空白 Compose 输出不会被误判为运行服务，也不会代停竞争项目。
+- 答案呈现仅在 QueryPipeline、SQL Guard、Result Oracle、结果签名及 Answer/Citation Guard 通过后执行；模型只改善表达结构，不得改写已核验数值、引用或 SQL 事实。无法回答时返回可行动的自然语言说明，不暴露内部异常、提示词或思维过程。
+- Excel/CSV 原文件不落盘；导入前执行 MIME、ZIP、公式、提示词注入、行列/Sheet/Cell/体积门禁，空白工作表可跳过，敏感样例不进入预览或元数据。每个导入创建独立 `chatbi_excel_<id>` 最小权限只读角色和独立 `excel_<id>` Schema；删除、Showcase Reset 与受保护的迁移降级会防止遗留数据或数据库角色。前端仍只经 Backend API 访问。
+- 敏感列识别覆盖 camelCase、紧凑命名和中英文常见标识，并沿直接别名、CTE、子查询、显式列别名、LATERAL、星号和整行复合值传播；无法可靠证明输出血缘时在 API 边界 fail closed 掩码。Oracle 与结果签名仍使用服务端原始执行结果，公开响应和持久化历史只保存遮罩结果。
+- 评测中心的 30 天演示趋势使用可复现数据库记录并标记 `SHOWCASE_DEMO`；首次真实评测不会继承演示点。用户与角色支持 ADMIN 创建成员及资源权限管理，分析师的管理 API/UI 继续 403 并记录审计。
+- 冻结态自动证据：Backend `744 passed, 8 skipped`、真实本机 PostgreSQL Excel 双数据源隔离/查询/清理 `1/1`；Frontend `16/16` files、`68/68` tests、TypeScript 0 diagnostics、production build 991 modules；PowerShell AST `21/21`，Showcase Compose `3/3` 发布端口解析为 loopback，双向竞争写栈门禁实跑 PASS。三 Provider 单次真实健康调用、两次停止态一键启动与最终浏览器矩阵仍以本轮最终交付结果为准。
+
 ## 2026-08-29：V1.3.1 最终发布身份 Successor
 
 - P0 Windows 一键启动兼容性已修复：根目录 `一键启动-ChatBI-V2.cmd` 固定使用 Windows PowerShell 5.1，而 `bootstrap.ps1` 曾把 `python -c`、Alembic 与 deployment bootstrap 嵌入同一条 `sh -c` 字符串；WinPS 5.1 在 PowerShell → Docker → Linux shell 边界重写嵌套引号，使 Python 实际只收到 `from` 并报 `SyntaxError`。Bootstrap 现改为四个原生参数调用并逐步 fail-fast，保留单次镜像构建优化。

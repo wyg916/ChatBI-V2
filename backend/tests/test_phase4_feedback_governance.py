@@ -126,7 +126,7 @@ def test_feedback_review_exact_states_preserve_versions_and_dashboard(db_session
     assert db_session.scalar(select(func.count()).select_from(AnswerVersion).where(
         AnswerVersion.answer_id == opened["answer_id"],
     )) == 3
-    dashboard = feedback_dashboard(db_session, workspace_id=principal.workspace_id)
+    dashboard = feedback_dashboard(db_session, principal=principal)
     assert dashboard["workflows"][0]["workflow_state"] == "REJECTED"
 
 

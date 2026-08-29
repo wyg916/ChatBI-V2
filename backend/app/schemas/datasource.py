@@ -46,6 +46,9 @@ class DataSourceRead(BaseModel):
     column_count: int = 0
     created_at: datetime
     updated_at: datetime
+    import_filename: str | None = None
+    import_row_count: int | None = None
+    import_sheet_count: int | None = None
 
 
 class ConnectionTestRequest(BaseModel):
@@ -100,3 +103,38 @@ class ColumnRead(BaseModel):
     default: str | None
     comment: str | None
     sample_values: list
+
+
+class SpreadsheetColumnRead(BaseModel):
+    source_name: str
+    name: str
+    data_type: str
+    nullable: bool | None = None
+
+
+class SpreadsheetSheetRead(BaseModel):
+    source_name: str
+    table_name: str
+    row_count: int
+    columns: list[SpreadsheetColumnRead]
+    preview_rows: list[dict] = Field(default_factory=list)
+
+
+class SpreadsheetPreviewRead(BaseModel):
+    filename: str
+    file_sha256: str
+    file_size_bytes: int
+    format: Literal["xlsx", "csv"]
+    sheet_count: int
+    row_count: int
+    column_count: int
+    limits: dict[str, int]
+    sheets: list[SpreadsheetSheetRead]
+    datasource_id: str | None = None
+    storage_schema: str | None = None
+    catalog: dict[str, int] | None = None
+
+
+class SpreadsheetImportRead(BaseModel):
+    datasource: DataSourceRead
+    preview: SpreadsheetPreviewRead

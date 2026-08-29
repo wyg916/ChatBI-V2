@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime, timezone
 
-from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Integer, JSON, String, Text, UniqueConstraint
+from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Index, Integer, JSON, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
@@ -240,6 +240,39 @@ class DataSource(Base, TimestampMixin):
     status: Mapped[str] = mapped_column(String(32), default="CREATED")
     last_sync_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     schemas: Mapped[list["DataSourceSchema"]] = relationship(cascade="all, delete-orphan", passive_deletes=True)
+    spreadsheet_import: Mapped["DataSourceImport | None"] = relationship(
+        cascade="all, delete-orphan", passive_deletes=True, uselist=False,
+    )
+
+
+class DataSourceImport(Base):
+    """Immutable provenance for a spreadsheet materialized as a managed datasource.
+
+    The original workbook is intentionally not persisted.  Only safe provenance
+    and the normalized sheet/column mapping are retained; queryable rows live in
+    the local PostgreSQL schema referenced by ``storage_schema``.
+    """
+
+    __tablename__ = "datasource_import"
+    __table_args__ = (
+        UniqueConstraint("datasource_id", name="uq_datasource_import_datasource_id"),
+        Index("ix_datasource_import_sha256", "file_sha256"),
+        Index("ix_datasource_import_status", "status"),
+    )
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uuid_str)
+    datasource_id: Mapped[str] = mapped_column(
+        ForeignKey("datasource.id", ondelete="CASCADE"), nullable=False,
+    )
+    original_filename: Mapped[str] = mapped_column(String(255), nullable=False)
+    file_sha256: Mapped[str] = mapped_column(String(64), nullable=False)
+    media_type: Mapped[str] = mapped_column(String(255), nullable=False)
+    file_size_bytes: Mapped[int] = mapped_column(Integer, nullable=False)
+    storage_schema: Mapped[str] = mapped_column(String(255), nullable=False)
+    row_count: Mapped[int] = mapped_column(Integer, nullable=False)
+    column_count: Mapped[int] = mapped_column(Integer, nullable=False)
+    sheet_metadata: Mapped[list] = mapped_column(JSON, default=list)
+    status: Mapped[str] = mapped_column(String(32), default="READY", nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, nullable=False)
 
 
 class DataSourceSchema(Base):

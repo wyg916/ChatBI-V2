@@ -14,7 +14,7 @@ import os
 from datetime import date, datetime
 from typing import Any, Iterable
 
-from sqlalchemy import func, select, text
+from sqlalchemy import func, inspect, select, text
 from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
@@ -25,6 +25,8 @@ from app.models import (
     ChatMessage,
     Conversation,
     Dashboard,
+    DataSource,
+    DataSourceImport,
     OrchestrationProfile,
     Project,
     ProviderRuntimeSetting,
@@ -68,6 +70,11 @@ def metadata_snapshot(db: Session, *, migration_head: str | None = None) -> dict
         "chat_message": db.scalar(select(func.count()).select_from(ChatMessage)) or 0,
         "verified_answer": db.scalar(select(func.count()).select_from(VerifiedAnswer)) or 0,
         "dashboard": db.scalar(select(func.count()).select_from(Dashboard)) or 0,
+        "datasource": db.scalar(select(func.count()).select_from(DataSource)) or 0,
+        "datasource_import": db.scalar(select(func.count()).select_from(DataSourceImport)) or 0,
+        "excel_datasource": db.scalar(
+            select(func.count()).select_from(DataSource).where(DataSource.type == "excel")
+        ) or 0,
         "orchestration_profile": db.scalar(select(func.count()).select_from(OrchestrationProfile)) or 0,
     }
     identity = {
@@ -113,6 +120,30 @@ def metadata_snapshot(db: Session, *, migration_head: str | None = None) -> dict
                 ProviderRuntimeSetting.cost_policy,
             ),
             ProviderRuntimeSetting.id,
+        ),
+        "datasource": _rows(
+            db,
+            (
+                DataSource.id,
+                DataSource.workspace_id,
+                DataSource.name,
+                DataSource.type,
+                DataSource.status,
+                DataSource.schema,
+            ),
+            DataSource.id,
+        ),
+        "datasource_import": _rows(
+            db,
+            (
+                DataSourceImport.id,
+                DataSourceImport.datasource_id,
+                DataSourceImport.file_sha256,
+                DataSourceImport.row_count,
+                DataSourceImport.column_count,
+                DataSourceImport.status,
+            ),
+            DataSourceImport.id,
         ),
         "invitation": _rows(
             db,
@@ -226,12 +257,98 @@ def provider_configuration_state(db: Session) -> list[dict[str, Any]]:
     return result
 
 
+def managed_spreadsheet_state(db: Session) -> dict[str, int]:
+    """Return tolerant counts for restore preflight, including pre-0014 DBs."""
+
+    bind = db.get_bind()
+    if bind.dialect.name == "postgresql":
+        datasource_exists = db.scalar(text("SELECT to_regclass('datasource')")) is not None
+        import_exists = db.scalar(text("SELECT to_regclass('datasource_import')")) is not None
+    else:
+        inspector = inspect(bind)
+        datasource_exists = inspector.has_table("datasource")
+        import_exists = inspector.has_table("datasource_import")
+    excel_count = int(db.scalar(text(
+        "SELECT COUNT(*) FROM datasource WHERE type = 'excel'"
+    )) or 0) if datasource_exists else 0
+    import_count = int(db.scalar(text(
+        "SELECT COUNT(*) FROM datasource_import"
+    )) or 0) if import_exists else 0
+    return {
+        "datasource_import": import_count,
+        "excel_datasource": excel_count,
+    }
+
+
+def _postgres_helper_checks(db: Session, helpers: Iterable[str]) -> list[dict[str, Any]]:
+    """Return existence/EXECUTE checks; missing signatures stay data, not errors."""
+
+    checks = []
+    for signature in helpers:
+        row = db.execute(
+            text(
+                "WITH helper AS (SELECT to_regprocedure(:signature) AS oid) "
+                "SELECT oid IS NOT NULL AS exists, "
+                "CASE WHEN oid IS NULL THEN false "
+                "ELSE has_function_privilege(current_user, oid, 'EXECUTE') END AS executable "
+                "FROM helper"
+            ),
+            {"signature": signature},
+        ).one()
+        checks.append({"signature": signature, "available": bool(row.exists and row.executable)})
+    return checks
+
+
+def _postgres_schema_usable(db: Session, schema_name: str) -> bool:
+    return bool(
+        db.scalar(
+            text(
+                "WITH target AS (SELECT to_regnamespace(:schema_name) AS oid) "
+                "SELECT CASE WHEN oid IS NULL THEN false "
+                "ELSE has_schema_privilege(current_user, oid, 'USAGE') END FROM target"
+            ),
+            {"schema_name": schema_name},
+        )
+    )
+
+
+def spreadsheet_helper_state(db: Session) -> dict[str, Any]:
+    """Verify the local PostgreSQL helper contract without exposing credentials."""
+
+    if db.get_bind().dialect.name != "postgresql":
+        return {"available": False, "database": "unsupported", "helpers": []}
+    checks = _postgres_helper_checks(
+        db,
+        (
+            "chatbi_admin.provision_excel_reader(text,text,text)",
+            "chatbi_admin.drop_excel_reader(text,text)",
+        ),
+    )
+    schema_usable = _postgres_schema_usable(db, "chatbi_admin")
+    return {
+        "available": schema_usable and all(item["available"] for item in checks),
+        "database": "postgresql",
+        "schema_usable": schema_usable,
+        "helpers": checks,
+    }
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument("command", choices=("snapshot", "providers"))
+    parser.add_argument(
+        "command",
+        choices=("snapshot", "providers", "managed-spreadsheets", "spreadsheet-helpers"),
+    )
     args = parser.parse_args()
     with SessionLocal() as db:
-        payload = metadata_snapshot(db) if args.command == "snapshot" else provider_configuration_state(db)
+        if args.command == "snapshot":
+            payload = metadata_snapshot(db)
+        elif args.command == "providers":
+            payload = provider_configuration_state(db)
+        elif args.command == "managed-spreadsheets":
+            payload = managed_spreadsheet_state(db)
+        else:
+            payload = spreadsheet_helper_state(db)
     print(json.dumps(payload, ensure_ascii=True, sort_keys=True, separators=(",", ":")))
 
 

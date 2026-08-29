@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
-from app.core.access import Principal, require_permission
+from app.core.access import Principal, ensure_query_run_access, require_permission
 from app.db.session import get_db
 from app.models import QueryRun
 from app.query.contracts import (
@@ -16,6 +16,7 @@ from app.model_gateway import ModelGateway
 from app.query.service import QueryPipeline, query_response, save_feedback, save_verified_answer
 from app.core.config import get_settings
 from app.schemas.content import AnswerRead
+from app.services.content import public_answer_payload
 from chatbi_agent_contracts import AgentRole, ToolName
 from chatbi_rag_adapter import LiveRagAdapter
 
@@ -28,6 +29,7 @@ def _run_or_404(db: Session, query_id: str, principal: Principal) -> QueryRun:
         raise HTTPException(status_code=404, detail="Query run not found")
     if run.workspace_id != principal.workspace_id:
         raise HTTPException(status_code=403, detail="Query run access denied")
+    ensure_query_run_access(db, principal, run)
     return run
 
 
@@ -114,6 +116,9 @@ def feedback(query_id: str, data: FeedbackRequest, db: Session = Depends(get_db)
 @router.post("/queries/{query_id}/save", response_model=AnswerRead, status_code=status.HTTP_201_CREATED)
 def save_answer(query_id: str, data: SaveAnswerRequest, db: Session = Depends(get_db), principal: Principal = Depends(require_permission("answer.manage"))):
     try:
-        return save_verified_answer(db, _run_or_404(db, query_id, principal), data)
+        answer = save_verified_answer(
+            db, _run_or_404(db, query_id, principal), data, principal=principal,
+        )
+        return public_answer_payload(db, answer)
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc

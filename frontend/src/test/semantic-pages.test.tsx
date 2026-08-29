@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { createMemoryRouter, RouterProvider } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -18,7 +18,10 @@ vi.mock('../hooks/useData', () => ({
 const models: SemanticModel[] = [
   {
     id: 'model-1', name: '财务分析主题', description: '收入、成本与毛利分析', datasource_id: 'source-1', status: 'PUBLISHED', version: 2, updated_at: '2026-08-16T11:42:00Z',
-    entities: [{ id: 'entity-1', name: 'orders', source_table: 'orders', primary_key: 'order_id', time_dimension: 'order_date' }],
+    entities: [
+      { id: 'entity-1', name: 'orders', source_table: 'orders', primary_key: 'order_id', time_dimension: 'order_date' },
+      { id: 'entity-2', name: 'customers', source_table: 'customers', primary_key: 'customer_id', time_dimension: 'created_at' },
+    ],
     metrics: [{ id: 'metric-1', name: 'revenue', label: '收入', expression: 'orders.revenue', aggregation: 'SUM' }],
     dimensions: [{ id: 'dimension-1', name: 'region', label: '地区', source_column: 'orders.region_id', type: 'STRING' }],
     relationships: [{ id: 'relation-1', left_entity: 'orders', right_entity: 'customers', join_type: 'LEFT', join_keys: [{ left: 'customer_id', right: 'customer_id' }], cardinality: 'MANY_TO_ONE' }],
@@ -43,6 +46,7 @@ function renderRoute(path: string, element: React.ReactNode) {
 describe('语义模型高保真界面', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    localStorage.clear();
     vi.mocked(useSemanticModels).mockImplementation((options = {}) => queryResult(models.filter((model) => {
       const query = options.query?.trim().toLowerCase() ?? '';
       return (!query || `${model.name} ${model.description ?? ''}`.toLowerCase().includes(query))
@@ -94,5 +98,27 @@ describe('语义模型高保真界面', () => {
 
     await waitFor(() => expect(semanticApi.updateResource).toHaveBeenCalledWith('model-1', 'entities', 'entity-1', expect.objectContaining({ name: 'sales_orders' })));
     expect(await screen.findByText('模型草稿已保存')).toBeVisible();
+  });
+
+  it('支持拖动实体、关系线随动并在浏览器中保存无重叠布局', async () => {
+    Object.defineProperty(window, 'PointerEvent', { value: MouseEvent, configurable: true });
+    renderRoute('/semantic-models/model-1', <SemanticEditorPage />);
+
+    const orders = screen.getByRole('button', { name: 'orders，可拖动' });
+    const before = orders.style.transform;
+    expect(screen.getByText('1 条关系')).toBeVisible();
+    expect(document.querySelectorAll('.semantic-connectors > path')).toHaveLength(1);
+
+    fireEvent.pointerDown(orders, { pointerId: 7, clientX: 120, clientY: 100 });
+    fireEvent.pointerMove(orders, { pointerId: 7, clientX: 188, clientY: 128 });
+    expect(orders.style.transform).not.toBe(before);
+    fireEvent.pointerUp(orders, { pointerId: 7, clientX: 188, clientY: 128 });
+
+    await waitFor(() => {
+      const saved = JSON.parse(localStorage.getItem('chatbi:semantic-layout:model-1:entities') ?? '{}') as Record<string, { x: number; y: number }>;
+      expect(saved['entity-1']).toBeDefined();
+      expect(saved['entity-2']).toBeDefined();
+      expect(saved['entity-1']).not.toEqual(saved['entity-2']);
+    });
   });
 });

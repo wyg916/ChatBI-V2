@@ -1,10 +1,25 @@
 from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.access import Principal, record_audit, require_permission
+from app.core.data_safety import (
+    SENSITIVE_COMMENT_MARKER,
+    is_sensitive_column,
+    redact_public_sql_payload,
+)
 from app.db.session import get_db
+from app.models import (
+    DataSource,
+    DataSourceColumn,
+    DataSourceSchema,
+    DataSourceTable,
+    EvaluationCaseResult,
+    QueryRun,
+)
 from app.schemas.evaluation import (
     EvaluationCaseDetail,
+    EvaluationCaseResultRead,
     EvaluationComparisonRequest,
     EvaluationComparisonResponse,
     EvaluationCreate,
@@ -51,6 +66,63 @@ from app.services.feedback_loop import (
 router = APIRouter(prefix="/evaluation", tags=["evaluation"])
 
 
+def _workspace_sensitive_columns(db: Session, workspace_id: str | None) -> list[str]:
+    if not workspace_id:
+        return []
+    rows = db.execute(
+        select(DataSourceColumn.name, DataSourceColumn.comment)
+        .join(DataSourceTable, DataSourceColumn.table_id == DataSourceTable.id)
+        .join(DataSourceSchema, DataSourceTable.schema_id == DataSourceSchema.id)
+        .join(DataSource, DataSourceSchema.datasource_id == DataSource.id)
+        .where(DataSource.workspace_id == workspace_id)
+    )
+    return sorted({
+        name
+        for name, comment in rows
+        if is_sensitive_column(name) or SENSITIVE_COMMENT_MARKER in (comment or "")
+    })
+
+
+def _public_evaluation_payload(
+    db: Session,
+    workspace_id: str | None,
+    payload,
+    *,
+    query_run_id: str | None = None,
+):
+    sensitive_columns = _workspace_sensitive_columns(db, workspace_id)
+    dialect = "postgresql"
+    if query_run_id:
+        query_run = db.get(QueryRun, query_run_id)
+        if query_run is not None:
+            context = query_run.context_payload or {}
+            dialect = str(
+                context.get("dialect")
+                or (query_run.execution_payload or {}).get("dialect")
+                or "postgresql"
+            )
+            policy = context.get("security_policy") or {}
+            if isinstance(policy, dict):
+                sensitive_columns = sorted({
+                    *sensitive_columns,
+                    *list(policy.get("sensitive_columns") or []),
+                })
+    return redact_public_sql_payload(
+        payload, sensitive_columns, dialect=dialect,
+    )
+
+
+def _public_case(
+    db: Session,
+    workspace_id: str | None,
+    case: EvaluationCaseResult,
+) -> dict:
+    payload = EvaluationCaseResultRead.model_validate(case).model_dump(mode="python")
+    return _public_evaluation_payload(
+        db, workspace_id, payload, query_run_id=case.query_run_id,
+    )
+
+
 @router.get("/overview", response_model=EvaluationOverviewResponse)
 def get_evaluation_overview(db: Session = Depends(get_db), principal: Principal = Depends(require_permission("evaluation.read"))):
     try:
@@ -69,7 +141,10 @@ def run_evaluation(db: Session = Depends(get_db), principal: Principal = Depends
         )
         db.commit()
         _, cases = evaluation_run_detail(db, run.id, principal.workspace_id)
-        return {"run": evaluation_run_view(run, cases), "cases": cases}
+        return {
+            "run": evaluation_run_view(run, cases),
+            "cases": [_public_case(db, principal.workspace_id, case) for case in cases],
+        }
     except (LookupError, RuntimeError, ValueError) as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
 
@@ -78,7 +153,10 @@ def run_evaluation(db: Session = Depends(get_db), principal: Principal = Depends
 def get_evaluation_run(run_id: str, db: Session = Depends(get_db), principal: Principal = Depends(require_permission("evaluation.read"))):
     try:
         run, cases = evaluation_run_detail(db, run_id, principal.workspace_id)
-        return {"run": evaluation_run_view(run, cases), "cases": cases}
+        return {
+            "run": evaluation_run_view(run, cases),
+            "cases": [_public_case(db, principal.workspace_id, case) for case in cases],
+        }
     except LookupError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
 
@@ -88,7 +166,12 @@ def get_evaluation_case(case_ref: str, db: Session = Depends(get_db), principal:
     try:
         run, case, previous_id, next_id = evaluation_case_detail(db, case_ref, principal.workspace_id)
         _, cases = evaluation_run_detail(db, run.id, principal.workspace_id)
-        return {"run": evaluation_run_view(run, cases), "case": case, "previous_case_id": previous_id, "next_case_id": next_id}
+        return {
+            "run": evaluation_run_view(run, cases),
+            "case": _public_case(db, principal.workspace_id, case),
+            "previous_case_id": previous_id,
+            "next_case_id": next_id,
+        }
     except LookupError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
 
@@ -124,7 +207,10 @@ def execute_evaluation_definition(
         _, cases = evaluation_run_detail(db, run.id, principal.workspace_id)
         record_audit(db, principal, action="EVALUATION_EXECUTE", resource_type="EVALUATION_RUN", resource_id=run.id, status=run.status)
         db.commit()
-        return {"run": evaluation_run_view(run, cases), "cases": cases}
+        return {
+            "run": evaluation_run_view(run, cases),
+            "cases": [_public_case(db, principal.workspace_id, case) for case in cases],
+        }
     except LookupError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     except (RuntimeError, ValueError) as exc:
@@ -174,7 +260,10 @@ def get_feedback_dashboard(
     db: Session = Depends(get_db),
     principal: Principal = Depends(require_permission("evaluation.read")),
 ):
-    return feedback_dashboard(db, workspace_id=principal.workspace_id)
+    return _public_evaluation_payload(
+        db, principal.workspace_id,
+        feedback_dashboard(db, principal=principal),
+    )
 
 
 @router.post("/feedback", response_model=FeedbackWorkflowRead, status_code=status.HTTP_201_CREATED)
@@ -190,7 +279,7 @@ def create_user_feedback(
             resource_id=item["answer_id"], details={"workflow_state": item["workflow_state"], "sentiment": data.sentiment, "reason": data.reason},
         )
         db.commit()
-        return item
+        return _public_evaluation_payload(db, principal.workspace_id, item)
     except LookupError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     except ValueError as exc:
@@ -211,7 +300,7 @@ def start_user_feedback_review(
             resource_id=answer_id, details={"workflow_state": item["workflow_state"]},
         )
         db.commit()
-        return item
+        return _public_evaluation_payload(db, principal.workspace_id, item)
     except LookupError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     except ValueError as exc:
@@ -233,7 +322,7 @@ def decide_user_feedback_review(
             details={"decision": data.decision, "workflow_state": item["workflow_state"], "version": item["version"]},
         )
         db.commit()
-        return item
+        return _public_evaluation_payload(db, principal.workspace_id, item)
     except LookupError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     except ValueError as exc:
@@ -247,7 +336,12 @@ def correct_feedback(
     principal: Principal = Depends(require_permission("answer.manage")),
 ):
     try:
-        item = record_correct_feedback(db, query_run_id=data.query_run_id, comment=data.comment, workspace_id=principal.workspace_id)
+        item = record_correct_feedback(
+            db,
+            query_run_id=data.query_run_id,
+            comment=data.comment,
+            principal=principal,
+        )
         return {"id": item.id, "query_run_id": item.query_run_id, "feedback_type": item.feedback_type, "recorded": True}
     except LookupError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
@@ -262,7 +356,10 @@ def incorrect_feedback(
     principal: Principal = Depends(require_permission("answer.manage")),
 ):
     try:
-        return submit_correction(db, data=data, principal=principal)
+        return _public_evaluation_payload(
+            db, principal.workspace_id,
+            submit_correction(db, data=data, principal=principal),
+        )
     except LookupError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     except ValueError as exc:
@@ -275,7 +372,9 @@ def recall_verified_sql(
     db: Session = Depends(get_db),
     principal: Principal = Depends(require_permission("evaluation.read")),
 ):
-    return {"candidates": recall_candidates(db, data=data, workspace_id=principal.workspace_id)}
+    return _public_evaluation_payload(db, principal.workspace_id, {
+        "candidates": recall_candidates(db, data=data, principal=principal),
+    })
 
 
 @router.post("/feedback/{answer_id}/review", response_model=FeedbackWorkflowRead)
@@ -286,7 +385,12 @@ def review_feedback(
     principal: Principal = Depends(require_permission("evaluation.run")),
 ):
     try:
-        return review_correction(db, answer_id=answer_id, data=data, reviewer=principal.email, workspace_id=principal.workspace_id)
+        return _public_evaluation_payload(
+            db, principal.workspace_id,
+            review_correction(
+                db, answer_id=answer_id, data=data, principal=principal,
+            ),
+        )
     except LookupError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     except ValueError as exc:
@@ -308,7 +412,7 @@ def replay_feedback(
             details={"query_run_id": item["query_run_id"], "oracle_status": item["oracle_status"]},
         )
         db.commit()
-        return item
+        return _public_evaluation_payload(db, principal.workspace_id, item)
     except LookupError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     except ValueError as exc:

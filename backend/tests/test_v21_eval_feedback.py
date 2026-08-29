@@ -208,6 +208,91 @@ def test_evaluation_and_feedback_endpoints_hide_foreign_workspace_records(client
     ).status_code == 404
 
 
+def test_evaluation_and_feedback_public_reads_redact_sensitive_sql_literals(client, db_session):
+    datasource, _ = _catalog(db_session)
+    orders = db_session.scalar(
+        select(DataSourceTable)
+        .join(DataSourceSchema, DataSourceTable.schema_id == DataSourceSchema.id)
+        .where(
+            DataSourceSchema.datasource_id == datasource.id,
+            DataSourceTable.name == "orders",
+        )
+    )
+    db_session.add(DataSourceColumn(
+        table_id=orders.id,
+        name="email",
+        qualified_name=f"{orders.qualified_name}.email",
+        data_type="TEXT",
+    ))
+    secret = "victim@example.com"
+    sql = "SELECT email FROM demo_business.orders WHERE email='victim@example.com'"
+    run = EvaluationRun(
+        workspace_id=datasource.workspace_id,
+        release_name="Sensitive SQL public boundary",
+        model_name="deterministic",
+        status="FAIL",
+        golden_set_count=1,
+        completed_at=datetime.now(timezone.utc),
+    )
+    db_session.add(run)
+    db_session.flush()
+    case = EvaluationCaseResult(
+        evaluation_run_id=run.id,
+        case_id="SENSITIVE-SQL-1",
+        category="security",
+        question="查询邮箱",
+        status="FAIL",
+        execution_ok=False,
+        result_ok=False,
+        semantic_ok=False,
+        expected={"sql": sql},
+        actual={
+            "plan": {"generated_sql": sql},
+            "execution": {
+                "normalized_sql": sql,
+                "error_code": "QUERY_EXECUTION_ERROR",
+                "error_message": f"driver echoed {sql}",
+            },
+        },
+        generated_sql=sql,
+        error_category="SQL_EXECUTION",
+    )
+    answer = VerifiedAnswer(
+        workspace_id=datasource.workspace_id,
+        datasource_id=datasource.id,
+        question="敏感修正 SQL",
+        module="评测反馈",
+        model_name="deterministic",
+        owner_name="Reviewer",
+        status="VERIFIED",
+        sql_text=sql,
+        oracle_status="PASSED",
+        feedback={
+            "flow": "SQLBOT_FEEDBACK_V2_1",
+            "workflow_state": "APPROVED",
+            "corrected_sql": sql,
+            "candidate_sql": sql,
+        },
+    )
+    db_session.add_all([case, answer])
+    db_session.commit()
+
+    run_read = client.get(f"/api/v1/evaluation/runs/{run.id}")
+    assert run_read.status_code == 200
+    assert secret not in run_read.text
+    assert run_read.json()["cases"][0]["generated_sql"].count("***MASKED***") == 1
+    case_read = client.get(f"/api/v1/evaluation/cases/{case.id}")
+    assert case_read.status_code == 200
+    assert secret not in case_read.text
+    assert "use the error code" in case_read.json()["case"]["actual"]["execution"]["error_message"]
+
+    feedback_read = client.get("/api/v1/evaluation/feedback/dashboard")
+    assert feedback_read.status_code == 200
+    assert secret not in feedback_read.text
+    assert feedback_read.json()["sql_examples"][0]["sql"].count("***MASKED***") == 1
+    assert feedback_read.json()["workflows"][0]["corrected_sql"].count("***MASKED***") == 1
+
+
 def test_feedback_dashboard_terms_are_workspace_scoped_and_stably_deduplicated(client, db_session):
     _, current_model = _catalog(db_session)
     current_workspace = db_session.get(Workspace, current_model.workspace_id)

@@ -61,9 +61,9 @@ PostgreSQL 是主开发和主验证路径，保证元数据、迁移和完整闭
 
 ChatBI 的目标是可信分析，不是通用 Agent 平台。固定角色、固定工具和硬预算让权限、失败模式、成本和 Trace 可验证；普通 DATA_QUERY 直接走确定性 QueryPipeline，避免为了 Agent 而 Agent。
 
-### 为什么本地 Demo 用 deterministic？
+### 为什么录屏时可以切到 deterministic？
 
-求职录屏要稳定、可复现、无付费风险。deterministic 仍执行真实数据库、SQL Guard、Executor 和 Oracle，只替换外部 Provider 的不稳定网络边界；正式 Release 的三 Provider 结果单独由发布证据证明。
+根目录一键启动默认是 `Auto`，有凭据时会真实使用 MiMo、DeepSeek、Kimi。求职录屏如果更看重稳定、可复现和无付费风险，可以显式选择 `ProviderMode Deterministic`；它仍执行真实数据库、SQL Guard、Executor 和 Oracle，只替换外部 Provider 的不稳定网络边界。
 
 ### 如何处理上游开源复用？
 
@@ -81,7 +81,7 @@ Session 绑定用户和 Workspace；资源查询带 Workspace/RBAC；数据源�
 
 ### “如何控制模型成本？”
 
-统一 Gateway 做能力/复杂度/预算路由，记录 Token、估算成本、重试和 fallback；测试分 LEVEL0/1/2，普通开发默认零付费，只有明确授权的定向或最终认证允许真实 Provider 并设置硬预算。
+统一 Gateway 做能力/复杂度路由，记录 Token、估算成本、重试和 fallback。CI 与免费回归仍显式使用 LEVEL0；当前本机交互 Showcase 经负责人授权后使用 `Auto`，关闭测试付费门禁，但 Provider 账号自身的额度与计费仍然有效。
 
 ### “最难的工程问题是什么？”
 

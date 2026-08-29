@@ -3,7 +3,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { datasourceApi } from '../api/datasources';
 import { useDatasources } from '../hooks/useData';
-import type { Datasource, DatasourceInput, DatasourceKind } from '../types/api';
+import type { Datasource, DatasourceInput, DatasourceKind, SpreadsheetPreview } from '../types/api';
 import { ErrorNotice, Field, FormActions, Loading, Modal, PageHeading, StatusBadge } from '../components/UI';
 import './datasources.css';
 
@@ -19,9 +19,9 @@ function isNormal(item: Datasource) {
 }
 
 function datasourceType(item: Datasource) {
-  return item.type === 'postgresql'
-    ? { mark: 'PG', product: 'PostgreSQL', version: 'PostgreSQL' }
-    : { mark: 'MY', product: 'MySQL', version: 'MySQL' };
+  if (item.type === 'postgresql') return { mark: 'PG', product: 'PostgreSQL', version: 'PostgreSQL' };
+  if (item.type === 'mysql') return { mark: 'MY', product: 'MySQL', version: 'MySQL' };
+  return { mark: 'XL', product: 'Excel 表格', version: item.import_filename ?? 'Backend 托管导入' };
 }
 
 function formatRelativeTime(value?: string) {
@@ -41,7 +41,11 @@ function formatRelativeTime(value?: string) {
 export function DatasourcesPage() {
   const client = useQueryClient();
   const [showCreate, setShowCreate] = useState(false);
+  const [showImport, setShowImport] = useState(false);
   const [form, setForm] = useState(defaultForm);
+  const [importName, setImportName] = useState('');
+  const [importFile, setImportFile] = useState<File | null>(null);
+  const [importPreview, setImportPreview] = useState<SpreadsheetPreview | null>(null);
   const [search, setSearch] = useState('');
   const [typeFilter, setTypeFilter] = useState<'all' | DatasourceKind>('all');
   const [statusFilter, setStatusFilter] = useState<'all' | 'normal' | 'attention'>('all');
@@ -68,6 +72,26 @@ export function DatasourcesPage() {
     },
   });
 
+  const previewImport = useMutation({
+    mutationFn: (file: File) => datasourceApi.previewSpreadsheet(file),
+    onSuccess: (preview) => {
+      setImportPreview(preview);
+      if (!importName.trim()) setImportName(preview.filename.replace(/\.(xlsx|csv)$/i, ''));
+    },
+  });
+
+  const importSpreadsheet = useMutation({
+    mutationFn: ({ name, file }: { name: string; file: File }) => datasourceApi.importSpreadsheet(name, file),
+    onSuccess: ({ datasource, preview }) => {
+      client.invalidateQueries({ queryKey: ['datasources'] });
+      setFeedback(`${datasource.name} 已导入：${preview.sheet_count} 张工作表、${preview.row_count} 行，可用于语义模型和问数。`);
+      setShowImport(false);
+      setImportName('');
+      setImportFile(null);
+      setImportPreview(null);
+    },
+  });
+
   const syncAll = useMutation({
     mutationFn: async () => {
       const results = await Promise.all(data.map(async (item) => ({ item, result: await datasourceApi.sync(item.id) })));
@@ -82,7 +106,7 @@ export function DatasourcesPage() {
   });
 
   const submit = (event: FormEvent) => { event.preventDefault(); create.mutate(form); };
-  const changeType = (type: DatasourceKind) => setForm((old) => ({
+  const changeType = (type: DatasourceInput['type']) => setForm((old) => ({
     ...old, type, port: type === 'postgresql' ? 5432 : 3306,
     schema: type === 'postgresql' ? 'public' : undefined,
   }));
@@ -97,6 +121,21 @@ export function DatasourcesPage() {
     return !latest || new Date(value) > new Date(latest) ? value : latest;
   }, undefined);
 
+  const selectSpreadsheet = (file: File | null) => {
+    setImportFile(file);
+    setImportPreview(null);
+    previewImport.reset();
+    importSpreadsheet.reset();
+    if (file) previewImport.mutate(file);
+  };
+
+  const submitImport = (event: FormEvent) => {
+    event.preventDefault();
+    if (importFile && importPreview && importName.trim()) {
+      importSpreadsheet.mutate({ name: importName.trim(), file: importFile });
+    }
+  };
+
   return <section className="datasource-page">
     <PageHeading
       title="数据源"
@@ -105,6 +144,7 @@ export function DatasourcesPage() {
         <button className="button secondary" disabled={syncAll.isPending} onClick={() => syncAll.mutate()}>
           {syncAll.isPending ? '正在同步…' : '↻ 同步全部数据源'}
         </button>
+        <button className="button secondary" data-testid="import-spreadsheet" onClick={() => setShowImport(true)}>⇧ 导入 Excel</button>
         <button className="button primary" data-testid="create-datasource" onClick={() => setShowCreate(true)}>＋ 新建数据源</button>
       </>}
     />
@@ -122,7 +162,7 @@ export function DatasourcesPage() {
     <div className="datasource-filterbar">
       <label className="datasource-search"><span aria-hidden="true">⌕</span><input aria-label="搜索数据源" placeholder="搜索数据源名称或数据库" value={search} onChange={(event) => setSearch(event.target.value)} /></label>
       <select aria-label="数据源类型" value={typeFilter} onChange={(event) => setTypeFilter(event.target.value as 'all' | DatasourceKind)}>
-        <option value="all">全部类型</option><option value="postgresql">PostgreSQL</option><option value="mysql">MySQL</option>
+        <option value="all">全部类型</option><option value="postgresql">PostgreSQL</option><option value="mysql">MySQL</option><option value="excel">Excel</option>
       </select>
       <select aria-label="连接状态" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value as 'all' | 'normal' | 'attention')}>
         <option value="all">全部状态</option><option value="normal">运行正常</option><option value="attention">需要关注</option>
@@ -150,7 +190,7 @@ export function DatasourcesPage() {
 
     {!isLoading && filtered.length === 0 && <div className="empty-card">
       <span>源</span><h2>{data.length ? '没有符合条件的数据源' : '还没有数据源'}</h2>
-      <p>{data.length ? '请调整搜索词或筛选条件。' : '连接 PostgreSQL 或 MySQL，开始同步业务元数据。'}</p>
+      <p>{data.length ? '请调整搜索词或筛选条件。' : '连接 PostgreSQL、MySQL，或安全导入 Excel 表格。'}</p>
       {!data.length && <button className="button primary" onClick={() => setShowCreate(true)}>新建数据源</button>}
     </div>}
 
@@ -175,6 +215,28 @@ export function DatasourcesPage() {
         <label className="check-row"><input type="checkbox" checked={form.ssl} onChange={(event) => setForm({ ...form, ssl: event.target.checked })} />启用 SSL 加密连接</label>
         <ErrorNotice error={create.error} />
         <FormActions busy={create.isPending} onCancel={() => setShowCreate(false)} submitLabel="保存并测试连接" />
+      </form>
+    </Modal>}
+
+    {showImport && <Modal title="导入 Excel 表格" onClose={() => setShowImport(false)}>
+      <form className="form-grid spreadsheet-import-form" noValidate onSubmit={submitImport}>
+        <p className="form-intro">文件仅经 Backend API 校验和解析，再物化到本机 PostgreSQL 的隔离 Schema。支持 .xlsx 和 .csv；不会执行宏或公式。</p>
+        <Field label="数据源名称"><input required maxLength={255} value={importName} onChange={(event) => setImportName(event.target.value)} placeholder="例如：月度销售明细" /></Field>
+        <Field label="选择表格"><input aria-label="选择 Excel 或 CSV 文件" required type="file" accept=".xlsx,.csv" onChange={(event) => selectSpreadsheet(event.target.files?.[0] ?? null)} /></Field>
+        <small className="spreadsheet-limit">单文件最多 10 MB、100,000 行、每张表 256 列且合计 2,000,000 个单元格；公式、宏、外部链接和嵌入对象将被拒绝。</small>
+        {previewImport.isPending && <Loading />}
+        {importPreview && <section className="spreadsheet-preview" aria-label="表格导入预览">
+          <header><strong>校验通过</strong><span>{importPreview.sheet_count} 张表 · {importPreview.row_count} 行 · {importPreview.column_count} 列</span></header>
+          {importPreview.sheets.map((sheet) => <article key={sheet.table_name}>
+            <div><strong>{sheet.source_name}</strong><span>将导入为 {sheet.table_name} · {sheet.row_count} 行</span></div>
+            <div className="spreadsheet-preview-scroll"><table>
+              <thead><tr>{sheet.columns.map((column) => <th key={column.name}>{column.name}<small>{column.data_type}</small></th>)}</tr></thead>
+              <tbody>{sheet.preview_rows.slice(0, 5).map((row, index) => <tr key={index}>{sheet.columns.map((column) => <td key={column.name}>{String(row[column.name] ?? '--')}</td>)}</tr>)}</tbody>
+            </table></div>
+          </article>)}
+        </section>}
+        <ErrorNotice error={previewImport.error ?? importSpreadsheet.error} />
+        <FormActions busy={previewImport.isPending || importSpreadsheet.isPending} onCancel={() => setShowImport(false)} submitLabel="确认导入并同步元数据" />
       </form>
     </Modal>}
   </section>;

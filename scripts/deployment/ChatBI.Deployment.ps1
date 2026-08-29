@@ -67,10 +67,100 @@ function Test-ChatBIPlaceholder {
   return $Value -match '^(<.*>|CHANGE_ME.*|REPLACE_ME.*|GENERATED_LOCAL_.*)$'
 }
 
+function Set-ChatBIShowcaseProcessEnvironment {
+  param(
+    [Parameter(Mandatory = $true)][string]$EnvFile,
+    [ValidateSet('Auto', 'Live', 'Deterministic')][string]$ProviderMode = 'Auto',
+    [string]$BackendImage = '',
+    [string]$FrontendImage = '',
+    [string]$SandboxImage = ''
+  )
+  $modeValues = Read-ChatBIEnv -EnvFile $EnvFile
+  $frontendPort = '15173'
+  $backendPort = '18080'
+  $ragPort = '18081'
+  $env:COMPOSE_PROJECT_NAME = 'chatbi-v2-showcase'
+  $env:CHATBI_BIND_HOST = '127.0.0.1'
+  $env:CHATBI_DEPLOYMENT_MODE = 'showcase'
+  $env:CHATBI_ENVIRONMENT = 'development'
+  $env:CHATBI_FRONTEND_PORT = $frontendPort
+  $env:CHATBI_BACKEND_PORT = $backendPort
+  $env:CHATBI_RAG_PORT = $ragPort
+  $env:CHATBI_CORS_ALLOW_ORIGINS = "http://localhost:$frontendPort,http://127.0.0.1:$frontendPort"
+
+  $configuredProviders = @()
+  foreach ($provider in @(
+    @{ Name = 'mimo'; Key = 'CHATBI_MIMO_API_KEY' },
+    @{ Name = 'deepseek'; Key = 'CHATBI_DEEPSEEK_API_KEY' },
+    @{ Name = 'kimi'; Key = 'CHATBI_KIMI_API_KEY' }
+  )) {
+    $credential = Get-ChatBIValue -Values $modeValues -Name $provider.Key
+    if (-not (Test-ChatBIPlaceholder -Value $credential)) { $configuredProviders += $provider.Name }
+  }
+  $useLiveProviders = $ProviderMode -eq 'Live' -or ($ProviderMode -eq 'Auto' -and $configuredProviders.Count -gt 0)
+  if ($ProviderMode -eq 'Live' -and $configuredProviders.Count -eq 0) {
+    throw 'Live Provider mode requires at least one configured MiMo, DeepSeek, or Kimi credential in the selected EnvFile.'
+  }
+  if ($useLiveProviders) {
+    $env:CHATBI_MODEL_PROVIDER = 'auto'
+    $env:CHATBI_GENERAL_MODEL_PROVIDER = 'auto'
+    $env:CHATBI_VISION_MODEL_PROVIDER = 'auto'
+    $env:CHATBI_MODEL_BUDGET_MODE = 'quality'
+    $env:CHATBI_TEST_COST_CONTROL = 'NO'
+    $env:CHATBI_TEST_EXECUTION_LEVEL = 'FINAL'
+    $env:CHATBI_PAID_GATE_AUTHORIZED = 'YES'
+    $env:CHATBI_LEVEL0_PAID_EXCEPTION = 'YES'
+    $env:CHATBI_PROVIDER_USAGE_UNRESTRICTED = 'true'
+    $runtimeMode = "live providers ($($configuredProviders -join ', ')); automatic capability routing; test cost control disabled"
+  } else {
+    $env:CHATBI_MODEL_PROVIDER = 'deterministic'
+    $env:CHATBI_GENERAL_MODEL_PROVIDER = 'deterministic'
+    $env:CHATBI_VISION_MODEL_PROVIDER = 'deterministic'
+    $env:CHATBI_MODEL_BUDGET_MODE = 'balanced'
+    $env:CHATBI_TEST_COST_CONTROL = 'YES'
+    $env:CHATBI_TEST_EXECUTION_LEVEL = 'LEVEL0'
+    $env:CHATBI_PAID_GATE_AUTHORIZED = 'NO'
+    $env:CHATBI_LEVEL0_PAID_EXCEPTION = 'NO'
+    $env:CHATBI_PROVIDER_USAGE_UNRESTRICTED = 'false'
+    $runtimeMode = 'deterministic / LEVEL0 / no paid provider calls'
+  }
+  $env:CHATBI_SEED_DEMO_SEMANTIC_MODEL = 'true'
+  $env:CHATBI_BACKEND_IMAGE = if ($BackendImage) { $BackendImage } else { 'chatbi-v2-backend:latest' }
+  $env:CHATBI_FRONTEND_IMAGE = if ($FrontendImage) { $FrontendImage } else { 'chatbi-v2-frontend:latest' }
+  $env:CHATBI_SANDBOX_IMAGE = if ($SandboxImage) { $SandboxImage } else { 'chatbi-sandbox-runtime:phase3' }
+  $env:CHATBI_STORAGE_ROOT = './.chatbi/showcase-storage'
+  $env:CHATBI_BACKUP_ROOT = './.chatbi/showcase-backups'
+  $gitSha = (& git -C $script:ChatBIProjectRoot rev-parse HEAD).Trim()
+  if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($gitSha)) {
+    throw 'Unable to resolve the local Showcase Git identity.'
+  }
+  $env:CHATBI_GIT_SHA = $gitSha
+  $env:CHATBI_RELEASE_VERSION = 'v1.3.1'
+  $env:CHATBI_FRONTEND_BUILD = 'production'
+  if ([string]::IsNullOrWhiteSpace($env:CHATBI_SHOWCASE_DATABASE_NAME)) {
+    $env:CHATBI_SHOWCASE_DATABASE_NAME = 'chatbi_v2'
+  }
+  if ([string]::IsNullOrWhiteSpace($env:CHATBI_DATABASE_URL)) {
+    $metaPassword = Get-ChatBIValue -Values $modeValues -Name 'CHATBI_META_PASSWORD'
+    if (Test-ChatBIPlaceholder -Value $metaPassword) {
+      throw 'Local Showcase requires CHATBI_DATABASE_URL or CHATBI_META_PASSWORD in the selected EnvFile.'
+    }
+    $encodedMetaPassword = [uri]::EscapeDataString($metaPassword)
+    $env:CHATBI_DATABASE_URL = "postgresql+psycopg://chatbi_app:${encodedMetaPassword}@host.docker.internal:5432/$env:CHATBI_SHOWCASE_DATABASE_NAME"
+  }
+  $env:CHATBI_BOOTSTRAP_ADMIN_PASSWORD = 'ChatBI-Showcase-2026!'
+  $env:CHATBI_BOOTSTRAP_ANALYST_PASSWORD = 'ChatBI-Analyst-2026!'
+  return [pscustomobject]@{
+    RuntimeMode = $runtimeMode
+    ConfiguredProviders = @($configuredProviders)
+  }
+}
+
 function New-ChatBISecret {
   param([int]$Bytes = 36)
   $buffer = New-Object byte[] $Bytes
-  [Security.Cryptography.RandomNumberGenerator]::Fill($buffer)
+  $generator = [Security.Cryptography.RandomNumberGenerator]::Create()
+  try { $generator.GetBytes($buffer) } finally { $generator.Dispose() }
   return [Convert]::ToBase64String($buffer).TrimEnd('=').Replace('+', '-').Replace('/', '_')
 }
 
@@ -222,10 +312,87 @@ function Get-ChatBIComposeArguments {
   return @('compose', '--env-file', $EnvFile, '--project-name', $ProjectName)
 }
 
+function Assert-ChatBINoCompetingMetadataWriteStack {
+  param(
+    [Parameter(Mandatory = $true)][string]$EnvFile,
+    [Parameter(Mandatory = $true)][string]$TargetProjectName,
+    [Parameter(Mandatory = $true)][string[]]$KnownProjectNames,
+    [Parameter(Mandatory = $true)][ValidateSet('backup', 'restore')][string]$Operation
+  )
+  $target = $TargetProjectName.ToLowerInvariant()
+  $candidates = [Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
+  foreach ($projectName in $KnownProjectNames) {
+    $candidate = ([string]$projectName).Trim().ToLowerInvariant()
+    if (-not $candidate -or $candidate -eq $target) { continue }
+    if ($candidate -notmatch '^[a-z0-9][a-z0-9_-]*$') {
+      throw "Known Compose project name contains unsupported characters: $candidate"
+    }
+    [void]$candidates.Add($candidate)
+  }
+  foreach ($candidate in $candidates) {
+    $candidateCompose = Get-ChatBIComposeArguments -EnvFile $EnvFile -ProjectName $candidate
+    $serviceOutput = @(& docker @candidateCompose ps --services --filter status=running)
+    if ($LASTEXITCODE -ne 0) {
+      throw "Unable to inspect competing Compose project '$candidate' before $Operation"
+    }
+    $runningServices = @(
+      $serviceOutput | Where-Object { -not [string]::IsNullOrWhiteSpace([string]$_) }
+    )
+    if ($runningServices.Count -gt 0) {
+      throw (
+        "COMPETING_METADATA_WRITER=$candidate. Refusing $Operation because another canonical ChatBI " +
+        "Compose project may be writing the selected metadata database. Stop that project explicitly; " +
+        "this command will not stop it automatically."
+      )
+    }
+  }
+}
+
 function Resolve-ChatBIDataPath {
   param([Parameter(Mandatory = $true)][string]$Path)
   if ([IO.Path]::IsPathRooted($Path)) { return [IO.Path]::GetFullPath($Path) }
   return [IO.Path]::GetFullPath((Join-Path $script:ChatBIProjectRoot $Path))
+}
+
+function Assert-ChatBISafeStorageTarget {
+  param(
+    [Parameter(Mandatory = $true)][string]$Path,
+    [Parameter(Mandatory = $true)][System.Collections.IDictionary]$Values,
+    [string]$ProjectRoot = $script:ChatBIProjectRoot
+  )
+  $trimCharacters = [char[]]@('\', '/')
+  $projectFull = [IO.Path]::GetFullPath($ProjectRoot).TrimEnd($trimCharacters)
+  $storageFull = Resolve-ChatBIDataPath -Path $Path
+  $storageFull = [IO.Path]::GetFullPath($storageFull).TrimEnd($trimCharacters)
+  $rootPath = [IO.Path]::GetPathRoot($storageFull).TrimEnd($trimCharacters)
+  if ([string]::IsNullOrWhiteSpace($storageFull) -or $storageFull -eq $projectFull -or $storageFull -eq $rootPath) {
+    throw 'Unsafe storage target was rejected'
+  }
+  $projectPrefix = $projectFull + [IO.Path]::DirectorySeparatorChar
+  if (-not $storageFull.StartsWith($projectPrefix, [StringComparison]::OrdinalIgnoreCase)) {
+    $allowExternal = Get-ChatBIValue -Values $Values -Name 'CHATBI_ALLOW_EXTERNAL_STORAGE_RESET' -Default 'NO'
+    if ($allowExternal -ne 'YES') {
+      throw 'External storage replacement is denied unless CHATBI_ALLOW_EXTERNAL_STORAGE_RESET=YES.'
+    }
+  }
+  return $storageFull
+}
+
+function Assert-ChatBIShowcaseDatabaseTarget {
+  param(
+    [Parameter(Mandatory = $true)]$Configuration,
+    [string]$ExpectedDatabaseName = 'chatbi_v2'
+  )
+  $databaseUrl = [string]$Configuration.DatabaseUrl
+  if ($databaseUrl -notmatch '^postgresql\+psycopg://(?:[^@/]+@)?([^/:?]+)(?::(\d+))?/([^?]+)(?:\?.*)?$') {
+    throw 'Local Showcase database URL could not be validated.'
+  }
+  $hostName = $matches[1].ToLowerInvariant()
+  $port = if ($matches[2]) { [int]$matches[2] } else { 5432 }
+  $databaseName = [uri]::UnescapeDataString($matches[3])
+  if ($hostName -ne 'host.docker.internal' -or $port -ne 5432 -or $databaseName -ne $ExpectedDatabaseName) {
+    throw "Local Showcase refused a non-local metadata target. ACTION: Remove inherited CHATBI_DATABASE_URL and use the project .env local chatbi_v2 connection."
+  }
 }
 
 function Test-ChatBIUrl {

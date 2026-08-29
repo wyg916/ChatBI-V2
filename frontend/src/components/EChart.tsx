@@ -10,12 +10,28 @@ export function EChart({ option, label, className = '' }: { option: EChartsCoreO
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
     const element = ref.current;
-    if (!element || element.clientWidth === 0 || element.clientHeight === 0) return;
-    const chart = init(element, undefined, { renderer: 'canvas' });
-    chart.setOption(option);
-    const observer = new ResizeObserver(() => chart.resize());
+    if (!element) return;
+    let chart: ReturnType<typeof init> | undefined;
+    const resize = () => {
+      const width = Math.floor(element.getBoundingClientRect().width || element.clientWidth);
+      const height = Math.floor(element.getBoundingClientRect().height || element.clientHeight);
+      if (width <= 0 || height <= 0) return;
+      if (!chart) {
+        chart = init(element, undefined, { renderer: 'canvas', width, height });
+        chart.setOption(option);
+      } else {
+        chart.resize({ width, height, silent: true });
+      }
+    };
+    resize();
+    const observer = new ResizeObserver(resize);
     observer.observe(element);
-    return () => { observer.disconnect(); chart.dispose(); };
+    window.addEventListener('resize', resize);
+    return () => {
+      observer.disconnect();
+      window.removeEventListener('resize', resize);
+      chart?.dispose();
+    };
   }, [option]);
   return <div ref={ref} className={`data-echart ${className}`} role="img" aria-label={label} />;
 }

@@ -383,9 +383,15 @@ def test_named_provider_uses_safe_provider_specific_contract(
     provider_id, secret_field, expected_url, auth_header, max_tokens_field,
 ):
     secret = f"{provider_id}-test-secret"
-    settings = Settings(_env_file=None, model_provider=provider_id, **{secret_field: secret})
+    settings = Settings(
+        _env_file=None,
+        model_provider=provider_id,
+        provider_usage_unrestricted=True,
+        **{secret_field: secret},
+    )
     router = Nl2SqlRouter(settings=settings)
     assert isinstance(router.provider, OpenAICompatibleProvider)
+    assert router.provider.settings.provider_usage_unrestricted is True
 
     expected = DeterministicTestProvider().plan(question="按地区统计收入", context=semantic_context())
     expected.provider = "untrusted-model-label"

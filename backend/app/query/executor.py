@@ -15,7 +15,7 @@ from sqlalchemy.exc import DBAPIError, OperationalError
 from app.core.config import get_settings
 from app.models import DataSource
 from app.query.contracts import ExecutionResult
-from app.services.datasources import build_connector
+from app.services.datasources import build_connector, runtime_dialect
 
 
 def json_value(value: Any) -> Any:
@@ -162,9 +162,10 @@ class QueryExecutor:
         timeout_ms: int,
         cancellation_event: threading.Event | None = None,
     ) -> ExecutionResult:
+        dialect = runtime_dialect(datasource)
         if cancellation_event is not None and cancellation_event.is_set():
             return ExecutionResult(
-                status="FAILED", datasource_id=datasource.id, dialect=datasource.type,
+                status="FAILED", datasource_id=datasource.id, dialect=dialect,
                 normalized_sql=normalized_sql, error_code="QUERY_CANCELLED",
                 error_message="Query was cancelled before execution",
             )
@@ -177,12 +178,12 @@ class QueryExecutor:
         if not acquired:
             if cancelled:
                 return ExecutionResult(
-                    status="FAILED", datasource_id=datasource.id, dialect=datasource.type,
+                    status="FAILED", datasource_id=datasource.id, dialect=dialect,
                     normalized_sql=normalized_sql, error_code="QUERY_CANCELLED",
                     error_message="Query was cancelled while waiting for execution capacity",
                 )
             return ExecutionResult(
-                status="CONCURRENCY_LIMIT", datasource_id=datasource.id, dialect=datasource.type,
+                status="CONCURRENCY_LIMIT", datasource_id=datasource.id, dialect=dialect,
                 normalized_sql=normalized_sql, error_code="QUERY_CONCURRENCY_LIMIT",
                 error_message="Timed out while waiting for query execution capacity",
             )
@@ -194,7 +195,7 @@ class QueryExecutor:
             with engine.connect() as connection:
                 monitor_stop = threading.Event()
                 monitor = None
-                if cancellation_event is not None and datasource.type == "postgresql":
+                if cancellation_event is not None and dialect == "postgresql":
                     def cancel_on_disconnect() -> None:
                         while not monitor_stop.wait(0.02):
                             if cancellation_event.is_set():
@@ -209,7 +210,7 @@ class QueryExecutor:
                     )
                     monitor.start()
                 try:
-                    if datasource.type == "postgresql":
+                    if dialect == "postgresql":
                         with connection.begin():
                             self._prepare_postgres_transaction(connection, datasource, timeout_ms)
                             result = connection.execute(text(normalized_sql))
@@ -235,7 +236,7 @@ class QueryExecutor:
             return ExecutionResult(
                 status="SUCCEEDED", columns=keys, column_types=types or ["unknown"] * len(keys), rows=rows,
                 row_count=len(rows), truncated=len(rows) >= row_limit, duration_ms=duration_ms,
-                datasource_id=datasource.id, dialect=datasource.type, normalized_sql=normalized_sql,
+                datasource_id=datasource.id, dialect=dialect, normalized_sql=normalized_sql,
                 result_signature=signature,
             )
         except (OperationalError, DBAPIError) as exc:
@@ -249,13 +250,13 @@ class QueryExecutor:
             else:
                 status, code = "FAILED", "QUERY_EXECUTION_ERROR"
             return ExecutionResult(
-                status=status, duration_ms=duration_ms, datasource_id=datasource.id, dialect=datasource.type,
+                status=status, duration_ms=duration_ms, datasource_id=datasource.id, dialect=dialect,
                 normalized_sql=normalized_sql, error_code=code, error_message=message[:1000],
             )
         except Exception as exc:
             duration_ms = round((time.perf_counter() - started) * 1000)
             return ExecutionResult(
-                status="FAILED", duration_ms=duration_ms, datasource_id=datasource.id, dialect=datasource.type,
+                status="FAILED", duration_ms=duration_ms, datasource_id=datasource.id, dialect=dialect,
                 normalized_sql=normalized_sql, error_code="QUERY_EXECUTION_ERROR", error_message=str(exc)[:1000],
             )
         finally:
@@ -271,11 +272,12 @@ class QueryExecutor:
         timeout_ms: int,
     ) -> ExecutionResult:
         """Explain a statement only after the caller has passed it through SqlGuard."""
+        dialect = runtime_dialect(datasource)
         semaphore = self._limit_semaphore()
         acquired, _ = self._acquire_slot(semaphore, timeout_ms=timeout_ms)
         if not acquired:
             return ExecutionResult(
-                status="CONCURRENCY_LIMIT", datasource_id=datasource.id, dialect=datasource.type,
+                status="CONCURRENCY_LIMIT", datasource_id=datasource.id, dialect=dialect,
                 normalized_sql=normalized_sql, error_code="QUERY_CONCURRENCY_LIMIT",
                 error_message="Timed out while waiting for query execution capacity",
             )
@@ -284,9 +286,9 @@ class QueryExecutor:
         try:
             connector = build_connector(datasource)
             engine = connector._engine()
-            prefix = "EXPLAIN (FORMAT JSON) " if datasource.type == "postgresql" else "EXPLAIN FORMAT=JSON "
+            prefix = "EXPLAIN (FORMAT JSON) " if dialect == "postgresql" else "EXPLAIN FORMAT=JSON "
             with engine.connect() as connection:
-                if datasource.type == "postgresql":
+                if dialect == "postgresql":
                     with connection.begin():
                         self._prepare_postgres_transaction(connection, datasource, timeout_ms)
                         value = connection.execute(text(prefix + normalized_sql)).scalar_one()
@@ -301,7 +303,7 @@ class QueryExecutor:
             return ExecutionResult(
                 status="SUCCEEDED", columns=["plan"], column_types=["json"], rows=rows,
                 row_count=1, duration_ms=duration_ms, datasource_id=datasource.id,
-                dialect=datasource.type, normalized_sql=normalized_sql,
+                dialect=dialect, normalized_sql=normalized_sql,
                 result_signature=result_signature(["plan"], rows),
             )
         except (OperationalError, DBAPIError) as exc:
@@ -310,13 +312,13 @@ class QueryExecutor:
             code = "QUERY_TIMEOUT" if "timeout" in message.lower() else "QUERY_EXPLAIN_ERROR"
             return ExecutionResult(
                 status="TIMEOUT" if code == "QUERY_TIMEOUT" else "FAILED",
-                duration_ms=duration_ms, datasource_id=datasource.id, dialect=datasource.type,
+                duration_ms=duration_ms, datasource_id=datasource.id, dialect=dialect,
                 normalized_sql=normalized_sql, error_code=code, error_message=message[:1000],
             )
         except Exception as exc:
             return ExecutionResult(
                 status="FAILED", duration_ms=round((time.perf_counter() - started) * 1000),
-                datasource_id=datasource.id, dialect=datasource.type, normalized_sql=normalized_sql,
+                datasource_id=datasource.id, dialect=dialect, normalized_sql=normalized_sql,
                 error_code="QUERY_EXPLAIN_ERROR", error_message=str(exc)[:1000],
             )
         finally:

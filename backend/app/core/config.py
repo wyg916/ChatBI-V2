@@ -82,12 +82,19 @@ class Settings(BaseSettings):
     attachment_max_rows: int = 100_000
     attachment_text_max_chars: int = 200_000
     attachment_ttl_hours: int = 24
+    spreadsheet_import_max_bytes: int = 10 * 1024 * 1024
+    spreadsheet_import_max_rows: int = 100_000
+    spreadsheet_import_max_columns: int = 256
+    spreadsheet_import_max_sheets: int = 32
+    spreadsheet_import_max_cells: int = 2_000_000
+    spreadsheet_import_preview_rows: int = 10
     chat_recent_message_limit: int = 20
     general_model_provider: str = "auto"
     vision_model_provider: str = "auto"
     vision_model_name: str = ""
     level0_vision_fixture_path: str = ""
     model_budget_mode: Literal["economy", "balanced", "quality"] = "balanced"
+    provider_usage_unrestricted: bool = False
 
     @property
     def agent_route_allowlist(self) -> frozenset[str]:

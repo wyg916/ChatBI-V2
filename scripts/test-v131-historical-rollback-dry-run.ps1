@@ -1,7 +1,7 @@
 [CmdletBinding()]
 param(
   [Parameter(Mandatory=$true)][string]$EvidencePath,
-  [string]$CandidateSha = '',
+  [string]$CandidateSha = '852d8aa35a6ec0a31bed34ba695ec6a17034b457',
   [string]$RollbackSha = '89bdc12936be0555bdad8a85f06932fb7dc476ee',
   [string]$SourceEnv = '',
   [string]$Python = '',
@@ -11,16 +11,42 @@ param(
 
 $ErrorActionPreference = 'Stop'
 $projectRoot = Split-Path -Parent $PSScriptRoot
-if(-not $CandidateSha) { $CandidateSha = (& git -C $projectRoot rev-parse HEAD).Trim() }
-if(-not $SourceEnv) { $SourceEnv = Join-Path (Split-Path -Parent (Split-Path -Parent $projectRoot)) '.env' }
+$certifiedCandidateSha = '852d8aa35a6ec0a31bed34ba695ec6a17034b457'
+$certifiedRollbackSha = '89bdc12936be0555bdad8a85f06932fb7dc476ee'
+$certifiedCandidateMigrationHead = '20260828_0013'
+$certifiedRollbackMigrationHead = '20260822_0012'
+
+if($CandidateSha -ne $certifiedCandidateSha -or $RollbackSha -ne $certifiedRollbackSha) {
+  throw 'This historical V1.3.1 runner accepts only candidate 852d8aa35a6ec0a31bed34ba695ec6a17034b457 and rollback 89bdc12936be0555bdad8a85f06932fb7dc476ee; use a separate current-version runner for migration 0014.'
+}
+if($CandidateMigrationHead -ne $certifiedCandidateMigrationHead -or $RollbackMigrationHead -ne $certifiedRollbackMigrationHead) {
+  throw 'This historical V1.3.1 runner accepts only migration 20260828_0013 to 20260822_0012; it must not be reused for migration 0014.'
+}
+
+function Test-RollbackPythonRuntime {
+  param([Parameter(Mandatory=$true)][string]$Executable)
+  if(-not (Test-Path -LiteralPath $Executable -PathType Leaf)) { return $false }
+  try {
+    & $Executable -c 'import psycopg; import pydantic; import pydantic_settings' *> $null
+    return $LASTEXITCODE -eq 0
+  } catch {
+    return $false
+  }
+}
+
+if(-not $SourceEnv) { $SourceEnv = Join-Path $projectRoot '.env' }
 if(-not $Python) {
-  $Python = @(
-    (Join-Path (Split-Path -Parent (Split-Path -Parent $projectRoot)) 'backend\.venv\Scripts\python.exe'),
-    (Join-Path $projectRoot 'backend\.venv\Scripts\python.exe')
-  ) | Where-Object { Test-Path -LiteralPath $_ } | Select-Object -First 1
+  $pythonCandidates = @((Join-Path $projectRoot 'backend\.venv\Scripts\python.exe'))
+  $pythonCommand = Get-Command python.exe -ErrorAction SilentlyContinue
+  if($pythonCommand) { $pythonCandidates += $pythonCommand.Source }
+  $Python = $pythonCandidates | Select-Object -Unique | Where-Object {
+    $_ -and (Test-RollbackPythonRuntime -Executable ([string]$_))
+  } | Select-Object -First 1
 }
 if(-not (Test-Path -LiteralPath $SourceEnv)) { throw 'Rollback source env is unavailable' }
-if(-not $Python -or -not (Test-Path -LiteralPath $Python)) { throw 'Rollback Python runtime is unavailable' }
+if(-not $Python -or -not (Test-RollbackPythonRuntime -Executable $Python)) {
+  throw 'Rollback Python runtime is unavailable or missing psycopg/pydantic dependencies. Pass -Python <path-to-backend-venv-python> explicitly.'
+}
 if((& git -C $projectRoot status --porcelain)) { throw 'Rollback dry-run requires a clean worktree' }
 if((& git -C $projectRoot rev-parse $CandidateSha).Trim() -ne $CandidateSha) { throw 'Candidate SHA is not exact' }
 & git -C $projectRoot merge-base --is-ancestor $RollbackSha $CandidateSha
@@ -28,7 +54,7 @@ if($LASTEXITCODE -ne 0) { throw 'Rollback SHA is not an ancestor of candidate SH
 
 $suffix = (Get-Date -Format 'yyyyMMddHHmmss') + '_' + $PID
 $schema = 'chatbi_release_rollback_' + $suffix
-$tempRoot = Join-Path ([System.IO.Path]::GetTempPath()) ('chatbi-phase5-rollback-' + $suffix)
+$tempRoot = Join-Path ([System.IO.Path]::GetTempPath()) ('chatbi-v131-historical-rollback-' + $suffix)
 $candidateRoot = Join-Path $tempRoot 'candidate'
 $rollbackRoot = Join-Path $tempRoot 'rollback'
 $candidateArchive = Join-Path $tempRoot 'candidate.tar'
@@ -54,7 +80,7 @@ $passed = $false
 $cleanup = $false
 $redactionValues = @()
 $result = [ordered]@{
-  schema_version = 'chatbi.v13.phase5.rollback-dry-run.v1'
+  schema_version = 'chatbi.v131.historical.rollback-dry-run.v1'
   timestamp = (Get-Date).ToUniversalTime().ToString('o')
   candidate_sha = $CandidateSha
   rollback_sha = $RollbackSha
@@ -157,7 +183,9 @@ function Invoke-ApiFingerprint {
     regions = $detail.regions
   } | ConvertTo-Json -Depth 20 -Compress
   $bytes = [System.Text.Encoding]::UTF8.GetBytes($stable)
-  return [Convert]::ToHexString([System.Security.Cryptography.SHA256]::HashData($bytes)).ToLowerInvariant()
+  $sha256 = [System.Security.Cryptography.SHA256]::Create()
+  try { $digest = $sha256.ComputeHash($bytes) } finally { $sha256.Dispose() }
+  return (($digest | ForEach-Object { $_.ToString('x2') }) -join '')
 }
 
 function Invoke-BrowserSmoke {
@@ -308,7 +336,7 @@ try {
   try {
     $resolvedTemp = [System.IO.Path]::GetFullPath($tempRoot)
     $expectedParent = [System.IO.Path]::GetFullPath([System.IO.Path]::GetTempPath())
-    if(-not $resolvedTemp.StartsWith($expectedParent) -or (Split-Path -Leaf $resolvedTemp) -notlike 'chatbi-phase5-rollback-*') {
+    if(-not $resolvedTemp.StartsWith($expectedParent) -or (Split-Path -Leaf $resolvedTemp) -notlike 'chatbi-v131-historical-rollback-*') {
       throw 'Refusing to remove unexpected rollback temporary path'
     }
     if(Test-Path -LiteralPath $resolvedTemp) { Remove-Item -LiteralPath $resolvedTemp -Recurse -Force }

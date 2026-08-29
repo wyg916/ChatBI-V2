@@ -20,6 +20,7 @@ E:\ChatBI V2 项目
    ```
 
 3. 等待浏览器打开 <http://127.0.0.1:15173/>。
+   Showcase 会强制将 Frontend、Backend 与 RAG 的发布端口绑定到 `127.0.0.1`；固定演示账号不得用于任何对外网卡或生产部署。
 4. 使用以下账号登录：
 
    ```text
@@ -34,7 +35,7 @@ E:\ChatBI V2 项目
 ```powershell
 cd "E:\ChatBI V2 项目"
 
-# 启动；已有镜像时直接复用，没有镜像时自动构建
+# 启动；默认 ProviderMode Auto，已有镜像时直接复用，没有镜像时自动构建
 .\scripts\showcase.ps1 -Action Start
 
 # 只检查状态，不打开浏览器
@@ -49,6 +50,19 @@ cd "E:\ChatBI V2 项目"
 # 代码或依赖有变更时强制重建镜像
 .\scripts\showcase.ps1 -Action Start -Rebuild
 ```
+
+## 模型运行模式
+
+- `Auto`（根目录一键启动默认）：只要 `.env` 或当前进程已配置 MiMo、DeepSeek、Kimi 中任一有效凭据，就使用 `quality` 能力路由，关闭 ChatBI 测试付费门禁，并取消三家的内部估算费用、Kimi 准入、候选数和重试数裁剪；三家均可在“系统设置 → 模型服务”中启用和真实测试。
+- `Live`：要求至少配置一家 Provider，否则启动直接失败，适合强制验证外部模型链路。
+- `Deterministic`：不发起外部付费请求，适合可重复录屏和免费回归。
+
+```powershell
+.\scripts\showcase.ps1 -Action Start -ProviderMode Live -NoOpen
+.\scripts\showcase.ps1 -Action Start -ProviderMode Deterministic -NoOpen
+```
+
+启动器不会覆盖模型服务页面中的管理员启停选择。`Auto`/`Live` 可能产生真实供应商费用；Provider 账号自身的余额、配额、并发、限流和网络限制仍然有效，SQL/回答/Agent 安全门禁也不会被关闭。
 
 双击入口与上述命令等价：
 

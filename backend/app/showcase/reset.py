@@ -37,6 +37,7 @@ from app.models import (
 from app.services.datasources import sync_datasource
 from app.services.runtime_seed import seed_v1_runtime
 from app.services.seed import seed_demo_semantic_model
+from app.services.spreadsheet_datasources import delete_managed_datasource
 
 
 ADMIN_EMAIL = "admin@chatbi.local"
@@ -84,6 +85,12 @@ def set_showcase_credentials(
 
 
 def _truncate_metadata(db: Session) -> None:
+    # Managed spreadsheet imports own database schemas and scoped reader roles
+    # outside ORM metadata.  Reclaim them before truncating provenance rows so
+    # a local Showcase reset cannot strand queryable data or login roles.
+    managed_sources = list(db.scalars(select(DataSource).where(DataSource.type == "excel")))
+    for datasource in managed_sources:
+        delete_managed_datasource(db, datasource)
     tables = sorted(Base.metadata.tables.values(), key=lambda item: item.name)
     dialect = db.get_bind().dialect
     if dialect.name == "postgresql":

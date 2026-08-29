@@ -11,11 +11,13 @@ import argparse
 import os
 import re
 
-from sqlalchemy import text
+from sqlalchemy import select, text
 from sqlalchemy.engine import make_url
 
 from app.core.config import get_settings
-from app.db.session import engine
+from app.db.session import SessionLocal, engine
+from app.models import DataSource
+from app.services.spreadsheet_datasources import delete_managed_datasource
 
 
 LOCAL_HOSTS = frozenset({"127.0.0.1", "localhost", "host.docker.internal"})
@@ -58,6 +60,13 @@ def rebuild_local_metadata_schema() -> None:
         expected_database=os.getenv("CHATBI_SHOWCASE_DATABASE_NAME", "chatbi_v2"),
         expected_schema=expected_schema,
     )
+    # Managed imports own schemas and login roles outside the metadata schema.
+    # Reclaim them while their provenance rows and the locked chatbi_admin
+    # helper functions still exist; dropping metadata first would orphan both.
+    with SessionLocal() as db:
+        managed_sources = list(db.scalars(select(DataSource).where(DataSource.type == "excel")))
+        for datasource in managed_sources:
+            delete_managed_datasource(db, datasource)
     with engine.begin() as connection:
         connection.execute(text(f'DROP SCHEMA "{expected_schema}" CASCADE'))
         connection.execute(text(f'CREATE SCHEMA "{expected_schema}" AUTHORIZATION CURRENT_USER'))

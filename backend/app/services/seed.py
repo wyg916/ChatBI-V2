@@ -36,6 +36,10 @@ def _ensure_day4_access_control(
     postgres_datasource_id: str,
     semantic_model_id: str,
 ) -> None:
+    # The demo session is configured with autoflush disabled.  Persist any
+    # answers/dashboards seeded immediately before this call so their resource
+    # grants are complete in the same transaction.
+    db.flush()
     users: dict[str, AppUser] = {}
     settings = get_settings()
     for email, display_name, role, password in [
@@ -55,10 +59,19 @@ def _ensure_day4_access_control(
             user.password_changed_at = utcnow()
         users[email] = user
     analyst = users["analyst@chatbi.local"]
-    for resource_type, resource_id, can_query in [
+    resources = [
         ("DATASOURCE", postgres_datasource_id, True),
         ("SEMANTIC_MODEL", semantic_model_id, True),
-    ]:
+        *(
+            ("ANSWER", item.id, True)
+            for item in db.scalars(select(VerifiedAnswer).where(VerifiedAnswer.workspace_id == workspace_id))
+        ),
+        *(
+            ("DASHBOARD", item.id, True)
+            for item in db.scalars(select(Dashboard).where(Dashboard.workspace_id == workspace_id))
+        ),
+    ]
+    for resource_type, resource_id, can_query in resources:
         if db.scalar(select(ResourceGrant.id).where(
             ResourceGrant.user_id == analyst.id,
             ResourceGrant.resource_type == resource_type,
@@ -180,6 +193,8 @@ def _ensure_mysql_semantic_model(db: Session, datasource: DataSource, source: Se
 
 
 def _seed_demo_content(db: Session, workspace_id: str) -> None:
+    from app.services.evaluation import DEFAULT_PROFILE, demo_evaluation_trend, load_golden_manifest, load_multiple_ground_truth
+
     if db.scalar(select(VerifiedAnswer.id).limit(1)) is None:
         answer_rows = [
             ("2026年二季度环比增长率入围多少?", "全体收入", "文心", "DRAFT", 98, 432, 84),
@@ -266,13 +281,30 @@ def _seed_demo_content(db: Session, workspace_id: str) -> None:
                 updated_at=now - timedelta(days=offset + 2),
             ))
 
+    current_run = db.scalar(select(EvaluationRun).where(
+        EvaluationRun.workspace_id == workspace_id,
+        EvaluationRun.is_current.is_(True),
+    ).order_by(EvaluationRun.completed_at.desc()))
+    if current_run is not None:
+        public_points = [point for point in (current_run.trend_points or []) if point.get("kind") != "evaluation_profile"]
+        if current_run.release_name == "V1.3.0 Golden 50 Showcase Snapshot" and (
+            len(public_points) < 30
+            or any(point.get("source") != "SHOWCASE_DEMO" for point in public_points)
+        ):
+            profile_points = [point for point in (current_run.trend_points or []) if point.get("kind") == "evaluation_profile"]
+            current_run.trend_points = [
+                *(profile_points or [{"kind": "evaluation_profile", "profile": DEFAULT_PROFILE}]),
+                *demo_evaluation_trend(
+                    current_run.completed_at or datetime.now(timezone.utc),
+                    latest_value=current_run.result_accuracy,
+                ),
+            ]
+
     if db.scalar(select(EvaluationRun.id).limit(1)) is None:
         # This deterministic local snapshot mirrors the repository's frozen
         # Golden 50 evidence.  Keeping case rows makes the overview, eight
         # Oracle dimensions, release gate, and case-detail pages agree.
         from app.evaluation.ibm_adapter import ACCURACY_DIMENSIONS
-        from app.services.evaluation import DEFAULT_PROFILE, load_golden_manifest, load_multiple_ground_truth
-
         manifest = load_golden_manifest()
         alternatives = load_multiple_ground_truth()
         # Stored in UTC; the UI renders this as 2026-08-27 18:55:25 in Asia/Shanghai.
@@ -283,7 +315,10 @@ def _seed_demo_content(db: Session, workspace_id: str) -> None:
             golden_set_count=50, sql_generation_rate=100, result_accuracy=100,
             semantic_accuracy=100, relevance_accuracy=100, average_response_seconds=0,
             error_distribution=[{"label": "无错误", "percent": 100, "color": "#16a36a"}],
-            trend_points=[{"date": "08/17", "value": 100}],
+            trend_points=[
+                {"kind": "evaluation_profile", "profile": DEFAULT_PROFILE},
+                *demo_evaluation_trend(completed_at),
+            ],
             completed_at=completed_at, duration_seconds=0, sort_order=1,
             manifest_sha256=manifest["manifest_sha256"],
             sql_execution_pass_count=50, result_value_pass_count=50, semantic_pass_count=50,
@@ -386,11 +421,11 @@ def seed_demo_semantic_model(db: Session) -> SemanticModel:
         _ensure_day2_semantic_resources(db, existing)
         db.flush()
         _ensure_mysql_semantic_model(db, mysql_datasource, existing)
+        _seed_demo_content(db, workspace.id)
         _ensure_day4_access_control(
             db, workspace_id=workspace.id, postgres_datasource_id=datasource.id,
             semantic_model_id=existing.id,
         )
-        _seed_demo_content(db, workspace.id)
         db.commit()
         return existing
 
@@ -426,11 +461,11 @@ def seed_demo_semantic_model(db: Session) -> SemanticModel:
     _ensure_day2_semantic_resources(db, model)
     db.flush()
     _ensure_mysql_semantic_model(db, mysql_datasource, model)
+    _seed_demo_content(db, workspace.id)
     _ensure_day4_access_control(
         db, workspace_id=workspace.id, postgres_datasource_id=datasource.id,
         semantic_model_id=model.id,
     )
-    _seed_demo_content(db, workspace.id)
     db.commit()
     db.refresh(model)
     return model

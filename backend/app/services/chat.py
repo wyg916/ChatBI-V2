@@ -22,7 +22,7 @@ from fastapi import HTTPException
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.core.access import Principal, record_audit
+from app.core.access import Principal, has_resource_access, record_audit
 from app.core.config import get_settings
 from app.file_multimodal.analysis import analyze_structured_files, requires_pandasai_runtime
 from app.file_multimodal.cache import InMemoryVisualEvidenceCache
@@ -44,10 +44,11 @@ from app.rag_runtime.answer_guard import (
 )
 from app.integration.question_router import QuestionRouter, is_local_date_question, normalize_common_input_typos
 from app.integration.service import AnalysisService
-from app.models import Attachment, ChatMessage, Conversation
+from app.models import Attachment, ChatMessage, Conversation, DataSource, DataSourceSchema, DataSourceTable
 from app.schemas.chat import ChatRequest, ChatResponse, ConversationRead, MessageRead
 from app.sandbox import DockerSandboxExecutor
 from app.services.answer_composer import AnswerComposer
+from app.services.answer_presentation import AnswerPresenter
 from app.services.attachments import attachment_path, get_attachment
 from app.services.conversations import (
     extract_slots,
@@ -108,6 +109,66 @@ def _comparative_answer(question: str, answer: str, primary: dict) -> str:
             difference = abs(float(left[metric] or 0) - float(right[metric] or 0))
             return f"{left['region']}与{right['region']}的{metric}相差 {difference:,.2f}。"
     return answer
+
+
+def _data_catalog_answer(db: Session, principal: Principal) -> tuple[str, dict]:
+    """Describe only synchronized metadata the current principal may access."""
+
+    sources = list(db.scalars(
+        select(DataSource)
+        .where(DataSource.workspace_id == principal.workspace_id)
+        .order_by(DataSource.name, DataSource.id)
+    ))
+    sources = [
+        item for item in sources
+        if has_resource_access(
+            db, principal, resource_type="DATASOURCE", resource_id=item.id, query=True,
+        )
+    ]
+    if not sources:
+        return (
+            "当前工作空间还没有可访问且已同步的数据源。你可以先到“数据源”页面连接数据库或导入表格，再同步 Schema。",
+            {"datasource_count": 0, "table_count": 0, "datasources": []},
+        )
+
+    source_ids = [item.id for item in sources]
+    table_rows = list(db.execute(
+        select(DataSourceSchema.datasource_id, DataSourceTable.qualified_name)
+        .join(DataSourceTable, DataSourceTable.schema_id == DataSourceSchema.id)
+        .where(DataSourceSchema.datasource_id.in_(source_ids))
+        .order_by(DataSourceSchema.datasource_id, DataSourceTable.qualified_name)
+    ))
+    tables_by_source: dict[str, list[str]] = {item.id: [] for item in sources}
+    for datasource_id, qualified_name in table_rows:
+        tables_by_source[datasource_id].append(str(qualified_name))
+
+    lines: list[str] = []
+    safe_sources: list[dict] = []
+    for source in sources:
+        tables = tables_by_source[source.id]
+        shown = tables[:8]
+        suffix = f"，另有 {len(tables) - len(shown)} 张" if len(tables) > len(shown) else ""
+        table_text = "、".join(shown) if shown else "尚未同步到数据表"
+        lines.append(f"- {source.name}（{source.type}，{source.status}）：{table_text}{suffix}")
+        safe_sources.append({
+            "id": source.id,
+            "name": source.name,
+            "type": source.type,
+            "status": source.status,
+            "table_count": len(tables),
+            "tables": shown,
+        })
+    table_count = sum(len(items) for items in tables_by_source.values())
+    answer = (
+        f"当前工作空间可访问 {len(sources)} 个数据源，已同步 {table_count} 张表：\n"
+        + "\n".join(lines)
+        + "\n你可以继续问某张表有哪些字段，或直接按指标、时间和区域发起问数。"
+    )
+    return answer, {
+        "datasource_count": len(sources),
+        "table_count": table_count,
+        "datasources": safe_sources,
+    }
 
 
 def _operation_spans(
@@ -275,6 +336,7 @@ class ChatService:
         self.gateway = gateway or ModelGateway()
         self.router = QuestionRouter(self.gateway)
         self.composer = AnswerComposer()
+        self.presenter = AnswerPresenter(self.gateway)
 
     def execute(
         self,
@@ -438,6 +500,8 @@ class ChatService:
         sql_execution: dict = {}
         fallback_reason = None
         answer_streamed = False
+        already_model_presented = False
+        server_authored_answer = False
         try:
             if route in {
                 QuestionRoute.DATA_QUERY,
@@ -562,16 +626,26 @@ class ChatService:
                 route_summary = str(catalog.get("selection_strategy") or "fixed")
                 answer = "当前模型状态如下：\n" + "\n".join(lines) + f"\n当前路由策略：{route_summary}；安全回退：Local Semantic Runtime。"
                 model_provider, model_name = "none", "none"
+                server_authored_answer = True
                 response_payload = {"answer": answer, "model_status": catalog}
             elif route == QuestionRoute.SYSTEM_CAPABILITY:
                 report("GENERATING_INSIGHT", {"route": route.value})
                 settings = get_settings()
-                answer = (
-                    f"{settings.app_name} {settings.app_version}（{settings.environment}）支持数据源连接、Schema 同步、"
-                    "语义模型、自然语言问数、只读 SQL 校验、结果验证、图表与洞察、答案库、看板和评测中心。"
-                )
+                if router_decision.reason == "DATA_CATALOG_OVERVIEW":
+                    answer, catalog_overview = _data_catalog_answer(db, principal)
+                else:
+                    answer = (
+                        f"{settings.app_name} {settings.app_version}（{settings.environment}）支持数据源连接、Schema 同步、"
+                        "语义模型、自然语言问数、只读 SQL 校验、结果验证、图表与洞察、答案库、看板和评测中心。"
+                    )
+                    catalog_overview = None
                 model_provider, model_name = "none", "none"
-                response_payload = {"answer": answer, "system_capability": {"version": settings.app_version}}
+                server_authored_answer = True
+                response_payload = {
+                    "answer": answer,
+                    "system_capability": {"version": settings.app_version},
+                    **({"data_catalog": catalog_overview} if catalog_overview is not None else {}),
+                }
             elif route == QuestionRoute.ADMIN_QUERY:
                 report("GENERATING_INSIGHT", {"route": route.value})
                 permissions = sorted(permission for permission in (
@@ -582,6 +656,7 @@ class ChatService:
                     f"工作空间 ID 为 {principal.workspace_id}。权限摘要：{('、'.join(permissions) or '无管理权限')}。"
                 )
                 model_provider, model_name = "none", "none"
+                server_authored_answer = True
                 response_payload = {"answer": answer, "admin_context": {"role": principal.role, "permissions": permissions}}
             elif route == QuestionRoute.GENERAL_CHAT:
                 report("GENERATING_INSIGHT", {"route": route.value})
@@ -602,6 +677,7 @@ class ChatService:
                         f"（{weekday_en[local_now.weekday()]}）。"
                     )
                     model_provider, model_name = "none", "none"
+                    server_authored_answer = True
                 elif (
                     os.getenv("CHATBI_TEST_COST_CONTROL", "").strip().lower() in {"1", "true", "yes", "on"}
                     and os.getenv("CHATBI_TEST_EXECUTION_LEVEL", "").strip().upper() == "LEVEL0"
@@ -612,6 +688,7 @@ class ChatService:
                     )
                     model_provider, model_name = "none", "level0-safe-general-v1"
                     model_trace = {"level0_safe_general": True, "paid_provider_calls": 0}
+                    server_authored_answer = True
                 else:
                     answer, model_provider, model_name, answer_streamed, model_trace = self._model_answer(
                         system=(
@@ -625,6 +702,7 @@ class ChatService:
                         request_context=request_context,
                         complexity_score=router_decision.complexity_score,
                     )
+                    already_model_presented = True
                 response_payload = {"answer": answer}
             elif route == QuestionRoute.FILE_QUERY:
                 with stream_registry.workload("sandbox"):
@@ -634,6 +712,10 @@ class ChatService:
                         request_context=request_context,
                         complexity_score=router_decision.complexity_score,
                     )
+                already_model_presented = bool(
+                    file_analysis is None
+                    and model_provider not in {None, "", "none"}
+                )
                 response_payload = {"answer": answer, "citations": retrieved_sources, "file_analysis": file_analysis}
                 if file_analysis and file_analysis.get("status") not in {None, "SUCCEEDED", "PARTIAL"}:
                     status = str(file_analysis.get("status"))
@@ -645,6 +727,7 @@ class ChatService:
                     request_context=request_context,
                     complexity_score=router_decision.complexity_score,
                 )
+                already_model_presented = True
                 response_payload = {"answer": answer, "visual_evidence": visual_evidence}
                 if (
                     request.datasource_id
@@ -675,19 +758,62 @@ class ChatService:
                 }
             else:
                 status, error_code = "REFUSED", "UNSUPPORTED"
-                answer = "无法执行该请求：它不在只读 ChatBI 分析范围内或当前账号没有权限，已拒绝。"
+                answer = (
+                    "这个请求超出了当前 ChatBI 的只读分析范围，我没有执行它。"
+                    "你可以改成查询某个指标、时间范围、区域或数据源中的数据。"
+                )
                 response_payload = {"answer": answer}
         except GroundedAnswerRejected as exc:
-            status, error_code, answer = "REFUSED", str(exc), "知识证据未通过回答绑定校验，已拒绝发布。"
+            status, error_code, answer = "REFUSED", str(exc), (
+                "这次我先不直接下结论，因为可用知识证据还不足以支撑可靠回答。"
+                "你可以补充相关制度或口径文档，或缩小问题范围后再试。"
+            )
             response_payload = {"answer": answer, "grounded_answer_guard": {"passed": False, "reason": str(exc)}}
         except VisionModelUnavailable:
-            status, error_code, answer = "FAILED", "VISION_MODEL_UNAVAILABLE", "当前没有可用的图片理解模型，请配置受支持的多模态模型后重试。"
+            status, error_code, answer = "FAILED", "VISION_MODEL_UNAVAILABLE", (
+                "这次暂时没有可用的图片理解模型。请先在“系统设置 → 模型服务”检查 MiMo 或 Kimi 的连接状态，再重试。"
+            )
             response_payload = {"answer": answer}
         except ModelUnavailable:
-            status, error_code, answer = "FAILED", "MODEL_UNAVAILABLE", "当前没有可用的外部模型，无法生成真实模型回答。"
+            status, error_code, answer = "FAILED", "MODEL_UNAVAILABLE", (
+                "这次暂时没能接通可用的回答模型。你的问题没有丢失；请稍后重试，"
+                "或先到“系统设置 → 模型服务”检查连接状态。"
+            )
             response_payload = {"answer": answer}
 
         report("GENERATING_INSIGHT", {"route": route.value})
+        primary_model_trace = model_trace
+        presentation = self.presenter.present(
+            route=route,
+            status=status,
+            answer=answer,
+            response_payload=response_payload,
+            request_context=request_context,
+            already_model_presented=already_model_presented,
+            server_authored=server_authored_answer,
+            primary_provider=model_provider,
+            primary_model=model_name,
+            primary_trace=primary_model_trace,
+            error_code=error_code,
+            cancellation_event=cancellation_event,
+        )
+        answer = presentation.content
+        presentation_trace = presentation.public_trace()
+        response_payload = {
+            **response_payload,
+            "answer_presentation": presentation_trace,
+            "presentation_status": presentation.status,
+        }
+        if presentation.applied:
+            model_provider = presentation.provider
+            model_name = presentation.model
+            presentation_model_trace = presentation.trace or {}
+            model_trace = {
+                **presentation_model_trace,
+                "purpose": "verified_answer_presentation",
+                "primary_model_call": primary_model_trace,
+                "presentation_model_call": presentation_model_trace,
+            }
         composed = self.composer.compose(
             answer=answer,
             status=status,
@@ -723,6 +849,8 @@ class ChatService:
             "model_provider": model_provider,
             "model_name": model_name,
             "model_call": model_trace,
+            "presentation_status": presentation.status,
+            "answer_presentation": presentation_trace,
             "router_decision": router_decision.model_dump(mode="json"),
             "request_cache_key": request_context.cache_key("chat-response"),
             "prompt_version": "v1.3-runtime-control-plane-v1",

@@ -10,6 +10,9 @@ from app.model_gateway.configuration import load_control_config
 from app.model_gateway.contracts import BudgetMode, ModelCapability, ModelRequest
 
 
+UNRESTRICTED_PROVIDER_IDS = frozenset({"mimo", "deepseek", "kimi"})
+
+
 @dataclass(frozen=True)
 class CostEstimate:
     provider: str
@@ -97,10 +100,21 @@ class ComplexityScorer:
 
 
 class RoutingPolicy:
-    def __init__(self) -> None:
+    def __init__(self, *, unrestricted: bool = False) -> None:
         self.capabilities = load_control_config("model_capabilities.yaml")
         self.policy = load_control_config("model_policy.yaml")
         self.cost = CostCalculator()
+        self.unrestricted = unrestricted
+
+    def is_unrestricted_provider(self, provider: str) -> bool:
+        """Return whether the operator waiver applies to this provider.
+
+        The local interactive waiver is intentionally allow-listed.  Enabling
+        it must never silently remove governance from a future or generic
+        OpenAI-compatible provider.
+        """
+
+        return self.unrestricted and provider in UNRESTRICTED_PROVIDER_IDS
 
     def resolve_alias(self, alias: str) -> str | None:
         normalized = alias.strip().lower()
@@ -115,7 +129,8 @@ class RoutingPolicy:
         explicit = self.resolve_alias(request.requested_alias)
         if explicit:
             if (
-                request.modality.value == "vision"
+                not self.unrestricted
+                and request.modality.value == "vision"
                 and explicit == "kimi"
                 and not request.premium_triggers
             ):
@@ -127,19 +142,20 @@ class RoutingPolicy:
         candidates = list(self.policy["provider_order"].get(capability, ()))
         premium = self.policy["budget_modes"][request.budget_mode.value]["allow_premium"]
         if request.modality.value == "vision":
-            # MiMo is the sole ordinary image route. Kimi may be selected only
-            # after an observable Vision Escalation Trigger has been recorded.
+            # A governed deployment keeps MiMo as the sole ordinary image
+            # route. Unrestricted local live mode keeps Kimi available for
+            # ordinary fallback and still prefers it for an explicit trigger.
             if request.premium_triggers and "kimi" in candidates:
                 candidates.remove("kimi")
                 candidates.insert(0, "kimi")
-            elif "kimi" in candidates:
+            elif not self.unrestricted and "kimi" in candidates:
                 candidates.remove("kimi")
         else:
             premium_eligible = request.complexity_score >= 80 or bool(request.premium_triggers)
             if premium and premium_eligible and "kimi" in candidates:
                 candidates.remove("kimi")
                 candidates.insert(0, "kimi")
-            elif not premium and "kimi" in candidates:
+            elif not self.unrestricted and not premium and "kimi" in candidates:
                 candidates.remove("kimi")
         return candidates
 
@@ -152,21 +168,33 @@ class RoutingPolicy:
         return required in capabilities
 
     def within_budget(self, provider: str, request: ModelRequest) -> bool:
+        if self.is_unrestricted_provider(provider):
+            return True
         estimate = self.cost.estimate(provider, request)
         if not estimate.priced:
             return True
         limit = float(self.policy["budget_modes"][request.budget_mode.value]["max_estimated_call_cny"])
         return estimate.cost_cny <= limit
 
-    def max_output_tokens(self, request: ModelRequest) -> int:
+    def max_output_tokens(self, request: ModelRequest, *, provider: str | None = None) -> int:
         configured = int(self.policy["budget_modes"][request.budget_mode.value]["max_output_tokens"])
+        if provider is not None and self.is_unrestricted_provider(provider):
+            return request.max_output_tokens or configured
         return min(request.max_output_tokens or configured, configured)
 
     def safe_summary(self) -> dict[str, Any]:
+        effective_limits = dict(self.policy["limits"])
+        unrestricted_providers = (
+            sorted(UNRESTRICTED_PROVIDER_IDS) if self.unrestricted else []
+        )
+        if self.is_unrestricted_provider("kimi"):
+            effective_limits["max_kimi_calls_per_request"] = None
         return {
             "schema_version": self.policy["schema_version"],
             "complexity_bands": self.policy["complexity_bands"],
             "budget_modes": self.policy["budget_modes"],
-            "limits": self.policy["limits"],
+            "limits": effective_limits,
+            "usage_unrestricted": self.unrestricted,
+            "unrestricted_providers": unrestricted_providers,
             "pricing_version": self.cost.version,
         }

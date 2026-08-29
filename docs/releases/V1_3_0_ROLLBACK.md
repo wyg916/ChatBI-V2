@@ -6,17 +6,13 @@ For a deployed candidate, stop Backend, Frontend, RAG runtime, Sandbox Controlle
 
 Migration verification uses an isolated PostgreSQL schema and must finish at the existing single V1.3 head `20260822_0012`. The rollback SHA has the same head, so migration downgrade is explicitly `NOT_APPLICABLE_SAME_HEAD`; the dry-run still verifies `alembic current` on both versions. Phase 5 must not edit historical migrations. If a release-discovered data migration defect exists, stop certification and create a new forward migration rather than rewriting history.
 
-## Exact isolated dry-run
+## Historical evidence boundary
 
-Run only after the successor commit is clean:
+This V1.3.0 manifest does not authorize executing a rollback runner from current `main`. The old `scripts/test-v13-phase5-rollback-dry-run.ps1` path belongs only to the exact historical source revision that produced its evidence; check out that recorded revision before reproducing the old Phase 5 run. Current source intentionally does not provide that filename.
 
-```powershell
-.\scripts\test-v13-phase5-rollback-dry-run.ps1 `
-  -CandidateSha (git rev-parse HEAD) `
-  -EvidencePath <external-evidence-root>\rollback\rollback-dry-run.json
-```
+Current source provides `scripts/test-v131-historical-rollback-dry-run.ps1` only for the fixed V1.3.1-line candidate `852d8aa35a6ec0a31bed34ba695ec6a17034b457` (`0013`) to `89bdc12936be0555bdad8a85f06932fb7dc476ee` (`0012`) path. That runner must not be substituted as V1.3.0 evidence and refuses current `0014` input.
 
-The script performs, in order:
+The historical runner performed, in order:
 
 1. exact-SHA/clean-worktree/fast-forward ancestry precheck;
 2. archive of the candidate and `89bdc12936be0555bdad8a85f06932fb7dc476ee` runtime/build paths into a guarded temporary directory (non-runtime design assets are excluded so Windows archive extraction is encoding-independent);
@@ -28,7 +24,7 @@ The script performs, in order:
 8. equality of the candidate and rollback business-data SHA-256 fingerprints;
 9. removal of only the run-specific Compose projects, schema and validated temporary directory.
 
-The runner forces deterministic local providers, `LEVEL0`, paid authorization
+That historical runner forced deterministic local providers, `LEVEL0`, paid authorization
 `NO`, and Level0 paid exception `NO`. Production systems are never targeted.
 The Evidence contains image IDs and fingerprints but no tokens, cookies,
 passwords, Provider keys or raw private data.

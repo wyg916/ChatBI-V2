@@ -5,7 +5,7 @@ import hashlib
 import json
 import time
 from collections import Counter
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
@@ -110,6 +110,42 @@ def _profile(run: EvaluationRun, cases: list[EvaluationCaseResult] | None = None
 
 def _public_trend_points(run: EvaluationRun) -> list[dict[str, Any]]:
     return [point for point in (run.trend_points or []) if point.get("kind") != "evaluation_profile"]
+
+
+def demo_evaluation_trend(end_at: datetime, *, latest_value: float = 100.0) -> list[dict[str, Any]]:
+    """Return a deterministic 30-day showcase series suitable for DB persistence."""
+
+    values = [
+        87.8, 88.4, 88.1, 89.2, 89.0, 89.8, 90.4, 90.1, 91.0, 91.6,
+        91.2, 92.0, 92.4, 92.1, 93.0, 93.7, 93.4, 94.2, 94.8, 94.5,
+        95.2, 95.7, 95.4, 96.3, 96.8, 97.1, 97.8, 98.5, 99.2, latest_value,
+    ]
+    start = end_at - timedelta(days=len(values) - 1)
+    return [
+        {
+            "date": (start + timedelta(days=index)).strftime("%m/%d"),
+            "value": value,
+            "source": "SHOWCASE_DEMO",
+        }
+        for index, value in enumerate(values)
+    ]
+
+
+def _next_trend_points(
+    previous: EvaluationRun | None,
+    *,
+    completed_at: datetime,
+    latest_value: float,
+) -> list[dict[str, Any]]:
+    history = [
+        point
+        for point in (_public_trend_points(previous) if previous is not None else [])
+        if point.get("source") != "SHOWCASE_DEMO"
+    ]
+    return [
+        *history,
+        {"date": completed_at.strftime("%m/%d %H:%M"), "value": latest_value},
+    ][-30:]
 
 
 def _ground_truths(case: dict[str, Any], alternatives: dict[str, list[str]]) -> list[dict[str, Any]]:
@@ -474,16 +510,21 @@ def run_golden_evaluation(
     run.completed_at = datetime.now(timezone.utc)
     gate_pass = execution_pass >= 49 and result_pass >= 48 and dangerous_blocked == dangerous_total
     run.status = "PASS" if gate_pass else "FAIL"
-    for previous in db.scalars(select(EvaluationRun).where(
+    previous_runs = list(db.scalars(select(EvaluationRun).where(
         EvaluationRun.workspace_id == workspace_id,
         EvaluationRun.id != run.id,
         EvaluationRun.is_current.is_(True),
-    )):
+    ).order_by(EvaluationRun.completed_at.desc())))
+    for previous in previous_runs:
         previous.is_current = False
     run.is_current = True
     run.trend_points = [
         _profile_record(resolved_profile),
-        {"date": run.completed_at.strftime("%m/%d %H:%M"), "value": run.result_accuracy},
+        *_next_trend_points(
+            previous_runs[0] if previous_runs else None,
+            completed_at=run.completed_at,
+            latest_value=run.result_accuracy,
+        ),
     ]
     db.commit()
     db.refresh(run)

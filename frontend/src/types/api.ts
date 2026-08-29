@@ -1,4 +1,5 @@
-export type DatasourceKind = 'postgresql' | 'mysql';
+export type DatasourceKind = 'postgresql' | 'mysql' | 'excel';
+export type DatabaseDatasourceKind = Exclude<DatasourceKind, 'excel'>;
 
 export interface ModelProviderStatus {
   id: string;
@@ -26,6 +27,7 @@ export interface ModelProviderStatus {
 export interface ModelProviderCatalog {
   active_provider: string;
   selection_strategy?: string;
+  usage_unrestricted?: boolean;
   secrets_exposed: false;
   items: ModelProviderStatus[];
 }
@@ -50,9 +52,16 @@ export interface SecurityAuditEvent {
   status: string; details: Record<string, unknown>; created_at: string;
 }
 export interface WorkspaceInvitation { id: string; email: string; role: 'ADMIN' | 'ANALYST'; status: string; expires_at: string; created_at: string; invite_url?: string }
+export type PermissionResourceType = 'DATASOURCE' | 'SEMANTIC_MODEL' | 'ANSWER' | 'DASHBOARD';
+export interface PermissionResource { resource_type: PermissionResourceType; resource_id: string; name: string }
+export interface ResourcePermission {
+  id: string; user_id: string; resource_type: PermissionResourceType; resource_id: string;
+  can_read: boolean; can_query: boolean;
+}
 export interface SecurityOverview {
   current_actor?: SecurityUser; user_count: number; role_count: number; active_user_count: number; audit_event_count: number;
   users: SecurityUser[]; roles: SecurityRole[]; audit_events: SecurityAuditEvent[]; invitations?: WorkspaceInvitation[];
+  permission_resources: PermissionResource[]; resource_grants: ResourcePermission[];
 }
 export interface AuditPage { items: SecurityAuditEvent[]; page: number; page_size: number; total: number }
 
@@ -71,10 +80,24 @@ export interface Datasource {
   column_count?: number;
   last_synced_at?: string;
   last_sync_at?: string;
+  import_filename?: string;
+  import_row_count?: number;
+  import_sheet_count?: number;
 }
 
-export type DatasourceInput = Omit<Datasource, 'id' | 'status' | 'table_count' | 'column_count' | 'last_synced_at'> & { password: string };
+export type DatasourceInput = Omit<Datasource, 'id' | 'type' | 'status' | 'table_count' | 'column_count' | 'last_synced_at' | 'import_filename' | 'import_row_count' | 'import_sheet_count'> & { type: DatabaseDatasourceKind; password: string };
 export type DatasourceUpdateInput = Partial<Pick<Datasource, 'name' | 'host' | 'port' | 'database' | 'username' | 'schema' | 'ssl'>> & { password?: string };
+
+export interface SpreadsheetPreviewColumn { source_name: string; name: string; data_type: string; nullable?: boolean }
+export interface SpreadsheetPreviewSheet {
+  source_name: string; table_name: string; row_count: number; columns: SpreadsheetPreviewColumn[]; preview_rows: Array<Record<string, unknown>>;
+}
+export interface SpreadsheetPreview {
+  filename: string; file_sha256: string; file_size_bytes: number; format: 'xlsx' | 'csv'; sheet_count: number;
+  row_count: number; column_count: number; limits: Record<string, number>; sheets: SpreadsheetPreviewSheet[];
+  datasource_id?: string; storage_schema?: string; catalog?: Record<string, number>;
+}
+export interface SpreadsheetImportResult { datasource: Datasource; preview: SpreadsheetPreview }
 
 export interface SchemaInfo { name: string; table_count?: number }
 export interface TableInfo { id?: string; name: string; schema?: string; schema_name?: string; qualified_name?: string; comment?: string; column_count?: number }

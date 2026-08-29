@@ -70,6 +70,26 @@ def record_audit(
     return event
 
 
+def grant_created_resource(
+    db: Session,
+    principal: Principal,
+    *,
+    resource_type: str,
+    resource_id: str,
+) -> None:
+    """Give a non-admin creator durable access to their new resource."""
+
+    if principal.role == "ADMIN" or not principal.user_id:
+        return
+    db.add(ResourceGrant(
+        user_id=principal.user_id,
+        resource_type=resource_type,
+        resource_id=resource_id,
+        can_read=True,
+        can_query=True,
+    ))
+
+
 def _request_token(request: Request) -> str:
     settings = get_settings()
     authorization = request.headers.get("authorization")
@@ -191,7 +211,7 @@ def require_permission(permission: str) -> Callable:
 
 
 def has_resource_access(db: Session, principal: Principal, *, resource_type: str, resource_id: str, query: bool = False) -> bool:
-    if not principal.user_id or not principal.workspace_id:
+    if not principal.workspace_id:
         return False
     resource_classes = {
         "DATASOURCE": DataSource,
@@ -207,7 +227,7 @@ def has_resource_access(db: Session, principal: Principal, *, resource_type: str
             return False
     if principal.role == "ADMIN":
         return True
-    if principal.user_id is None:
+    if not principal.user_id:
         return False
     grant = db.scalar(select(ResourceGrant).where(
         ResourceGrant.user_id == principal.user_id,
@@ -233,3 +253,54 @@ def ensure_resource_access(
     )
     db.commit()
     raise HTTPException(status_code=403, detail=f"Access denied for {resource_type.lower()}")
+
+
+def ensure_query_run_access(
+    db: Session,
+    principal: Principal,
+    run: QueryRun,
+    *,
+    require_owner: bool = True,
+) -> None:
+    """Authorize a persisted QueryRun through all of its bound resources.
+
+    QueryRun identifiers appear in answers, evaluation and audit views, so
+    workspace membership alone is not an access boundary.  Analysts must retain
+    query rights to both bound resources and, for private run operations, own
+    the original server-authenticated request.  Administrators retain their
+    workspace-wide operational view.
+    """
+
+    if run.workspace_id != principal.workspace_id:
+        raise HTTPException(status_code=403, detail="Query run access denied")
+    ensure_resource_access(
+        db,
+        principal,
+        resource_type="DATASOURCE",
+        resource_id=run.datasource_id,
+        query=True,
+    )
+    ensure_resource_access(
+        db,
+        principal,
+        resource_type="SEMANTIC_MODEL",
+        resource_id=run.semantic_model_id,
+        query=True,
+    )
+    if principal.role == "ADMIN" or not require_owner:
+        return
+    request_context = (run.context_payload or {}).get("request_context")
+    owner_id = request_context.get("user_id") if isinstance(request_context, dict) else None
+    if owner_id and owner_id == principal.user_id:
+        return
+    record_audit(
+        db,
+        principal,
+        action="RESOURCE_ACCESS",
+        resource_type="QUERY_RUN",
+        resource_id=run.id,
+        status="DENIED",
+        details={"reason": "QUERY_RUN_OWNER_MISMATCH"},
+    )
+    db.commit()
+    raise HTTPException(status_code=403, detail="Query run access denied")

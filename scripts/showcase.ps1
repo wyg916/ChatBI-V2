@@ -4,7 +4,9 @@ param(
   [string]$Action = 'Start',
   [string]$EnvFile = '',
   [switch]$NoOpen,
-  [switch]$Rebuild
+  [switch]$Rebuild,
+  [ValidateSet('Auto', 'Live', 'Deterministic')]
+  [string]$ProviderMode = 'Auto'
 )
 
 $ErrorActionPreference = 'Stop'
@@ -48,50 +50,44 @@ function Assert-LocalPrerequisites {
 }
 
 function Set-ShowcaseEnvironment {
-  $env:COMPOSE_PROJECT_NAME = $showcaseProjectName
-  $env:CHATBI_DEPLOYMENT_MODE = 'showcase'
-  $env:CHATBI_ENVIRONMENT = 'development'
-  $env:CHATBI_FRONTEND_PORT = $showcaseFrontendPort
-  $env:CHATBI_BACKEND_PORT = $showcaseBackendPort
-  $env:CHATBI_RAG_PORT = $showcaseRagPort
-  $env:CHATBI_CORS_ALLOW_ORIGINS = "http://localhost:$showcaseFrontendPort,http://127.0.0.1:$showcaseFrontendPort"
-  $env:CHATBI_MODEL_PROVIDER = 'deterministic'
-  $env:CHATBI_GENERAL_MODEL_PROVIDER = 'deterministic'
-  $env:CHATBI_VISION_MODEL_PROVIDER = 'deterministic'
-  $env:CHATBI_TEST_COST_CONTROL = 'YES'
-  $env:CHATBI_TEST_EXECUTION_LEVEL = 'LEVEL0'
-  $env:CHATBI_PAID_GATE_AUTHORIZED = 'NO'
-  $env:CHATBI_LEVEL0_PAID_EXCEPTION = 'NO'
-  $env:CHATBI_SEED_DEMO_SEMANTIC_MODEL = 'true'
-  $env:CHATBI_BACKEND_IMAGE = $showcaseBackendImage
-  $env:CHATBI_FRONTEND_IMAGE = $showcaseFrontendImage
-  $env:CHATBI_SANDBOX_IMAGE = $showcaseSandboxImage
-  $env:CHATBI_STORAGE_ROOT = './.chatbi/showcase-storage'
-  $env:CHATBI_BACKUP_ROOT = './.chatbi/showcase-backups'
-  $env:CHATBI_GIT_SHA = (& git -C $projectRoot rev-parse HEAD).Trim()
-  $env:CHATBI_RELEASE_VERSION = 'v1.3.1'
-  $env:CHATBI_FRONTEND_BUILD = 'production'
-  if ([string]::IsNullOrWhiteSpace($env:CHATBI_SHOWCASE_DATABASE_NAME)) {
-    $env:CHATBI_SHOWCASE_DATABASE_NAME = 'chatbi_v2'
-  }
-  if ([string]::IsNullOrWhiteSpace($env:CHATBI_DATABASE_URL)) {
-    $modeValues = Read-ChatBIEnv -EnvFile $resolvedEnv
-    $metaPassword = Get-ChatBIValue -Values $modeValues -Name 'CHATBI_META_PASSWORD'
-    if (Test-ChatBIPlaceholder -Value $metaPassword) {
-      throw 'Local Showcase requires CHATBI_DATABASE_URL or CHATBI_META_PASSWORD in the selected EnvFile.'
-    }
-    $encodedMetaPassword = [uri]::EscapeDataString($metaPassword)
-    $env:CHATBI_DATABASE_URL = "postgresql+psycopg://chatbi_app:${encodedMetaPassword}@host.docker.internal:5432/$env:CHATBI_SHOWCASE_DATABASE_NAME"
-  }
-  $env:CHATBI_BOOTSTRAP_ADMIN_PASSWORD = $showcaseAdminPassword
-  $env:CHATBI_BOOTSTRAP_ANALYST_PASSWORD = $showcaseAnalystPassword
+  $result = Set-ChatBIShowcaseProcessEnvironment `
+    -EnvFile $resolvedEnv `
+    -ProviderMode $ProviderMode `
+    -BackendImage $showcaseBackendImage `
+    -FrontendImage $showcaseFrontendImage `
+    -SandboxImage $showcaseSandboxImage
+  $script:showcaseRuntimeMode = $result.RuntimeMode
 }
 
 function Test-CanonicalImages {
+  # A Git revision label cannot distinguish committed source from local edits
+  # at the same HEAD. Never reuse an image while the checkout is dirty; Start
+  # will rebuild it, and a clean post-commit checkout can then verify/reuse it.
+  $dirtyEntries = @(& git -C $projectRoot status --porcelain --untracked-files=normal)
+  if ($LASTEXITCODE -ne 0 -or $dirtyEntries.Count -gt 0) { return $false }
   foreach ($image in $showcaseBackendImage, $showcaseFrontendImage, $showcaseSandboxImage) {
-    & docker image inspect $image *> $null
-    if ($LASTEXITCODE -ne 0) { return $false }
+    try {
+      $inspectJson = (& docker image inspect $image 2>$null | Out-String)
+    } catch {
+      # Windows PowerShell 5 promotes native stderr to NativeCommandError when
+      # ErrorActionPreference is Stop. A missing image is a cache miss, not a
+      # fatal startup error: return false so Start can build it.
+      return $false
+    }
+    if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($inspectJson)) { return $false }
+    try {
+      $inspect = @($inspectJson | ConvertFrom-Json)
+      $labels = $inspect[0].Config.Labels
+      $revision = if ($labels) { [string]$labels.'org.opencontainers.image.revision' } else { '' }
+    } catch { return $false }
+    if ($revision -ne $env:CHATBI_GIT_SHA) { return $false }
   }
+  try {
+    $capabilityHelp = (& docker run --rm --entrypoint python $showcaseBackendImage -m app.db.deployment_state --help 2>&1 | Out-String)
+  } catch {
+    return $false
+  }
+  if ($LASTEXITCODE -ne 0 -or $capabilityHelp -notmatch 'spreadsheet-helpers') { return $false }
   return $true
 }
 
@@ -100,13 +96,13 @@ function Invoke-CanonicalBuild {
   # three canonical images directly avoids intermittent Windows gRPC session
   # header failures while keeping the exact same Dockerfiles and contexts.
   Write-Stage 'Building Backend image...'
-  & docker build --progress=plain -t $showcaseBackendImage -f backend/Dockerfile .
+  & docker build --progress=plain --label "org.opencontainers.image.revision=$env:CHATBI_GIT_SHA" -t $showcaseBackendImage -f backend/Dockerfile .
   if ($LASTEXITCODE -ne 0) { throw 'Backend image build failed.' }
   Write-Stage 'Building Sandbox image...'
-  & docker build --progress=plain -t $showcaseSandboxImage -f sandbox_runtime/Dockerfile .
+  & docker build --progress=plain --label "org.opencontainers.image.revision=$env:CHATBI_GIT_SHA" -t $showcaseSandboxImage -f sandbox_runtime/Dockerfile .
   if ($LASTEXITCODE -ne 0) { throw 'Sandbox image build failed.' }
   Write-Stage 'Building Frontend image...'
-  & docker build --progress=plain -t $showcaseFrontendImage frontend
+  & docker build --progress=plain --label "org.opencontainers.image.revision=$env:CHATBI_GIT_SHA" -t $showcaseFrontendImage frontend
   if ($LASTEXITCODE -ne 0) { throw 'Frontend image build failed.' }
 }
 
@@ -123,6 +119,7 @@ function Invoke-StartStack {
   } else {
     Invoke-CanonicalBuild
   }
+  Assert-SpreadsheetHelpers
   Invoke-StartFromImages
 }
 
@@ -138,6 +135,20 @@ function Set-DocumentedCredentials {
   Write-Stage 'Applying documented local-demo credentials and revoking stale sessions...'
   & docker @script:showcaseCompose exec -T backend python -m app.showcase.reset --credentials-only
   if ($LASTEXITCODE -ne 0) { throw 'Unable to apply local-demo credentials.' }
+}
+
+function Assert-SpreadsheetHelpers {
+  Write-Stage 'Checking scoped PostgreSQL spreadsheet-reader helpers...'
+  $output = & docker @script:showcaseCompose run --rm --no-deps backend python -m app.db.deployment_state spreadsheet-helpers
+  if ($LASTEXITCODE -ne 0) {
+    throw 'Unable to verify spreadsheet helpers. ACTION: Rebuild the Backend image, then rerun local database bootstrap.'
+  }
+  $json = $output | Where-Object { ([string]$_).Trim().StartsWith('{') } | Select-Object -Last 1
+  if (-not $json) { throw 'Spreadsheet helper verification did not return a result.' }
+  $state = [string]$json | ConvertFrom-Json
+  if (-not $state.available) {
+    throw 'Spreadsheet import helpers are unavailable. ACTION: Run .\scripts\bootstrap-local-databases.ps1 -SpreadsheetHelpersOnly, then retry.'
+  }
 }
 
 function Test-ShowcaseLogin {
@@ -174,7 +185,7 @@ function Write-ReadySummary {
   Write-Host "Browser  : $frontendUrl"
   Write-Host "Account  : $showcaseAdminEmail"
   Write-Host "Password : $showcaseAdminPassword"
-  Write-Host 'Mode     : deterministic / LEVEL0 / no paid provider calls'
+  Write-Host "Mode     : $script:showcaseRuntimeMode"
 }
 
 Set-Location -LiteralPath $projectRoot
@@ -190,6 +201,11 @@ switch ($Action) {
   }
   'Status' {
     Assert-LocalPrerequisites
+    Assert-ChatBIShowcaseDatabaseTarget -Configuration $showcaseConfiguration
+    if (-not (Test-CanonicalImages)) {
+      throw 'Canonical images are stale or missing the current runtime contract. ACTION: Run the one-click Start command to rebuild them.'
+    }
+    Assert-SpreadsheetHelpers
     & (Join-Path $PSScriptRoot 'status.ps1') -EnvFile $resolvedEnv
     & (Join-Path $PSScriptRoot 'verify.ps1') -EnvFile $resolvedEnv
     Test-ShowcaseLogin
@@ -198,10 +214,12 @@ switch ($Action) {
   }
   'Reset' {
     Assert-LocalPrerequisites
+    Assert-ChatBIShowcaseDatabaseTarget -Configuration $showcaseConfiguration
     Write-Stage 'Resetting local ChatBI metadata; read-only business schemas are preserved...'
     & (Join-Path $PSScriptRoot 'stop.ps1') -EnvFile $resolvedEnv
     if ($Rebuild -or -not (Test-CanonicalImages)) { Invoke-CanonicalBuild }
     Reset-MetadataSchema
+    Assert-SpreadsheetHelpers
     Invoke-StartFromImages
     & docker @script:showcaseCompose exec -T backend python -m app.showcase.reset --confirm-local-showcase-reset
     if ($LASTEXITCODE -ne 0) { throw 'Local showcase metadata reset failed.' }
@@ -214,6 +232,7 @@ switch ($Action) {
   }
   'Start' {
     Assert-LocalPrerequisites
+    Assert-ChatBIShowcaseDatabaseTarget -Configuration $showcaseConfiguration
     Invoke-StartStack
     Set-DocumentedCredentials
     Test-ShowcaseLogin

@@ -1,5 +1,6 @@
 param(
-  [switch]$ResetDemoData
+  [switch]$ResetDemoData,
+  [switch]$SpreadsheetHelpersOnly
 )
 
 $ErrorActionPreference = 'Stop'
@@ -38,15 +39,18 @@ try {
     $postgresBstr = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($secure)
     $postgresAdmin = [Runtime.InteropServices.Marshal]::PtrToStringBSTR($postgresBstr)
   }
-  if (-not $mysqlAdmin) {
+  if (-not $SpreadsheetHelpersOnly -and -not $mysqlAdmin) {
     $secure = Read-Host 'Local MySQL administrator password' -AsSecureString
     $mysqlBstr = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($secure)
     $mysqlAdmin = [Runtime.InteropServices.Marshal]::PtrToStringBSTR($mysqlBstr)
   }
   $env:CHATBI_LOCAL_POSTGRES_ADMIN_PASSWORD = $postgresAdmin
-  $env:CHATBI_LOCAL_MYSQL_ADMIN_PASSWORD = $mysqlAdmin
+  if (-not $SpreadsheetHelpersOnly) {
+    $env:CHATBI_LOCAL_MYSQL_ADMIN_PASSWORD = $mysqlAdmin
+  }
   $arguments = @('-m', 'app.db.bootstrap_local')
   if ($ResetDemoData) { $arguments += '--reset-demo' }
+  if ($SpreadsheetHelpersOnly) { $arguments += '--spreadsheet-helpers-only' }
   Push-Location -LiteralPath $backendRoot
   try { & $venvPython @arguments } finally { Pop-Location }
   if ($LASTEXITCODE -ne 0) { throw 'Local database bootstrap failed' }

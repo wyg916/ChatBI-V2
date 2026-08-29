@@ -95,6 +95,7 @@ export function DatasourceDetailPage() {
 
   const update = useMutation({
     mutationFn: () => {
+      if (source.data?.type === 'excel') return datasourceApi.update(id, { name: editForm.name });
       const { password, ...values } = editForm;
       return datasourceApi.update(id, password ? { ...values, password } : values);
     },
@@ -127,11 +128,12 @@ export function DatasourceDetailPage() {
   if (!source.data) return <ErrorNotice error={source.error ?? new Error('未找到数据源')} />;
 
   const queryAvailable = source.data.status === 'CONNECTED' || source.data.status === 'SYNCED';
+  const managedSpreadsheet = source.data.type === 'excel';
 
   return <section className="datasource-detail-page">
     <PageHeading
       title="Schema 与字段管理"
-      description="同步数据源元数据，配置字段业务含义，管理 ChatBI 可用字段。"
+      description={managedSpreadsheet ? '已通过 Backend API 安全导入表格，可直接建立语义模型并进入问数。' : '同步数据源元数据，配置字段业务含义，管理 ChatBI 可用字段。'}
       actions={<>
         <Link className="button secondary" to={`/datasources/${id}/workspace`}>数据工作台</Link>
         <button className="button secondary" data-testid="sync-schema" disabled={sync.isPending} onClick={() => sync.mutate()}>{sync.isPending ? '正在刷新…' : '刷新数据'}</button>
@@ -198,14 +200,15 @@ export function DatasourceDetailPage() {
         <p>Schema：{activeSchema || '--'}</p>
         <p>数据表：{source.data.table_count ?? tables.data?.length ?? 0}</p>
         <p>字段数量：{source.data.column_count ?? 0}</p>
+        {managedSpreadsheet && <><hr /><h3>导入来源</h3><p>文件：{source.data.import_filename ?? '--'}</p><p>工作表：{source.data.import_sheet_count ?? 0}</p><p>总行数：{source.data.import_row_count ?? 0}</p></>}
       </aside>
     </div>
 
     {showEdit && <Modal title="编辑数据源设置" onClose={() => setShowEdit(false)}>
       <form className="form-grid" onSubmit={submitEdit}>
-        <p className="form-intro">修改连接配置后建议重新测试连接并刷新 Schema。密码留空表示保持现有密钥。</p>
+        <p className="form-intro">{managedSpreadsheet ? '表格运行连接由 Backend 托管，浏览器不可查看或修改；这里只允许修改显示名称。' : '修改连接配置后建议重新测试连接并刷新 Schema。密码留空表示保持现有密钥。'}</p>
         <Field label="数据源名称"><input required value={editForm.name} onChange={(event) => setEditForm({ ...editForm, name: event.target.value })} /></Field>
-        <div className="form-columns">
+        {!managedSpreadsheet && <><div className="form-columns">
           <Field label="Host"><input required value={editForm.host} onChange={(event) => setEditForm({ ...editForm, host: event.target.value })} /></Field>
           <Field label="Port"><input required type="number" value={editForm.port} onChange={(event) => setEditForm({ ...editForm, port: Number(event.target.value) })} /></Field>
         </div>
@@ -217,6 +220,7 @@ export function DatasourceDetailPage() {
         <Field label="默认 Schema"><input value={editForm.schema} onChange={(event) => setEditForm({ ...editForm, schema: event.target.value })} /></Field>
         <label className="check-row"><input type="checkbox" checked={editForm.ssl} onChange={(event) => setEditForm({ ...editForm, ssl: event.target.checked })} />启用 SSL 加密连接</label>
         <button className="button secondary test-connection-button" type="button" data-testid="test-connection" disabled={test.isPending} onClick={() => test.mutate()}>{test.isPending ? '测试中…' : '测试当前连接'}</button>
+        </>}
         <ErrorNotice error={update.error ?? test.error} />
         <FormActions busy={update.isPending} onCancel={() => setShowEdit(false)} submitLabel="保存设置" />
       </form>

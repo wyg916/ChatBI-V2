@@ -92,6 +92,7 @@ class ProviderStatus(BaseModel):
 class ProviderCatalog(BaseModel):
     active_provider: str
     selection_strategy: str
+    usage_unrestricted: bool = False
     secrets_exposed: bool = False
     items: list[ProviderStatus]
 

@@ -30,6 +30,11 @@ _SYSTEM_CAPABILITY_MARKERS = (
 _ADMIN_QUERY_MARKERS = (
     "当前用户", "我是谁", "我的权限", "当前权限", "有哪些权限", "用户权限", "角色权限", "系统配置", "工作空间设置",
 )
+_DATA_CATALOG_QUESTION = re.compile(
+    r"(?=.*(?:数据库|数据源|当前数据|数据表|业务数据|(?:^|[^数])表|字段))"
+    r"(?=.*(?:有哪些|有什么|包含什么|包含哪些|能查什么|哪些表|哪些字段|字段列表|表结构))",
+    re.IGNORECASE,
+)
 _DATA_FOLLOW_UP = re.compile(
     r"(?:^|[，,。；;\s])(?:其中|再|继续|然后|另外|刚才|上一条|上一个|前面|基于这个|基于上述)|"
     r"(?:哪个|哪一个).*(?:最高|最低|最大|最小)|(?:去年|今年|本月|上月|下月|上季度|本季度|下季度)呢[？?。]?$|"
@@ -150,6 +155,13 @@ class QuestionRouter:
             return self._decision(
                 QuestionRoute.MODEL_STATUS, question=normalized,
                 reason="EXPLICIT_NEW_INTENT_MODEL_STATUS", model_required=False,
+            )
+        if _DATA_CATALOG_QUESTION.search(normalized):
+            return self._decision(
+                QuestionRoute.SYSTEM_CAPABILITY,
+                question=normalized,
+                reason="DATA_CATALOG_OVERVIEW",
+                model_required=False,
             )
         if (
             any(marker.lower() in lowered for marker in _SYSTEM_CAPABILITY_MARKERS)

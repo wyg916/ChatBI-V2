@@ -3,7 +3,7 @@ param(
   [string]$EvidencePath = 'docs/evidence/day5/cold-start.json',
   [string]$SourceEnv = '',
   [string]$Python = '',
-  [string]$ExpectedMigrationHead = '20260828_0013',
+  [string]$ExpectedMigrationHead = '20260829_0014',
   [ValidateRange(30, 300)]
   [int]$AskTimeoutSeconds = 120,
   [ValidateRange(120, 900)]

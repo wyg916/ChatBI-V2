@@ -4,6 +4,7 @@ from app.models.entities import (
     AuditEvent,
     BusinessTerm,
     DataSource,
+    DataSourceImport,
     DataSourceColumn,
     DataSourceRelation,
     DataSourceSchema,
@@ -50,7 +51,7 @@ from app.models.data_workspace import SqlWorkspaceRun
 from app.models.governance import ModelInvocation
 
 __all__ = [
-    "Workspace", "AppUser", "ResourceGrant", "AuditEvent", "DataSource", "DataSourceSchema", "DataSourceTable",
+    "Workspace", "AppUser", "ResourceGrant", "AuditEvent", "DataSource", "DataSourceImport", "DataSourceSchema", "DataSourceTable",
     "DataSourceColumn", "DataSourceRelation", "SemanticModel",
     "SemanticEntity", "Metric", "Dimension", "SemanticRelation",
     "BusinessTerm", "SemanticVersion", "VerifiedAnswer", "AnswerVersion",

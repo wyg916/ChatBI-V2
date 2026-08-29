@@ -8,6 +8,7 @@ This is an executable upgrade workflow for a future owner-approved version. It d
 2. Run Doctor and ensure the existing deployment is healthy.
 3. Create a named backup and copy its manifest/dump to protected storage.
 4. Review Release Notes, migration notes, third-party notices, and rollback target.
+5. Before the first managed Excel/CSV import on an existing local installation, install the scoped PostgreSQL helpers with `.\scripts\bootstrap-local-databases.ps1 -SpreadsheetHelpersOnly`. The administrator credential is prompt-only and is not persisted.
 
 ```powershell
 git rev-parse HEAD

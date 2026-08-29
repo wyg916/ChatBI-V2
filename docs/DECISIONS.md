@@ -1,5 +1,19 @@
 # Architecture Decisions
 
+## ADR-095：回答体验、Excel 数据源与本机三 Provider 采用受控主链路闭环
+
+本轮仅处理 ChatBI 主链路上的 P0/P1 可用性缺口，不引入通用 AI、通用 Agent、通用报表或插件平台。验证型数据回答必须先完成 SQL Guard、只读执行、Result Oracle 与 Result Signature，再允许最终模型做表达层润色；润色结果必须逐字保留服务端已验证答案，包装语只可来自服务端白名单，任何数字、日期、金额、比例、引用或结论变化都回退原答案。安全拒答也只允许添加人性化包装，不得把拒答改成成功。SSE 对外继续发送真实增量，Provider 原生流和服务端分段流均保持同一最终答案契约。
+
+Excel/CSV 作为正式数据源类型进入 `导入 → Backend 安全预检 → 本机 PostgreSQL 独立 excel_* Schema 物化 → 数据源独立只读账号 → Catalog/语义模型 → 问数据`。原文件不落盘，公式、宏、外链、嵌入对象、提示注入、伪造 worksheet dimension、压缩炸弹和超出行列/Sheet/Cell 上限的文件必须在 DataFrame 扩张前拒绝；敏感列样例既不持久化也不返回预览。每个导入只通过 PostgreSQL 管理员预装的受限 SECURITY DEFINER helper 创建一个匹配同 ID 的 `chatbi_excel_*` 登录角色，应用账号本身不获得 `CREATEROLE`，该角色只拥有目标 Schema 的 USAGE/SELECT；删除与 Showcase Reset 同步回收角色和 Schema。物化、元数据、角色、审计与响应投影共享一个事务，失败时回滚受控资源。Frontend 仍只通过 Backend API 访问，不保存或展示数据库连接凭据。
+
+敏感结果投影不可信任最终列名：camelCase/紧凑命名与中英文常见 PII 先写入 Catalog 标记，公开响应再沿直接别名、CTE、子查询、显式列别名列表、LATERAL、星号、集合操作与整行复合值做递归污染传播；AST 不兼容、血缘有污染但无法映射到返回列，或显式敏感引用未形成可证明投影时，一律对整组公开输出 fail closed 掩码。Oracle、结果签名、只读执行与受控内部持久化保留原始值；SQL 历史展示、问数公开答案和 API 响应只提供遮罩版本。
+
+根目录本机一键入口改为 `ProviderMode Auto`。只要 MiMo、DeepSeek 或 Kimi 至少一家已配置，就使用 `quality` 自动能力路由并关闭仅用于测试的付费门禁；`CHATBI_PROVIDER_USAGE_UNRESTRICTED=true` 同时取消三家的内部估算费用上限、Kimi 复杂度准入以及 Provider 候选/重试数裁剪。三家仍统一通过唯一 ModelGateway，并继续尊重管理员启停、能力匹配、健康/熔断、回答安全、SQL/Agent 硬边界和 Provider 自身额度/网络限制。正常启动不得覆盖管理员启停选择。没有凭据时安全回退 deterministic；CI、Golden 和零付费录屏继续显式使用 `ProviderMode Deterministic`/LEVEL0，不因本机交互授权而改变发布回归成本边界。
+
+固定演示账号只允许用于本机 Showcase：Compose 发布端口必须接受显式 `CHATBI_BIND_HOST`，Showcase 强制 `127.0.0.1`，Default/Enterprise 默认监听行为由部署者控制。Backup/Restore 必须在停栈、`pg_dump` 或 `pg_restore` 前双向检查 `chatbi-v2-showcase`、`chatbi-v2` 和 EnvFile 配置的 canonical 项目；发现可能共享元数据库的其他运行写栈只 fail closed 报告，不得自动停止。Compose 空白输出先过滤后计数，避免把已停止栈误判为运行或错误恢复。
+
+评测 30 天趋势只允许 Showcase 的可复现演示种子写入模拟历史；真实首次评测只写当前运行点，不伪造过去 29 天。语义节点位置保存在当前浏览器的模型级本地布局中，不改变语义元数据；看板按业务类型使用差异化布局和图表，但指标标题必须来自真实数据口径，不做模板式改名。
+
 ## ADR-094：Windows 一键启动的 Bootstrap 子命令必须保持原生参数边界
 
 根目录 Showcase CMD 是正式 Windows 一键入口，并明确由 Windows PowerShell 5.1 执行。PowerShell AST 解析成功不能证明后续原生进程参数完整：把带引号的 `python -c` 再嵌入 `sh -c`，经过 PowerShell → Docker CLI → Linux shell 后可能被 WinPS 5.1 重写为不完整的 Python 程序。

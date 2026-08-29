@@ -111,6 +111,12 @@ describe('答案库和看板列表高保真界面', () => {
     expect(screen.getAllByTestId('dashboard-card')).toHaveLength(2);
     expect(screen.getAllByText('数据库卡片')).toHaveLength(2);
     expect(document.querySelectorAll('.dashboard-trend img')).toHaveLength(0);
+    expect(document.querySelector('.dashboard-preview-executive')).toBeInTheDocument();
+    expect(document.querySelector('.dashboard-preview-regional')).toBeInTheDocument();
+    expect(document.querySelector('.dashboard-mini-line')).toBeInTheDocument();
+    expect(document.querySelector('.dashboard-mini-bars')).toBeInTheDocument();
+    expect(screen.getByText('经营总览', { selector: '.dashboard-preview-head span' })).toBeVisible();
+    expect(screen.getByText('区域经营', { selector: '.dashboard-preview-head span' })).toBeVisible();
     expect(screen.getByText('经营总览看板', { selector: 'h2' })).toBeVisible();
     await user.click(screen.getByRole('button', { name: '列表视图' }));
     expect(screen.getByRole('button', { name: '列表视图' })).toHaveClass('active');

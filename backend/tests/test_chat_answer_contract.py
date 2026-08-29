@@ -10,6 +10,7 @@ from sqlalchemy.orm import sessionmaker
 
 import app.api.routes.chat as chat_route
 import app.api.routes.analysis as analysis_route
+import app.services.chat as chat_service_module
 from chatbi_agent_contracts import ProgressStage, QuestionRoute
 from app.core.access import Principal
 from app.core.config import Settings
@@ -63,7 +64,7 @@ def test_run_started_cancel_window_sets_event_before_worker_submission(monkeypat
 
 class _StreamingGateway:
     def stream(self, **_kwargs):
-        for content in ("这是第一段。", "这是第二段，", "回答完成。"):
+        for content in (" 这是第一段。", "这是第二段，", "回答完成。 "):
             yield ModelReply(content=content, provider="test-provider", model="test-model")
 
     def complete(self, **_kwargs):
@@ -108,7 +109,7 @@ def test_chat_stream_is_canonical_lossless_persisted_and_has_one_terminal(client
     completed_phases = [item["phase"] for item in events if item["event_type"] == "phase.completed"]
     assert started_phases == completed_phases
     deltas = [item["delta"] for item in events if item["event_type"] == "answer.delta"]
-    assert deltas == ["这是第一段。", "这是第二段，", "回答完成。"]
+    assert deltas == [" 这是第一段。", "这是第二段，", "回答完成。 "]
     terminal = events[-1]
     persisted_content = terminal["response"]["assistant_message"]["content"]
     assert "".join(deltas) == persisted_content
@@ -123,6 +124,81 @@ def test_chat_stream_is_canonical_lossless_persisted_and_has_one_terminal(client
     assert persisted.content == persisted_content
     assert persisted.response_payload["result_semantic"] == "VALUE"
     assert persisted.response_payload["message_parts"] == terminal["message_parts"]
+    assert persisted.response_payload["presentation_status"] == "PRIMARY_MODEL_PRESENTED"
+    assert persisted.response_payload["answer_presentation"]["mode"] == "PRIMARY_MODEL"
+    assert persisted.trace_payload["presentation_status"] == "PRIMARY_MODEL_PRESENTED"
+    assert persisted.trace_payload["answer_presentation"]["provider"] == "test-provider"
+
+
+def test_verified_data_query_presents_then_streams_guarded_deltas_and_preserves_both_model_traces(client, db_session, monkeypatch):
+    conversation = client.post("/api/v1/conversations", json={"title": "Verified data stream"}).json()
+    _allow_stream(db_session)
+    factory = sessionmaker(bind=db_session.get_bind(), autoflush=False, expire_on_commit=False)
+    monkeypatch.setattr(chat_route, "SessionLocal", factory)
+
+    query = _query_payload_for_analysis(42)
+    query["plan"]["model_trace"] = {
+        "resolved_provider": "deepseek",
+        "resolved_model": "deepseek-v4-flash",
+        "latency_ms": 7,
+    }
+
+    class _AnalysisService:
+        def execute(self, _db, _data, _principal, *, progress_callback, cancellation_event, request_context):
+            assert cancellation_event is not None
+            progress_callback(ProgressStage.UNDERSTANDING, {})
+            progress_callback(ProgressStage.QUERYING_DATA, {})
+            progress_callback(ProgressStage.VERIFYING, {})
+            return AnalysisResponse(
+                status="SUCCEEDED",
+                route=QuestionRoute.DATA_QUERY,
+                trace_id=request_context.trace_id,
+                primary=query,
+                feature_modes={"rag": "on", "agent": "on"},
+                security={"CROSS_WORKSPACE_LEAK": 0},
+            )
+
+    class _PresentationGateway:
+        providers = {"mimo": object()}
+
+        def complete(self, **kwargs):
+            source = json.loads(kwargs["user"])["source_answer"]
+            return ModelReply(
+                content=json.dumps({"answer": f"先看结论：{source} 可以继续按区域下钻。"}, ensure_ascii=False),
+                provider="mimo",
+                model="mimo-v2.5",
+                trace={
+                    "resolved_provider": "mimo",
+                    "resolved_model": "mimo-v2.5",
+                    "latency_ms": 9,
+                },
+            )
+
+        def stream(self, **_kwargs):
+            raise AssertionError("verified data presentation must be guarded before public deltas")
+
+    monkeypatch.setattr(chat_service_module, "AnalysisService", _AnalysisService)
+    monkeypatch.setattr(chat_route, "ChatService", lambda: ChatService(gateway=_PresentationGateway()))
+
+    response = client.post("/api/v1/chat/stream", json={
+        "conversation_id": conversation["id"],
+        "client_message_id": "client-verified-data-stream-001",
+        "content": "今年收入是多少",
+        "route": "DATA_QUERY",
+    })
+
+    assert response.status_code == 200
+    events = _events(response.text)
+    deltas = [item["delta"] for item in events if item["event_type"] == "answer.delta"]
+    terminal = events[-1]
+    assistant = terminal["response"]["assistant_message"]
+    assert len(deltas) >= 2
+    assert "查询完成，revenue 为 42。" in "".join(deltas)
+    assert "".join(deltas) == assistant["content"]
+    assert assistant["response_payload"]["answer_presentation"]["status"] == "APPLIED"
+    model_call = assistant["trace_payload"]["model_call"]
+    assert model_call["primary_model_call"]["resolved_provider"] == "deepseek"
+    assert model_call["presentation_model_call"]["resolved_provider"] == "mimo"
 
 
 def test_chat_stream_keeps_full_analysis_but_only_repeats_twenty_table_rows(client, db_session, monkeypatch):

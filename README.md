@@ -58,7 +58,7 @@ Bootstrap 只生成仍为占位符的四个本地应用 Secret，执行 Alembic 
 
 ### 2. Local Showcase
 
-适合本机作品集演示和面试讲解。它使用本机 PostgreSQL/MySQL 的可复现模拟业务数据，固定端口 `15173/18080/18081`、独立 Compose 项目名、documented local-only 账号，以及 `deterministic / LEVEL0 / no-paid` Provider 模式。Compose 不创建数据库容器或数据库 volume。
+适合本机作品集演示和面试讲解。它使用本机 PostgreSQL/MySQL 的可复现模拟业务数据、固定端口 `15173/18080/18081`、独立 Compose 项目名和 documented local-only 账号，并强制把三个发布端口绑定到 `127.0.0.1`，不会把固定演示凭据暴露到局域网网卡。根目录一键入口使用 `ProviderMode Auto`：只要 MiMo、DeepSeek 或 Kimi 任一凭据已配置，就启用三家 Provider 的自动能力路由和 `quality` 模式，关闭 ChatBI 测试付费门禁，并取消三者的内部估算费用上限、Kimi 复杂度准入和 Provider 候选/重试次数裁剪；没有可用凭据时安全回退到 `deterministic / LEVEL0 / no-paid`。Compose 不创建数据库容器或数据库 volume。
 
 首次初始化本机演示数据库后，可使用根目录入口：
 
@@ -77,6 +77,14 @@ Bootstrap 只生成仍为占位符的四个本地应用 Secret，执行 Alembic 
 .\scripts\showcase.ps1 -Action Stop
 .\scripts\showcase.ps1 -Action Reset -NoOpen
 ```
+
+需要稳定、零付费的录屏或回归时，可显式选择确定性模式：
+
+```powershell
+.\scripts\showcase.ps1 -Action Start -ProviderMode Deterministic -NoOpen
+```
+
+`Auto`/`Live` 不受 ChatBI 内部测试付费、估算费用或 Kimi 准入限制，但仍尊重系统设置中的管理员启停、模型能力/健康状态、回答安全门禁，以及 Provider 账号自身的余额、额度、并发和网络策略；实际调用可能产生供应商费用。
 
 启动后访问 <http://127.0.0.1:15173/>。Showcase 的固定凭据仅用于明确标记的本机演示 Seed 路径，不得复制到企业配置。
 
@@ -140,7 +148,7 @@ CHATBI_DEEPSEEK_API_KEY=
 CHATBI_KIMI_API_KEY=
 ```
 
-Key 不返回浏览器，也不写入 Trace 或 Evidence。`CHATBI_MODEL_PROVIDER=auto` 只使用已配置且启用的 Provider，否则保留 deterministic 本地路径。详见 [Model Control Plane](docs/runtime/MODEL_CONTROL_PLANE.md)。
+Key 不返回浏览器，也不写入 Trace 或 Evidence。`CHATBI_MODEL_PROVIDER=auto` 只使用已配置且启用的 Provider，否则保留 deterministic 本地路径。本机一键 `Auto`/`Live` 会设置 `CHATBI_PROVIDER_USAGE_UNRESTRICTED=true`，让三家 Provider 均可进入能力/健康路由而不受 ChatBI 内部费用阈值限制。详见 [Model Control Plane](docs/runtime/MODEL_CONTROL_PLANE.md)。
 
 ## Datasource 与演示数据
 

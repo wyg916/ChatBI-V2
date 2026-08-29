@@ -107,7 +107,7 @@ class ModelGateway:
         self.settings = settings or get_settings()
         self.transport = transport
         self.providers = provider_overrides or configured_providers(self.settings)
-        self.policy = RoutingPolicy()
+        self.policy = RoutingPolicy(unrestricted=self.settings.provider_usage_unrestricted)
         self.test_cost_control = TestCostController()
         self.health_config = load_control_config("provider_health.yaml")
         self.sleeper = sleeper
@@ -151,7 +151,25 @@ class ModelGateway:
             if self._circuits.available(provider_id):
                 candidates.append(provider)
         limit = int(self.policy.policy["limits"]["max_model_escalations"]) + 1
-        candidates = candidates[:limit]
+        if self.policy.unrestricted:
+            # Keep every explicitly waived MiMo/DeepSeek/Kimi candidate.  A
+            # generic or future provider retains the ordinary candidate cap
+            # and cannot inherit this operator waiver by accident.
+            unrestricted = [
+                item for item in candidates
+                if self.policy.is_unrestricted_provider(item.provider_id)
+            ]
+            governed = [
+                item for item in candidates
+                if not self.policy.is_unrestricted_provider(item.provider_id)
+            ]
+            governed_slots = max(0, limit - len(unrestricted))
+            selected_ids = {
+                id(item) for item in (*unrestricted, *governed[:governed_slots])
+            }
+            candidates = [item for item in candidates if id(item) in selected_ids]
+        else:
+            candidates = candidates[:limit]
         if not candidates and over_budget:
             raise ModelBudgetExceeded("No configured model provider fits the request budget")
         if not candidates:
@@ -173,7 +191,9 @@ class ModelGateway:
         stream: bool,
         context: RequestContext | None = None,
     ) -> dict[str, Any]:
-        max_output_tokens = self.policy.max_output_tokens(request)
+        max_output_tokens = self.policy.max_output_tokens(
+            request, provider=provider.provider_id,
+        )
         if self.transport is None:
             max_output_tokens = self.test_cost_control.limit_output_tokens(
                 max_output_tokens,
@@ -251,7 +271,11 @@ class ModelGateway:
             max(1, int(self.health_config["retry_attempts"]))
         )
         for fallback_count, provider in enumerate(candidates):
-            provider_attempts = 1 if provider.provider_id == "kimi" else attempts
+            provider_attempts = (
+                attempts
+                if self.policy.is_unrestricted_provider(provider.provider_id)
+                else (1 if provider.provider_id == "kimi" else attempts)
+            )
             for attempt in range(provider_attempts):
                 self._cancelled(cancellation_event)
                 attempt_started = perf_counter()
@@ -502,7 +526,11 @@ class ModelGateway:
             )
             raise
         for fallback_count, provider in enumerate(candidates):
-            provider_attempts = 1 if provider.provider_id == "kimi" else attempts
+            provider_attempts = (
+                attempts
+                if self.policy.is_unrestricted_provider(provider.provider_id)
+                else (1 if provider.provider_id == "kimi" else attempts)
+            )
             for attempt in range(provider_attempts):
                 self._cancelled(cancellation_event)
                 attempt_started = perf_counter()

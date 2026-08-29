@@ -32,6 +32,7 @@ services:
       CHATBI_DEMO_MYSQL_PASSWORD: ${CHATBI_DEMO_MYSQL_PASSWORD:-}
       CHATBI_MODEL_PROVIDER: ${CHATBI_MODEL_PROVIDER:-auto}
       CHATBI_MODEL_BUDGET_MODE: ${CHATBI_MODEL_BUDGET_MODE:-balanced}
+      CHATBI_PROVIDER_USAGE_UNRESTRICTED: ${CHATBI_PROVIDER_USAGE_UNRESTRICTED:-false}
       CHATBI_MODEL_BASE_URL: ${CHATBI_MODEL_BASE_URL:-}
       CHATBI_MODEL_API_KEY: ${CHATBI_MODEL_API_KEY:-}
       CHATBI_MODEL_NAME: ${CHATBI_MODEL_NAME:-}
@@ -110,7 +111,7 @@ services:
         source: ${CHATBI_STORAGE_ROOT:-./.chatbi/storage}
         target: /var/lib/chatbi
     ports:
-      - "${CHATBI_BACKEND_PORT:-8000}:8000"
+      - "${CHATBI_BIND_HOST:-0.0.0.0}:${CHATBI_BACKEND_PORT:-8000}:8000"
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health', timeout=2)"]
       interval: 4s
@@ -194,7 +195,7 @@ services:
       backend:
         condition: service_healthy
     ports:
-      - "${CHATBI_RAG_PORT:-8001}:8001"
+      - "${CHATBI_BIND_HOST:-0.0.0.0}:${CHATBI_RAG_PORT:-8001}:8001"
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8001/health', timeout=2)"]
       interval: 4s
@@ -207,7 +208,7 @@ services:
     build:
       context: ./frontend
     ports:
-      - "${CHATBI_FRONTEND_PORT:-5173}:80"
+      - "${CHATBI_BIND_HOST:-0.0.0.0}:${CHATBI_FRONTEND_PORT:-5173}:80"
     depends_on:
       rag-runtime:
         condition: service_healthy

@@ -50,6 +50,8 @@ def create_datasource(db: Session, data: DataSourceCreate, workspace_id: str | N
 
 
 def update_datasource(db: Session, datasource: DataSource, data: DataSourceUpdate) -> DataSource:
+    if datasource.type == "excel" and (data.model_fields_set - {"name"}):
+        raise ValueError("SPREADSHEET_RUNTIME_CONNECTION_IS_MANAGED")
     values = data.model_dump(exclude_unset=True, exclude={"password"})
     for key, value in values.items():
         if key == "schema_name":
@@ -64,7 +66,7 @@ def update_datasource(db: Session, datasource: DataSource, data: DataSourceUpdat
 
 def build_connector(datasource: DataSource):
     return connector_for(
-        datasource.type,
+        runtime_dialect(datasource),
         host=datasource.host,
         port=datasource.port,
         database=datasource.database,
@@ -73,6 +75,16 @@ def build_connector(datasource: DataSource):
         ssl=datasource.ssl,
         schema=datasource.schema,
     )
+
+
+def runtime_dialect(datasource: DataSource) -> str:
+    """Return the SQL dialect used by a datasource's read-only runtime.
+
+    Excel/CSV uploads are materialized into local PostgreSQL; ``excel`` remains
+    the product-facing source type while the Guard and Executor use PostgreSQL.
+    """
+
+    return "postgresql" if datasource.type == "excel" else datasource.type
 
 
 def test_datasource(db: Session, datasource: DataSource) -> None:
@@ -86,7 +98,13 @@ def test_datasource(db: Session, datasource: DataSource) -> None:
     db.commit()
 
 
-def store_metadata(db: Session, datasource: DataSource, metadata: ConnectorMetadata) -> dict[str, int]:
+def store_metadata(
+    db: Session,
+    datasource: DataSource,
+    metadata: ConnectorMetadata,
+    *,
+    commit: bool = True,
+) -> dict[str, int]:
     # Serialize refreshes of the same datasource. The row lock covers multiple API
     # workers while the single transaction keeps the previous catalog visible to
     # readers until the complete replacement commits.
@@ -159,7 +177,10 @@ def store_metadata(db: Session, datasource: DataSource, metadata: ConnectorMetad
 
     datasource.status = "SYNCED"
     datasource.last_sync_at = datetime.now(timezone.utc)
-    db.commit()
+    if commit:
+        db.commit()
+    else:
+        db.flush()
     return {
         "schemas": len(schema_models),
         "tables": len(metadata.tables),

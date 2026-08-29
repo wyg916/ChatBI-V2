@@ -47,7 +47,7 @@
 
 画面：Streaming → 一句话结论 → KPI → ECharts → 洞察 → 明细 → 追问。
 
-补充：Showcase 使用 deterministic/LEVEL0，保证录屏可重复且不产生付费调用；正式 V1.3 支持 MiMo/DeepSeek/Kimi 的统一控制平面。
+补充：根目录一键启动默认使用 `Auto`，有凭据时会真实路由 MiMo/DeepSeek/Kimi。需要保证录屏可重复且不产生付费调用时，录屏前显式执行 `showcase.ps1 -Action Start -ProviderMode Deterministic`。
 
 ## 4:30～5:25 功能 5：依据与安全失败关闭
 

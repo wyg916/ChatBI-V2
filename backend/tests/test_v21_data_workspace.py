@@ -8,8 +8,159 @@ from app.models import (
     DataSourceTable,
     Workspace,
 )
+from app.core.data_safety import (
+    redact_public_sql,
+    redact_public_sql_payload,
+    sensitive_output_columns,
+)
 from app.query.contracts import ExecutionResult
 from app.query.executor import QueryExecutor
+
+
+def test_sensitive_lineage_follows_ctes_subqueries_and_stars():
+    cases = (
+        "SELECT q.contact FROM (SELECT email AS contact FROM customers) q",
+        "WITH q AS (SELECT email AS contact FROM customers) SELECT contact FROM q",
+        "SELECT * FROM (SELECT email AS contact FROM customers) q",
+    )
+    for sql in cases:
+        assert sensitive_output_columns(
+            sql, ["contact"], ["email"], dialect="postgresql",
+        ) == ["contact"]
+    renamed_cases = (
+        "WITH q(status) AS (SELECT email FROM customers) SELECT status FROM q",
+        "SELECT status FROM (SELECT email FROM customers) q(status)",
+        "SELECT status FROM LATERAL (SELECT email FROM customers) q(status)",
+        "SELECT q.status FROM LATERAL (SELECT email FROM customers) q(status)",
+    )
+    for sql in renamed_cases:
+        assert sensitive_output_columns(
+            sql, ["status"], ["email"], dialect="postgresql",
+        ) == ["status"]
+    whole_row_cases = (
+        "WITH q AS (SELECT email AS contact FROM customers) SELECT q AS payload FROM q",
+        "WITH q AS (SELECT email AS contact FROM customers) SELECT ROW(q) AS payload FROM q",
+        "SELECT ROW(u.*) AS payload FROM customers u",
+        "SELECT json_build_array(u.*) AS payload FROM customers u",
+    )
+    for sql in whole_row_cases:
+        assert sensitive_output_columns(
+            sql, ["payload"], ["email"], dialect="postgresql",
+        ) == ["payload"]
+
+
+def test_public_sql_renderer_redacts_sensitive_predicate_literals_only():
+    sql = (
+        "SELECT email AS contact FROM customers "
+        "WHERE email = 'victim@example.com' "
+        "OR email IN ('first@example.com', 'second@example.com') "
+        "OR email ILIKE '%example.com' "
+        "OR email BETWEEN 'a@example.com' AND 'z@example.com' "
+        "OR customer_id = 42"
+    )
+    public_sql = redact_public_sql(sql, ["email"], dialect="postgresql")
+    assert public_sql is not None
+    assert "victim@example.com" not in public_sql
+    assert "first@example.com" not in public_sql
+    assert "%example.com" not in public_sql
+    assert "z@example.com" not in public_sql
+    assert public_sql.count("***MASKED***") == 6
+    assert "customer_id = 42" in public_sql
+
+    alias_cases = (
+        "WITH c(contact) AS (SELECT email FROM customers) "
+        "SELECT contact FROM c WHERE contact='victim@example.com'",
+        "SELECT q.contact FROM (SELECT email FROM customers) q(contact) "
+        "WHERE q.contact='victim@example.com'",
+        "SELECT q.contact FROM LATERAL (SELECT email FROM customers) q(contact) "
+        "WHERE q.contact='victim@example.com'",
+        "SELECT 'victim@example.com' AS email",
+    )
+    for alias_sql in alias_cases:
+        rendered = redact_public_sql(alias_sql, ["email"], dialect="postgresql")
+        assert rendered is not None
+        assert "victim@example.com" not in rendered
+        assert "***MASKED***" in rendered
+
+    predicate_cases = (
+        "SELECT 1 FROM customers WHERE starts_with(email, 'victim@example.com')",
+        "SELECT 1 FROM customers WHERE email ~* 'victim@example.com'",
+        "SELECT 1 FROM customers WHERE email OPERATOR(pg_catalog.~~) 'victim@example.com'",
+        "SELECT 1 FROM customers WHERE strpos(email, 'victim@example.com') > 0",
+    )
+    for predicate_sql in predicate_cases:
+        rendered = redact_public_sql(predicate_sql, ["email"], dialect="postgresql")
+        assert rendered is not None
+        assert "victim@example.com" not in rendered
+        assert "***MASKED***" in rendered
+
+    expression_cases = (
+        "SELECT starts_with(email, 'victim@example.com') FROM users",
+        "SELECT email || ':victim@example.com' FROM users",
+        "SELECT DISTINCT ON (starts_with(email, 'victim@example.com')) id FROM users",
+        "SELECT id FROM users GROUP BY starts_with(email, 'victim@example.com')",
+        "SELECT id FROM users ORDER BY starts_with(email, 'victim@example.com')",
+        "SELECT row_number() OVER (PARTITION BY starts_with(email, 'victim@example.com') "
+        "ORDER BY strpos(email, 'victim@example.com')) FROM users",
+    )
+    for expression_sql in expression_cases:
+        rendered = redact_public_sql(expression_sql, ["email"], dialect="postgresql")
+        assert rendered is not None
+        assert "victim@example.com" not in rendered
+        assert "***MASKED***" in rendered
+
+    table_function_cases = (
+        "SELECT x.email FROM jsonb_to_recordset('[{\"email\":\"victim@example.com\"}]') "
+        "AS x(email text) WHERE x.email='victim@example.com'",
+        "SELECT x.email FROM customers c CROSS JOIN "
+        "jsonb_to_recordset('[{\"email\":\"victim@example.com\"}]') AS x(email text) "
+        "WHERE x.email='victim@example.com'",
+        "SELECT x.email FROM customers c, "
+        "jsonb_to_recordset('[{\"email\":\"victim@example.com\"}]') AS x(email text) "
+        "WHERE x.email='victim@example.com'",
+    )
+    for table_function_sql in table_function_cases:
+        rendered = redact_public_sql(
+            table_function_sql, ["email"], dialect="postgresql",
+        )
+        assert rendered is not None
+        assert "victim@example.com" not in rendered
+        assert rendered.count("***MASKED***") >= 2
+
+    recursive = redact_public_sql_payload({
+        "feedback": {
+            "corrected_sql": "SELECT email FROM customers WHERE email='victim@example.com'",
+            "workflow": {
+                "candidate_sql": "SELECT email FROM customers WHERE email='victim@example.com'",
+            },
+        },
+        "evaluation": {
+            "expected": {"sql": "SELECT email FROM customers WHERE email='victim@example.com'"},
+            "actual": {
+                "semantic_sql": "SELECT email FROM customers WHERE email='victim@example.com'",
+                "generated_sql": "SELECT email FROM customers WHERE email='victim@example.com'",
+                "error_code": "QUERY_EXECUTION_ERROR",
+                "error_message": "driver echoed victim@example.com",
+            },
+        },
+    }, ["email"], dialect="postgresql")
+    assert "victim@example.com" not in str(recursive)
+    opaque_table_function_cases = (
+        "SELECT j.value AS payload FROM users u "
+        "CROSS JOIN LATERAL jsonb_each_text(to_jsonb(u)) AS j WHERE j.key = 'email'",
+        "SELECT j.value AS payload FROM users u "
+        "CROSS JOIN LATERAL jsonb_each_text(to_jsonb(u)) AS j(key, value) WHERE j.key = 'email'",
+        "SELECT j.value AS payload FROM users u "
+        "CROSS JOIN LATERAL unnest(ARRAY[u.email]) AS j(value)",
+        "SELECT j.value AS payload FROM users u "
+        "CROSS JOIN jsonb_each_text(to_jsonb(u)) AS j(key, value) WHERE j.key = 'email'",
+        "SELECT j.value AS payload FROM users u, "
+        "jsonb_each_text(to_jsonb(u)) AS j(key, value) WHERE j.key = 'email'",
+    )
+    for sql in opaque_table_function_cases:
+        assert sensitive_output_columns(
+            sql, ["payload"], ["email"], dialect="postgresql",
+        ) == ["payload"]
 
 
 def seed_catalog(db_session, datasource_id: str) -> None:
@@ -36,7 +187,10 @@ def seed_catalog(db_session, datasource_id: str) -> None:
 
 
 def fake_execute(self, *, datasource, normalized_sql, row_limit, timeout_ms):
-    rows = [{"order_id": 1, "customer_id": 7, "email": "buyer@example.com", "revenue": 99.5}]
+    if " AS contact" in normalized_sql:
+        rows = [{"contact": "buyer@example.com"}]
+    else:
+        rows = [{"order_id": 1, "customer_id": 7, "email": "buyer@example.com", "revenue": 99.5}]
     columns = list(rows[0])
     return ExecutionResult(
         status="SUCCEEDED", columns=columns, column_types=["unknown"] * len(columns), rows=rows,
@@ -106,6 +260,16 @@ def test_sql_workspace_guard_execute_explain_history_replay_and_verified_sql(
     assert run["status"] == "SUCCEEDED"
     assert run["oracle"]["status"] == "PASSED"
     assert run["execution"]["result_signature"] == "a" * 64
+    assert run["execution"]["rows"][0]["email"] == "***MASKED***"
+
+    alias = client.post("/api/v1/data-workspace/sql/execute", json={
+        "datasource_id": datasource_id,
+        "sql": "SELECT email AS contact FROM finance.orders",
+        "row_limit": 20,
+    })
+    assert alias.status_code == 201
+    assert alias.json()["execution"]["rows"][0]["contact"] == "***MASKED***"
+    assert alias.json()["execution"]["masked_columns"] == ["contact"]
 
     explained = client.post("/api/v1/data-workspace/sql/explain", json={
         "datasource_id": datasource_id, "sql": sql, "row_limit": 20,
@@ -115,7 +279,7 @@ def test_sql_workspace_guard_execute_explain_history_replay_and_verified_sql(
 
     history = client.get(f"/api/v1/data-workspace/sql/history?datasource_id={datasource_id}")
     assert history.status_code == 200
-    assert history.json()["total"] == 3
+    assert history.json()["total"] == 4
 
     replay = client.post(f"/api/v1/data-workspace/sql/history/{run['id']}/replay")
     assert replay.status_code == 201

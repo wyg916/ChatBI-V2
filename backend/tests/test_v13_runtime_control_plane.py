@@ -258,6 +258,51 @@ def test_kimi_hard_budget_never_retries_within_one_request():
     assert calls == ["https://api.moonshot.cn/v1/chat/completions"]
 
 
+def test_unrestricted_provider_mode_removes_cost_routing_caps_and_allows_kimi_retry():
+    calls = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        calls.append(str(request.url))
+        if len(calls) == 1:
+            return httpx.Response(429, headers={"Retry-After": "0"}, json={"error": "rate limited"})
+        return httpx.Response(200, json={"choices": [{"message": {"content": "available"}}]})
+
+    gateway = ModelGateway(Settings(
+        _env_file=None,
+        mimo_api_key="unit-test-only",
+        deepseek_api_key="unit-test-only",
+        kimi_api_key="unit-test-only",
+        model_budget_mode="quality",
+        provider_usage_unrestricted=True,
+    ), transport=httpx.MockTransport(handler), sleeper=lambda _: None)
+    request = ModelRequest(
+        capability=ModelCapability.GENERAL,
+        messages=({"role": "user", "content": "ordinary request"},),
+        budget_mode=BudgetMode.QUALITY,
+        max_output_tokens=16_384,
+    )
+    assert gateway.policy.provider_candidates(request)[:3] == ["mimo", "deepseek", "kimi"]
+    assert gateway.policy.within_budget("kimi", request) is True
+    assert gateway.policy.is_unrestricted_provider("openai-compatible") is False
+    assert gateway.policy.max_output_tokens(request, provider="kimi") == 16_384
+    assert gateway.policy.max_output_tokens(request, provider="openai-compatible") == 8192
+    assert gateway.policy.safe_summary()["limits"]["max_model_escalations"] == 2
+    assert gateway.policy.safe_summary()["limits"]["max_kimi_calls_per_request"] is None
+    assert gateway.policy.safe_summary()["unrestricted_providers"] == ["deepseek", "kimi", "mimo"]
+
+    premium_request = request.model_copy(update={"complexity_score": 90})
+    assert gateway.policy.provider_candidates(premium_request)[0] == "kimi"
+
+    reply = gateway.complete(
+        system="system",
+        user="retry Kimi",
+        requested_alias="kimi",
+        budget_mode=BudgetMode.QUALITY,
+    )
+    assert reply.provider == "kimi"
+    assert len(calls) == 2
+
+
 def test_circuit_breaker_opens_after_repeated_retryable_failures():
     calls = []
 
