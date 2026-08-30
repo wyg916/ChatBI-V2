@@ -110,7 +110,7 @@ jobs:
             | sort -z | xargs -0 sha256sum > docs/evidence/v1.3/phase5-ci/SHA256SUMS.txt
       - name: Upload deterministic evidence
         if: always()
-        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6, Node 24
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v6, Node 24
         with:
           name: v13-phase5-deterministic-${{ github.sha }}
           path: docs/evidence/v1.3/phase5-ci
@@ -158,7 +158,7 @@ jobs:
             | sort -z | xargs -0 sha256sum > docs/evidence/v1.3/phase5-migration-ci/SHA256SUMS.txt
       - name: Upload migration evidence
         if: always()
-        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6, Node 24
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v6, Node 24
         with:
           name: v13-phase5-migration-${{ github.sha }}
           path: docs/evidence/v1.3/phase5-migration-ci
@@ -230,7 +230,7 @@ jobs:
             | sort -z | xargs -0 sha256sum > docs/evidence/v1.3/phase5-supply-ci/SHA256SUMS.txt
       - name: Upload supply-chain evidence
         if: always()
-        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6, Node 24
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v6, Node 24
         with:
           name: v13-phase5-supply-${{ github.sha }}
           path: docs/evidence/v1.3/phase5-supply-ci
@@ -268,7 +268,7 @@ jobs:
             --output .phase5-remote-evidence/remote-ci-certificate.json
       - name: Upload remote CI certificate
         if: always()
-        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6, Node 24
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v6, Node 24
         with:
           name: v13-phase5-remote-ci-certificate-${{ github.sha }}
           path: .phase5-remote-evidence/remote-ci-certificate.json
