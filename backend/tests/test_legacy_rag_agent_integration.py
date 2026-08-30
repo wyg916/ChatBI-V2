@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import json
+import threading
 import time
 from pathlib import Path
+from types import SimpleNamespace
 
 import httpx
 import pytest
@@ -95,7 +97,11 @@ def prepare_catalog(db_session):
 
 
 def fake_query_execution(monkeypatch):
-    def execute(self, *, datasource, normalized_sql, row_limit, timeout_ms):
+    def execute(
+        self, *, datasource, normalized_sql, row_limit, timeout_ms,
+        cancellation_event=None,
+    ):
+        assert cancellation_event is None or not cancellation_event.is_set()
         return ExecutionResult(
             status="SUCCEEDED", columns=["revenue"], column_types=["NUMERIC"], rows=[{"revenue": 100.0}],
             row_count=1, duration_ms=1, datasource_id=datasource.id, dialect=datasource.type,
@@ -103,7 +109,8 @@ def fake_query_execution(monkeypatch):
         )
     monkeypatch.setattr(QueryExecutor, "execute", execute)
 
-    def explain(self, *, datasource, normalized_sql, timeout_ms):
+    def explain(self, *, datasource, normalized_sql, timeout_ms, cancellation_event=None):
+        assert cancellation_event is None or not cancellation_event.is_set()
         return ExecutionResult(
             status="SUCCEEDED", columns=["plan"], column_types=["json"],
             rows=[{"plan": [{"Plan": {"Node Type": "Limit", "Total Cost": 10.0}}]}],
@@ -385,6 +392,63 @@ def test_tool_executor_rejects_unknown_tool_without_direct_db_access(db_session)
     assert executor.direct_db_access is False
     assert result.status == "REFUSED"
     assert result.error_code == "UNAUTHORIZED_TOOL_CALL"
+
+
+def test_live_agent_rag_tool_clamps_each_bridge_call_to_thirty_seconds(db_session):
+    observed: list[int] = []
+
+    class CapturingRagAdapter:
+        def retrieve(self, request):
+            observed.append(request.context.timeout_ms)
+            return RagResult(
+                status="SUCCEEDED",
+                citations=(),
+                retrieval_mode="test",
+                trace_id=request.context.trace_id,
+                adapter="fake",
+            )
+
+    principal = type("PrincipalStub", (), {"workspace_id": "workspace-a", "user_id": "user-a"})()
+    result = ChatBIToolExecutor(db_session, principal, CapturingRagAdapter()).execute_controlled(
+        ToolCall(
+            tool_name=ToolName.RETRIEVE_KNOWLEDGE.value,
+            agent_role=AgentRole.KNOWLEDGE,
+            arguments={"question": "收入口径是什么"},
+            idempotency_key="rag-budget-12345678",
+        ),
+        agent_context(timeout_ms=120_000),
+        cancellation_event=threading.Event(),
+        deadline_monotonic=time.monotonic() + 120,
+    )
+
+    assert result.status == "SUCCEEDED"
+    assert observed == [30_000]
+
+
+def test_direct_live_rag_context_clamps_bridge_subbudget(db_session, monkeypatch):
+    datasource, _model = prepare_catalog(db_session)
+    monkeypatch.setattr(
+        "app.integration.service.get_settings",
+        lambda: SimpleNamespace(
+            agent_timeout_ms=120_000,
+            agent_max_steps=8,
+            agent_token_budget=6_000,
+        ),
+    )
+
+    context = AnalysisService()._rag_context(
+        db_session,
+        Principal(
+            "test-admin",
+            datasource.workspace_id,
+            "admin@chatbi.local",
+            "Admin",
+            "ADMIN",
+        ),
+        "TRACE-RAG-BRIDGE-BUDGET",
+    )
+
+    assert context.timeout_ms == 30_000
 
 
 def test_question_router_covers_governed_data_knowledge_complex_and_general_routes():

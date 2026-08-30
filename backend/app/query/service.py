@@ -17,6 +17,7 @@ from app.core.access import (
 from app.core.config import get_settings
 from app.core.data_safety import mask_result_rows, redact_public_sql_payload
 from app.model_gateway.contracts import BudgetMode, RequestContext
+from app.model_gateway.control import bind_model_request_control
 from app.model_gateway.ledger import bind_model_invocation_session
 from app.models import (
     AnswerVersion,
@@ -355,7 +356,7 @@ class QueryPipeline:
         self, db: Session, request: AskRequest, principal: Principal | None = None,
         *, cancellation_event: Event | None = None, request_context: RequestContext | None = None,
     ) -> QueryRun:
-        with bind_model_invocation_session(db):
+        with bind_model_invocation_session(db), bind_model_request_control(cancellation_event):
             return self._execute(
                 db, request, principal,
                 cancellation_event=cancellation_event,
@@ -547,11 +548,14 @@ class QueryPipeline:
                 return run
 
             run.normalized_sql = guard.normalized_sql
-            explain = self.executor.explain(
+            explain_arguments = dict(
                 datasource=datasource,
                 normalized_sql=guard.normalized_sql or "",
                 timeout_ms=context.security_policy.timeout_ms,
             )
+            if cancellation_event is not None:
+                explain_arguments["cancellation_event"] = cancellation_event
+            explain = self.executor.explain(**explain_arguments)
             cost_assessment = self.explain_cost_guard.assess(
                 explain,
                 maximum_cost=settings.query_max_estimated_cost,
@@ -574,6 +578,20 @@ class QueryPipeline:
                 "duration_ms": cost_assessment.explain_duration_ms,
                 "reason": cost_assessment.reason,
             })
+            if explain.error_code == "QUERY_CANCELLED":
+                run.status = "FAILED"
+                run.error_code = "QUERY_CANCELLED"
+                run.error_message = explain.error_message or "Query was cancelled during EXPLAIN"
+                run.oracle_payload = _json(OracleResult(status="NOT_RUN", confidence=0))
+                db.commit()
+                db.refresh(run)
+                if principal is not None:
+                    record_audit(
+                        db, principal, action="QUERY_RUN", resource_type="QUERY_RUN", resource_id=run.id,
+                        status=run.status, details={"error_code": run.error_code},
+                    )
+                    db.commit()
+                return run
             if cost_assessment.status != "PASS":
                 run.status = "SECURITY_REJECTED"
                 run.error_code = (

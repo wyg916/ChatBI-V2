@@ -61,6 +61,7 @@ from app.streaming import phase_for_stage
 from app.streaming.lifecycle import StreamCancelled, stream_registry
 from app.services.answer_envelope import build_answer_envelope
 from app.services.admin_settings import provider_catalog
+from app.services.analysis_limitation import humanized_analysis_limitation
 
 
 _VISUAL_EVIDENCE_CACHE = InMemoryVisualEvidenceCache()
@@ -613,6 +614,7 @@ class ChatService:
                 report("RESULT_VALIDATING", {"route": route.value, "status": status})
                 if status not in {"SUCCEEDED", "PARTIAL"}:
                     error_code = str(primary.get("error_code") or status)
+                    answer = humanized_analysis_limitation(route, error_code)
             elif route == QuestionRoute.MODEL_STATUS:
                 report("GENERATING_INSIGHT", {"route": route.value})
                 catalog = provider_catalog(db, principal).model_dump(mode="json")

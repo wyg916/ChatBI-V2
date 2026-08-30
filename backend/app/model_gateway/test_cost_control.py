@@ -895,7 +895,7 @@ class TestCostController:
                     response.cost_cny if response is not None else 0.0,
                     "UNKNOWN",
                     actual_latency_ms,
-                    max(attempt.retry_count, response.retry_count if response is not None else 0),
+                    attempt.retry_count,
                     response.fallback_count if response is not None else 0,
                     error_code or "NONE",
                     datetime.now().astimezone().isoformat(),

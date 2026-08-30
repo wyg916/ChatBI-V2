@@ -387,7 +387,11 @@ class AnswerPresenter:
                 budget_mode=BudgetMode(settings.model_budget_mode),
                 requested_alias=settings.general_model_provider or "auto",
                 cancellation_event=cancellation_event,
-                max_output_tokens=min(512, max(96, len(source) * 2)),
+                max_output_tokens=min(4096, max(256, len(source) * 3)),
+                # Presentation is a constrained rewrite, not a reasoning task.
+                # Keep the complexity signal for Kimi routing while preserving
+                # the output budget for the exact verified source anchor.
+                thinking=False,
             )
         except (ModelUnavailable, TestCostControlError):
             return AnswerPresentation(source, "FALLBACK_MODEL_UNAVAILABLE", source_verified=source_verified)

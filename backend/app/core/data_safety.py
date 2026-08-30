@@ -52,6 +52,33 @@ _PUBLIC_ERROR_TEXT_KEYS = frozenset({
     "stack_trace",
     "traceback",
 })
+_PUBLIC_EXPLAIN_EXPRESSION_KEYS = frozenset({
+    # PostgreSQL JSON EXPLAIN expression-bearing fields.  These values are
+    # rendered SQL fragments and can echo predicate/projection literals even
+    # when the surrounding public SQL has already been redacted.
+    "filter",
+    "function_call",
+    "group_key",
+    "hash_cond",
+    "hash_key",
+    "index_cond",
+    "join_filter",
+    "merge_cond",
+    "one_time_filter",
+    "output",
+    "presorted_key",
+    "recheck_cond",
+    "remote_sql",
+    "run_condition",
+    "sort_key",
+    "tid_cond",
+    # MySQL JSON EXPLAIN condition fields.
+    "attached_condition",
+    "having_condition",
+    "index_condition",
+    "pushed_index_condition",
+    "table_condition",
+})
 
 
 def is_sensitive_column(value: str) -> bool:
@@ -254,6 +281,55 @@ def redact_public_sql(
     return statement.sql(dialect=sqlglot_dialect, pretty=False, comments=False)
 
 
+def redact_public_explain_plan_payload(
+    value: Any,
+    sensitive_columns: list[str] | set[str] = (),
+) -> Any:
+    """Copy an EXPLAIN payload while hiding SQL-expression fragments.
+
+    PostgreSQL and MySQL JSON plans expose predicates and projection
+    expressions as ordinary strings (for example ``Filter`` or
+    ``attached_condition``).  They are not standalone SQL fields, so the SQL
+    renderer cannot safely parse every dialect-specific fragment.  When the
+    datasource policy contains sensitive columns, fail closed for those
+    expression-bearing fields while retaining structural/cost evidence.
+    """
+
+    recognized = {
+        str(column).rsplit(".", 1)[-1].casefold()
+        for column in sensitive_columns
+        if str(column).strip()
+    }
+    if isinstance(value, list):
+        return [
+            redact_public_explain_plan_payload(item, sensitive_columns)
+            for item in value
+        ]
+    if not isinstance(value, dict):
+        return value
+
+    result: dict[str, Any] = {}
+    for key, item in value.items():
+        normalized_key = re.sub(
+            r"[^a-z0-9]+", "_", str(key).casefold(),
+        ).strip("_")
+        if recognized and normalized_key in _PUBLIC_EXPLAIN_EXPRESSION_KEYS:
+            if isinstance(item, list):
+                result[key] = [
+                    None if candidate is None else PUBLIC_SQL_MASK
+                    for candidate in item
+                ]
+            elif item is None:
+                result[key] = None
+            else:
+                result[key] = PUBLIC_SQL_MASK
+        else:
+            result[key] = redact_public_explain_plan_payload(
+                item, sensitive_columns,
+            )
+    return result
+
+
 def redact_public_sql_payload(
     value: Any,
     sensitive_columns: list[str] | set[str] = (),
@@ -286,6 +362,20 @@ def redact_public_sql_payload(
         if key in _PUBLIC_SQL_KEYS and isinstance(item, str):
             result[key] = redact_public_sql(
                 item, sensitive_columns, dialect=dialect,
+            )
+        elif str(key).casefold() == "plan" and recognized:
+            # ``plan`` is also used by NL2SQL/evaluation payloads and may
+            # contain ordinary SQL-bearing keys such as ``generated_sql``.
+            # Apply the normal recursive SQL redactor first, then scrub any
+            # EXPLAIN expression fields without treating every plan as an
+            # opaque planner tree.
+            result[key] = redact_public_explain_plan_payload(
+                redact_public_sql_payload(
+                    item,
+                    sensitive_columns,
+                    dialect=dialect,
+                ),
+                sensitive_columns,
             )
         elif (
             key == "question"

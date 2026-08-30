@@ -799,6 +799,23 @@ def test_analysis_stream_presenter_exception_still_completes(client, db_session,
     assert assistant["response_payload"]["answer_envelope"]["model"] == "deepseek-v4-flash"
 
 
+def test_analysis_sync_and_stream_source_humanize_internal_failure_codes():
+    payload = {
+        "status": "TIMEOUT",
+        "route": "COMPLEX_ANALYSIS",
+        "primary": {
+            "error_code": "DBGPT_RUNTIME_TIMEOUT",
+            "error_message": "DBGPT_RUNTIME_TIMEOUT",
+        },
+    }
+
+    visible = analysis_route._answer_text(payload)
+
+    assert "受控时限内完成" in visible
+    assert "没有发布不完整的结论" in visible
+    assert "DBGPT_RUNTIME_TIMEOUT" not in visible
+
+
 def _query_payload_for_analysis(value):
     return {
         "id": "query-analysis",

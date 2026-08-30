@@ -111,6 +111,10 @@ function Set-ChatBIShowcaseProcessEnvironment {
     $env:CHATBI_PAID_GATE_AUTHORIZED = 'YES'
     $env:CHATBI_LEVEL0_PAID_EXCEPTION = 'YES'
     $env:CHATBI_PROVIDER_USAGE_UNRESTRICTED = 'true'
+    # Real provider fallbacks can legitimately cross the deterministic 30 s
+    # budget. Keep a finite hard deadline, but give the fixed five-role flow
+    # enough time to finish one governed SQL/verification/presentation chain.
+    $env:CHATBI_AGENT_TIMEOUT_MS = '120000'
     $runtimeMode = "live providers ($($configuredProviders -join ', ')); automatic capability routing; test cost control disabled"
   } else {
     $env:CHATBI_MODEL_PROVIDER = 'deterministic'
@@ -122,6 +126,7 @@ function Set-ChatBIShowcaseProcessEnvironment {
     $env:CHATBI_PAID_GATE_AUTHORIZED = 'NO'
     $env:CHATBI_LEVEL0_PAID_EXCEPTION = 'NO'
     $env:CHATBI_PROVIDER_USAGE_UNRESTRICTED = 'false'
+    $env:CHATBI_AGENT_TIMEOUT_MS = '30000'
     $runtimeMode = 'deterministic / LEVEL0 / no paid provider calls'
   }
   $env:CHATBI_SEED_DEMO_SEMANTIC_MODEL = 'true'

@@ -78,6 +78,9 @@ def test_showcase_and_deployment_precedence_are_project_scoped():
     assert "$env:CHATBI_PAID_GATE_AUTHORIZED = 'YES'" in runtime
     assert "$env:CHATBI_LEVEL0_PAID_EXCEPTION = 'YES'" in runtime
     assert "$env:CHATBI_PROVIDER_USAGE_UNRESTRICTED = 'true'" in runtime
+    assert "$env:CHATBI_AGENT_TIMEOUT_MS = '120000'" in runtime
+    assert "$env:CHATBI_AGENT_TIMEOUT_MS = '30000'" in runtime
+    assert "MAX_AGENT_TIMEOUT_MS = 120_000" in _read("backend/app/integration/service.py")
     assert all(name in runtime for name in (
         "CHATBI_MIMO_API_KEY", "CHATBI_DEEPSEEK_API_KEY", "CHATBI_KIMI_API_KEY",
     ))

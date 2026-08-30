@@ -46,7 +46,7 @@
 
 画面：知识问题的引用和 Complex Analysis 公开阶段 Trace。
 
-> 专业知识走 Workspace ACL 和 Citation Guard；复杂分析只允许固定五角色、六个工具、8 步、12 次工具和 30 秒预算。Agent 不能直连数据库，也不能绕过 SQL Guard 和 Result Oracle。
+> 专业知识走 Workspace ACL 和 Citation Guard；复杂分析只允许固定五角色、六个工具、8 步和 12 次工具。Deterministic/Level0 预算 30 秒，本机 Auto/Live 三模型最多 120 秒，且同一绝对 deadline 会传入模型、RAG、SQL/EXPLAIN 与 Sandbox。Agent 不能直连数据库，也不能绕过 SQL Guard 和 Result Oracle。
 
 ## 3:25～3:55 功能 7：答案、看板、评测
 

@@ -11,6 +11,7 @@ from app.integration.question_router import QuestionRouter
 from app.model_gateway import ModelReply, RequestContext
 from app.models import AppUser, DataSource, DataSourceSchema, DataSourceTable, Workspace
 from app.services.answer_presentation import AnswerPresenter
+from app.services.analysis_limitation import humanized_analysis_limitation
 from app.services.chat import _data_catalog_answer
 
 
@@ -98,6 +99,25 @@ def test_unrestricted_complex_answer_uses_kimi_for_guarded_final_presentation(mo
     assert source in result.content
     assert gateway.calls[0]["requested_alias"] == "auto"
     assert gateway.calls[0]["complexity_score"] == 90
+    assert gateway.calls[0]["thinking"] is False
+    assert gateway.calls[0]["max_output_tokens"] >= 256
+
+
+def test_analysis_failure_codes_are_humanized_without_becoming_conclusions() -> None:
+    projection = humanized_analysis_limitation(
+        QuestionRoute.COMPLEX_ANALYSIS,
+        "PROJECTION_ALIAS_DEPENDENCY_UNSAFE",
+    )
+    timeout = humanized_analysis_limitation(
+        QuestionRoute.COMPLEX_ANALYSIS,
+        "DBGPT_RUNTIME_TIMEOUT",
+    )
+
+    assert "字段或别名歧义" in projection
+    assert "没有执行或发布" in projection
+    assert "受控时限内完成" in timeout
+    assert "没有发布不完整的结论" in timeout
+    assert "PROJECTION_ALIAS_DEPENDENCY_UNSAFE" not in projection
 
 
 def test_presentation_rejects_changed_or_new_facts_and_keeps_verified_source() -> None:

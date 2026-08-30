@@ -7,6 +7,7 @@ from time import perf_counter
 from datetime import datetime, timezone
 from uuid import uuid4
 
+from chatbi_agent_contracts import QuestionRoute
 from fastapi import APIRouter, Depends, Response, status
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
@@ -21,6 +22,7 @@ from app.core.config import get_settings
 from app.services.answer_composer import AnswerComposer
 from app.services.answer_envelope import build_answer_envelope
 from app.services.answer_presentation import AnswerPresenter
+from app.services.analysis_limitation import humanized_analysis_limitation
 from app.streaming import PHASE_LABELS, StreamCancelled, StreamEventFactory, format_sse, phase_for_stage, stream_registry
 
 
@@ -161,6 +163,13 @@ def analyze(
 
 def _answer_text(payload: dict) -> str:
     primary = payload.get("primary") if isinstance(payload.get("primary"), dict) else {}
+    error_code = str(primary.get("error_code") or "").strip()
+    if str(payload.get("status") or "").upper() != "SUCCEEDED" and error_code:
+        try:
+            route = QuestionRoute(str(payload.get("route") or "COMPLEX_ANALYSIS"))
+        except ValueError:
+            route = QuestionRoute.COMPLEX_ANALYSIS
+        return humanized_analysis_limitation(route, error_code)
     if isinstance(primary.get("data"), dict):
         data_summary = str(primary["data"].get("summary") or "")
         knowledge = primary.get("knowledge") if isinstance(primary.get("knowledge"), dict) else {}

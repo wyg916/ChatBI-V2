@@ -14,6 +14,7 @@ from .runtime import (
     RuntimeControl,
     RuntimeRequest,
     preload_selected_runtime,
+    register_deadline_aware_callback,
 )
 
 __all__ = [
@@ -32,4 +33,5 @@ __all__ = [
     "RuntimeControl",
     "RuntimeRequest",
     "preload_selected_runtime",
+    "register_deadline_aware_callback",
 ]

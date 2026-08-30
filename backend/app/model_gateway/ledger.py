@@ -37,7 +37,7 @@ def record_model_invocation(
     status: str,
     latency_ms: int,
     fallback_count: int = 0,
-    retry_count: int = 0,
+    retry_count: int | None = None,
     error_code: str | None = None,
     circuit_state: str = "UNKNOWN",
 ) -> None:
@@ -68,7 +68,12 @@ def record_model_invocation(
         latency_ms=max(0, latency_ms),
         cache_hit=bool(usage and usage.cached_input_tokens > 0),
         fallback_count=max(0, response.fallback_count if response is not None else fallback_count),
-        retry_count=max(0, response.retry_count if response is not None else retry_count),
+        retry_count=max(
+            0,
+            response.retry_count
+            if retry_count is None and response is not None
+            else (retry_count or 0),
+        ),
         premium_escalation=provider == "kimi" and bool(request.premium_triggers or request.complexity_score >= 80),
         error_code=error_code,
         circuit_state=circuit_state,

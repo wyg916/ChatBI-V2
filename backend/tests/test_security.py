@@ -335,7 +335,12 @@ def test_sensitive_sql_literal_is_absent_from_run_history_and_shared_answer_read
     def fake_explain(self, *, datasource, normalized_sql, timeout_ms):
         return ExecutionResult(
             status="SUCCEEDED", columns=["plan"], column_types=["JSON"],
-            rows=[{"plan": [{"Plan": {"Node Type": "Limit", "Total Cost": 1.0}}]}],
+            rows=[{"plan": [{"Plan": {
+                "Node Type": "Seq Scan",
+                "Total Cost": 1.0,
+                "Filter": "(email = 'victim@example.com'::text)",
+                "Output": ["email", "'victim@example.com'::text AS contact"],
+            }}]}],
             row_count=1, duration_ms=1, datasource_id=datasource.id,
             dialect=datasource.type, normalized_sql=normalized_sql,
             result_signature="b" * 64,
@@ -356,6 +361,35 @@ def test_sensitive_sql_literal_is_absent_from_run_history_and_shared_answer_read
     assert stored_run is not None
     assert secret in stored_run.sql_text
     assert secret in (stored_run.normalized_sql or "")
+
+    explained = raw_client.post("/api/v1/data-workspace/sql/explain", json={
+        "datasource_id": datasource["id"], "sql": sql, "row_limit": 20,
+    })
+    assert explained.status_code == 201
+    assert secret not in explained.text
+    explain_plan = explained.json()["execution"]["rows"][0]["plan"][0]["Plan"]
+    assert explain_plan["Node Type"] == "Seq Scan"
+    assert explain_plan["Total Cost"] == 1.0
+    assert explain_plan["Filter"] == "***MASKED***"
+    assert explain_plan["Output"] == ["***MASKED***", "***MASKED***"]
+
+    explain_run_id = explained.json()["id"]
+    stored_explain = db_session.get(SqlWorkspaceRun, explain_run_id)
+    assert stored_explain is not None
+    assert secret in (stored_explain.normalized_sql or "")
+    assert secret in stored_explain.execution_payload["normalized_sql"]
+    assert secret not in str(stored_explain.execution_payload["rows"])
+    assert stored_explain.execution_payload["result_signature"] == "b" * 64
+
+    verified_explain = raw_client.post(
+        f"/api/v1/data-workspace/sql/history/{explain_run_id}/verify",
+        json={"owner_name": "Security Admin", "status": "VERIFIED"},
+    )
+    assert verified_explain.status_code == 201
+    explain_answer = db_session.get(VerifiedAnswer, verified_explain.json()["answer_id"])
+    assert explain_answer is not None
+    assert secret in explain_answer.result_snapshot["normalized_sql"]
+    assert secret not in str(explain_answer.result_snapshot["rows"])
 
     history = raw_client.get(
         "/api/v1/data-workspace/sql/history", params={"datasource_id": datasource["id"]},
@@ -385,6 +419,22 @@ def test_sensitive_sql_literal_is_absent_from_run_history_and_shared_answer_read
     db_session.add(ResourceGrant(
         user_id=analyst.id, resource_type="ANSWER", resource_id=answer.id,
         can_read=True, can_query=False,
+    ))
+    db_session.add(ResourceGrant(
+        user_id=analyst.id, resource_type="ANSWER", resource_id=explain_answer.id,
+        can_read=True, can_query=False,
+    ))
+    db_session.add(AnswerVersion(
+        answer_id=explain_answer.id,
+        version=1,
+        snapshot={
+            "result_snapshot": {
+                "rows": [{"plan": [{"Plan": {
+                    "Node Type": "Seq Scan",
+                    "Filter": "(email = 'victim@example.com'::text)",
+                }}]}],
+            },
+        },
     ))
     db_session.commit()
 
@@ -445,7 +495,10 @@ def test_sensitive_sql_literal_is_absent_from_run_history_and_shared_answer_read
     )
     assert failed_history.status_code == 200
     assert secret not in failed_history.text
-    assert "use the error code" in failed_history.json()["items"][0]["error_message"]
+    failed_item = next(
+        item for item in failed_history.json()["items"] if item["id"] == run_id
+    )
+    assert "use the error code" in failed_item["error_message"]
 
     assert raw_client.post("/api/v1/auth/logout").status_code == 204
     _login(raw_client, analyst.email)
@@ -461,3 +514,15 @@ def test_sensitive_sql_literal_is_absent_from_run_history_and_shared_answer_read
     assert detail.json()["sql_text"].count("***MASKED***") == 1
     assert detail.json()["versions"][0]["snapshot"]["question"].count("***MASKED***") == 1
     assert detail.json()["versions"][0]["snapshot"]["sql"].count("***MASKED***") == 1
+
+    explain_detail = raw_client.get(f"/api/v1/answers/{explain_answer.id}")
+    assert explain_detail.status_code == 200
+    assert secret not in explain_detail.text
+    public_explain_plan = explain_detail.json()["result_snapshot"]["rows"][0]["plan"][0]["Plan"]
+    assert public_explain_plan["Node Type"] == "Seq Scan"
+    assert public_explain_plan["Filter"] == "***MASKED***"
+    version_plan = explain_detail.json()["versions"][0]["snapshot"]["result_snapshot"][
+        "rows"
+    ][0]["plan"][0]["Plan"]
+    assert version_plan["Node Type"] == "Seq Scan"
+    assert version_plan["Filter"] == "***MASKED***"

@@ -42,7 +42,7 @@ The semantic cache is bounded and its key includes workspace, role, semantic ver
 
 - `KNOWLEDGE_QUERY`: signed Live RAG bridge → workspace/user/role/scenario ACL → hybrid BM25/vector/RRF/rerank → document/version/chunk/locator citation → Answer Guard.
 - `HYBRID_ANALYSIS`: bounded planner → the same guarded data path → governed RAG → result/citation verification → evidence merge.
-- `COMPLEX_ANALYSIS`: Planner, DataAnalyst, Knowledge, Verification, and Insight roles; only `QUERY_DATA`, `RETRIEVE_KNOWLEDGE`, `VERIFY_RESULT`, `VERIFY_CITATION`, `GENERATE_CHART`, and `GENERATE_INSIGHT`; budgets 8 steps/12 calls/2 replans/depth 2/30 seconds. The ToolExecutor has no direct connector.
+- `COMPLEX_ANALYSIS`: Planner, DataAnalyst, Knowledge, Verification, and Insight roles; only `QUERY_DATA`, `RETRIEVE_KNOWLEDGE`, `VERIFY_RESULT`, `VERIFY_CITATION`, `GENERATE_CHART`, and `GENERATE_INSIGHT`; budgets 8 steps/12 calls/2 replans/depth 2, with a 30-second Deterministic/Level0 deadline and a maximum 120-second local Auto/Live deadline for the three governed providers. Model HTTP, RAG, SQL/EXPLAIN, and Sandbox inherit the same absolute deadline and cancellation signal before a terminal is emitted. Before Sandbox admission, the controller client reserves a scaled cleanup budget; every cleanup deadline is capped by that same hard deadline and it starts no network call after it. The ToolExecutor has no direct connector.
 
 ## File and multimodal path
 

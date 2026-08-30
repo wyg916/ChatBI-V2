@@ -10,6 +10,7 @@ from app.models import (
     Workspace,
 )
 from app.core.data_safety import (
+    redact_public_explain_plan_payload,
     redact_public_sql,
     redact_public_sql_payload,
     sensitive_output_columns,
@@ -146,6 +147,43 @@ def test_public_sql_renderer_redacts_sensitive_predicate_literals_only():
         },
     }, ["email"], dialect="postgresql")
     assert "victim@example.com" not in str(recursive)
+
+    explain_plan = {
+        "Plan": {
+            "Node Type": "Seq Scan",
+            "Total Cost": 12.5,
+            "Filter": "(email = 'victim@example.com'::text)",
+            "Output": ["email", "'victim@example.com'::text AS contact"],
+            "Plans": [{
+                "Node Type": "Index Scan",
+                "Index Cond": "(email = 'victim@example.com'::text)",
+            }],
+        },
+        "query_block": {
+            "table": {
+                "table_name": "customers",
+                "attached_condition": "customers.email = 'victim@example.com'",
+            },
+        },
+    }
+    public_plan = redact_public_explain_plan_payload(explain_plan, ["email"])
+    assert "victim@example.com" not in str(public_plan)
+    assert public_plan["Plan"]["Node Type"] == "Seq Scan"
+    assert public_plan["Plan"]["Total Cost"] == 12.5
+    assert public_plan["Plan"]["Filter"] == "***MASKED***"
+    assert public_plan["Plan"]["Output"] == ["***MASKED***", "***MASKED***"]
+    assert public_plan["Plan"]["Plans"][0]["Index Cond"] == "***MASKED***"
+    assert public_plan["query_block"]["table"]["attached_condition"] == "***MASKED***"
+
+    public_snapshot = redact_public_sql_payload(
+        {"result_snapshot": {"rows": [{"plan": explain_plan}]}},
+        ["email"],
+        dialect="postgresql",
+    )
+    assert "victim@example.com" not in str(public_snapshot)
+    assert public_snapshot["result_snapshot"]["rows"][0]["plan"]["Plan"][
+        "Node Type"
+    ] == "Seq Scan"
     opaque_table_function_cases = (
         "SELECT j.value AS payload FROM users u "
         "CROSS JOIN LATERAL jsonb_each_text(to_jsonb(u)) AS j WHERE j.key = 'email'",

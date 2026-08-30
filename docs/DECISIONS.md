@@ -8,7 +8,7 @@ Excel/CSV 作为正式数据源类型进入 `导入 → Backend 安全预检 →
 
 敏感结果投影不可信任最终列名：camelCase/紧凑命名与中英文常见 PII 先写入 Catalog 标记，公开响应再沿直接别名、CTE、子查询、显式列别名列表、LATERAL、星号、集合操作与整行复合值做递归污染传播；AST 不兼容、血缘有污染但无法映射到返回列，或显式敏感引用未形成可证明投影时，一律对整组公开输出 fail closed 掩码。Oracle、结果签名、只读执行与受控内部持久化保留原始值；SQL 历史展示、问数公开答案和 API 响应只提供遮罩版本。
 
-根目录本机一键入口改为 `ProviderMode Auto`。只要 MiMo、DeepSeek 或 Kimi 至少一家已配置，就使用 `quality` 自动能力路由并关闭仅用于测试的付费门禁；`CHATBI_PROVIDER_USAGE_UNRESTRICTED=true` 同时取消三家的内部估算费用上限、Kimi 复杂度准入以及 Provider 候选/重试数裁剪。三家仍统一通过唯一 ModelGateway，并继续尊重管理员启停、能力匹配、健康/熔断、回答安全、SQL/Agent 硬边界和 Provider 自身额度/网络限制。正常启动不得覆盖管理员启停选择。没有凭据时安全回退 deterministic；CI、Golden 和零付费录屏继续显式使用 `ProviderMode Deterministic`/LEVEL0，不因本机交互授权而改变发布回归成本边界。
+根目录本机一键入口改为 `ProviderMode Auto`。只要 MiMo、DeepSeek 或 Kimi 至少一家已配置，就使用 `quality` 自动能力路由并关闭仅用于测试的付费门禁；`CHATBI_PROVIDER_USAGE_UNRESTRICTED=true` 同时取消三家的内部估算费用上限、Kimi 复杂度准入以及 Provider 候选/重试数裁剪。为避免单家连续慢重试耗尽 Agent 总截止，unrestricted 模式先让每个符合能力与健康条件的候选各执行一次，只有已发生可重试失败的 Provider 才进入第二轮；普通 governed 模式的顺序保持不变。三家仍统一通过唯一 ModelGateway，并继续尊重管理员启停、能力匹配、健康/熔断、回答安全、SQL/Agent 硬边界和 Provider 自身额度/网络限制。正常启动不得覆盖管理员启停选择。没有凭据时安全回退 deterministic；CI、Golden 和零付费录屏继续显式使用 `ProviderMode Deterministic`/LEVEL0，不因本机交互授权而改变发布回归成本边界。
 
 固定演示账号只允许用于本机 Showcase：Compose 发布端口必须接受显式 `CHATBI_BIND_HOST`，Showcase 强制 `127.0.0.1`，Default/Enterprise 默认监听行为由部署者控制。Backup/Restore 必须在停栈、`pg_dump` 或 `pg_restore` 前双向检查 `chatbi-v2-showcase`、`chatbi-v2` 和 EnvFile 配置的 canonical 项目；发现可能共享元数据库的其他运行写栈只 fail closed 报告，不得自动停止。Compose 空白输出先过滤后计数，避免把已停止栈误判为运行或错误恢复。
 
@@ -592,6 +592,7 @@ Phase5 Live Runner 在 Level0/1/2 运行前已经通过唯一成本控制器验�
 - Status: Accepted (2026-08-29)
 - `provider_usage_unrestricted` removes ChatBI internal cost admission and call caps only for MiMo, DeepSeek and Kimi. It does not disable credential, health, SQL, result, citation, visual or answer publication guards, and it never applies to OpenAI-compatible or future providers automatically.
 - General chat normally uses MiMo, NL2SQL normally uses DeepSeek, and verified high-complexity `COMPLEX_ANALYSIS` presentation raises the routing score so Kimi is preferred while automatic MiMo/DeepSeek fallback remains available.
+- The constrained final Presenter keeps that high-complexity routing signal but explicitly disables Provider thinking and grants a length-derived, hard-capped 4096-token output budget. This prevents reasoning tokens from consuming the exact verified source anchor while retaining bounded execution and the unchanged-source publication guard.
 - A Provider may improve presentation only after the deterministic evidence boundary passes. The exact verified source answer must remain unchanged and contiguous; model failure or guard rejection returns the source answer instead of weakening publication safety.
 
 ## ADR-098 — Every formal answer endpoint shares the guarded final Presenter
@@ -600,3 +601,11 @@ Phase5 Live Runner 在 Level0/1/2 运行前已经通过唯一成本控制器验�
 - `/chat/stream`, `/analysis` and `/analysis/stream` are formal authenticated answer endpoints. Each applies `AnswerPresenter` only after its route-specific SQL/Result/Citation/Answer publication guards; `AnalysisService` remains presentation-neutral so Chat does not run the stage twice.
 - Synchronous Analysis binds the presentation call to its ModelInvocation session before composing the canonical AnswerEnvelope. Streaming Analysis performs the same call in its worker before the first `answer.delta`, records the resolved route in RequestContext, and exposes the same provider/model trace without changing primary evidence, Agent steps or result signatures.
 - Presenter/provider failure, cancellation or exact-source guard rejection preserves the validated source answer. Presentation can add latency but cannot turn a successful analysis into a failed result or change facts.
+
+## ADR-099 — Live Showcase keeps a finite 120-second Agent deadline
+
+- Status: Accepted (2026-08-30)
+- Deterministic/Level0 keeps the 30-second Agent deadline. Auto/Live Showcase has explicit authorization for real MiMo, DeepSeek and Kimi fallback, whose governed HTTP attempts can legitimately exceed that deterministic budget, so the fixed five-role complex-analysis flow receives a 120-second hard deadline.
+- The maximum remains capped in Backend code at 120 seconds. Eight steps, twelve tool calls, two replans, depth two, the token budget and cancellation checks remain enforced; this does not permit indefinite work, dynamic Agents or any SQL/Oracle bypass.
+- Production orchestration accepts only a `DeadlineAwareToolExecutor`; the caller/workflow cancellation signals and absolute monotonic deadline are passed into every fixed tool. Model and RAG HTTP readers receive an active close plus bounded join and are restricted to private network buffers, so a non-cooperative transport cannot write a ledger success, database row or public answer after the terminal. PostgreSQL query and EXPLAIN paths call the native driver cancel hook. Sandbox uses a client-owned 32-hex job ID, idempotent `PUT` and short-lived cancel tombstones, so an acknowledgement loss or late submission cannot create an orphan job. Its client reserves a scaled cleanup budget before `PUT`, caps cancellation cleanup at the shared hard deadline, and never starts controller network work after that deadline.
+- The AWEL adapter rejects an unregistered callback before dependency loading or execution. The only production registration site wraps the selected orchestrator's code-owned closure after `DeadlineAwareToolExecutor` admission; registration declares cooperative `RuntimeControl` checkpoints and is never applied to dynamic or user-provided callables. No executor thread is created to emulate cancellation.

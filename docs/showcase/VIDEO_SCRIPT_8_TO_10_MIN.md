@@ -69,7 +69,7 @@
 
 - 固定 `Planner/DataAnalyst/Knowledge/Verification/Insight` 五角色。
 - 固定 `QUERY_DATA/RETRIEVE_KNOWLEDGE/VERIFY_RESULT/VERIFY_CITATION/GENERATE_CHART/GENERATE_INSIGHT` 六工具。
-- 最大 8 步、12 次工具、2 次重规划、深度 2、30 秒。
+- 最大 8 步、12 次工具、2 次重规划、深度 2；发布回归与 `Deterministic`/`Level0` 为 30 秒，本机 `Auto`/`Live` 三模型实测最多 120 秒并共享同一绝对截止时间。
 - 不输出内部思维过程，不允许动态工具、任意 URL 或数据库连接。
 
 ## 6:25～7:25 功能 7：答案、看板和评测闭环

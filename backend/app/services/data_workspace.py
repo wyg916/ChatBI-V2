@@ -12,6 +12,7 @@ from app.core.data_safety import (
     SENSITIVE_COMMENT_MARKER,
     is_sensitive_column,
     mask_result_rows,
+    redact_public_explain_plan_payload,
     redact_public_sql,
 )
 from app.models import (
@@ -189,8 +190,13 @@ def execute_sql(
             # source SQL is already part of this authenticated workspace run;
             # applying result-column lineage to the single ``plan`` field
             # would replace the complete plan whenever the query references a
-            # sensitive source column.
-            masked_rows, masked_columns = execution.rows, []
+            # sensitive source column.  Preserve structural/cost evidence, but
+            # fail closed for planner expression strings because fields such as
+            # PostgreSQL ``Filter`` can echo the original sensitive literal.
+            masked_rows = redact_public_explain_plan_payload(
+                execution.rows, policy.sensitive_columns,
+            )
+            masked_columns = []
         else:
             masked_rows, masked_columns = mask_result_rows(
                 guard.normalized_sql or execution.normalized_sql,
