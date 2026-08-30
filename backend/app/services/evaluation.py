@@ -32,7 +32,7 @@ GOLDEN_MANIFEST_PATH = next(
     (candidate for candidate in _GOLDEN_MANIFEST_CANDIDATES if candidate.is_file()),
     _GOLDEN_MANIFEST_CANDIDATES[-1],
 )
-GOLDEN_MANIFEST_SHA256 = "67a1d43d53232644df86a8e46ee66fc51baaeeb724881679d53855dde49e0dc4"
+GOLDEN_MANIFEST_SHA256 = "ff83e727331fb137cd8cc692aa780c3ba016c48adeec4246d4464874fbf7db1d"
 SOURCE_GOLDEN_20_SHA256 = "741da55b7dd41046a6f8411522a3cf92afb45ca1ac38b90b202b49c87f8eef0e"
 _MULTI_GROUND_TRUTH_CANDIDATES = (
     _SERVICE_FILE.parents[3] / "evaluation" / "golden" / "v2.1-multiple-ground-truth.json",
@@ -42,7 +42,7 @@ MULTI_GROUND_TRUTH_PATH = next(
     (candidate for candidate in _MULTI_GROUND_TRUTH_CANDIDATES if candidate.is_file()),
     _MULTI_GROUND_TRUTH_CANDIDATES[-1],
 )
-MULTI_GROUND_TRUTH_SHA256 = "1386ceab512d95556fa1a86f0664f1fc451d51cb102cfcb4cfcd529096fdc157"
+MULTI_GROUND_TRUTH_SHA256 = "1e11b66f241f951e0265b3510310eaf856553ba2f2b4cea17854dc56aada4f36"
 RELEASE_THRESHOLDS = {
     "golden_count": 50,
     "sql_execution_rate": 0.98,

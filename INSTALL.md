@@ -69,7 +69,7 @@ cd ..
 .\.venv\Scripts\python.exe scripts\release\generate_sbom.py
 ```
 
-Golden runner 必须报告冻结 SHA-256 `67a1d43d53232644df86a8e46ee66fc51baaeeb724881679d53855dde49e0dc4`，PostgreSQL 50/50、MySQL 兼容集 10/10；Expected Result 只能在独立 Oracle 证明业务契约需更新时变更。
+Golden runner 必须报告冻结 SHA-256 `ff83e727331fb137cd8cc692aa780c3ba016c48adeec4246d4464874fbf7db1d`，PostgreSQL 50/50、MySQL 兼容集 10/10；Expected Result 只能在独立 Oracle 证明业务契约需更新时变更。
 
 ## 外部模型
 

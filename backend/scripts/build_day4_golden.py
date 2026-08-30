@@ -143,7 +143,7 @@ def main() -> int:
         raise RuntimeError("Original Golden 20 manifest changed; refusing to build Day 4 manifest")
     manifest = {
         "name": "ChatBI V2 Day 4 Golden 50",
-        "version": "4.1.0",
+        "version": "4.1.1",
         "source_manifest_sha256": ORIGINAL_SHA256,
         "frozen": False,
         "frozen_at": None,
