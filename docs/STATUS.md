@@ -295,6 +295,6 @@
 - 已批准候选 `74c59b4c33df19f84ca60b51ddb4734a649c4228` 经 PR #1 的 6/6 必跑门禁后使用 merge commit 合入公开仓库；远端 `main` 为 `2ea605270c2396b77b1087a69b5655603e1355c4`。
 - 合并后精确 `main` 的 7/8 jobs 成功；IBM self-contained job 在 50/50 查询均成功后以 G29 唯一 `RESULT_MISMATCH` fail-closed，结果值准确率为 0.98，因此没有创建 `v1.4.0` Tag 或 Release。
 - 根因是 fresh seed 已把 `customer_id=9` 的展示名改为“华东新能源综合服务集团股份有限公司上海运营中心”，但冻结 Golden G29 与 Data100 P5D055 仍保存旧名“客户-009”；候选 SQL、稳定排序与查询结果数值均正确。
-- 修复分支将 Day4 Golden 重新冻结为 `4.1.1`，同步 G29/P5D055、Golden/overlay/Data100 三层哈希及 Backend 固定哈希；Golden manifest 为 `ff83e727331fb137cd8cc692aa780c3ba016c48adeec4246d4464874fbf7db1d`（ADR-100）。
+- 修复分支将 Day4 Golden 重新冻结为 `4.1.1`，同步 G29/P5D055、Golden/overlay/Data100 三层哈希及 Backend 固定哈希；Golden manifest 为 `ff83e727331fb137cd8cc692aa780c3ba016c48adeec4246d4464874fbf7db1d`（ADR-102）。
 - 本地哈希闭环通过。原生 Linux 镜像全量 Backend 为 815 passed、10 skipped；仅因镜像上下文排除 `.github` 导致 2 个文件存在性用例失败，挂载真实 `.github` 后该两项 2/2 通过，合并结果等价为 817 passed、10 skipped。Windows bind-mount 下的单个沙箱时延用例受挂载 I/O 影响失败，当前代码烘焙到原生镜像层后 1/1 通过（0.47 秒）。
 - 该修复会改变发布 HEAD，旧批准 `OSS-74c59b4c-6c95a6772627` 已失效；新候选必须重新提交批准、走新 PR，并在最终 `main` 的 8/8 jobs 全成功后才能打 Tag 和发布 Release。

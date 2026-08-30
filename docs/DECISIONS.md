@@ -628,7 +628,7 @@ Phase5 Live Runner 在 Level0/1/2 运行前已经通过唯一成本控制器验�
 - Production orchestration accepts only a `DeadlineAwareToolExecutor`; the caller/workflow cancellation signals and absolute monotonic deadline are passed into every fixed tool. Model and RAG HTTP readers receive an active close plus bounded join and are restricted to private network buffers, so a non-cooperative transport cannot write a ledger success, database row or public answer after the terminal. PostgreSQL query and EXPLAIN paths call the native driver cancel hook. Sandbox uses a client-owned 32-hex job ID, idempotent `PUT` and short-lived cancel tombstones, so an acknowledgement loss or late submission cannot create an orphan job. Its client reserves a scaled cleanup budget before `PUT`, caps cancellation cleanup at the shared hard deadline, and never starts controller network work after that deadline.
 - The AWEL adapter rejects an unregistered callback before dependency loading or execution. The only production registration site wraps the selected orchestrator's code-owned closure after `DeadlineAwareToolExecutor` admission; registration declares cooperative `RuntimeControl` checkpoints and is never applied to dynamic or user-provided callables. No executor thread is created to emulate cancellation.
 
-## ADR-100 — Fresh seed and frozen Golden answers advance as one data contract
+## ADR-102 — Fresh seed and frozen Golden answers advance as one data contract
 
 - Status: Accepted (2026-08-30)
 - A change to deterministic demo seed values that can appear in query results requires the affected frozen Golden rows, signatures and manifest version to be revalidated against a fresh seed in the same release. A persistent developer database or historical evidence cannot certify the new seed.
