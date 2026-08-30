@@ -21,9 +21,9 @@
 
 ## 项目介绍视频
 
-<!-- CHATBI_NATIVE_VIDEO_URL_PENDING_APPROVED_UPLOAD -->
+https://github.com/user-attachments/assets/217ddbba-2915-4650-80ca-8fbf799615ef
 
-> 2 分 12 秒真实产品演示。正式发布时使用 GitHub 原生视频附件播放器，点击播放、不自动下载；画面来自本仓库 `v1.4.0` Local Showcase 与可复现模拟业务数据。
+> 2 分 12 秒真实产品演示。使用 GitHub 原生视频附件播放器，点击播放、不自动下载；画面来自本仓库 `v1.4.0` Local Showcase 与可复现模拟业务数据。
 
 ## 30 秒了解 ChatBI Studio
 
