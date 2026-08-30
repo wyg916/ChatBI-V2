@@ -19,19 +19,11 @@
 
 </div>
 
-![ChatBI Studio v1.4.0 真实问数据结果页](docs/images/showcase/ask-data-result.jpg)
-
-> 实机截图来自本仓库 `v1.4.0` Local Showcase，使用可复现模拟业务数据。自然语言问题、SQL、结果值、图表与洞察均经 Backend API 主链路生成和校验。
-
 ## 项目介绍视频
 
-<p align="center">
-  <a href="https://github.com/wyg916/ChatBI-V2/releases/download/v1.4.0/ChatBI-Studio-v1.4.0-Introduction.mp4">
-    <img src="docs/images/showcase/dashboard.jpg" alt="播放 ChatBI Studio v1.4.0 项目介绍视频" width="88%">
-  </a>
-</p>
+https://github.com/user-attachments/assets/217ddbba-2915-4650-80ca-8fbf799615ef
 
-<p align="center"><strong>▶ 点击封面观看 1 分 35 秒项目介绍视频</strong><br><sub>1080p · 真实 v1.4.0 Showcase · GitHub Release 托管</sub></p>
+> 2 分 12 秒真实产品演示。使用 GitHub 原生视频附件播放器，点击播放、不自动下载；画面来自本仓库 `v1.4.0` Local Showcase 与可复现模拟业务数据。
 
 ## 30 秒了解 ChatBI Studio
 
@@ -62,42 +54,96 @@ ChatBI Studio 是面向企业数据分析的开源 ChatBI / NL2SQL 产品。它�
 ## 技术架构
 
 ```mermaid
-flowchart LR
-    U[业务用户] --> FE[React + TypeScript + ECharts]
-    FE -->|/api/v1 + SSE| API[FastAPI API Boundary]
+flowchart TB
+    U[业务用户] --> FE[React + TypeScript + ECharts 工作台]
+    FE -->|Backend API + SSE| API[FastAPI API 边界]
 
-    subgraph QP[可信查询平面]
-      CTX[Context Builder] --> N2S[NL2SQL Router]
-      N2S --> SG[SQL AST Guard]
-      SG --> EX[Read-only Executor]
-      EX --> RO[Result Oracle]
-      RO --> AP[Answer Presenter]
-    end
+    API --> IAM[安全会话 / Workspace / RBAC]
+    API --> SEM[Schema Catalog / 语义模型]
+    API --> ROUTE[Question Router]
+    API --> META[(元数据 PostgreSQL)]
+    API --> OBS[全链路 Trace / Audit / Evaluation]
 
-    API --> CTX
-    API --> SEM[Semantic Model / Catalog]
-    API --> GOV[Workspace / RBAC / Audit]
-    API --> RAG[Governed RAG]
-    API --> AG[Bounded Multi-Agent]
+    ROUTE -->|DATA_QUERY| QP[QueryPipeline<br/>Context Builder → NL2SQL → SQL Guard → 只读执行 → Result Oracle]
+    ROUTE -->|KNOWLEDGE_QUERY| RAG[Governed RAG Path<br/>独立 Runtime + Backend Guards]
+    ROUTE -->|HYBRID_ANALYSIS| HYBRID[Hybrid Coordinator]
+    ROUTE -->|COMPLEX_ANALYSIS| AGENT[固定五角色有限编排 / 硬预算]
 
-    SEM --> CTX
-    GOV --> QP
-    RAG --> AP
-    AG --> QP
-    EX --> DS[(PostgreSQL / MySQL / Managed Excel)]
-    RO --> VA[Verified Answer / Dashboard / Evaluation]
+    IAM --> ROUTE
+    SEM --> QP
+    QP --> MG[Model Gateway / 本地语义运行时]
+    MG --> PROVIDER[兼容模型 Provider]
+    QP --> DB[(PostgreSQL / MySQL 只读数据源)]
+    IMPORT[Excel / CSV 安全预检与导入] --> MANAGED[(独立 PostgreSQL excel_* Schema)]
+    QP --> MANAGED
+
+    HYBRID --> QP
+    HYBRID --> RAG
+    QP --> DATAEVID[Oracle 已验证数据]
+    RAG --> KNOWEVID[引用已验证知识]
+    DATAEVID --> FUSION[Verified Fusion]
+    KNOWEVID --> FUSION
+
+    AGENT --> TOOLS[六个 Allowlisted ToolExecutor]
+    TOOLS -->|QUERY_DATA| QP
+    TOOLS -->|RETRIEVE_KNOWLEDGE| RAG
+    TOOLS -. 受限计算 .-> SANDBOX[独立 Sandbox Controller / Proxy]
+    DATAEVID --> VERIFY[Verification Agent]
+    KNOWEVID --> VERIFY
+
+    DATAEVID --> PRESENT[Answer Presenter]
+    KNOWEVID --> PRESENT
+    FUSION --> PRESENT
+    VERIFY --> PRESENT
+    PRESENT -->|可保存| LIB[答案库 / 看板 / 评测中心]
+    PRESENT --> API
+    ROUTE -. 阶段事件 .-> OBS
+    PRESENT -. 最终输出 .-> OBS
 ```
 
 核心信任边界只有一条：**浏览器只访问 Backend API**。数据库连接、模型凭据、SQL 解析与执行、权限校验、结果验证和审计全部留在服务端。
 
 ### 从问题到可信答案
 
-```text
-连接数据源 → 同步 Schema / Catalog → 建立并发布语义模型
-→ 自然语言提问 → 生成结构化 SQLPlan → AST 安全校验
-→ 只读执行 → Result Oracle 验证 → 结论 / KPI / 图表 / 洞察
-→ 保存答案或看板 → Golden Set / Feedback 持续优化
+```mermaid
+flowchart TB
+    Q[自然语言问题] --> AUTH[安全会话与 Workspace 权限]
+    AUTH --> ROUTE[意图路由]
+    ROUTE -->|DATA_QUERY| CTX[Schema 与语义上下文]
+    CTX --> PLAN[结构化 SQLPlan]
+    PLAN --> GUARD[AST / 权限 / 成本门禁]
+    GUARD --> EXEC[只读执行<br/>超时 / 行限 / 并发 / 脱敏]
+    EXEC --> ORACLE[Result Oracle<br/>口径与结果值验证]
+    ROUTE -->|KNOWLEDGE_QUERY| RAG[RAG Runtime<br/>Workspace / ACL 检索]
+    RAG --> EVIDENCE[Citation / Answer Guard]
+    ROUTE -->|HYBRID_ANALYSIS| HYBRID[受控数据与知识取证]
+    HYBRID --> CTX
+    HYBRID --> RAG
+    ORACLE --> FUSION[仅融合已验证数据与引用]
+    EVIDENCE --> FUSION
+    ROUTE -->|COMPLEX_ANALYSIS| AGENT[固定五角色 / 硬预算]
+    AGENT --> TOOLS[六个 Allowlisted 工具]
+    TOOLS -->|QUERY_DATA| CTX
+    TOOLS -->|RETRIEVE_KNOWLEDGE| RAG
+    TOOLS --> VERIFY[Verification Agent]
+    ORACLE --> VERIFY
+    EVIDENCE --> VERIFY
+    ORACLE --> PRES[Answer Presenter<br/>只润色已验证事实]
+    EVIDENCE --> PRES
+    FUSION --> PRES
+    VERIFY --> PRES
+    PRES --> OUT[结论 / KPI / 图表<br/>洞察 / 明细 / 追问]
+    OUT --> SAVE[保存答案或看板]
+    SAVE --> EVAL[Golden Set / Feedback]
+    GUARD -->|拒绝| SAFE[澄清或安全失败]
+    ORACLE -->|不一致| SAFE
+    EVIDENCE -->|无授权证据| SAFE
+    VERIFY -->|验证失败| SAFE
+    ROUTE -. SSE 阶段事件 .-> OBS[全链路阶段反馈与可核验记录]
+    PRES -. 最终输出 .-> OBS
 ```
+
+任何安全门禁失败或结果值不一致都会失败关闭：系统返回澄清或可解释错误，不把未经验证的内容包装成业务答案。
 
 ## 真实产品预览
 
@@ -164,7 +210,7 @@ cd ChatBI-V2
 .\一键启动-ChatBI-V2.cmd
 ```
 
-启动后访问 <http://127.0.0.1:15173/>。完整流程见 [Showcase 操作手册](docs/showcase/DEMO_RUNBOOK.md)。
+启动完成后即可进入 Web 工作台。完整流程与状态检查方式见 [Showcase 操作手册](docs/showcase/DEMO_RUNBOOK.md)。
 
 ### 方式二：标准开源部署 / Enterprise PoC
 
@@ -182,14 +228,7 @@ Copy-Item .env.example .env
 .\scripts\start.ps1 -SkipBuild -SkipBootstrap
 ```
 
-| 服务 | 默认地址 |
-| --- | --- |
-| Frontend | <http://127.0.0.1:5173/> |
-| Backend Health | <http://127.0.0.1:8000/health> |
-| OpenAPI | <http://127.0.0.1:8000/docs> |
-| RAG Health | <http://127.0.0.1:8001/health> |
-
-完整部署契约见 [Quick Start](docs/deployment/QUICK_START.md)、[配置参考](docs/deployment/CONFIGURATION.md) 与 [私有部署](docs/deployment/PRIVATE_DEPLOYMENT.md)。
+启动后使用项目提供的 Doctor、Verify 与 Status 入口检查服务状态。完整部署契约见 [Quick Start](docs/deployment/QUICK_START.md)、[配置参考](docs/deployment/CONFIGURATION.md) 与 [私有部署](docs/deployment/PRIVATE_DEPLOYMENT.md)。
 
 > 本源码发布面向本地部署、Enterprise PoC、私有化部署验证与二次开发。进入正式生产前，应结合目标环境完成 TLS、网络收口、高可用、监控、密钥轮换、备份恢复和组织合规设计。
 

@@ -19,19 +19,11 @@ Natural-language analytics · Semantic layer · Guarded NL2SQL · Result verific
 
 </div>
 
-![ChatBI Studio v1.4.0 live Ask Data result](docs/images/showcase/ask-data-result.jpg)
-
-> Captured from the repository's running `v1.4.0` Local Showcase with reproducible demo data. The question, SQL, values, chart, and insight travel through the real Backend API verification path.
-
 ## Project introduction video
 
-<p align="center">
-  <a href="https://github.com/wyg916/ChatBI-V2/releases/download/v1.4.0/ChatBI-Studio-v1.4.0-Introduction.mp4">
-    <img src="docs/images/showcase/dashboard.jpg" alt="Play the ChatBI Studio v1.4.0 project introduction video" width="88%">
-  </a>
-</p>
+https://github.com/user-attachments/assets/217ddbba-2915-4650-80ca-8fbf799615ef
 
-<p align="center"><strong>▶ Click the cover to watch the 1:35 project introduction</strong><br><sub>1080p · Live v1.4.0 Showcase · Hosted as a GitHub Release asset</sub></p>
+> A 2:12 live product walkthrough. The README uses GitHub's native video-attachment player for click-to-play viewing instead of an automatic download. Footage comes from this repository's `v1.4.0` Local Showcase and reproducible demo data.
 
 ## ChatBI Studio in 30 seconds
 
@@ -62,40 +54,96 @@ The project actively owns and maintains its product control plane, verified anal
 ## Architecture
 
 ```mermaid
-flowchart LR
-    U[Business user] --> FE[React + TypeScript + ECharts]
-    FE -->|/api/v1 + SSE| API[FastAPI API Boundary]
+flowchart TB
+    U[Business user] --> FE[React + TypeScript + ECharts workspace]
+    FE -->|Backend API + SSE| API[FastAPI API boundary]
 
-    subgraph QP[Verified Query Plane]
-      CTX[Context Builder] --> N2S[NL2SQL Router]
-      N2S --> SG[SQL AST Guard]
-      SG --> EX[Read-only Executor]
-      EX --> RO[Result Oracle]
-      RO --> AP[Answer Presenter]
-    end
+    API --> IAM[Secure session / Workspace / RBAC]
+    API --> SEM[Schema Catalog / Semantic Model]
+    API --> ROUTE[Question Router]
+    API --> META[(Metadata PostgreSQL)]
+    API --> OBS[End-to-end Trace / Audit / Evaluation]
 
-    API --> CTX
-    API --> SEM[Semantic Model / Catalog]
-    API --> GOV[Workspace / RBAC / Audit]
-    API --> RAG[Governed RAG]
-    API --> AG[Bounded Multi-Agent]
+    ROUTE -->|DATA_QUERY| QP[QueryPipeline<br/>Context Builder → NL2SQL → SQL Guard → read-only execution → Result Oracle]
+    ROUTE -->|KNOWLEDGE_QUERY| RAG[Governed RAG Path<br/>independent Runtime + Backend Guards]
+    ROUTE -->|HYBRID_ANALYSIS| HYBRID[Hybrid Coordinator]
+    ROUTE -->|COMPLEX_ANALYSIS| AGENT[Fixed five-role analysis / hard budgets]
 
-    SEM --> CTX
-    GOV --> QP
-    RAG --> AP
-    AG --> QP
-    EX --> DS[(PostgreSQL / MySQL / Managed Excel)]
-    RO --> VA[Verified Answer / Dashboard / Evaluation]
+    IAM --> ROUTE
+    SEM --> QP
+    QP --> MG[Model Gateway / local semantic runtime]
+    MG --> PROVIDER[Compatible model providers]
+    QP --> DB[(PostgreSQL / MySQL read-only sources)]
+    IMPORT[Excel / CSV security preflight and import] --> MANAGED[(Isolated PostgreSQL excel_* schema)]
+    QP --> MANAGED
+
+    HYBRID --> QP
+    HYBRID --> RAG
+    QP --> DATAEVID[Oracle-verified data]
+    RAG --> KNOWEVID[Citation-verified knowledge]
+    DATAEVID --> FUSION[Verified Fusion]
+    KNOWEVID --> FUSION
+
+    AGENT --> TOOLS[Six allowlisted ToolExecutors]
+    TOOLS -->|QUERY_DATA| QP
+    TOOLS -->|RETRIEVE_KNOWLEDGE| RAG
+    TOOLS -. bounded compute .-> SANDBOX[Independent Sandbox Controller / Proxy]
+    DATAEVID --> VERIFY[Verification Agent]
+    KNOWEVID --> VERIFY
+
+    DATAEVID --> PRESENT[Answer Presenter]
+    KNOWEVID --> PRESENT
+    FUSION --> PRESENT
+    VERIFY --> PRESENT
+    PRESENT -->|optional save| LIB[Answer Library / Dashboards / Evaluation]
+    PRESENT --> API
+    ROUTE -. stage events .-> OBS
+    PRESENT -. final output .-> OBS
 ```
 
 The trust boundary is explicit: **the browser talks only to the Backend API**. Database connections, provider credentials, SQL parsing and execution, authorization, result verification, and audit stay server-side.
 
-```text
-Connect datasource → synchronize Schema/Catalog → publish semantic model
-→ ask in natural language → create structured SQLPlan → apply AST policy
-→ execute read-only query → verify with Result Oracle → present chart and insight
-→ save answer/dashboard → improve through Golden Sets and feedback
+### From question to trustworthy answer
+
+```mermaid
+flowchart TB
+    Q[Natural-language question] --> AUTH[Secure session and Workspace policy]
+    AUTH --> ROUTE[Intent routing]
+    ROUTE -->|DATA_QUERY| CTX[Schema and semantic context]
+    CTX --> PLAN[Structured SQLPlan]
+    PLAN --> GUARD[AST / authorization / cost gate]
+    GUARD --> EXEC[Read-only execution<br/>timeout / row / concurrency / masking]
+    EXEC --> ORACLE[Result Oracle<br/>business and value checks]
+    ROUTE -->|KNOWLEDGE_QUERY| RAG[RAG Runtime<br/>Workspace / ACL retrieval]
+    RAG --> EVIDENCE[Citation / Answer Guard]
+    ROUTE -->|HYBRID_ANALYSIS| HYBRID[Governed data and knowledge evidence]
+    HYBRID --> CTX
+    HYBRID --> RAG
+    ORACLE --> FUSION[Verified data and citations only]
+    EVIDENCE --> FUSION
+    ROUTE -->|COMPLEX_ANALYSIS| AGENT[Fixed five roles / hard budgets]
+    AGENT --> TOOLS[Six allowlisted tools]
+    TOOLS -->|QUERY_DATA| CTX
+    TOOLS -->|RETRIEVE_KNOWLEDGE| RAG
+    TOOLS --> VERIFY[Verification Agent]
+    ORACLE --> VERIFY
+    EVIDENCE --> VERIFY
+    ORACLE --> PRES[Answer Presenter<br/>verified facts only]
+    EVIDENCE --> PRES
+    FUSION --> PRES
+    VERIFY --> PRES
+    PRES --> OUT[Conclusion / KPI / chart<br/>insight / detail / follow-ups]
+    OUT --> SAVE[Save answer or dashboard]
+    SAVE --> EVAL[Golden Set / Feedback]
+    GUARD -->|reject| SAFE[Clarification or safe failure]
+    ORACLE -->|mismatch| SAFE
+    EVIDENCE -->|no authorized evidence| SAFE
+    VERIFY -->|verification failure| SAFE
+    ROUTE -. SSE stage events .-> OBS[End-to-end stage feedback and verifiable record]
+    PRES -. final output .-> OBS
 ```
+
+Safety-gate failures and value mismatches fail closed: the system returns clarification or an explainable error instead of presenting an unverified claim as a business answer.
 
 ## Real product preview
 
@@ -162,7 +210,7 @@ cd ChatBI-V2
 .\一键启动-ChatBI-V2.cmd
 ```
 
-Open <http://127.0.0.1:15173/>. See the [Showcase runbook](docs/showcase/DEMO_RUNBOOK.md) for the reproducible demo flow.
+When startup completes, enter the Web workspace. See the [Showcase runbook](docs/showcase/DEMO_RUNBOOK.md) for the reproducible demo flow and status checks.
 
 ### Standard open-source deployment / Enterprise PoC
 
@@ -180,14 +228,7 @@ Set `CHATBI_DATABASE_URL` to a least-privilege PostgreSQL application account. U
 .\scripts\start.ps1 -SkipBuild -SkipBootstrap
 ```
 
-| Service | Default URL |
-| --- | --- |
-| Frontend | <http://127.0.0.1:5173/> |
-| Backend health | <http://127.0.0.1:8000/health> |
-| OpenAPI | <http://127.0.0.1:8000/docs> |
-| RAG health | <http://127.0.0.1:8001/health> |
-
-Read [Quick Start](docs/deployment/QUICK_START.md), [Configuration](docs/deployment/CONFIGURATION.md), and [Private deployment](docs/deployment/PRIVATE_DEPLOYMENT.md) for the complete contract.
+Use the provided Doctor, Verify, and Status entrypoints after startup. Read [Quick Start](docs/deployment/QUICK_START.md), [Configuration](docs/deployment/CONFIGURATION.md), and [Private deployment](docs/deployment/PRIVATE_DEPLOYMENT.md) for the complete contract.
 
 > This source release targets local deployment, Enterprise PoC, private-deployment validation, and secondary development. A production rollout should add environment-specific TLS, network controls, high availability, observability, key rotation, recovery, and organizational compliance.
 

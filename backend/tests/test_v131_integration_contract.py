@@ -193,6 +193,24 @@ def test_current_product_release_identity_is_published_v140():
     assert "预期发布" not in readme
 
 
+def test_public_readmes_use_native_video_and_governed_flow_diagrams():
+    native_video = "https://github.com/user-attachments/assets/217ddbba-2915-4650-80ca-8fbf799615ef"
+    required_routes = {"DATA_QUERY", "KNOWLEDGE_QUERY", "HYBRID_ANALYSIS", "COMPLEX_ANALYSIS"}
+
+    for relative_path in ("README.md", "README.en.md"):
+        readme = _read(relative_path)
+
+        assert readme.count(native_video) == 1
+        assert "CHATBI_NATIVE_VIDEO_URL_PENDING_APPROVED_UPLOAD" not in readme
+        assert "ask-data-result.jpg" not in readme
+        assert "127.0.0.1" not in readme
+        assert "localhost" not in readme.lower()
+        assert "releases/download/v1.4.0/ChatBI-Studio-v1.4.0-Introduction.mp4" not in readme
+        assert readme.count("```mermaid") == 2
+        assert readme.count("flowchart TB") == 2
+        assert required_routes.issubset(set(re.findall(r"\b[A-Z]+(?:_[A-Z]+)+\b", readme)))
+
+
 def test_release_docs_separate_published_tag_from_unreleased_0015_successor():
     release_notes = _read("docs/releases/V1_3_1_RELEASE_NOTES.md")
     published, successor = release_notes.split("## Unreleased `0015` main successor", 1)
