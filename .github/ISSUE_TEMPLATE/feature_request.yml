@@ -1,0 +1,45 @@
+name: Feature request
+description: Propose a change to the governed ChatBI workflow.
+title: "[Feature]: "
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What user or data decision is blocked today?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed outcome
+      description: Explain the smallest user-visible outcome, not a preferred implementation only.
+    validations:
+      required: true
+  - type: dropdown
+    id: stage
+    attributes:
+      label: Core workflow stage
+      options:
+        - Datasource and catalog
+        - Semantic model
+        - NL2SQL and query safety
+        - Result verification
+        - Answer and dashboard
+        - Evaluation and optimization
+        - Deployment and operations
+    validations:
+      required: true
+  - type: textarea
+    id: boundaries
+    attributes:
+      label: Security, data, and compatibility impact
+      description: Include tenant isolation, read-only SQL, migration, provider cost, and rollback considerations when relevant.
+  - type: checkboxes
+    id: scope
+    attributes:
+      label: Scope check
+      options:
+        - label: This proposal serves ChatBI's governed analytics workflow rather than a general-purpose AI or agent platform.
+          required: true

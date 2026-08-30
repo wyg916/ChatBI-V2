@@ -1,5 +1,14 @@
 # 项目状态
 
+## 2026-08-30：V1.4.0 开源发布候选准备
+
+- 当前最新源代码由 `v1.3.1` 之后 5 个 forward commits 组成，功能范围覆盖 Windows 一键启动修复、问数/管理体验、SSE 流式契约、Excel/CSV 数据源与答案生命周期、Model Gateway 运行时加固。按严格 SemVer 定位为 `v1.4.0`，不是对历史 `chatbi-v2-v1.3.1` 标签的覆盖。
+- 目标仓库为 `wyg916/ChatBI-V2`（public、Apache-2.0）。远端已有同源历史，候选只允许经 `chore/open-source-release` PR 合入 `main`；三条 GitHub Actions 全绿后，才允许在合并后的 exact SHA 创建新的不可变 annotated tag `v1.4.0` 与 GitHub Release。禁止 force push、移动旧标签或用历史 CI 冒充当前候选证据。
+- 本地 Backend 全量测试实际收集 `827` 项：`817 passed`、`10 skipped`、`0 failed`；Frontend Vitest 为 `68/68`。默认串行 core E2E 最终独立复验为 `90/90` 通过，`npm`、PowerShell 与统一进程退出码均为 `0`，并覆盖 `1440×900`、`1366×768`、`1920×1080` 三个批准视口。较早一次诊断运行出现过 Windows 截图文件瞬态 `open ... UNKNOWN`，目标用例单跑 `1/1` 与最终全量均未复现；未把该瞬态失败隐藏为首次全绿。
+- 本地 Golden Set 为 `50/50`，危险 SQL 阻断为 `56/56`。这些数字来自当前候选的本地 deterministic 执行，不代表 GitHub-hosted runner 或真实付费 Provider 的远端认证结果。
+- CycloneDX/SPDX SBOM 已生成；源代码历史、tracked 文件、依赖、许可证与 Secret 审计未发现 `Critical` 或 `High` 项（`0 Critical / 0 High`）。Python 完整 hash lock 与 Docker 基础镜像 tag 固定仍作为公开风险披露，不用零高危结论掩盖剩余供应链加固项。
+- GitHub 发布、远端 PR、三条远端 CI、合并后 exact-SHA 验证、annotated tag `v1.4.0` 和 GitHub Release 均尚未执行。开源候选仍处于本地准备状态；远端写入必须先冻结其余本地门禁，并由绑定最终 HEAD 和工作树的 Release ID 获得用户精确批准。
+
 ## 2026-08-30：问数体验、Excel 数据源与管理控制收口
 
 - 本轮严格限定在 ChatBI 主链路与既有 P1 管理体验：P0 完成真实 SSE 增量输出、校验后答案呈现、受控自然化兜底、Excel/CSV 导入为可查询数据源、评测趋势从 Backend API 读取；P1 修复语义节点拖动与防重叠、差异化看板、全局返回导航、模型卡片、成员创建和权限管理。未引入 P2 平台化功能。
@@ -33,12 +42,12 @@
 ## V1.3.0 POST_RELEASE 求职 Showcase 维护模式（2026-08-27～28）
 
 - 正式发布事实保持不变：annotated tag `chatbi-v2-v1.3.0` 的 peeled commit 仍为 `52db955fd67ebe592c289399a135528c13cb3e3d`，GitHub Release 不覆盖、不重建、不移动。本节及对应脚本属于 main 上的 POST_RELEASE 维护提交，不启动 V1.4、V2.0 或 Production Deployment。
-- 唯一本地正式目录固定为 `E:\ChatBI V2 项目`；`scripts/showcase.ps1` 提供 `Start / Stop / Reset / Status`，根目录提供启动、停止、重置三个双击入口。正式端口为 Frontend `15173`、Backend `18080`、RAG `18081`，默认 deterministic / LEVEL0 / no-paid 模式。
+- 唯一本地正式目录固定为当前 `<project-root>`；`scripts/showcase.ps1` 提供 `Start / Stop / Reset / Status`，根目录提供启动、停止、重置三个双击入口。正式端口为 Frontend `15173`、Backend `18080`、RAG `18081`，默认 deterministic / LEVEL0 / no-paid 模式。
 - Reset 只重建本机元数据库 `chatbi_v2.public` 并旋转两组公开演示账号；只读业务 Schema 不变。演示数据固定到 `2026-08-17`，PostgreSQL/MySQL `orders` 均为 1,095 行；元数据固定为 2 个数据源、18 张表、112 个字段、24 条关系、2 个语义模型、128 个答案、18 个看板、50 个可下钻 Golden Case 和 6 篇受控知识文档。
 - 浏览器现场验收已跑通：登录后默认进入六模块 Chat-first 问数据；“按地区统计订单收入”真实返回 5 行地区收入、ECharts、洞察与明细；数据源/语义模型与目录统计一致；评测中心 Golden 50、八类 Result Oracle、50/50 执行/结果/语义、38/38 危险 SQL 均显示 PASS。
-- 清理遵循先盘点、后备份、再删除：全 refs bundle、根 dirty patch/untracked ZIP、Enterprise 并发提交 bundle/WIP patch、IBM/临时 Evidence 清单均保存在 `E:\ChatBI_V2_Safety_Backup\20260827-170500-pre-showcase`。历史 worktree、重复 audit/release clone、Evidence 下 fresh clone、旧 ChatBI runtime/venv、Codex temp/tmp 缓存和 6 组旧 Uvicorn 进程均已退出运行链；正式本机数据库服务和 canonical Docker 栈保留。
+- 清理遵循先盘点、后备份、再删除：全 refs bundle、根 dirty patch/untracked ZIP、Enterprise 并发提交 bundle/WIP patch、IBM/临时 Evidence 清单均保存在仓库外 `<external-safety-backup>`。历史 worktree、重复 audit/release clone、Evidence 下 fresh clone、旧 ChatBI runtime/venv、Codex temp/tmp 缓存和 6 组旧 Uvicorn 进程均已退出运行链；正式本机数据库服务和 canonical Docker 栈保留。
 - README 与 `docs/showcase/` 已提供求职定位、演示 Runbook、3～5 分钟和 8～10 分钟视频脚本、面试讲解稿以及资源清理记录。最终 Backend 为 679 collected（672 passed、7 个条件性 skip、0 failed），Frontend Vitest 15 files / 60 tests、Vite 994 modules，Playwright 求职核心闭环 45/45；停止态启动连续 2/2，均完成 5/5 healthy、登录、代理、RAG 和匿名 401 门禁。
-- 最终本机只注册 `E:\ChatBI V2 项目` 一个 worktree、本地只保留 `main`；并发 Enterprise 最终 `656496a` 与仓库内 `tmp/phase3-edit` 均先生成可恢复外部归档并校验后清理。全仓 `node_modules/.venv/__pycache__/.pytest_cache/test-results/playwright-report` 匹配数为 0；Docker 只保留 canonical 5 容器、3 images、3 networks、0 volumes，并保持 Demo 运行态。
+- 最终本机当时只注册当前 `<project-root>` 一个 worktree、本地只保留 `main`；并发 Enterprise 最终 `656496a` 与仓库内 `tmp/phase3-edit` 均先生成可恢复外部归档并校验后清理。全仓 `node_modules/.venv/__pycache__/.pytest_cache/test-results/playwright-report` 匹配数为 0；Docker 只保留 canonical 5 容器、3 images、3 networks、0 volumes，并保持 Demo 运行态。
 
 ## 2026-08-27：V1.3 Enterprise Quick Deploy 产品化候选
 
@@ -102,7 +111,7 @@
 - PandasAI 固定 `bbbb771d31062d81f6fa19bafb40620d5cbe48f4`，仅直接复用 MIT community `pandasai/sandbox/sandbox.py`。简单文件问题仍由全文件确定性操作执行；复杂关联才经该基类和独立 Sandbox Controller 进入一次性 Docker worker；Backend 无 Docker socket，Controller 仅接受固定协议并强制不可变安全配置，Docker/来源/协议不可用时 fail closed。
 - 文件链路支持 CSV/XLSX 全文件解析、公式/提示词注入检查和可定位证据；Vision 统一做方向归一化、去元数据、缩放/分块、敏感字段脱敏和 VisualEvidence 缓存。普通视觉默认 MiMo，仅明确多图、低质量文档或大图分块触发 Kimi；图片不发送给 DeepSeek。扫描 PDF 由固定 pypdfium2 渲染为 PNG 后进入同一受控 Vision 链。
 - 图片与数据库对照只接受单个可解析视觉数值，并重新进入现有 DATA_QUERY 的 Schema/Semantic/NL2SQL/SQL Guard/只读 Executor/Result Oracle；数据库证据必须保留 Query Run、Guard、Oracle 与结果签名。同步与 SSE Trace 分开记账，只有真实流式入口记录 `sse.stream`。
-- 项目负责人已明确确认 `E:\新能源企业经营分析智能平台` 为其自有旧项目并授权内部复用，因此 Legacy RAG 外部权属审计不再是 Gate。旧项目锁定在 `b2573a9dc1881a54581c5c556fb4a8c34046f9c3`，仅把 byte-identical `indexer.py`、`reranker.py`、`security.py` 作为 selected source 引入；ChatBI 继续独占 HMAC、Workspace/RBAC/ACL、Citation、单一 Model Gateway、Answer Guard、Trace/SSE 与数据模型。自包含 Legacy Gate 为 Knowledge 20/20、真实 selected-source runtime calls 20、Citation Accuracy 1.0，越权/跨场景/Prompt Injection 证据/跨 Workspace 均为 0；最终状态仍须由 Successor SHA 全量回归和同 SHA 远端 CI 绑定。
+- 项目负责人已明确确认 owner-authorized legacy project 为其自有旧项目，并将 checksum-locked 的 `indexer.py`、`reranker.py`、`security.py` 三个 selected source 文件贡献给 ChatBI V2 以 Apache-2.0 公开分发；本机绝对路径和其余旧项目内容不进入发行。ChatBI 继续独占 HMAC、Workspace/RBAC/ACL、Citation、单一 Model Gateway、Answer Guard、Trace/SSE 与数据模型。自包含 Legacy Gate 为 Knowledge 20/20、真实 selected-source runtime calls 20、Citation Accuracy 1.0，越权/跨场景/Prompt Injection 证据/跨 Workspace 均为 0；最终状态仍须由 Successor SHA 全量回归和同 SHA 远端 CI 绑定。
 - 最终提交前本地候选门禁：Backend 391 collected（385 passed、6 个显式外部运行时门禁 skipped）、Phase3 全显式真实 DB-GPT/Controller/Worker 专项 113/113、Phase1/2 定向回归 47/47；同一精确 AWEL runtime 的 Golden Agent15 为 15/15 并累计 15 次 `BaseOperator.call`。File12 真实全文件/Controller/Sandbox runner 为 12/12，三模型真实多模态 runner 完整有界复验为 10/10，Frontend Vitest 13 files/50 tests、TypeScript、Vite 741 modules 均通过。Playwright 完整执行 85 项时 84 项通过，唯一 MiMo HTTP 200 后未形成可接受回答的外部模型失败项保留原日志并按同一真实拓扑有界复验 1/1 通过；不把首轮外部模型失败隐藏成单次 85/85。隔离 Compose 四服务从停止态连续两次 4/4 healthy，分别 30.61s 与 29.38s。上述结论仍须绑定最终 clean SHA，并由 GitHub-hosted Phase3 artifact 与同 SHA IBM self-contained CI 复验后才能作为远端发布门禁结论。
 
 ## V1.3.0 Phase 2 数据主链与真实上游接入（2026-08-21）
@@ -278,5 +287,5 @@
 - Cycle 2 已从空 schema 正式迁移到唯一 head `20260828_0013`，并由正式 seed 重建 9 张业务表、1,095 条订单和 1,825 条日 KPI。
 - 浏览器发现并最小修复：全外部 Provider 关闭时 DATA_QUERY 走 Local Semantic Runtime；Provider 开关不再隐式产生付费探测；排名图表业务化标题、金额单位与长名称展示；Analyst 管理入口/直达 URL 前端 fail-closed。
 - 第二轮最终浏览器又发现并修复：首次显式连接测试不得把已配置 Provider 的默认启用态反转为禁用；三家健康探针统一限制为 8 个输出 Token，Kimi 不再因普通 2,048 Token 请求预算而在实际连接前被误拒绝。
-- 最终 forward commit 之后才执行同 SHA 全回归、三 Provider 各一次显式连接测试、最终 UI 控件清单与 SHA-256 manifest；这些自引用证据只写入仓库外 `E:/ChatBI_V2_Evidence/PostRelease/Functional_Experience_Closure/`。
+- 最终 forward commit 之后才执行同 SHA 全回归、三 Provider 各一次显式连接测试、最终 UI 控件清单与 SHA-256 manifest；这些自引用证据只写入仓库外 `<external-evidence-root>/PostRelease/Functional_Experience_Closure/`。
 - C 线浏览器全控件验收发现 SQL Workspace 保存的 `VERIFIED` 答案可能不具备语义模型、查询运行或图表绑定；答案库现按 Backend 的真实前置条件分别门禁“复用”和“加入看板”，列表与详情均显示禁用原因，避免可点击后返回 422 的假可用控件（ADR-078）。

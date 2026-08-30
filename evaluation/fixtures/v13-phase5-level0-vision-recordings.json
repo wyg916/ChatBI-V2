@@ -3,7 +3,7 @@
   "records": [
     {
       "recording_id": "chatbi-ui-approved-reference-20260823",
-      "file_sha256": "9507f1cffe3e3935450bf3742c03a490acb4913e6832dae74f5e9606178e8976",
+      "file_sha256": "4b0d1b59f3c8f5da5883687dfbe03d39435f65427ea926511e56617c2bdf4c71",
       "question_sha256": "f750d8225a4c6a124d0f65028aced55621df084bbc735fe886ff659071555df0",
       "response": {
         "answer": "左侧导航高亮项和内容区主标题都是问数据。",

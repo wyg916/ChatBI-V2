@@ -59,7 +59,7 @@ async function pageTargets(request: APIRequestContext): Promise<PageTarget[]> {
     { id: '11', title: '评测中心总览', path: '/evaluation', appShell: true, ready: (page) => page.getByTestId('evaluation-overview'), criticalControl: (page) => page.getByRole('button', { name: /运行 Golden 50/ }) },
     { id: '12', title: '评测用例详情', path: '/evaluation/G01', appShell: true, ready: (page) => page.getByRole('heading', { name: '评测用例详情' }), criticalControl: (page) => page.getByRole('button', { name: '重新运行' }) },
     { id: '13', title: '系统设置与模型服务', path: '/settings/models', appShell: true, ready: (page) => page.getByTestId('settings-models-page'), criticalControl: (page) => page.getByRole('button', { name: '保存全部设置' }) },
-    { id: '14', title: '用户角色与审计', path: '/settings/security', appShell: true, ready: (page) => page.getByTestId('security-audit-page'), criticalControl: (page) => page.getByRole('button', { name: '＋ 邀请成员' }) },
+    { id: '14', title: '用户角色与审计', path: '/settings/security', appShell: true, ready: (page) => page.getByTestId('security-audit-page'), criticalControl: (page) => page.getByRole('button', { name: '邀请成员', exact: true }) },
   ];
 }
 

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import subprocess
 from pathlib import Path
 
@@ -228,9 +229,10 @@ def test_live_gate_authenticates_through_the_chatbi_api_cookie_boundary(monkeypa
 
 
 def test_runtime_evidence_contract_from_real_run() -> None:
-    evidence_path = Path(
-        "E:/ChatBI_V2_Evidence/V1.3.0/Phase2_Closure_20260821_160111/04_ibm_official_runtime.json"
-    )
+    configured_path = os.getenv("CHATBI_IBM_RUNTIME_EVIDENCE", "").strip()
+    if not configured_path:
+        pytest.skip("set CHATBI_IBM_RUNTIME_EVIDENCE to validate external release-gate evidence")
+    evidence_path = Path(configured_path)
     if not evidence_path.exists():
         pytest.skip("official runtime evidence is produced by the release-gate script")
     evidence = json.loads(evidence_path.read_text(encoding="utf-8"))

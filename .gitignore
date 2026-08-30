@@ -24,6 +24,8 @@ __pycache__/
 tmp/
 temp/
 .chatbi/
+.codex-private/
+docs/audit/
 
 playwright-report/
 test-results/

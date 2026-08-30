@@ -135,7 +135,8 @@ test('内容中心、经营看板详情与评测总览由 API 驱动并适配三
 
     await page.goto(`/dashboards/${String(dashboardPayload.items[0].id)}`);
     await expect(page.getByTestId('dashboard-detail')).toBeVisible();
-    await expect(page.getByText('收入趋势图表')).toBeVisible();
+    await expect(page.getByRole('heading', { name: '收入趋势' })).toBeVisible();
+    await expect(page.getByRole('img', { name: '收入趋势' })).toBeVisible();
     expect(await page.locator('body').evaluate((body) => body.scrollWidth <= window.innerWidth), `dashboard detail @ ${viewport.width}x${viewport.height}`).toBe(true);
 
     await page.goto('/evaluation');

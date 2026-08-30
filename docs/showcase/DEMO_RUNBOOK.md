@@ -2,10 +2,10 @@
 
 ## 唯一正式目录
 
-当前机器的唯一正式本地项目：
+从当前 clone 的仓库根目录运行以下命令；本文不绑定任何个人机器路径：
 
 ```text
-E:\ChatBI V2 项目
+<project-root>
 ```
 
 其他历史 worktree/clone 不作为 Demo 入口。正式 Release 证据、Git bundle 安全备份和第三方参考源码不是可运行项目副本。
@@ -33,7 +33,7 @@ E:\ChatBI V2 项目
 ## 启动、状态、停止、重置
 
 ```powershell
-cd "E:\ChatBI V2 项目"
+Set-Location -LiteralPath '<project-root>'
 
 # 启动；默认 ProviderMode Auto，已有镜像时直接复用，没有镜像时自动构建
 .\scripts\showcase.ps1 -Action Start

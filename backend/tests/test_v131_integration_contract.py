@@ -48,7 +48,7 @@ def test_one_compose_has_mode_identity_and_no_database_server():
     assert "CHATBI_ENVIRONMENT: development" not in compose
     assert "CHATBI_ENVIRONMENT: ${CHATBI_ENVIRONMENT:-local}" in compose
     assert "CHATBI_GIT_SHA: ${CHATBI_GIT_SHA:-UNAVAILABLE}" in compose
-    assert "CHATBI_RELEASE_VERSION: ${CHATBI_RELEASE_VERSION:-v1.3.1}" in compose
+    assert "CHATBI_RELEASE_VERSION: ${CHATBI_RELEASE_VERSION:-v1.4.0}" in compose
     assert "CHATBI_FRONTEND_IMAGE" in compose
     assert compose.count("CHATBI_SANDBOX_WORKER_IMAGE: ${CHATBI_SANDBOX_IMAGE") == 2
     assert compose.count("${CHATBI_BIND_HOST:-0.0.0.0}:") == 3
@@ -169,7 +169,7 @@ def test_candidate_migration_and_backup_contracts_are_version_aware():
     assert "RESTORED_METADATA=SETTINGS_PROVIDER_INVITATION_RBAC_WORKSPACE_PERSISTENCE_PASS" in restore
 
 
-def test_current_product_release_identity_is_v131_and_v130_history_remains_immutable():
+def test_current_product_release_identity_is_v140_and_v131_history_remains_immutable():
     backend_config = _read("backend/app/core/config.py")
     app_shell = _read("frontend/src/components/AppShell.tsx")
     showcase = _read("scripts/showcase.ps1")
@@ -178,13 +178,14 @@ def test_current_product_release_identity_is_v131_and_v130_history_remains_immut
     supply_policy = _read("supply-chain/v1.3-phase5-policy.json")
     readme = _read("README.md")
 
-    assert 'app_version: str = "1.3.1"' in backend_config
-    assert "v1.3.1 · 开源企业版" in app_shell
-    assert "$env:CHATBI_RELEASE_VERSION = 'v1.3.1'" in showcase + deployment
+    assert 'app_version: str = "1.4.0"' in backend_config
+    assert "v1.4.0 · 开源企业版" in app_shell
+    assert "$env:CHATBI_RELEASE_VERSION = 'v1.4.0'" in showcase + deployment
     assert "v1.3.1-candidate" not in showcase
-    assert 'PROJECT_VERSION = "1.3.1"' in release_sbom
-    assert '"project_version": "1.3.1"' in supply_policy
-    assert "release-v1.3.1" in readme
+    assert 'PROJECT_VERSION = "1.4.0"' in release_sbom
+    assert '"project_version": "1.4.0"' in supply_policy
+    assert "github/v/release/wyg916/ChatBI-V2" in readme
+    assert "Tag 为 `v1.4.0`" in readme
     assert "chatbi-v2-v1.3.1" in readme
     assert "chatbi-v2-v1.3.0" in readme
     assert "52db955fd67ebe592c289399a135528c13cb3e3d" in readme

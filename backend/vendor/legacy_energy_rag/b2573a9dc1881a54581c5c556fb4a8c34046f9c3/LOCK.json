@@ -1,10 +1,13 @@
 {
-  "schema_version": "chatbi-owner-authorized-selected-source-v1",
-  "source_project": "E:\\新能源企业经营分析智能平台",
+  "schema_version": "chatbi-owner-attested-original-contribution-v1",
+  "source_project": "owner-attested-legacy-project",
   "source_commit": "b2573a9dc1881a54581c5c556fb4a8c34046f9c3",
-  "ownership": "OWNER_ATTESTED_PASS",
-  "provenance_audit": "NOT_REQUIRED",
-  "integration_mode": "SELECTED_SOURCE_INTERNAL_PACKAGE",
+  "ownership": "OWNER_ATTESTED_ORIGINAL_CONTRIBUTION",
+  "redistribution_basis": "OWNER_ATTESTED_ORIGINAL_CONTRIBUTION_APACHE_2_0",
+  "public_license": "Apache-2.0",
+  "license_file": "LICENSE.owner-attested.md",
+  "distribution_scope": "THREE_CHECKSUM_LOCKED_SELECTED_FILES_ONLY",
+  "integration_mode": "SELECTED_SOURCE_VENDORED_RUNTIME",
   "files": [
     {
       "source_path": "backend/app/knowledge/indexer.py",

@@ -103,7 +103,7 @@ export function AppShell() {
         {isAdmin && <><div className="nav-caption manage">管理</div><NavLink to="/settings/models" className={isSettings ? 'nav-item active' : 'nav-item'}><span>设</span>系统设置</NavLink></>}
         <div className="side-spacer" />
         <div className="user-card">{isAdmin ? <NavLink to="/settings/security"><span>{user.display_name.slice(0, 1)}</span><div><strong>{user.display_name}</strong><small>{user.role} · 当前工作空间</small></div></NavLink> : <><span>{user.display_name.slice(0, 1)}</span><div><strong>{user.display_name}</strong><small>{user.role} · 当前工作空间</small></div></>}<button type="button" aria-label="退出登录" onClick={() => void logout()}>退出</button></div>
-        <small className="version">v1.3.1 · 开源企业版</small>
+        <small className="version">v1.4.0 · 开源企业版</small>
       </aside>
       <div className="app-frame">
         <header className="topbar"><div><small>{headerCrumb}</small><h2>{title}</h2></div><div className="header-actions"><div className="context-pill" aria-label="当前页面上下文"><img src={onlineIcon} alt="" />{contextLabel}</div>{parentRoute ? <Link className="icon-button" aria-label={parentRoute.label} title={parentRoute.label} to={parentRoute.to}>←</Link> : <button className="icon-button" type="button" aria-label="帮助" disabled title="当前版本未提供独立帮助中心">?</button>}{(isContentLibrary || isDashboardDetail || isEvaluation || isSettings) && <button className="icon-button" type="button" aria-label="更多操作" disabled title="当前页面没有额外操作">{isDashboardDetail || isEvaluation ? '↑' : '⋯'}</button>}</div></header>

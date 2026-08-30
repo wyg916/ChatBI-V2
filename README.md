@@ -1,13 +1,15 @@
 # ChatBI V2
 
+简体中文 | [English](README.en.md)
+
 > 面向企业数据分析的开源 ChatBI / NL2SQL 产品，支持本地部署、私有化部署、Enterprise PoC 与二次开发；把自然语言问题转换为受语义层约束的只读 SQL，并返回可验证结果、图表、业务洞察与审计证据。
 
-[![Release](https://img.shields.io/badge/release-v1.3.1-5b5bd6)](https://github.com/wyg916/ChatBI-V2/releases/tag/chatbi-v2-v1.3.1)
+[![Release](https://img.shields.io/github/v/release/wyg916/ChatBI-V2?include_prereleases&sort=semver)](https://github.com/wyg916/ChatBI-V2/releases)
 [![License](https://img.shields.io/badge/license-Apache--2.0-2f855a)](LICENSE)
 [![Frontend](https://img.shields.io/badge/frontend-React%20%2B%20TypeScript-3178c6)](frontend)
 [![Backend](https://img.shields.io/badge/backend-FastAPI%20%2B%20SQLAlchemy-009688)](backend)
 
-![ChatBI V2 可验证问数结果](artifacts/chat-ui-optimization-20260819/final-integration/chat-ui-result-1440x900.png)
+![ChatBI V2 v1.4.0 问数据工作区](docs/images/chatbi-v1.4-ask-data.png)
 
 ChatBI V2 始终是 ChatBI-first 产品：数据源、语义模型、问数据、可验证答案、看板和评测处于同一条主链路。它不是通用 AI、知识库、Agent 或模型管理平台。Local Showcase 仅用于本机体验、作品集演示和面试讲解，不代表生产部署认证。
 
@@ -45,9 +47,9 @@ Copy-Item .env.example .env
 编辑 `.env`，把 `CHATBI_DATABASE_URL` 设置为最小权限的 PostgreSQL 应用账号；Windows 宿主数据库使用 `host.docker.internal`，不能使用容器内的 `localhost`。随后运行：
 
 ```powershell
-.\scripts\doctor.ps1
 .\scripts\bootstrap.ps1
-.\scripts\start.ps1 -SkipBuild
+.\scripts\doctor.ps1
+.\scripts\start.ps1 -SkipBuild -SkipBootstrap
 ```
 
 Bootstrap 只生成仍为占位符的四个本地应用 Secret，执行 Alembic migration，并幂等创建 Workspace 与登录身份。默认 `CHATBI_SEED_DEMO_SEMANTIC_MODEL=false`，企业 Fresh Deployment 不依赖演示数据。
@@ -108,12 +110,12 @@ Showcase 重点展示 7 个能力：
 
 ### 3. Enterprise PoC
 
-适合在独立项目名、端口、镜像、存储目录和 PostgreSQL Schema 下进行私有 PoC。复制一份专用环境文件，配置只读业务数据源与服务端 Provider（如需要），先执行 Doctor，再 Bootstrap/Start。Stop、Reset、Backup 和 Restore 都绑定该环境文件和 Compose 项目名，不会操作其他部署。
+适合在独立项目名、端口、镜像、存储目录和 PostgreSQL Schema 下进行私有 PoC。复制一份专用环境文件，配置只读业务数据源与服务端 Provider（如需要），先执行 Bootstrap 生成本地 Secret 和迁移，再执行 Doctor 与 Start。Stop、Reset、Backup 和 Restore 都绑定该环境文件和 Compose 项目名，不会操作其他部署。
 
 ```powershell
-.\scripts\doctor.ps1 -EnvFile .env.enterprise
 .\scripts\bootstrap.ps1 -EnvFile .env.enterprise
-.\scripts\start.ps1 -EnvFile .env.enterprise -SkipBuild
+.\scripts\doctor.ps1 -EnvFile .env.enterprise
+.\scripts\start.ps1 -EnvFile .env.enterprise -SkipBuild -SkipBootstrap
 .\scripts\status.ps1 -EnvFile .env.enterprise
 .\scripts\stop.ps1 -EnvFile .env.enterprise
 ```
@@ -184,11 +186,11 @@ FastAPI ── Auth / Workspace / RBAC / Audit
 - 查询超时、行数、并发、脱敏、Workspace 隔离、ACL、审计和结果签名均受控。
 - Golden Sets、Backend/Frontend、E2E、Migration、Security 和 Release Gates 形成可复现证据。
 
-参见 [Acceptance](docs/ACCEPTANCE.md)、[Security](docs/deployment/SECURITY.md) 和 [Golden 50](evaluation/golden/day4-golden-50.json)。
+参见 [Acceptance](docs/ACCEPTANCE.md)、[Security](docs/deployment/SECURITY.md)、[Golden 50](evaluation/golden/day4-golden-50.json)、[开源许可证审计](docs/OPEN_SOURCE_LICENSE_AUDIT.md)、[CycloneDX SBOM](docs/sbom/V1_4_0.cdx.json) 与 [SPDX SBOM](docs/sbom/V1_4_0.spdx.json)。
 
 ## 发布事实与限制
 
-当前正式开源 Source Release 为 [ChatBI V2 v1.3.1](https://github.com/wyg916/ChatBI-V2/releases/tag/chatbi-v2-v1.3.1)，对应 annotated tag `chatbi-v2-v1.3.1`。历史 `chatbi-v2-v1.3.0` 继续固定在 peeled SHA `52db955fd67ebe592c289399a135528c13cb3e3d`，不移动、不覆盖。V1.3.1 支持本地部署、Enterprise PoC、私有部署验证与二次开发，但不构成生产部署认证；详见 [V1.3.1 Release Notes](docs/releases/V1_3_1_RELEASE_NOTES.md)。
+当前候选源代码版本为 ChatBI V2 v1.4.0，预期发布 Tag 为 `v1.4.0`；正式发布状态只以 [GitHub Releases](https://github.com/wyg916/ChatBI-V2/releases) 中实际存在且与源码匹配的 Tag 为准。历史 `chatbi-v2-v1.3.1` 与 `chatbi-v2-v1.3.0` 保持不可变，其中 V1.3.0 peeled SHA 为 `52db955fd67ebe592c289399a135528c13cb3e3d`。V1.4.0 候选源码面向本地部署、Enterprise PoC、私有部署验证与二次开发，但不构成生产部署认证；详见 [V1.4.0 Release Notes](docs/releases/V1_4_0_RELEASE_NOTES.md)、[发布候选清单](docs/releases/V1_4_0_FINAL_MANIFEST.md) 与 [CHANGELOG](CHANGELOG.md)。候选清单不自证远端 SHA、Tag 或 Release URL；这些事实只由发布后的外部 attestation 确认。
 
 当前支持本地部署、文档化私有部署、Enterprise PoC 和二次开发，但不宣称生产认证。Kubernetes、Helm、HA PostgreSQL、多节点灾备、生产 Key 轮换、不可变生产 OCI 签名、生产监控与正式 SLA 仍属于未来工作。
 

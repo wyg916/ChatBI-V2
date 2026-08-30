@@ -19,13 +19,13 @@
     "environment": {
       "CHATBI_WEB_BASE": "http://127.0.0.1:5173",
       "CHATBI_API_BASE": "http://127.0.0.1:8000/api/v1",
-      "PLAYWRIGHT_HTML_OUTPUT_DIR": "E:\\ChatBI V2 项目\\artifacts\\chat-ui-optimization-20260819\\final-integration\\reports\\playwright-directed-html"
+      "PLAYWRIGHT_HTML_OUTPUT_DIR": "<project-root>\\artifacts\\chat-ui-optimization-20260819\\final-integration\\reports\\playwright-directed-html"
     },
-    "cwd": "E:\\ChatBI V2 项目\\frontend",
+    "cwd": "<project-root>\\frontend",
     "started_at": "2026-08-20T05:45:12.260700+00:00",
     "finished_at": "2026-08-20T05:49:57.371421+00:00",
     "exit_code": 0,
-    "log": "E:\\ChatBI V2 项目\\artifacts\\chat-ui-optimization-20260819\\final-integration\\reports\\playwright-directed-52.txt"
+    "log": "<project-root>\\artifacts\\chat-ui-optimization-20260819\\final-integration\\reports\\playwright-directed-52.txt"
   },
   {
     "name": "playwright-full-82",
@@ -40,13 +40,13 @@
     "environment": {
       "CHATBI_WEB_BASE": "http://127.0.0.1:5173",
       "CHATBI_API_BASE": "http://127.0.0.1:8000/api/v1",
-      "PLAYWRIGHT_HTML_OUTPUT_DIR": "E:\\ChatBI V2 项目\\artifacts\\chat-ui-optimization-20260819\\final-integration\\reports\\playwright-full-html"
+      "PLAYWRIGHT_HTML_OUTPUT_DIR": "<project-root>\\artifacts\\chat-ui-optimization-20260819\\final-integration\\reports\\playwright-full-html"
     },
-    "cwd": "E:\\ChatBI V2 项目\\frontend",
+    "cwd": "<project-root>\\frontend",
     "started_at": "2026-08-20T05:50:13.549597+00:00",
     "finished_at": "2026-08-20T05:57:48.400022+00:00",
     "exit_code": 1,
-    "log": "E:\\ChatBI V2 项目\\artifacts\\chat-ui-optimization-20260819\\final-integration\\reports\\playwright-full-82.txt"
+    "log": "<project-root>\\artifacts\\chat-ui-optimization-20260819\\final-integration\\reports\\playwright-full-82.txt"
   },
   {
     "name": "playwright-day3-final02-race-rerun",
@@ -65,11 +65,11 @@
       "CHATBI_WEB_BASE": "http://127.0.0.1:5173",
       "CHATBI_API_BASE": "http://127.0.0.1:8000/api/v1"
     },
-    "cwd": "E:\\ChatBI V2 项目\\frontend",
+    "cwd": "<project-root>\\frontend",
     "started_at": "2026-08-20T05:59:28.577778+00:00",
     "finished_at": "2026-08-20T05:59:41.472472+00:00",
     "exit_code": 0,
-    "log": "E:\\ChatBI V2 项目\\artifacts\\chat-ui-optimization-20260819\\final-integration\\reports\\playwright-day3-final02-rerun.txt"
+    "log": "<project-root>\\artifacts\\chat-ui-optimization-20260819\\final-integration\\reports\\playwright-day3-final02-rerun.txt"
   },
   {
     "name": "playwright-full-82-final",
@@ -84,13 +84,13 @@
     "environment": {
       "CHATBI_WEB_BASE": "http://127.0.0.1:5173",
       "CHATBI_API_BASE": "http://127.0.0.1:8000/api/v1",
-      "PLAYWRIGHT_HTML_OUTPUT_DIR": "E:\\ChatBI V2 项目\\artifacts\\chat-ui-optimization-20260819\\final-integration\\reports\\playwright-full-final-html"
+      "PLAYWRIGHT_HTML_OUTPUT_DIR": "<project-root>\\artifacts\\chat-ui-optimization-20260819\\final-integration\\reports\\playwright-full-final-html"
     },
-    "cwd": "E:\\ChatBI V2 项目\\frontend",
+    "cwd": "<project-root>\\frontend",
     "started_at": "2026-08-20T05:59:59.945789+00:00",
     "finished_at": "2026-08-20T06:06:00.664502+00:00",
     "exit_code": 0,
-    "log": "E:\\ChatBI V2 项目\\artifacts\\chat-ui-optimization-20260819\\final-integration\\reports\\playwright-full-82-final.txt"
+    "log": "<project-root>\\artifacts\\chat-ui-optimization-20260819\\final-integration\\reports\\playwright-full-82-final.txt"
   },
   {
     "name": "docker-stop-before-run2",
@@ -103,11 +103,11 @@
       "scripts\\stop.ps1"
     ],
     "environment": {},
-    "cwd": "E:\\ChatBI V2 项目",
+    "cwd": "<project-root>",
     "started_at": "2026-08-20T06:06:27.412086+00:00",
     "finished_at": "2026-08-20T06:06:47.409482+00:00",
     "exit_code": 0,
-    "log": "E:\\ChatBI V2 项目\\artifacts\\chat-ui-optimization-20260819\\final-integration\\reports\\docker-stop-before-run2.txt"
+    "log": "<project-root>\\artifacts\\chat-ui-optimization-20260819\\final-integration\\reports\\docker-stop-before-run2.txt"
   },
   {
     "name": "docker-start-run2-skip-build",
@@ -121,10 +121,10 @@
       "-SkipBuild"
     ],
     "environment": {},
-    "cwd": "E:\\ChatBI V2 项目",
+    "cwd": "<project-root>",
     "started_at": "2026-08-20T06:07:15.041811+00:00",
     "finished_at": "2026-08-20T06:07:48.835247+00:00",
     "exit_code": 0,
-    "log": "E:\\ChatBI V2 项目\\artifacts\\chat-ui-optimization-20260819\\final-integration\\reports\\docker-start-run2.txt"
+    "log": "<project-root>\\artifacts\\chat-ui-optimization-20260819\\final-integration\\reports\\docker-start-run2.txt"
   }
 ]

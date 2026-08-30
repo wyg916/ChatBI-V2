@@ -34,7 +34,7 @@ python scripts/phase5-test-cost-control.py plan `
   --level LEVEL0 `
   --sha <40位候选提交SHA> `
   --estimated-cost-cny 0 `
-  --output E:\ChatBI_V2_Evidence\V1.3.0\Phase5_Cost_Control\level0-plan.json
+  --output <external-evidence-root>\V1.3.0\Phase5_Cost_Control\level0-plan.json
 ```
 
 只有全部必选 Level 0 Gate 均为 `PASS` 时，才能用 `certify-level0` 生成与完整 Git SHA 绑定的 receipt。缺失或失败的 Gate 会使命令退出非零，不能进入 Level 2。
@@ -70,8 +70,8 @@ $env:CHATBI_TEST_AFFECTED_PATH='scanned_pdf'
 $env:CHATBI_TEST_ALLOWED_PROVIDERS='kimi'
 $env:CHATBI_TEST_BUDGET_CLASS='targeted_live_regression'
 $env:CHATBI_TEST_BUDGET_CNY='1.00'
-$env:CHATBI_TEST_COST_LEDGER_ROOT='E:\ChatBI_V2_Evidence\V1.3.0\Phase5_Cost_Control'
-$env:CHATBI_LEVEL0_RECEIPT='E:\ChatBI_V2_Evidence\V1.3.0\Phase5_Cost_Control\level0-receipt.json'
+$env:CHATBI_TEST_COST_LEDGER_ROOT='<external-evidence-root>\V1.3.0\Phase5_Cost_Control'
+$env:CHATBI_LEVEL0_RECEIPT='<external-evidence-root>\V1.3.0\Phase5_Cost_Control\level0-receipt.json'
 $env:CHATBI_TEST_NECESSITY_DECLARATION='YES'
 $env:CHATBI_TEST_DETERMINISTIC_INSUFFICIENT_REASON='录制响应不能证明该候选 SHA 的真实 Kimi scanned-PDF 路径。'
 $env:CHATBI_PROMPT_VERSION='chatbi-visual-evidence-v1'

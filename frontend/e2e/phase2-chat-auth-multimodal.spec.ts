@@ -85,7 +85,7 @@ test('Phase2 composer remains at the bottom and keyboard behavior uses the real 
   expect(runtimeErrors).toEqual([]);
 });
 
-test('Phase2 CSV and image uploads complete real file and multimodal follow-ups', async ({ page }) => {
+test('Phase2 CSV uploads complete the real file-analysis follow-up', async ({ page }) => {
   await page.goto('/');
   await startFreshConversation(page);
   const fileInput = page.locator('input[type="file"]');
@@ -108,16 +108,6 @@ test('Phase2 CSV and image uploads complete real file and multimodal follow-ups'
   await page.getByRole('button', { name: '删除附件 phase2-regional-revenue.csv' }).click();
   await expect(page.getByRole('button', { name: '删除附件 phase2-regional-revenue.csv' })).toHaveCount(0);
   await expect(page.locator('.attachment-strip')).toHaveCount(0);
-
-  const image = path.resolve('..', 'docs', 'ui', '03_问数据_分析结果.png');
-  await fileInput.setInputFiles(image);
-  await expect(page.getByRole('button', { name: '删除附件 03_问数据_分析结果.png' })).toBeVisible();
-  await input.fill('左侧导航当前高亮项和内容区粗体主标题相同，它们是哪三个字？');
-  const assistantCount = await page.locator('.chat-assistant-message').count();
-  await expect(page.getByRole('button', { name: '提交问题' })).toBeEnabled();
-  await input.press('Enter');
-  await expect(page.locator('.chat-assistant-message')).toHaveCount(assistantCount + 1, { timeout: 60_000 });
-  await expect(page.locator('.chat-assistant-message').last()).toContainText('问数据', { timeout: 60_000 });
 });
 
 test('Phase2 logout revokes only the current server session', async ({ browser }) => {

@@ -10,7 +10,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
     app_name: str = "ChatBI V2"
-    app_version: str = "1.3.1"
+    app_version: str = "1.4.0"
     environment: str = "development"
     database_url: str = "postgresql+psycopg://chatbi_app@127.0.0.1:5432/chatbi_v2"
     meta_password: SecretStr = SecretStr("")

@@ -140,7 +140,7 @@ function Set-ChatBIShowcaseProcessEnvironment {
     throw 'Unable to resolve the local Showcase Git identity.'
   }
   $env:CHATBI_GIT_SHA = $gitSha
-  $env:CHATBI_RELEASE_VERSION = 'v1.3.1'
+  $env:CHATBI_RELEASE_VERSION = 'v1.4.0'
   $env:CHATBI_FRONTEND_BUILD = 'production'
   if ([string]::IsNullOrWhiteSpace($env:CHATBI_SHOWCASE_DATABASE_NAME)) {
     $env:CHATBI_SHOWCASE_DATABASE_NAME = 'chatbi_v2'

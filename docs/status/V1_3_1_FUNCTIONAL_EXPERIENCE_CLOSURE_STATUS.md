@@ -38,6 +38,6 @@
 
 The tracked document cannot contain the hash of the commit that contains itself. Exact-SHA browser control inventory, three-provider live replay, full regression, image/runtime identities, cost ledger, SHA-256 manifest, and final PASS/FAIL are therefore written only under:
 
-`E:/ChatBI_V2_Evidence/PostRelease/Functional_Experience_Closure/`
+`<external-evidence-root>/PostRelease/Functional_Experience_Closure/`
 
-No merge, tag, release, or pull request is authorized by this status document. A normal non-force branch backup is permitted only if every final gate passes.
+No merge, tag, release, or pull request is authorized by this status document. A normal non-force branch backup is permitted only if every final gate passes. This historical V1.3.1 status cannot attest a V1.4.0 candidate; final remote SHA, annotated tag identity, CI URLs and GitHub Release URL must remain post-publication external attestation rather than being self-recorded in a tracked candidate manifest.

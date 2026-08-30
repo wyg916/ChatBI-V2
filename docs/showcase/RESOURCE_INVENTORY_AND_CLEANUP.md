@@ -14,7 +14,7 @@
 安全备份：
 
 ```text
-E:\ChatBI_V2_Safety_Backup\20260827-170500-pre-showcase
+<external-safety-backup>
 ```
 
 包含：
@@ -30,7 +30,7 @@ E:\ChatBI_V2_Safety_Backup\20260827-170500-pre-showcase
 
 ## 初始 Git 资源
 
-- 1 个主仓库：`E:\ChatBI V2 项目`，当时位于历史 V1.2 分支且 dirty。
+- 1 个主仓库：`<project-root>`，当时位于历史 V1.2 分支且 dirty。
 - 首轮 8 个历史 worktree 加 2 个后续并发 worktree；最终二次盘点的 8 个注册路径中 7 个 clean，`v1.3-next-enterprise-productization` 含 tracked/untracked WIP，先独立备份后才进入清理。
 - 2 个 clean 的 Phase 6 审计 clone。
 - 1 个未完成空 Release clone。
@@ -52,11 +52,11 @@ E:\ChatBI_V2_Safety_Backup\20260827-170500-pre-showcase
 - `git worktree list` 清理并 prune 后只保留主目录；最终 Enterprise worktree 在并发任务转为空闲、HEAD clean 且最新 bundle 验证通过后移除。
 - 18 个本地历史/任务分支全部在 exact tip 可从全 refs bundle、Enterprise final bundle 或冻结 main/tag 恢复的前提下删除；本地只保留 `main`。远端分支未批量删除，避免把本机资源清理扩大为远端协作变更。
 - 两个 Phase 6 audit clone、未完成 release clone、Enterprise Evidence 中 5 个 fresh clone 均在 clean/backup 检查后移除；Evidence 的 dump、manifest、日志和 source tar 保留。
-- `E:\ChatBI_V2_Audit_Venv_3afbfb8`、`E:\ChatBI_V2_Audit_Runtime`、`E:\ChatBI_V2_Runtime` 与旧 final-integration 链接目录已清理。
+- 仓库外的历史审计 venv/runtime 与旧 final-integration 链接目录已清理；个人机器绝对路径不在公开记录中保留。
 - Codex `temp/tmp` 下 ChatBI 目录、根文件、IBM checkout/venv、DB probe、successor bundle 和 run artifact 在外部 Evidence 复制并生成哈希清单后移除。
 - 仓库内历史 `tmp/phase3-edit` 在完整归档后移除；最终全仓 `node_modules`、`.venv`、`__pycache__`、`.pytest_cache`、`test-results`、`playwright-report` 目录匹配数为 0。
 - 6 组旧 ChatBI Uvicorn（端口 `18003～18006、18155、18156`）共 12 个父/子 Python 进程停止，旧端口监听数为 0；正式 `15173/18080/18081` 不受影响。
-- 正式本机 PostgreSQL/MySQL 服务、`E:\ChatBI_V2_Evidence`、Release Baselines、第三方参考项目和 Safety Backup 均保留。
+- 正式本机 PostgreSQL/MySQL 服务、仓库外 Evidence、Release Baselines、第三方参考项目和 Safety Backup 均保留。
 - 最终 Docker 只保留 canonical 5 个 healthy 容器、3 个 image tags、3 个 network、0 个 ChatBI volume；一次性测试镜像和 Enterprise image tags 已删除。
 
 ## 最终验证
@@ -71,16 +71,16 @@ E:\ChatBI_V2_Safety_Backup\20260827-170500-pre-showcase
 
 保留：
 
-- `E:\ChatBI V2 项目`：唯一正式可运行项目。
-- `E:\ChatBI_V2_Evidence`、`E:\ChatBI_V2_Release_Baselines`：正式证据/基线，不作为项目 clone。
-- `E:\ChatBI V2 开源参考项目`：第三方参考仓库集合，不是 ChatBI V2 clone。
-- `E:\ChatBI_V2_Safety_Backup`：清理前可恢复备份，不是可运行项目。
+- `<project-root>`：唯一正式可运行项目。
+- `<external-evidence-root>`、`<external-release-baselines>`：正式证据/基线，不作为项目 clone。
+- `<external-reference-root>`：第三方参考仓库集合，不是 ChatBI V2 clone。
+- `<external-safety-backup>`：清理前可恢复备份，不是可运行项目。
 
 清理范围：
 
 - 历史 ChatBI worktree、重复 audit/release clone。
 - 旧 root `.venv`、`backend/.venv`、`frontend/node_modules`、`dist`、Playwright/test-results、pytest 与 Python cache。
-- `E:\ChatBI_V2_Audit_Venv_3afbfb8`、`E:\ChatBI_V2_Audit_Runtime`、`E:\ChatBI_V2_Runtime` 和 Codex temp/tmp 下的 ChatBI 临时 venv/cache/checkout。
+- 仓库外历史审计 venv/runtime 和临时 venv/cache/checkout。
 - 清理前检测到的独有非缓存日志/文档先进入安全备份。
 
 ## 最终验收字段

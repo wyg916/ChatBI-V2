@@ -80,6 +80,4 @@ git revert -m 1 8676c07cc3144026fbbd282f54d318ae3cc2f546
 
 ## 个人经验复盘回执
 
-- 新增：`E:\AI开发经验与面试知识库\01_原始经验卡片\安全与权限\EXP-SECURITY-20260820-001.md`。总结：Playwright HTML/trace 可能携带会话 Cookie，发布证据必须分层，只提交 PNG、脱敏文本、命令元数据和哈希，原始会话归档在 stage 前清理。
-- 更新：`E:\AI开发经验与面试知识库\01_原始经验卡片\测试\EXP-TEST-20260812-001.md`。总结：乐观 user 或 pending Assistant DOM 不证明事务提交；持久化功能必须继续核验 API 可见行与刷新恢复。
-- V1.2 receipt：`E:\AI开发经验与面试知识库\99_系统\logs\turn_receipts\01a01d4c-5849-7960-824f-61fea673dbdc.json`，状态 `recorded`，新增 1、更新 1。
+- 个人工程复盘保存在仓库外的独立知识库中；公开仓库不包含本机路径、会话 receipt 或个人知识卡片。

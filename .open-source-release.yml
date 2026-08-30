@@ -1,0 +1,66 @@
+schema_version: 1
+mode: full
+
+repository:
+  url: https://github.com/wyg916/ChatBI-V2.git
+  owner: wyg916
+  name: ChatBI-V2
+  visibility: public
+  description: Governed open-source ChatBI and NL2SQL platform with verifiable results, semantic models, RAG, and bounded agents.
+  homepage: null
+  topics:
+    - chatbi
+    - nl2sql
+    - fastapi
+    - react
+    - postgresql
+    - semantic-layer
+    - rag
+    - data-analytics
+
+project:
+  display_name: ChatBI V2
+  summary: Enterprise-oriented open-source ChatBI for governed natural-language analytics.
+  official_affiliation: false
+
+source_control:
+  remote_name: origin
+  default_branch: main
+  preparation_branch: chore/open-source-release
+  nonempty_remote_strategy: pull-request
+  merge_preparation_pr: true
+
+release:
+  license: Apache-2.0
+  version: v1.4.0
+  create_release: true
+  draft_first: true
+  prerelease: false
+
+content:
+  primary_readme_language: zh-CN
+  additional_readme_languages:
+    - en
+  research_reference_repositories: true
+  required_governance_files: true
+
+screenshots:
+  required_for_ui_projects: true
+  maximum: 5
+  output_directory: docs/images
+  demo_data_only: true
+
+security:
+  scan_git_history: true
+  block_on:
+    - critical
+    - high
+  require_clean_tree_before_publish: true
+  enable_dependabot_alerts: true
+  enable_dependabot_security_updates: true
+  enable_private_vulnerability_reporting: true
+
+approval:
+  required: true
+  invalidate_on_head_change: true
+  invalidate_on_worktree_change: true

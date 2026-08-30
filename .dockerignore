@@ -8,6 +8,8 @@
 **/.mypy_cache
 **/.ruff_cache
 **/.venv
+.codex-private
+docs/audit
 **/node_modules
 **/dist
 **/test-results

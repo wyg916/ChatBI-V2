@@ -1,5 +1,23 @@
 # Architecture Decisions
 
+## ADR-101：默认浏览器门禁串行运行 Core，高资源与破坏性场景使用专用隔离 Profile
+
+V1.4.0 的常规本地与 CI 浏览器门禁以 `CHATBI_E2E_PROFILE=core` 为默认值，并在 `frontend/playwright.config.ts` 固定 `workers: 1`、`fullyParallel: false`。Core 只排除 `data-workspace.spec.ts`、`phase2-recorded-vision.spec.ts`、`phase5-control-certification.spec.ts` 和 `phase5-visible-control-inventory.spec.ts`；其余主链路、RBAC、SQL Guard/Oracle、RAG/Multi-Agent、治理页与三个批准视口均按单 worker 串行执行。共享 Workspace、会话、Query、答案、看板和审计状态不得依赖并发调度顺序，默认门禁也不得因机器资源不同隐式放大并发。
+
+四个被排除的场景不是可跳过的发布能力，而是具有不同前置条件的专用隔离 Profile。10M Data Workspace 只使用 `frontend/playwright.data-workspace.config.ts`，连接独立 Backend、隔离 metadata/业务 schema 与已冻结指纹的 10M fixture；不得借用默认 Showcase 中不存在的 benchmark datasource。Phase 5 control inventory 与 certification 必须在独立认证 schema 中按 `inventory → certification` 顺序执行，显式允许仅限该 schema 的 cleanup，并把中间 inventory/receipt 写到仓库外证据路径；默认 Core 不得触发这些破坏性动作。
+
+Recorded Vision 只在 `scripts/start-v21-eval-isolated.ps1 -ModelProvider deterministic` 建立的 LEVEL0 环境中运行 `phase2-recorded-vision.spec.ts`，固定读取 `evaluation/fixtures/v13-phase5-level0-vision-recordings.json`，并保持 `CHATBI_PAID_GATE_AUTHORIZED=NO`；它验证录制视觉契约，不冒充真实 Provider 认证。`CHATBI_E2E_PROFILE` 的非 Core 值本身只解除默认 ignore，不构成运行上述场景的授权或隔离证明；调用方仍必须显式选择对应配置/文件并满足各自前置门禁。Core PASS、10M PASS、Phase 5 PASS 与 Recorded Vision PASS 必须分别记录，禁止把其中一项的结果外推为另一项或用一次混合执行掩盖缺失的隔离证据。
+
+## ADR-100：V1.4.0 开源发布采用审计绑定的 PR、CI 与不可变 Release
+
+当前 `main` 后继源码在 v1.3.1 基础上新增 Excel/CSV 数据源、正式 SSE 契约、答案生命周期、模型运行时与管理体验，属于向后兼容的新功能集合，按严格 SemVer 定为 `v1.4.0`。历史 `chatbi-v2-v1.3.0`、`chatbi-v2-v1.3.1` 及其 GitHub Release 保持不可变；ADR-079 中“不启动 V1.4”的历史维护期限制由本决定显式结束，但其历史事实仍保留。
+
+远端仓库已有同源历史，因此发布必须通过短生命周期 `chore/open-source-release` 分支和面向 `main` 的 PR。三条 Actions 门禁全部通过且 PR 合并后，重新验证远端 `main` exact SHA，再创建新的 annotated tag `v1.4.0` 和 GitHub Release。禁止 force push、移动/复用标签、绕过 CI、用旧 SHA 的测试冒充当前候选证据，或在 GitHub 写入前跳过绑定 HEAD、工作树、仓库、visibility、license、version、strategy 的 Release ID 精确批准。
+
+公开发行只允许 Apache-2.0 兼容或项目所有者有权贡献的代码与资产。Legacy RAG 三个 selected-source 文件统一认定为 `owner-attested original contribution under Apache-2.0`，并由目录内 owner contribution notice 和 checksum LOCK 同时约束；`SELECTED_SOURCE_VENDORED_RUNTIME` 只描述运行时装载拓扑，不再以 internal/public package 字样表达许可证状态。UI 参考包必须明确为 project-owned original，并标注为设计参考而非当前运行截图。个人知识库、receipt、本机绝对路径、`.env`、Provider Key、数据库口令和浏览器会话证据不得进入公开提交。
+
+仓内 `docs/releases/V1_4_0_FINAL_MANIFEST.md` 因历史链接兼容保留文件名，但内容仅是 Release Candidate Manifest 与发布前清单。包含最终远端 `main` SHA、annotated tag object/peeled SHA、PR/CI URL、GitHub Release ID/URL 和发布时间的事实不能由包含自身的 tracked commit 自证，必须在发布完成后写入 GitHub Release 或等价的不可变外部 attestation；候选文件不得预填 PASS 或伪造远端身份。
+
 ## ADR-095：回答体验、Excel 数据源与本机三 Provider 采用受控主链路闭环
 
 本轮仅处理 ChatBI 主链路上的 P0/P1 可用性缺口，不引入通用 AI、通用 Agent、通用报表或插件平台。验证型数据回答必须先完成 SQL Guard、只读执行、Result Oracle 与 Result Signature，再允许最终模型做表达层润色；润色结果必须逐字保留服务端已验证答案，包装语只可来自服务端白名单，任何数字、日期、金额、比例、引用或结论变化都回退原答案。安全拒答也只允许添加人性化包装，不得把拒答改成成功。SSE 对外继续发送真实增量，Provider 原生流和服务端分段流均保持同一最终答案契约。
@@ -36,7 +54,7 @@ V1.3.1 Integration Candidate 必须从 C 线 Exact SHA `fbb42a48568985808dbbc12d
 
 ## ADR-079：V1.3.0 发布后只保留本机求职 Showcase 维护面
 
-V1.3.0 的 annotated tag、peeled commit 与 GitHub Release 保持不可变；后续求职材料、启动脚本和本机演示稳定性修复只能作为 main 的 POST_RELEASE 提交，不回写 Release，不启动 V1.4、V2.0 或 Production Deployment。唯一本地可运行目录固定为 `E:\ChatBI V2 项目`，历史 worktree/clone/venv/node_modules/cache 只有在 dirty、untracked、unique commit 完成外部备份与恢复校验后才可删除。
+V1.3.0 的 annotated tag、peeled commit 与 GitHub Release 保持不可变；在该历史维护期内，求职材料、启动脚本和本机演示稳定性修复只能作为 main 的 POST_RELEASE 提交，不回写当时 Release，也不启动 V1.4、V2.0 或 Production Deployment。唯一本地可运行目录固定为当前 `<project-root>`，历史 worktree/clone/venv/node_modules/cache 只有在 dirty、untracked、unique commit 完成外部备份与恢复校验后才可删除。该维护期现由 ADR-100 的 V1.4.0 决定结束。
 
 本机 Demo 继续使用 Windows PostgreSQL/MySQL 服务，不新增 Docker 数据库容器或数据库 volume。Frontend 只能通过 Backend API 读取数据；canonical Compose 只运行 Backend、RAG Runtime、Sandbox Controller/Proxy 和 Frontend，固定映射 `18080/18081/15173`。Nginx 通过 Docker DNS 动态解析 Backend，避免容器重建后缓存旧 IP；一键启动始终先验证前端代理版本接口、RAG 认证门禁和五组受保护 API 的匿名 401。
 
@@ -188,11 +206,11 @@ Phase 3 的独立 Controller 虽不把 Docker Socket 暴露给 Backend 或一次
 
 此方案不把 Host Docker Socket 交给 Worker，也不把通用 Docker API 交给 Controller；但“风险关闭”仍依赖真实 daemon 正向生命周期与完整负向攻击证据。proxy 不可用或策略拒绝时 Sandbox 必须失败，不得回落到直连 socket。若真实攻击 Gate 不能证明 `DOCKER_CONTROL_ESCAPE=0`，V1.3.0 正式发布继续阻断。
 
-## ADR-051：负责人授权的 Legacy RAG 只复用三个锁定源码模块
+## ADR-051：负责人声明原创并按 Apache-2.0 贡献三个 Legacy RAG 锁定源码模块
 
-项目负责人明确确认 `E:\新能源企业经营分析智能平台` 为其自有旧项目并授权 ChatBI 内部复用；外部作者、公司和权属证明不再是本轮 Gate。工程 Gate 仍锁定 Git commit `b2573a9dc1881a54581c5c556fb4a8c34046f9c3`、selected paths、Git blobs、SHA-256、依赖、Secret、数据隔离、接口和回滚。
+项目负责人对 legacy project 的三个 checksum-locked selected-source 文件作出 `owner-attested original contribution under Apache-2.0` 声明，并贡献给 ChatBI V2 公开分发；本机绝对路径和其余旧项目内容均排除。工程 Gate 继续锁定 Git commit `b2573a9dc1881a54581c5c556fb4a8c34046f9c3`、selected paths、Git blobs、SHA-256、owner contribution notice、依赖、Secret、数据隔离、接口和回滚。
 
-旧知识 API/Retrieval Service 依赖其模块化单体的 Identity、Governance、ORM 和数据库，若按 Service 整体接入会建立第二套 Auth/Workspace/Data Model。ChatBI 因此选择最小 `SELECTED_SOURCE_INTERNAL_PACKAGE`：byte-identical `indexer.py`、`reranker.py`、`security.py` 在导入前校验锁文件，真实执行 deterministic feature-hash vector、BM25、RRF、rerank 与 prompt-injection detection；ChatBI Adapter 只把已经通过 HMAC、Workspace/用户/角色、ACL、场景和版本过滤的 Chunk 映射为无持久化结构对象。
+旧知识 API/Retrieval Service 依赖其模块化单体的 Identity、Governance、ORM 和数据库，若按 Service 整体接入会建立第二套 Auth/Workspace/Data Model。ChatBI 因此选择最小 `SELECTED_SOURCE_VENDORED_RUNTIME`：byte-identical `indexer.py`、`reranker.py`、`security.py` 在导入前校验锁文件，真实执行 deterministic feature-hash vector、BM25、RRF、rerank 与 prompt-injection detection；ChatBI Adapter 只把已经通过 HMAC、Workspace/用户/角色、ACL、场景和版本过滤的 Chunk 映射为无持久化结构对象。该标识只描述 vendored runtime 拓扑，公开分发权只来自上述 Apache-2.0 原创贡献声明。
 
 正式路径保持 `Question → ChatBI Workspace/RBAC → LiveRagAdapter/HMAC → ChatBI ACL/scenario → selected-source BM25/vector/RRF/rerank → Citation → 唯一 ModelGateway → Answer Guard → AnswerEnvelope → ChatBI SSE`。旧项目不得获得数据库连接、Provider Key、Conversation、SQL Executor、外部 SSE 或动态工具。锁校验失败必须 fail closed；回滚只需 revert Successor commit，不含 Schema 或数据迁移。完整清单见 `docs/runtime/V1_3_PHASE3_OWNER_AUTHORIZED_LEGACY_RAG_LOCK.md`。
 
@@ -204,7 +222,7 @@ PandasAI 只允许固定提交 `bbbb771d31062d81f6fa19bafb40620d5cbe48f4`、Git 
 
 Vision 先执行方向归一化、元数据清除、尺寸约束、必要分块、提示词注入识别与敏感字段脱敏，形成可签名 `VisualEvidence`。普通视觉默认 MiMo；Kimi 只由多图、低质量文档或大图分块等显式 premium trigger 选择，DeepSeek 不接收原始图片。扫描 PDF 经固定 pypdfium2 逐页渲染后复用同一 Vision 链。图片与数据库对照必须重新走 ChatBI Schema/Semantic/NL2SQL/SQL Guard/只读 Executor/Result Oracle，并保留 Query Run 与结果签名；视觉文本不得直接生成或执行数据库 SQL。
 
-正式 Trace 只记录实际执行的 `rag.retrieve`、`agent.step`、`file.parse`、`python.execute`、`model.invoke`、`sql.execute`、`oracle.verify`、`answer.compose` 和 `sse.stream`。同步入口不得记录 `sse.stream`，失败或回滚不得冒充已完成 span。Legacy RAG 的历史 `BLOCKED` 结论已被项目负责人授权和 ADR-051 的最小 selected-source lock 覆盖；ACL、Citation、Answer Guard 与单一控制平面要求不变。
+正式 Trace 只记录实际执行的 `rag.retrieve`、`agent.step`、`file.parse`、`python.execute`、`model.invoke`、`sql.execute`、`oracle.verify`、`answer.compose` 和 `sse.stream`。同步入口不得记录 `sse.stream`，失败或回滚不得冒充已完成 span。Legacy RAG 的历史 `BLOCKED` 结论已被 ADR-051 的 owner-attested original contribution under Apache-2.0 与最小 selected-source lock 覆盖；ACL、Citation、Answer Guard 与单一控制平面要求不变。
 
 ## ADR-090：V1.3.0 以自包含 IBM 远端 Gate 和受控 SQLBot 例外收口 Phase 2
 
