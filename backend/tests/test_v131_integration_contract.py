@@ -169,7 +169,7 @@ def test_candidate_migration_and_backup_contracts_are_version_aware():
     assert "RESTORED_METADATA=SETTINGS_PROVIDER_INVITATION_RBAC_WORKSPACE_PERSISTENCE_PASS" in restore
 
 
-def test_current_product_release_identity_is_v140_and_v131_history_remains_immutable():
+def test_current_product_release_identity_is_published_v140():
     backend_config = _read("backend/app/core/config.py")
     app_shell = _read("frontend/src/components/AppShell.tsx")
     showcase = _read("scripts/showcase.ps1")
@@ -185,10 +185,12 @@ def test_current_product_release_identity_is_v140_and_v131_history_remains_immut
     assert 'PROJECT_VERSION = "1.4.0"' in release_sbom
     assert '"project_version": "1.4.0"' in supply_policy
     assert "github/v/release/wyg916/ChatBI-V2" in readme
-    assert "Tag 为 `v1.4.0`" in readme
-    assert "chatbi-v2-v1.3.1" in readme
-    assert "chatbi-v2-v1.3.0" in readme
-    assert "52db955fd67ebe592c289399a135528c13cb3e3d" in readme
+    assert "https://github.com/wyg916/ChatBI-V2/releases/tag/v1.4.0" in readme
+    assert "f6487737acf817178db2f08520623a7510bc18bd" in readme
+    assert "ChatBI Studio" in readme
+    assert "THIRD_PARTY_NOTICES.md" in readme
+    assert "候选版本" not in readme
+    assert "预期发布" not in readme
 
 
 def test_release_docs_separate_published_tag_from_unreleased_0015_successor():
