@@ -1,4 +1,54 @@
-# Open-source and supply-chain audit — V1.1.0
+# Open-source and supply-chain audit — V1.4.0 release candidate
+
+## V1.4.0 release-candidate ownership and redistribution declaration — 2026-08-30
+
+This document now describes the V1.4.0 release candidate. Earlier V1.1.0 and
+V1.3.0 sections below are retained as the chronological audit record; where an
+older statement conflicts with this section, this current declaration governs
+the files distributed by the V1.4.0 release candidate.
+
+### Owner-attested original Legacy RAG contribution
+
+The project owner attests original authorship of the selected source recorded in
+`backend/vendor/legacy_energy_rag/b2573a9dc1881a54581c5c556fb4a8c34046f9c3/LOCK.json`
+and contributes the following three byte-identical selected-source files to
+ChatBI V2 under the repository's Apache License 2.0:
+
+- `app/knowledge/indexer.py`
+- `app/knowledge/reranker.py`
+- `app/knowledge/security.py`
+
+This is an owner-attested original contribution for public distribution. The
+root `LICENSE` applies to the copies stored below the locked vendor directory.
+The source commit, Git blob identities, SHA-256 values, dependency/data closure
+and rollback boundary are recorded in the machine-readable `LOCK.json`; the
+corresponding owner notice is
+`docs/runtime/V1_3_PHASE3_OWNER_AUTHORIZED_LEGACY_RAG_LOCK.md`. No other source,
+data, credential, UI, model, logo or asset from that legacy project is granted
+or distributed by this declaration.
+
+The `SELECTED_SOURCE_VENDORED_RUNTIME` integration mode is a runtime topology
+only. It is neither a private/internal license nor a separately published
+package; redistribution of the three files is governed solely by the
+owner-attested original contribution under Apache-2.0.
+
+### Project-owned UI reference assets
+
+The project owner confirms that `ChatBI_V2_完整UI设计参考包_高清版/` is original,
+project-owned ChatBI V2 design material. Its HTML, PNG, JSON and Markdown files
+are contributed with this repository under Apache License 2.0. The reference
+pack contains no copied third-party UI, logo, font, trademark or restricted
+brand asset. Its pages remain design and acceptance references; runtime product
+behavior is implemented by the project-owned frontend source.
+
+For the V1.4.0 release-candidate distribution, the accurate result is:
+
+- restricted or unlicensed copied source, UI, logo, model or benchmark assets: **0**;
+- owner-attested original contribution: **3 locked Legacy RAG Python files**, Apache-2.0;
+- owner-contributed original UI reference pack: **included**, Apache-2.0;
+- the V1.4.0 candidate SBOMs have been regenerated from 106 Backend and 353
+  Frontend components with zero unknown licenses; publication remains conditional
+  on rebinding their checksums and every final gate to the frozen release SHA.
 
 ## V1.3.0 Phase 3 addendum — 2026-08-22
 
@@ -25,27 +75,31 @@ The OpenChatBI/Wren destination blobs match the official locked Git blobs. Their
 
 The V1.3.0 SQLBot direct-runtime target is superseded by the controlled [`SQLBot License and Runtime Requirement Exception`](opensource/V1_3_SQLBOT_LICENSE_EXCEPTION.md). The pinned tree has no path-specific grant that relaxes the modified root terms; official startup necessarily imports an unclosed XPack package, and no immutable commit-bound official runtime artifact is publicly reproducible. Therefore `SQLBOT_DIRECT_UPSTREAM_REUSE=BLOCKED_BY_UPSTREAM_LICENSE`, official calls and XPack loads remain zero, and the ChatBI-owned feedback/replay path is not counted as upstream reuse.
 
-- Audit date: 2026-08-19 (Asia/Shanghai)
-- Scope: released backend container, complete frontend lockfile, eight upstream design references, copied source/assets, notices, checksums, rollback boundaries, CycloneDX and SPDX output.
-- Result: **PASS for the audited release candidate**. Unknown dependency licenses: **0**. Copied restricted source/UI/logo/model/benchmark assets: **0**.
-- Machine-readable inventories: `docs/sbom/V1_1_0.cdx.json` and `docs/sbom/V1_1_0.spdx.json`.
-- Reproduction: start the release compose stack, then run `.venv/Scripts/python scripts/release/generate_sbom.py`. The generator exits non-zero when any installed backend or locked frontend package has no normalized license.
+- Audit date: 2026-08-30 (Asia/Shanghai); the dependency inventory below was regenerated for the V1.4.0 working candidate and must be checksum-bound again after the final release SHA is frozen.
+- Scope: release-candidate backend/frontend sources, complete frontend lockfile, selected upstream and owner-contributed source, original project assets, notices, checksums, rollback boundaries, and regenerated CycloneDX/SPDX output at the final frozen SHA.
+- Pre-freeze observation: restricted or unlicensed copied source/UI/logo/model/benchmark assets: **0**; unknown package licenses: **0**. This observation is not a publication PASS; exact release status remains conditional on the frozen-SHA gates and post-publication external attestation.
+- Machine-readable inventories: `docs/sbom/V1_4_0.cdx.json` and `docs/sbom/V1_4_0.spdx.json`.
+- Reproduction: start the release compose stack, then run `.venv\Scripts\python.exe scripts\release\generate_sbom.py --backend-container <backend-container>`. The generator exits non-zero when any installed backend or locked frontend package has no normalized license.
 
 This is an engineering compliance record, not legal advice. Any future source incorporation, additional upstream path, version change, model weight, dataset, logo, or redistributed binary requires a new path-level audit before merge.
 
-## Dependency inventory
+## Last generated dependency inventory (V1.4.0 candidate)
+
+The following counts describe the current V1.4.0 working candidate. The final
+release gate must verify or regenerate both SBOM formats from the frozen
+candidate and fail if any component has an unknown license.
 
 | Inventory | Source of truth | Components | Unknown licenses | Result |
 | --- | --- | ---: | ---: | --- |
-| Backend | Packages installed in `chatbi-v2-backend-1` | 64 | 0 | PASS |
-| Frontend | Every non-root package in `frontend/package-lock.json` | 255 | 0 | PASS |
-| Combined | CycloneDX 1.6 / SPDX 2.3 | 319 | 0 | PASS |
+| Backend | Packages installed in the release Backend container | 106 | 0 | Candidate inventory; final recheck required |
+| Frontend | Every non-root package in `frontend/package-lock.json` | 353 | 0 | Candidate inventory; final recheck required |
+| Combined | CycloneDX 1.6 / SPDX 2.3 | 459 | 0 | Candidate inventory; final recheck required |
 
 The backend inventory includes first-party `chatbi-*` distributions under the repository's Apache-2.0 license. The frontend inventory includes both runtime and development lock entries and preserves npm scope/integrity metadata. `NOASSERTION` is not used for any package license in the SPDX document.
 
 ## Upstream path-level decisions
 
-All revisions below were checked out from their official GitHub remotes in the external audit cache and match `docs/UPSTREAM_LOCK.json`. No reviewed upstream source file is present in the ChatBI repository.
+All revisions below were checked against their official origins and match `docs/UPSTREAM_LOCK.json`. Only the explicitly licensed, checksum-locked selected-source files documented in this audit are present; all reference-only projects remain source-excluded.
 
 | Project | Locked revision | Audited license boundary | V1.1.0 decision |
 | --- | --- | --- | --- |
@@ -63,11 +117,11 @@ All revisions below were checked out from their official GitHub remotes in the e
 - `docs/UPSTREAM_LOCK.json` records repository, exact SHA, selected paths, license files, SHA-256 checksum, allowed/forbidden use, runtime entry, fallback, and rollback.
 - `THIRD_PARTY_NOTICES.md` records direct package and design provenance notices. The SQLBot revision is aligned with the locked audit SHA.
 - The final security runner scans tracked files for credential patterns and scans prohibited upstream names/import forms. It records findings in the final-SHA security artifact.
-- The legacy project's production source, private evaluation payloads, database dumps, credentials, model weights, logos, and UI assets are excluded from the public release.
+- Except for the three owner-attested original, hash-locked Legacy RAG contributions explicitly licensed under Apache-2.0 above, the legacy project's production source, private evaluation payloads, database dumps, credentials, model weights, logos, and UI assets are excluded from the public release.
 
 ## Release conditions and rollback
 
-1. Preserve `docs/UPSTREAM_LOCK.json`, this audit, both SBOMs, and `THIRD_PARTY_NOTICES.md` in every V1.1.0 distribution.
+1. Preserve `docs/UPSTREAM_LOCK.json`, this audit, both V1.4.0 SBOMs, and `THIRD_PARTY_NOTICES.md` in every V1.4.0 distribution.
 2. Keep Wren/OpenChatBI/SuperSonic behind `SemanticEngine`; keep IBM behind `EvaluationAdapter`; keep the RAG bridge behind `RagAdapter`.
 3. Default fallbacks must remain available: local semantic engine, ChatBI Result Oracle and deterministic full-file operations. A DB-GPT or Sandbox provenance/runtime failure must be labelled and fail closed; it must never be reported as a verified upstream call.
 4. If an audited license changes or an unknown license appears, block release and use the recorded per-capability rollback; do not silently substitute source.

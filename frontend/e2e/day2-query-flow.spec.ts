@@ -73,7 +73,7 @@ test('Day2-4 危险 SQL 被 AST Guard 拒绝且不访问数据库', async ({ pag
   const refused = page.getByTestId('result-state-FAILED');
   await expect(refused).toBeVisible({ timeout: 30_000 });
   await expect(refused).toContainText('回答未完成');
-  await expect(refused).toContainText('不在只读 ChatBI 分析范围内');
+  await expect(refused).toContainText('超出了当前 ChatBI 的只读分析范围');
   await expect(refused.getByRole('button', { name: '重新查询' })).toBeVisible();
   await expect(page.getByTestId('query-success')).toHaveCount(0);
   await expect(page.locator('.chart-card, .table-card')).toHaveCount(0);

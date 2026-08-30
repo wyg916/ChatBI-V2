@@ -1,9 +1,10 @@
-from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Response, UploadFile, status
 from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
 from app.core.access import Principal, ensure_resource_access, has_resource_access, record_audit, require_permission
 from app.db.session import get_db
+from app.core.config import get_settings
 from app.models import DataSource, DataSourceColumn, DataSourceSchema, DataSourceTable
 from app.schemas.datasource import (
     ColumnRead,
@@ -12,9 +13,17 @@ from app.schemas.datasource import (
     DataSourceUpdate,
     OperationResult,
     SchemaRead,
+    SpreadsheetImportRead,
+    SpreadsheetPreviewRead,
     TableRead,
 )
 from app.services import datasources as service
+from app.services.spreadsheet_datasources import (
+    SpreadsheetImportError,
+    delete_managed_datasource,
+    import_spreadsheet,
+    spreadsheet_preview,
+)
 
 router = APIRouter(prefix="/datasources", tags=["datasources"])
 
@@ -44,10 +53,36 @@ def _datasource_counts(db: Session) -> tuple[dict[str, int], dict[str, int]]:
 
 
 def _read_datasource(datasource: DataSource, table_count: int = 0, column_count: int = 0) -> DataSourceRead:
-    return DataSourceRead.model_validate(datasource).model_copy(update={
+    imported = datasource.spreadsheet_import
+    updates = {
         "table_count": table_count,
         "column_count": column_count,
-    })
+        "import_filename": imported.original_filename if imported else None,
+        "import_row_count": imported.row_count if imported else None,
+        "import_sheet_count": len(imported.sheet_metadata) if imported else None,
+    }
+    if imported:
+        # The browser only needs managed-import provenance.  Runtime PostgreSQL
+        # addressing and the read-only principal stay behind the Backend API.
+        updates.update({
+            "host": "Backend managed",
+            "port": 0,
+            "database": "Imported spreadsheet",
+            "username": "Managed read-only",
+        })
+    return DataSourceRead.model_validate(datasource).model_copy(update=updates)
+
+
+async def _read_spreadsheet_upload(upload: UploadFile) -> tuple[str, str, bytes]:
+    filename = (upload.filename or "").strip()
+    if not filename:
+        raise HTTPException(status_code=400, detail="SPREADSHEET_FILENAME_REQUIRED")
+    limit = get_settings().spreadsheet_import_max_bytes
+    data = await upload.read(limit + 1)
+    await upload.close()
+    if len(data) > limit:
+        raise HTTPException(status_code=413, detail="SPREADSHEET_FILE_SIZE_LIMIT_EXCEEDED")
+    return filename, upload.content_type or "application/octet-stream", data
 
 
 @router.post("", response_model=DataSourceRead, status_code=status.HTTP_201_CREATED)
@@ -55,10 +90,91 @@ def create_datasource(data: DataSourceCreate, db: Session = Depends(get_db), pri
     return service.create_datasource(db, data, principal.workspace_id)
 
 
+@router.post("/import/preview", response_model=SpreadsheetPreviewRead)
+async def preview_spreadsheet_datasource(
+    file: UploadFile = File(...),
+    principal: Principal = Depends(require_permission("datasource.manage")),
+):
+    del principal  # Permission dependency is the authorization boundary.
+    filename, media_type, data = await _read_spreadsheet_upload(file)
+    try:
+        return spreadsheet_preview(filename, media_type, data)
+    except SpreadsheetImportError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.code) from exc
+
+
+@router.post("/import", response_model=SpreadsheetImportRead, status_code=status.HTTP_201_CREATED)
+async def import_spreadsheet_datasource(
+    name: str = Form(..., min_length=1, max_length=255),
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    principal: Principal = Depends(require_permission("datasource.manage")),
+):
+    filename, media_type, data = await _read_spreadsheet_upload(file)
+    try:
+        datasource, preview = import_spreadsheet(
+            db,
+            workspace_id=principal.workspace_id,
+            name=name,
+            filename=filename,
+            declared_mime=media_type,
+            data=data,
+        )
+        record_audit(
+            db,
+            principal,
+            action="IMPORT",
+            resource_type="DATASOURCE",
+            resource_id=datasource.id,
+            details={
+                "format": preview["format"],
+                "file_sha256": preview["file_sha256"],
+                "rows": preview["row_count"],
+                "columns": preview["column_count"],
+                "sheets": preview["sheet_count"],
+            },
+        )
+        table_counts, column_counts = _datasource_counts(db)
+        result = SpreadsheetImportRead(
+            datasource=_read_datasource(
+                datasource,
+                table_counts.get(datasource.id, 0),
+                column_counts.get(datasource.id, 0),
+            ),
+            preview=SpreadsheetPreviewRead.model_validate(preview),
+        )
+        db.commit()
+        return result
+    except SpreadsheetImportError as exc:
+        db.rollback()
+        record_audit(
+            db,
+            principal,
+            action="IMPORT",
+            resource_type="DATASOURCE",
+            status="FAILED",
+            details={"error_code": exc.code},
+        )
+        db.commit()
+        raise HTTPException(status_code=exc.status_code, detail=exc.code) from exc
+    except Exception as exc:
+        db.rollback()
+        record_audit(
+            db,
+            principal,
+            action="IMPORT",
+            resource_type="DATASOURCE",
+            status="FAILED",
+            details={"error_type": type(exc).__name__},
+        )
+        db.commit()
+        raise HTTPException(status_code=400, detail="SPREADSHEET_IMPORT_FAILED") from exc
+
+
 @router.get("", response_model=list[DataSourceRead])
 def list_datasources(
     query: str = "",
-    datasource_type: str = Query(default="all", alias="type", pattern="^(all|postgresql|mysql)$"),
+    datasource_type: str = Query(default="all", alias="type", pattern="^(all|postgresql|mysql|excel)$"),
     connection_status: str = Query(default="all", alias="status", pattern="^(all|normal|attention)$"),
     db: Session = Depends(get_db),
     principal: Principal = Depends(require_permission("datasource.read")),
@@ -98,7 +214,10 @@ def get_datasource(datasource_id: str, db: Session = Depends(get_db), principal:
 @router.put("/{datasource_id}", response_model=DataSourceRead)
 def update_datasource(datasource_id: str, data: DataSourceUpdate, db: Session = Depends(get_db), principal: Principal = Depends(require_permission("datasource.manage"))):
     ensure_resource_access(db, principal, resource_type="DATASOURCE", resource_id=datasource_id)
-    datasource = service.update_datasource(db, _get_or_404(db, datasource_id), data)
+    try:
+        datasource = service.update_datasource(db, _get_or_404(db, datasource_id), data)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
     table_counts, column_counts = _datasource_counts(db)
     return _read_datasource(
         datasource,
@@ -110,8 +229,32 @@ def update_datasource(datasource_id: str, data: DataSourceUpdate, db: Session = 
 @router.delete("/{datasource_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_datasource(datasource_id: str, db: Session = Depends(get_db), principal: Principal = Depends(require_permission("datasource.manage"))):
     ensure_resource_access(db, principal, resource_type="DATASOURCE", resource_id=datasource_id)
-    db.delete(_get_or_404(db, datasource_id))
-    db.commit()
+    try:
+        details = delete_managed_datasource(
+            db, _get_or_404(db, datasource_id), commit=False,
+        )
+        record_audit(
+            db,
+            principal,
+            action="DELETE",
+            resource_type="DATASOURCE",
+            resource_id=datasource_id,
+            details=details,
+        )
+        db.commit()
+    except SpreadsheetImportError as exc:
+        db.rollback()
+        record_audit(
+            db,
+            principal,
+            action="DELETE",
+            resource_type="DATASOURCE",
+            resource_id=datasource_id,
+            status="FAILED",
+            details={"error_code": exc.code},
+        )
+        db.commit()
+        raise HTTPException(status_code=exc.status_code, detail=exc.code) from exc
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
@@ -206,6 +349,9 @@ def list_tables(
 def list_columns(datasource_id: str, table: str, schema: str | None = None, db: Session = Depends(get_db), principal: Principal = Depends(require_permission("datasource.read"))):
     ensure_resource_access(db, principal, resource_type="DATASOURCE", resource_id=datasource_id)
     _get_or_404(db, datasource_id)
+    can_query = has_resource_access(
+        db, principal, resource_type="DATASOURCE", resource_id=datasource_id, query=True,
+    )
     query = (
         select(DataSourceColumn)
         .join(DataSourceTable, DataSourceColumn.table_id == DataSourceTable.id)
@@ -215,4 +361,9 @@ def list_columns(datasource_id: str, table: str, schema: str | None = None, db: 
     )
     if schema:
         query = query.where(DataSourceSchema.name == schema)
-    return list(db.scalars(query))
+    return [
+        ColumnRead.model_validate(column).model_copy(
+            update={"sample_values": list(column.sample_values or []) if can_query else []},
+        )
+        for column in db.scalars(query)
+    ]

@@ -27,7 +27,7 @@
 
 角色固定为 `PlannerAgent`、`DataAnalystAgent`、`KnowledgeAgent`、`VerificationAgent`、`InsightAgent`。工具固定为 `QUERY_DATA`、`RETRIEVE_KNOWLEDGE`、`VERIFY_RESULT`、`VERIFY_CITATION`、`GENERATE_CHART`、`GENERATE_INSIGHT`。
 
-最大步骤 8、工具调用 12、重规划 2、Agent 深度 2、总超时 30 秒。禁止动态工具、Agent 直连数据库、绕过 SQL Guard/Result Oracle、文件访问和任意网络工具。只允许发布已验证结果；RAG 不可用时可降级为已验证的数据结论，但必须显式标记 `PARTIAL`，不得伪造引用。
+最大步骤 8、工具调用 12、重规划 2、Agent 深度 2，Deterministic/Level0 总超时 30 秒；本机 Auto/Live 三家受控 Provider 的 120 秒有限例外及其绝对 deadline 传播由 ADR-099 约束。禁止动态工具、Agent 直连数据库、绕过 SQL Guard/Result Oracle、文件访问和任意网络工具。只允许发布已验证结果；RAG 不可用时可降级为已验证的数据结论，但必须显式标记 `PARTIAL`，不得伪造引用。
 
 ## Prompt 与元数据
 

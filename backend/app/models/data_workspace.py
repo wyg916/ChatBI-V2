@@ -24,7 +24,9 @@ class SqlWorkspaceRun(Base):
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
     workspace_id: Mapped[str] = mapped_column(ForeignKey("workspace.id", ondelete="CASCADE"), index=True)
     user_id: Mapped[str] = mapped_column(ForeignKey("app_user.id", ondelete="CASCADE"), index=True)
-    datasource_id: Mapped[str] = mapped_column(ForeignKey("datasource.id", ondelete="RESTRICT"), index=True)
+    datasource_id: Mapped[str | None] = mapped_column(
+        ForeignKey("datasource.id", ondelete="SET NULL"), nullable=True, index=True,
+    )
     operation: Mapped[str] = mapped_column(String(32), nullable=False, index=True)
     sql_text: Mapped[str] = mapped_column(Text, nullable=False)
     normalized_sql: Mapped[str | None] = mapped_column(Text)

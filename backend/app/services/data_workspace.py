@@ -1,14 +1,20 @@
 from __future__ import annotations
 
-import re
 from typing import Any
 
 from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 from sqlglot import exp, parse_one
 
-from app.core.access import Principal, record_audit
+from app.core.access import Principal, grant_created_resource, record_audit
 from app.core.config import get_settings
+from app.core.data_safety import (
+    SENSITIVE_COMMENT_MARKER,
+    is_sensitive_column,
+    mask_result_rows,
+    redact_public_explain_plan_payload,
+    redact_public_sql,
+)
 from app.models import (
     DataSource,
     DataSourceColumn,
@@ -22,12 +28,7 @@ from app.query.contracts import ExecutionResult, GuardResult, OracleResult, SQLP
 from app.query.executor import QueryExecutor
 from app.query.oracle import ResultOracle
 from app.query.sql_guard import SqlGuard
-
-
-SENSITIVE_COLUMN = re.compile(
-    r"(^|_)(password|passwd|pwd|secret|token|api_key|private_key|id_card|ssn|phone|mobile|email|bank_account|card_number)(_|$)",
-    re.IGNORECASE,
-)
+from app.services.datasources import runtime_dialect
 
 
 def datasource_or_error(db: Session, datasource_id: str, workspace_id: str) -> DataSource:
@@ -36,28 +37,32 @@ def datasource_or_error(db: Session, datasource_id: str, workspace_id: str) -> D
         raise LookupError("Datasource not found")
     if datasource.workspace_id != workspace_id:
         raise PermissionError("Datasource belongs to another workspace")
-    if datasource.type not in {"postgresql", "mysql"}:
-        raise ValueError("Only PostgreSQL and MySQL are supported")
+    if datasource.type not in {"postgresql", "mysql", "excel"}:
+        raise ValueError("Only PostgreSQL, MySQL and managed spreadsheet datasources are supported")
     return datasource
 
 
 def security_policy(db: Session, datasource_id: str, row_limit: int) -> SecurityPolicy:
     schemas = list(db.scalars(select(DataSourceSchema.name).where(DataSourceSchema.datasource_id == datasource_id)))
     rows = db.execute(
-        select(DataSourceTable.name, DataSourceColumn.name)
+        select(DataSourceTable.name, DataSourceColumn.name, DataSourceColumn.comment)
         .join(DataSourceSchema, DataSourceTable.schema_id == DataSourceSchema.id)
         .join(DataSourceColumn, DataSourceColumn.table_id == DataSourceTable.id)
         .where(DataSourceSchema.datasource_id == datasource_id)
     )
     columns: dict[str, list[str]] = {}
-    for table_name, column_name in rows:
+    sensitive_columns: set[str] = set()
+    for table_name, column_name, comment in rows:
         columns.setdefault(table_name.lower(), []).append(column_name.lower())
+        if is_sensitive_column(column_name) or SENSITIVE_COMMENT_MARKER in (comment or ""):
+            sensitive_columns.add(column_name.lower())
     return SecurityPolicy(
         row_limit=min(row_limit, get_settings().query_row_limit),
         timeout_ms=get_settings().query_timeout_ms,
         allowed_schemas=schemas,
         allowed_tables=sorted(columns),
         allowed_columns=columns,
+        sensitive_columns=sorted(sensitive_columns),
     )
 
 
@@ -124,7 +129,7 @@ def relation_rows(db: Session, datasource_id: str) -> list[DataSourceRelation]:
 
 def _manual_plan(datasource: DataSource, guard: GuardResult, execution: ExecutionResult) -> SQLPlan:
     return SQLPlan(
-        question="SQL Workspace read-only execution", intent="MANUAL_SQL", dialect=datasource.type,
+        question="SQL Workspace read-only execution", intent="MANUAL_SQL", dialect=runtime_dialect(datasource),
         provider="data-workspace", semantic_model_id="manual-sql", semantic_model_version=1,
         selected_entities=guard.tables, selected_tables=guard.tables, selected_columns=guard.columns,
         metrics=[], dimensions=[], joins=[], filters=[], group_by=[], order_by=[], limit=guard.applied_limit or 1,
@@ -146,12 +151,19 @@ def execute_sql(
     # whose narrow allowlist is versioned in Backend code. User SQL always
     # derives its policy from the synchronized datasource catalog.
     policy = trusted_policy or security_policy(db, datasource.id, row_limit)
-    guard = SqlGuard().validate(sql, dialect=datasource.type, policy=policy)
+    guard = SqlGuard().validate(sql, dialect=runtime_dialect(datasource), policy=policy)
     run = SqlWorkspaceRun(
         workspace_id=principal.workspace_id or "", user_id=principal.user_id or "",
         datasource_id=datasource.id, operation=operation, sql_text=sql,
         normalized_sql=guard.normalized_sql, status="SECURITY_REJECTED" if not guard.allowed else "PLANNING",
-        guard_payload=guard.model_dump(mode="json"), execution_payload={}, oracle_payload={},
+        guard_payload={
+            **guard.model_dump(mode="json"),
+            # Private server-side snapshot: the catalog may later be deleted,
+            # but historical public SQL must retain the policy that applied at
+            # execution time.  The API projection removes this key.
+            "_sensitive_columns_snapshot": sorted(set(policy.sensitive_columns)),
+        },
+        execution_payload={}, oracle_payload={},
     )
     db.add(run)
     db.flush()
@@ -173,7 +185,30 @@ def execute_sql(
                 row_limit=guard.applied_limit or policy.row_limit, timeout_ms=policy.timeout_ms,
             )
             oracle = ResultOracle().verify(plan=_manual_plan(datasource, guard, execution), guard=guard, execution=execution)
-        run.execution_payload = execution.model_dump(mode="json")
+        if operation == "EXPLAIN":
+            # EXPLAIN returns planner metadata, not business result rows.  The
+            # source SQL is already part of this authenticated workspace run;
+            # applying result-column lineage to the single ``plan`` field
+            # would replace the complete plan whenever the query references a
+            # sensitive source column.  Preserve structural/cost evidence, but
+            # fail closed for planner expression strings because fields such as
+            # PostgreSQL ``Filter`` can echo the original sensitive literal.
+            masked_rows = redact_public_explain_plan_payload(
+                execution.rows, policy.sensitive_columns,
+            )
+            masked_columns = []
+        else:
+            masked_rows, masked_columns = mask_result_rows(
+                guard.normalized_sql or execution.normalized_sql,
+                execution.rows,
+                policy.sensitive_columns,
+                dialect=runtime_dialect(datasource),
+            )
+        public_execution = execution.model_copy(update={
+            "rows": masked_rows,
+            "masked_columns": masked_columns,
+        })
+        run.execution_payload = public_execution.model_dump(mode="json")
         run.oracle_payload = oracle.model_dump(mode="json")
         run.duration_ms = execution.duration_ms
         if execution.status != "SUCCEEDED":
@@ -193,7 +228,7 @@ def execute_sql(
 
 
 def mask_rows(rows: list[dict[str, Any]]) -> tuple[list[dict[str, Any]], list[str]]:
-    masked_columns = sorted({column for row in rows for column in row if SENSITIVE_COLUMN.search(column)})
+    masked_columns = sorted({column for row in rows for column in row if is_sensitive_column(column)})
     masked = []
     for row in rows:
         masked.append({column: ("***MASKED***" if column in masked_columns and value is not None else value) for column, value in row.items()})
@@ -223,7 +258,7 @@ def sample_table(
     ))
     if not columns:
         raise LookupError("Table metadata not found; synchronize the datasource first")
-    dialect = {"postgresql": "postgres", "mysql": "mysql"}[datasource.type]
+    dialect = {"postgresql": "postgres", "mysql": "mysql"}[runtime_dialect(datasource)]
     statement = exp.select(*(exp.column(column) for column in columns)).from_(
         exp.Table(this=exp.to_identifier(table_name), db=exp.to_identifier(schema_name))
     ).limit(page_size).offset((page - 1) * page_size)
@@ -244,24 +279,37 @@ def save_verified_sql(
     execution = run.execution_payload or {}
     if run.workspace_id != principal.workspace_id or run.user_id != principal.user_id:
         raise PermissionError("SQL workspace run access denied")
+    if run.datasource_id is None:
+        raise ValueError("SQL_WORKSPACE_DATASOURCE_DELETED")
     if run.status != "SUCCEEDED" or (run.oracle_payload or {}).get("status") != "PASSED":
         raise ValueError("Only a successful, Oracle-passed SQL run can be saved")
     if not execution.get("result_signature"):
         raise ValueError("The SQL run has no result signature")
     sort_order = int(db.scalar(select(func.count(VerifiedAnswer.id))) or 0) + 1
+    dialect = str((run.guard_payload or {}).get("dialect") or "postgresql")
+    public_sql = redact_public_sql(
+        run.sql_text,
+        security_policy(db, run.datasource_id, get_settings().query_row_limit).sensitive_columns,
+        dialect=dialect,
+    ) or ""
+    public_guard = dict(run.guard_payload or {})
+    public_guard.pop("_sensitive_columns_snapshot", None)
     answer = VerifiedAnswer(
-        workspace_id=principal.workspace_id or "", question=f"SQL 工作台验证：{run.sql_text[:180]}", module="数据源",
+        workspace_id=principal.workspace_id or "", question=f"SQL 工作台验证：{public_sql[:180]}", module="数据源",
         sql_synced=True, model_name="SQL Workspace", owner_name=owner_name, status=status,
         accuracy_percent=100, sort_order=sort_order, query_run_id=None, sql_text=run.normalized_sql,
         result_signature=execution["result_signature"], semantic_model_version=None,
         semantic_intent={"intent": "MANUAL_SQL", "datasource_id": run.datasource_id},
-        sql_plan={"provider": "data-workspace", "guard": run.guard_payload}, result_snapshot=execution,
+        sql_plan={"provider": "data-workspace", "guard": public_guard}, result_snapshot=execution,
         chart_spec={}, narrative={"conclusion": "该 SQL 已通过只读校验并保存为 Verified SQL。"},
         datasource_id=run.datasource_id, semantic_model_id=None, oracle_status="PASSED",
         feedback={"source": "SQL_WORKSPACE", "verified_by": principal.user_id},
     )
     db.add(answer)
     db.flush()
+    grant_created_resource(
+        db, principal, resource_type="ANSWER", resource_id=answer.id,
+    )
     run.verified_answer_id = answer.id
     record_audit(
         db, principal, action="SQL_WORKSPACE_VERIFY", resource_type="ANSWER", resource_id=answer.id,

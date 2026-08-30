@@ -779,6 +779,7 @@ class OpenAICompatibleProvider(ModelProviderAdapter):
         request_options: dict[str, Any] | None = None,
         timeout_seconds: float = 30,
         transport: httpx.BaseTransport | None = None,
+        settings: Settings | None = None,
     ):
         self.name = provider_name
         self.display_name = display_name
@@ -791,6 +792,7 @@ class OpenAICompatibleProvider(ModelProviderAdapter):
         self.request_options = request_options or {}
         self.timeout_seconds = timeout_seconds
         self.transport = transport
+        self.settings = settings or Settings(_env_file=None)
 
     def capabilities(self) -> dict[str, Any]:
         configured = bool(self.base_url and self.api_key and self.model_name)
@@ -837,7 +839,7 @@ class OpenAICompatibleProvider(ModelProviderAdapter):
             request_options=self.request_options,
         )
         gateway = ModelGateway(
-            Settings(_env_file=None, model_budget_mode="quality"),
+            self.settings.model_copy(update={"model_budget_mode": "quality"}),
             transport=self.transport, provider_overrides={self.name: provider}, sleeper=lambda _: None,
         )
         response = gateway.execute(
@@ -1006,6 +1008,7 @@ def build_model_provider(settings: Settings | None = None) -> ModelProviderAdapt
                 auth_prefix=definition.auth_prefix,
                 max_tokens_field=definition.max_tokens_field,
                 request_options=definition.request_options,
+                settings=settings,
             )
         break
     return DeterministicTestProvider()

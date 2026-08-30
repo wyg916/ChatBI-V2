@@ -3,6 +3,7 @@ name: V1.3 Phase5 Release Hardening Gate
 on:
   push:
     branches:
+      - "main"
       - "codex/v1.3.0-release-hardening-full-gate"
   pull_request:
     paths:

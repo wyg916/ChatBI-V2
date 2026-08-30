@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom';
 import { contentApi } from '../api/content';
 import { ErrorNotice, Loading, PageHeading } from '../components/UI';
 import { ContentImportDialog, NewDashboardDialog } from './ContentDialogs';
+import { dashboardPresentation, type DashboardKind } from './dashboardPresentation';
 import './content-library.css';
 
 const number = new Intl.NumberFormat('zh-CN');
@@ -15,6 +16,13 @@ function relativeUpdate(value: string) {
   if (minutes < 24 * 60) return `${Math.floor(minutes / 60)} 小时前`;
   if (minutes < 48 * 60) return '昨天';
   return new Intl.DateTimeFormat('zh-CN', { month: '2-digit', day: '2-digit' }).format(new Date(value));
+}
+
+function DashboardPreviewVisual({ kind, variant }: { kind: DashboardKind; variant: number }) {
+  if (kind === 'customer' || kind === 'finance') return <div className="dashboard-mini-donut" aria-hidden="true"><i /><span /><b /></div>;
+  if (kind === 'regional' || kind === 'supply') return <div className="dashboard-mini-bars" aria-hidden="true">{[42, 68, 54, 82, 64].map((height, index) => <i style={{ height: `${Math.max(24, height - ((variant + index) % 3) * 7)}%` }} key={index} />)}</div>;
+  const path = kind === 'marketing' ? 'M2 34 C18 31 24 11 40 20 S62 42 78 18 S104 8 118 14' : 'M2 35 C18 38 26 24 40 27 S62 12 78 19 S99 23 118 7';
+  return <svg className="dashboard-mini-line" viewBox="0 0 120 44" preserveAspectRatio="none" aria-hidden="true"><path className="fill" d={`${path} L118 44 L2 44 Z`} /><path d={path} /></svg>;
 }
 
 export function DashboardListPage() {
@@ -52,8 +60,9 @@ export function DashboardListPage() {
     <ErrorNotice error={result.error} />
     {result.isLoading ? <Loading /> : <section className={`dashboard-grid dashboard-grid-${view}`}>
       {result.data?.items.map((dashboard) => {
+        const presentation = dashboardPresentation(dashboard);
         return <Link className="dashboard-card" data-testid="dashboard-card" to={`/dashboards/${dashboard.id}`} key={dashboard.id}>
-          <div className="dashboard-preview"><strong>{dashboard.name}</strong><span className="realtime-badge">Backend API</span><div className="dashboard-trend"><span>{number.format(dashboard.card_count)}</span><small>数据库卡片</small></div></div>
+          <div className={`dashboard-preview dashboard-preview-${presentation.kind}`} data-dashboard-kind={presentation.kind}><div className="dashboard-preview-head"><strong>{dashboard.name}</strong><span>{presentation.label}</span></div><DashboardPreviewVisual kind={presentation.kind} variant={dashboard.trend_variant} /><div className="dashboard-trend"><span>{number.format(dashboard.card_count)}</span><small>数据库卡片</small></div></div>
           <div className="dashboard-card-title"><h2>{dashboard.name}</h2><b>{dashboard.card_count} 张卡片</b></div>
           <div className="dashboard-card-meta"><p>{dashboard.description}</p><time dateTime={dashboard.updated_at}>{relativeUpdate(dashboard.updated_at)}</time></div>
         </Link>;

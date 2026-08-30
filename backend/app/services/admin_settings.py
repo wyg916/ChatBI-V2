@@ -166,7 +166,11 @@ def provider_catalog(db: Session, principal: Principal) -> ProviderCatalog:
             last_checked_at=state.last_checked_at if state else None,
             capabilities=list((capabilities.get(provider_id) or {}).get("capabilities") or []),
             priority=(order.index(provider_id) + 1) if provider_id in order else 100,
-            cost_policy="PREMIUM" if provider_id == "kimi" else "STANDARD",
+            cost_policy=(
+                "UNRESTRICTED"
+                if settings.provider_usage_unrestricted and provider_id in {"mimo", "deepseek", "kimi"}
+                else ("PREMIUM" if provider_id == "kimi" else "STANDARD")
+            ),
             credential_source="SERVER_ENVIRONMENT", protocol="openai-chat-completions", external_model=True,
         ))
     items.append(ProviderStatus(
@@ -178,7 +182,16 @@ def provider_catalog(db: Session, principal: Principal) -> ProviderCatalog:
     ))
     active = next((item.provider_id for item in sorted(items, key=lambda item: item.priority) if item.enabled and item.configured), "deterministic")
     items = [item.model_copy(update={"active": item.provider_id == active}) for item in items]
-    return ProviderCatalog(active_provider=active, selection_strategy="capability-complexity-cost", items=items)
+    return ProviderCatalog(
+        active_provider=active,
+        selection_strategy=(
+            "capability-health-unrestricted"
+            if settings.provider_usage_unrestricted
+            else "capability-complexity-cost"
+        ),
+        usage_unrestricted=settings.provider_usage_unrestricted,
+        items=items,
+    )
 
 
 def test_provider(db: Session, principal: Principal, provider_id: str) -> ProviderStatus:

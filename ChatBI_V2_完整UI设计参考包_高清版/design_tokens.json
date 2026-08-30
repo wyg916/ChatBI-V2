@@ -1,6 +1,6 @@
 {
   "design_base": "1440x900",
-  "output_resolution": "2880x1800",
+  "output_resolution": "1440x900",
   "style": "Chat-first，亮色内容区，深色侧栏，紫色主色",
   "colors": {
     "primary": "#5B5CF6",

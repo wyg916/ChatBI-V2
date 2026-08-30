@@ -4,11 +4,14 @@ import json
 import os
 import threading
 import time
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
 
+import app.sandbox.controller_client as controller_client_module
+import app.sandbox.controller_server as controller_server_module
 
 from app.sandbox import (
     DockerSandboxExecutor,
@@ -236,13 +239,23 @@ def controller_result_payload(status="SUCCEEDED", **overrides):
     return payload
 
 
+def deadline_aware_transport(transport):
+    """Declare that an injected test transport honors its passed timeout."""
+
+    transport._chatbi_deadline_aware = True
+    return transport
+
+
 def test_controller_client_sends_only_fixed_protocol_and_decodes_verified_result():
     calls = []
-    job_id = "a" * 32
+    job_id = ""
 
+    @deadline_aware_transport
     def transport(method, path, payload, timeout):
+        nonlocal job_id
         calls.append((method, path, payload, timeout))
-        if method == "POST":
+        if method == "PUT":
+            job_id = path.rsplit("/", 1)[-1]
             return {
                 "protocol_version": PROTOCOL_VERSION,
                 "job_id": job_id,
@@ -265,11 +278,14 @@ def test_controller_client_sends_only_fixed_protocol_and_decodes_verified_result
     assert result.runtime_verified and result.container_destroyed
     assert result.security["controller_protocol"] == PROTOCOL_VERSION
     submitted = calls[0][2]
+    assert calls[0][0] == "PUT"
+    assert calls[0][1].startswith("/v1/jobs/")
     assert set(submitted) == {"protocol_version", "code", "datasets", "timeout_ms"}
     assert not ({"image", "command", "environment", "mounts", "network"} & submitted.keys())
 
 
 def test_controller_unavailable_fails_closed_without_local_docker_fallback():
+    @deadline_aware_transport
     def unavailable(method, path, payload, timeout):
         raise OSError("controller unavailable")
 
@@ -295,11 +311,14 @@ def test_controller_url_is_fixed_allowlist_and_invalid_url_fails_closed():
 def test_controller_cancel_protocol_waits_for_destroyed_result():
     calls = []
     cancellation = threading.Event()
-    job_id = "b" * 32
+    job_id = ""
 
+    @deadline_aware_transport
     def transport(method, path, payload, timeout):
+        nonlocal job_id
         calls.append(method)
-        if method == "POST":
+        if method == "PUT":
+            job_id = path.rsplit("/", 1)[-1]
             cancellation.set()
             return {
                 "protocol_version": PROTOCOL_VERSION,
@@ -331,6 +350,377 @@ def test_controller_cancel_protocol_waits_for_destroyed_result():
     assert result.status is SandboxStatus.CANCELLED
     assert result.container_destroyed
     assert "DELETE" in calls
+
+
+def test_controller_cancel_discards_completed_success_body_after_cancel_wins():
+    cancellation = threading.Event()
+    job_id = ""
+    calls = []
+
+    @deadline_aware_transport
+    def transport(method, path, payload, timeout):
+        nonlocal job_id
+        calls.append(method)
+        if method == "PUT":
+            job_id = path.rsplit("/", 1)[-1]
+            cancellation.set()
+            return {
+                "protocol_version": PROTOCOL_VERSION,
+                "job_id": job_id,
+                "state": "RUNNING",
+            }
+        assert method == "DELETE"
+        return {
+            "protocol_version": PROTOCOL_VERSION,
+            "job_id": job_id,
+            "state": "COMPLETED",
+            "result": controller_result_payload(
+                output={"must_not_publish": True},
+                stdout="must-not-publish-stdout",
+                stderr="must-not-publish-stderr",
+                artifacts=[{
+                    "name": "private.txt",
+                    "media_type": "text/plain",
+                    "size_bytes": 1,
+                    "sha256": "a" * 64,
+                    "content_base64": "eA==",
+                }],
+            ),
+        }
+
+    result = DockerSandboxExecutor(
+        controller_url="http://localhost:18765",
+        controller_transport=transport,
+    ).execute("result = 1", {}, cancellation_event=cancellation)
+
+    assert calls == ["PUT", "DELETE"]
+    assert result.status is SandboxStatus.CANCELLED
+    assert result.error_code == "SANDBOX_CANCELLED"
+    assert result.output is None
+    assert result.stdout == ""
+    assert result.stderr == ""
+    assert result.artifacts == ()
+    assert result.runtime_verified is False
+    assert result.container_destroyed is True
+
+
+def test_controller_timeout_discards_completed_success_body_after_timeout_wins():
+    job_id = ""
+
+    @deadline_aware_transport
+    def transport(method, path, payload, timeout):
+        nonlocal job_id
+        if method == "PUT":
+            job_id = path.rsplit("/", 1)[-1]
+            time.sleep(timeout)
+            return {
+                "protocol_version": PROTOCOL_VERSION,
+                "job_id": job_id,
+                "state": "RUNNING",
+            }
+        assert method == "DELETE"
+        return {
+            "protocol_version": PROTOCOL_VERSION,
+            "job_id": job_id,
+            "state": "COMPLETED",
+            "result": controller_result_payload(
+                output="must-not-publish",
+                stdout="must-not-publish-stdout",
+            ),
+        }
+
+    result = DockerSandboxExecutor(
+        controller_url="http://localhost:18765",
+        controller_transport=transport,
+    ).execute(
+        "result = 1",
+        {},
+        deadline_monotonic=time.monotonic() + 0.01,
+    )
+
+    assert result.status is SandboxStatus.TIMEOUT
+    assert result.error_code == "SANDBOX_TIMEOUT"
+    assert result.output is None
+    assert result.stdout == ""
+    assert result.runtime_verified is False
+    assert result.container_destroyed is True
+
+
+def test_controller_hard_deadline_reserves_cleanup_and_never_starts_a_late_call():
+    calls: list[tuple[str, float]] = []
+    put_payload: dict[str, object] = {}
+    deadline = time.monotonic() + 0.12
+
+    @deadline_aware_transport
+    def transport(method, _path, payload, timeout):
+        calls.append((method, time.monotonic()))
+        if method == "PUT":
+            put_payload.update(payload or {})
+        # An injected transport must cooperate with the deadline.  Delaying
+        # each call only until its phase deadline proves that no extra 10s
+        # cleanup window is opened after the hard deadline.
+        time.sleep(min(timeout, max(0.0, deadline - time.monotonic())))
+        return {}
+
+    started = time.monotonic()
+    result = DockerSandboxExecutor(
+        controller_url="http://localhost:18765",
+        controller_transport=transport,
+        limits=SandboxLimits(timeout_seconds=1.0),
+    ).execute("result = 1", {}, deadline_monotonic=deadline)
+    elapsed = time.monotonic() - started
+
+    # Scheduling can run just past a monotonic instant, but cleanup never gets
+    # an extra confirmation window after this deadline.
+    assert elapsed < 0.18
+    assert result.status is SandboxStatus.FAILED
+    assert result.error_code == "SANDBOX_CONTROLLER_CANCEL_UNCONFIRMED"
+    assert [method for method, _ in calls] == ["PUT", "DELETE"]
+    assert all(call_started < deadline for _, call_started in calls)
+    assert 0 < int(put_payload["timeout_ms"]) < 120
+
+
+def test_controller_skips_submission_when_no_execution_budget_remains():
+    calls = []
+
+    result = DockerSandboxExecutor(
+        controller_url="http://localhost:18765",
+        controller_transport=deadline_aware_transport(
+            lambda *args: calls.append(args)
+        ),
+    ).execute("result = 1", {}, deadline_monotonic=time.monotonic())
+
+    assert result.status is SandboxStatus.TIMEOUT
+    assert result.error_code == "SANDBOX_TIMEOUT"
+    assert calls == []
+
+
+def test_controller_rejects_unmarked_injected_transport_without_calling_it():
+    calls = []
+
+    def transport(*args):
+        calls.append(args)
+        return {}
+
+    result = DockerSandboxExecutor(
+        controller_url="http://localhost:18765",
+        controller_transport=transport,
+    ).execute("result = 1", {})
+
+    assert result.status is SandboxStatus.UNAVAILABLE
+    assert result.error_code == "SANDBOX_CONTROLLER_TRANSPORT_NOT_DEADLINE_AWARE"
+    assert calls == []
+
+
+def test_controller_completed_decode_rechecks_cancellation_before_publishing(
+    monkeypatch,
+):
+    cancellation = threading.Event()
+    job_id = ""
+    calls = []
+    original_decode = controller_client_module._decode_controller_result
+
+    def decode_then_cancel(response):
+        result = original_decode(response)
+        cancellation.set()
+        return result
+
+    monkeypatch.setattr(
+        controller_client_module, "_decode_controller_result", decode_then_cancel
+    )
+
+    @deadline_aware_transport
+    def transport(method, path, _payload, _timeout):
+        nonlocal job_id
+        calls.append(method)
+        if method == "PUT":
+            job_id = path.rsplit("/", 1)[-1]
+            return {
+                "protocol_version": PROTOCOL_VERSION,
+                "job_id": job_id,
+                "state": "RUNNING",
+            }
+        if method == "GET":
+            return {
+                "protocol_version": PROTOCOL_VERSION,
+                "job_id": job_id,
+                "state": "COMPLETED",
+                "result": controller_result_payload(
+                    output={"must_not_publish": True},
+                    stdout="must-not-publish",
+                ),
+            }
+        return {
+            "protocol_version": PROTOCOL_VERSION,
+            "job_id": job_id,
+            "state": "ABSENT",
+        }
+
+    result = DockerSandboxExecutor(
+        controller_url="http://localhost:18765",
+        controller_transport=transport,
+    ).execute("result = 1", {}, cancellation_event=cancellation)
+
+    assert calls == ["PUT", "GET", "DELETE"]
+    assert result.status is SandboxStatus.CANCELLED
+    assert result.error_code == "SANDBOX_CANCELLED"
+    assert result.output is None
+    assert result.stdout == ""
+    assert result.runtime_verified is False
+
+
+def test_controller_completed_cleanup_rechecks_execution_deadline_before_publishing():
+    job_id = ""
+    deadline = time.monotonic() + 0.25
+
+    @deadline_aware_transport
+    def transport(method, path, _payload, _timeout):
+        nonlocal job_id
+        if method == "PUT":
+            job_id = path.rsplit("/", 1)[-1]
+            return {
+                "protocol_version": PROTOCOL_VERSION,
+                "job_id": job_id,
+                "state": "RUNNING",
+            }
+        if method == "GET":
+            return {
+                "protocol_version": PROTOCOL_VERSION,
+                "job_id": job_id,
+                "state": "COMPLETED",
+                "result": controller_result_payload(
+                    output="must-not-publish", stdout="must-not-publish"
+                ),
+            }
+        # The success cleanup itself is bounded by the hard deadline, but it
+        # intentionally consumes the reserved window after execution ended.
+        time.sleep(max(0.0, deadline - time.monotonic()))
+        return {
+            "protocol_version": PROTOCOL_VERSION,
+            "job_id": job_id,
+            "state": "ABSENT",
+        }
+
+    result = DockerSandboxExecutor(
+        controller_url="http://localhost:18765",
+        controller_transport=transport,
+        limits=SandboxLimits(timeout_seconds=1.0),
+    ).execute("result = 1", {}, deadline_monotonic=deadline)
+
+    assert result.status is SandboxStatus.TIMEOUT
+    assert result.error_code == "SANDBOX_TIMEOUT"
+    assert result.output is None
+    assert result.stdout == ""
+    assert result.runtime_verified is False
+
+
+def test_controller_real_http_midflight_cancel_reaps_slow_drip_and_confirms_cleanup():
+    job_id_seen = ""
+    cancelled = threading.Event()
+    drip_started = threading.Event()
+    drip_exited = threading.Event()
+
+    class Handler(BaseHTTPRequestHandler):
+        def log_message(self, *_args):
+            return
+
+        def _json(self, payload, status=200):
+            encoded = json.dumps(payload, separators=(",", ":")).encode()
+            self.send_response(status)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Length", str(len(encoded)))
+            self.end_headers()
+            self.wfile.write(encoded)
+
+        def do_PUT(self):
+            nonlocal job_id_seen
+            job_id_seen = self.path.rsplit("/", 1)[-1]
+            length = int(self.headers.get("Content-Length") or 0)
+            self.rfile.read(length)
+            self._json({
+                "protocol_version": PROTOCOL_VERSION,
+                "job_id": job_id_seen,
+                "state": "RUNNING",
+            }, status=202)
+
+        def do_GET(self):
+            if cancelled.is_set():
+                self._json({
+                    "protocol_version": PROTOCOL_VERSION,
+                    "job_id": job_id_seen,
+                    "state": "COMPLETED",
+                    "result": controller_result_payload(
+                        "CANCELLED",
+                        output=None,
+                        error_code="SANDBOX_CANCELLED",
+                        runtime_verified=False,
+                    ),
+                })
+                return
+            drip_started.set()
+            encoded = json.dumps({
+                "protocol_version": PROTOCOL_VERSION,
+                "job_id": job_id_seen,
+                "state": "RUNNING",
+                "padding": "x" * 256,
+            }, separators=(",", ":")).encode()
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Length", str(len(encoded)))
+            self.end_headers()
+            try:
+                for byte in encoded:
+                    self.wfile.write(bytes([byte]))
+                    self.wfile.flush()
+                    time.sleep(0.005)
+            except (BrokenPipeError, ConnectionResetError):
+                pass
+            finally:
+                drip_exited.set()
+
+        def do_DELETE(self):
+            cancelled.set()
+            self._json({
+                "protocol_version": PROTOCOL_VERSION,
+                "job_id": job_id_seen,
+                "state": "RUNNING",
+            })
+
+    server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+    server_thread = threading.Thread(
+        target=lambda: server.serve_forever(poll_interval=0.01),
+        daemon=True,
+    )
+    server_thread.start()
+    cancellation = threading.Event()
+
+    def cancel_midflight():
+        assert drip_started.wait(1)
+        time.sleep(0.03)
+        cancellation.set()
+
+    cancel_thread = threading.Thread(target=cancel_midflight)
+    cancel_thread.start()
+    started = time.monotonic()
+    try:
+        result = DockerSandboxExecutor(
+            controller_url=f"http://127.0.0.1:{server.server_port}",
+        ).execute("result = 1", {}, cancellation_event=cancellation)
+        client_elapsed = time.monotonic() - started
+    finally:
+        cancel_thread.join(timeout=1)
+        server.shutdown()
+        server.server_close()
+        server_thread.join(timeout=1)
+
+    # Measure the client cancellation boundary itself. Test-server shutdown may
+    # wait for its intentionally slow handler and is not part of the product
+    # request latency.
+    assert client_elapsed < 0.6
+    assert result.status is SandboxStatus.CANCELLED
+    assert result.container_destroyed
+    assert cancelled.is_set()
+    assert drip_exited.wait(0.1)
 
 
 def test_controller_cancel_confirmation_is_bounded_but_covers_docker_cleanup():
@@ -392,6 +782,120 @@ def test_job_registry_propagates_cancel_to_executor_and_returns_destroy_proof():
         "completed_jobs": 1,
     }
     registry.shutdown()
+
+
+def test_job_registry_client_id_is_idempotent_and_conflicting_spec_fails_closed():
+    started = threading.Event()
+    release = threading.Event()
+    calls = 0
+
+    class ControlledExecutor:
+        def execute(self, *_args, **_kwargs):
+            nonlocal calls
+            calls += 1
+            started.set()
+            release.wait(1)
+            return SandboxResult(
+                status=SandboxStatus.CANCELLED,
+                error_code="SANDBOX_CANCELLED",
+                container_destroyed=True,
+            )
+
+    registry = JobRegistry(executor_factory=lambda _limits: ControlledExecutor())
+    job_id = "c" * 32
+    payload = {
+        "protocol_version": PROTOCOL_VERSION,
+        "code": "result = 1",
+        "datasets": {},
+        "timeout_ms": 1000,
+    }
+    try:
+        assert registry.submit(payload, job_id=job_id) == job_id
+        assert started.wait(1)
+        assert registry.submit(payload, job_id=job_id) == job_id
+        with pytest.raises(ControllerRequestError) as caught:
+            registry.submit({**payload, "code": "result = 2"}, job_id=job_id)
+        assert caught.value.status == 409
+        assert caught.value.error_code == "SANDBOX_JOB_ID_CONFLICT"
+        assert calls == 1
+    finally:
+        release.set()
+        registry.shutdown()
+
+
+def test_absent_delete_tombstone_blocks_late_put_without_orphan_job():
+    registry = JobRegistry(
+        executor_factory=lambda _limits: pytest.fail("tombstoned job must not start"),
+    )
+    job_id = "d" * 32
+    release_late_put = threading.Event()
+    put_finished = threading.Event()
+    errors = []
+    payload = {
+        "protocol_version": PROTOCOL_VERSION,
+        "code": "result = 1",
+        "datasets": {},
+        "timeout_ms": 1000,
+    }
+
+    def delayed_put_arrival():
+        release_late_put.wait(1)
+        try:
+            registry.submit(payload, job_id=job_id)
+        except ControllerRequestError as exc:
+            errors.append(exc)
+        finally:
+            put_finished.set()
+
+    thread = threading.Thread(target=delayed_put_arrival)
+    thread.start()
+    absent = registry.cancel(job_id)
+    assert absent["state"] == "ABSENT"
+    release_late_put.set()
+    assert put_finished.wait(1)
+    thread.join(timeout=1)
+
+    assert len(errors) == 1
+    assert errors[0].status == 409
+    assert errors[0].error_code == "SANDBOX_JOB_ID_CANCELLED"
+    assert registry.snapshot() == {
+        "registered_jobs": 0,
+        "running_jobs": 0,
+        "completed_jobs": 0,
+    }
+
+
+def test_tombstone_saturation_globally_blocks_late_put_without_orphan_job(monkeypatch):
+    monkeypatch.setattr(controller_server_module, "MAX_CANCEL_TOMBSTONES", 2)
+    registry = JobRegistry(
+        executor_factory=lambda _limits: pytest.fail("closed admission must not start a job"),
+    )
+    payload = {
+        "protocol_version": PROTOCOL_VERSION,
+        "code": "result = 1",
+        "datasets": {},
+        "timeout_ms": 1000,
+    }
+    registry.cancel("1" * 32)
+    registry.cancel("2" * 32)
+
+    # This DELETE cannot fit an individual tombstone. It must still succeed
+    # and activate a global refusal window that covers its delayed PUT.
+    assert registry.cancel("3" * 32)["state"] == "ABSENT"
+    for job_id in ("3" * 32, "4" * 32):
+        with pytest.raises(ControllerRequestError) as caught:
+            registry.submit(payload, job_id=job_id)
+        assert caught.value.status == 409
+        assert caught.value.error_code == "SANDBOX_JOB_ID_CANCELLED"
+    with pytest.raises(ControllerRequestError) as legacy:
+        registry.submit(payload)
+    assert legacy.value.status == 409
+    assert legacy.value.error_code == "SANDBOX_JOB_ID_CANCELLED"
+    assert registry.snapshot() == {
+        "registered_jobs": 0,
+        "running_jobs": 0,
+        "completed_jobs": 0,
+    }
 
 
 def test_compose_backend_has_no_docker_socket_and_controller_is_private_fixed_boundary():

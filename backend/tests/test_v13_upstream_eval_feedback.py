@@ -85,8 +85,7 @@ def test_review_attests_verified_sql_and_tampering_fails_before_query_pipeline(
         db_session,
         answer_id=answer.id,
         data=FeedbackReviewRequest(decision="APPROVE", comment="Oracle 与业务口径已复核"),
-        reviewer="reviewer@chatbi.local",
-        workspace_id=principal.workspace_id,
+        principal=principal,
     )
     db_session.refresh(answer)
     assert reviewed["status"] == "VERIFIED"
@@ -125,8 +124,7 @@ def test_replay_rejects_resource_rebinding_before_query_pipeline(
         db_session,
         answer_id=answer.id,
         data=FeedbackReviewRequest(decision="APPROVE", comment="Oracle 与业务口径已复核"),
-        reviewer="reviewer@chatbi.local",
-        workspace_id=principal.workspace_id,
+        principal=principal,
     )
 
     def fail_if_called(*args, **kwargs):

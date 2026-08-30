@@ -140,3 +140,39 @@ def test_query_api_rejects_dangerous_sql_before_executor(client, db_session, mon
     assert response.json()["status"] == "SECURITY_REJECTED"
     assert response.json()["execution"] == {}
     assert calls == 0
+
+
+def test_query_pipeline_preserves_explain_cancellation(client, db_session, monkeypatch):
+    datasource, model = prepare_catalog(db_session)
+
+    def cancelled_explain(self, *, datasource, normalized_sql, timeout_ms):
+        return ExecutionResult(
+            status="FAILED",
+            duration_ms=1,
+            datasource_id=datasource.id,
+            dialect=datasource.type,
+            normalized_sql=normalized_sql,
+            error_code="QUERY_CANCELLED",
+            error_message="Query was cancelled during EXPLAIN",
+        )
+
+    monkeypatch.setattr(QueryExecutor, "explain", cancelled_explain)
+    monkeypatch.setattr(
+        QueryExecutor,
+        "execute",
+        lambda *args, **kwargs: (_ for _ in ()).throw(
+            AssertionError("Cancelled EXPLAIN must not execute the query")
+        ),
+    )
+
+    response = client.post("/api/v1/ask", json={
+        "question": "按地区统计订单收入",
+        "datasource_id": datasource.id,
+        "semantic_model_id": model.id,
+    })
+
+    assert response.status_code == 201
+    body = response.json()
+    assert body["status"] == "FAILED"
+    assert body["error_code"] == "QUERY_CANCELLED"
+    assert body["error_message"] == "The operation could not be completed; use the error code for diagnosis."

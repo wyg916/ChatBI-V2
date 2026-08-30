@@ -2,9 +2,15 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from app.core.access import Principal, ensure_resource_access, record_audit, require_permission
+from app.core.access import (
+    Principal,
+    ensure_resource_access,
+    grant_created_resource,
+    record_audit,
+    require_permission,
+)
 from app.db.session import get_db
-from app.models import Dashboard, DashboardCard, VerifiedAnswer
+from app.models import Dashboard, DashboardCard, ResourceGrant, VerifiedAnswer
 from app.query.contracts import AskRequest, QueryResponse
 from app.query.service import QueryPipeline, query_response
 from app.schemas.content import (
@@ -28,12 +34,27 @@ from app.services.content import (
     dashboard_summary,
     list_answers,
     list_dashboards,
+    public_answer_payload,
     refresh_dashboard_card,
     update_answer_status,
 )
 from app.services.datasources import default_workspace
 
 router = APIRouter(tags=["answers and dashboards"])
+
+
+def _allowed_resource_ids(
+    db: Session,
+    principal: Principal,
+    resource_type: str,
+) -> list[str] | None:
+    if principal.role == "ADMIN":
+        return None
+    return list(db.scalars(select(ResourceGrant.resource_id).where(
+        ResourceGrant.user_id == principal.user_id,
+        ResourceGrant.resource_type == resource_type,
+        ResourceGrant.can_read.is_(True),
+    )))
 
 
 @router.get("/answers", response_model=AnswerLibraryResponse)
@@ -45,8 +66,16 @@ def get_answers(
     db: Session = Depends(get_db),
     principal: Principal = Depends(require_permission("answer.read")),
 ):
-    items, total = list_answers(db, query=query, tab=tab, page=page, page_size=page_size, workspace_id=principal.workspace_id)
-    return {"summary": answer_summary(db, principal.workspace_id), "items": items, "total": total, "page": page, "page_size": page_size}
+    allowed_ids = _allowed_resource_ids(db, principal, "ANSWER")
+    items, total = list_answers(
+        db, query=query, tab=tab, page=page, page_size=page_size,
+        workspace_id=principal.workspace_id, allowed_ids=allowed_ids,
+    )
+    return {
+        "summary": answer_summary(db, principal.workspace_id, allowed_ids=allowed_ids),
+        "items": [public_answer_payload(db, item) for item in items],
+        "total": total, "page": page, "page_size": page_size,
+    }
 
 
 @router.post("/answers", response_model=AnswerRead, status_code=status.HTTP_201_CREATED)
@@ -70,11 +99,14 @@ def create_answer(
         sort_order=sort_order,
     )
     db.add(answer)
-    db.commit()
-    db.refresh(answer)
+    db.flush()
+    grant_created_resource(
+        db, principal, resource_type="ANSWER", resource_id=answer.id,
+    )
     record_audit(db, principal, action="CREATE", resource_type="ANSWER", resource_id=answer.id)
     db.commit()
-    return answer
+    db.refresh(answer)
+    return public_answer_payload(db, answer)
 
 
 @router.get("/answers/{answer_id}", response_model=AnswerDetailResponse)
@@ -87,7 +119,7 @@ def get_answer(
     if answer is None:
         raise HTTPException(status_code=404, detail="Answer not found")
     ensure_resource_access(db, principal, resource_type="ANSWER", resource_id=answer_id)
-    return answer
+    return public_answer_payload(db, answer, include_versions=True)
 
 
 @router.patch("/answers/{answer_id}/status", response_model=AnswerRead)
@@ -100,7 +132,9 @@ def set_answer_status(
     answer = db.get(VerifiedAnswer, answer_id)
     if answer is None:
         raise HTTPException(status_code=404, detail="Answer not found")
-    ensure_resource_access(db, principal, resource_type="ANSWER", resource_id=answer_id)
+    ensure_resource_access(
+        db, principal, resource_type="ANSWER", resource_id=answer_id, query=True,
+    )
     try:
         updated = update_answer_status(db, answer, status=data.status, feedback=data.feedback)
         record_audit(
@@ -108,7 +142,7 @@ def set_answer_status(
             details={"status": data.status},
         )
         db.commit()
-        return updated
+        return public_answer_payload(db, updated)
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
 
@@ -122,7 +156,9 @@ def reuse_answer(
     answer = db.get(VerifiedAnswer, answer_id)
     if answer is None:
         raise HTTPException(status_code=404, detail="Answer not found")
-    ensure_resource_access(db, principal, resource_type="ANSWER", resource_id=answer_id)
+    ensure_resource_access(
+        db, principal, resource_type="ANSWER", resource_id=answer_id, query=True,
+    )
     if answer.status != "VERIFIED" or not answer.datasource_id or not answer.semantic_model_id:
         raise HTTPException(status_code=422, detail="Only a complete VERIFIED answer can be reused")
     run = QueryPipeline().execute(db, AskRequest(
@@ -146,8 +182,15 @@ def get_dashboards(
     db: Session = Depends(get_db),
     principal: Principal = Depends(require_permission("dashboard.read")),
 ):
-    items, total = list_dashboards(db, query=query, sort=sort, page=page, page_size=page_size, workspace_id=principal.workspace_id)
-    return {"summary": dashboard_summary(db, principal.workspace_id), "items": items, "total": total, "page": page, "page_size": page_size}
+    allowed_ids = _allowed_resource_ids(db, principal, "DASHBOARD")
+    items, total = list_dashboards(
+        db, query=query, sort=sort, page=page, page_size=page_size,
+        workspace_id=principal.workspace_id, allowed_ids=allowed_ids,
+    )
+    return {
+        "summary": dashboard_summary(db, principal.workspace_id, allowed_ids=allowed_ids),
+        "items": items, "total": total, "page": page, "page_size": page_size,
+    }
 
 
 @router.post("/dashboards", response_model=DashboardRead, status_code=status.HTTP_201_CREATED)
@@ -167,10 +210,13 @@ def create_dashboard(
         sort_order=sort_order,
     )
     db.add(dashboard)
-    db.commit()
-    db.refresh(dashboard)
+    db.flush()
+    grant_created_resource(
+        db, principal, resource_type="DASHBOARD", resource_id=dashboard.id,
+    )
     record_audit(db, principal, action="CREATE", resource_type="DASHBOARD", resource_id=dashboard.id)
     db.commit()
+    db.refresh(dashboard)
     return dashboard
 
 
@@ -183,7 +229,9 @@ def get_dashboard_detail(
     dashboard = db.get(Dashboard, dashboard_id)
     if dashboard is None:
         raise HTTPException(status_code=404, detail="Dashboard not found")
-    ensure_resource_access(db, principal, resource_type="DASHBOARD", resource_id=dashboard_id)
+    ensure_resource_access(
+        db, principal, resource_type="DASHBOARD", resource_id=dashboard_id, query=True,
+    )
     try:
         return dashboard_detail(db, dashboard, principal)
     except (LookupError, RuntimeError) as exc:
@@ -200,11 +248,15 @@ def add_dashboard_card(
     dashboard = db.get(Dashboard, dashboard_id)
     if dashboard is None:
         raise HTTPException(status_code=404, detail="Dashboard not found")
-    ensure_resource_access(db, principal, resource_type="DASHBOARD", resource_id=dashboard_id)
+    ensure_resource_access(
+        db, principal, resource_type="DASHBOARD", resource_id=dashboard_id, query=True,
+    )
     answer = db.get(VerifiedAnswer, data.answer_id)
     if answer is None:
         raise HTTPException(status_code=404, detail="Answer not found")
-    ensure_resource_access(db, principal, resource_type="ANSWER", resource_id=answer.id)
+    ensure_resource_access(
+        db, principal, resource_type="ANSWER", resource_id=answer.id, query=True,
+    )
     try:
         card = create_dashboard_card(db, dashboard, answer=answer, data=data)
     except ValueError as exc:
@@ -229,9 +281,15 @@ def refresh_card(
     db: Session = Depends(get_db),
     principal: Principal = Depends(require_permission("dashboard.manage")),
 ):
-    ensure_resource_access(db, principal, resource_type="DASHBOARD", resource_id=dashboard_id)
+    ensure_resource_access(
+        db, principal, resource_type="DASHBOARD", resource_id=dashboard_id, query=True,
+    )
     try:
-        card = refresh_dashboard_card(db, _card_or_404(db, dashboard_id, card_id))
+        card = _card_or_404(db, dashboard_id, card_id)
+        ensure_resource_access(
+            db, principal, resource_type="ANSWER", resource_id=card.answer_id, query=True,
+        )
+        card = refresh_dashboard_card(db, card, principal=principal)
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     payload = dashboard_card_payload(db, card)
@@ -247,7 +305,9 @@ def delete_card(
     db: Session = Depends(get_db),
     principal: Principal = Depends(require_permission("dashboard.manage")),
 ):
-    ensure_resource_access(db, principal, resource_type="DASHBOARD", resource_id=dashboard_id)
+    ensure_resource_access(
+        db, principal, resource_type="DASHBOARD", resource_id=dashboard_id, query=True,
+    )
     card = _card_or_404(db, dashboard_id, card_id)
     dashboard = db.get(Dashboard, dashboard_id)
     db.delete(card)

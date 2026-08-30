@@ -2,7 +2,7 @@ import { render, screen } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { createMemoryRouter, RouterProvider } from 'react-router-dom';
 import { describe, expect, it } from 'vitest';
-import { AppShell } from '../components/AppShell';
+import { AppShell, parentRouteFor } from '../components/AppShell';
 import { routeManifest } from '../router';
 import { AuthContext } from '../auth';
 
@@ -39,7 +39,7 @@ describe('UI route coverage', () => {
     expect(nav).not.toHaveTextContent('系统设置');
     expect(screen.getByRole('button', { name: '帮助' })).toBeDisabled();
     expect(document.querySelector('.context-pill')?.tagName).toBe('DIV');
-    expect(screen.getByText('v1.3.1 · 开源企业版')).toBeVisible();
+    expect(screen.getByText('v1.4.0 · 开源企业版')).toBeVisible();
   });
 
   it('hides every system and user-management entry from analysts', () => {
@@ -51,5 +51,16 @@ describe('UI route coverage', () => {
     expect(document.querySelector('a[href="/settings/models"]')).toBeNull();
     expect(document.querySelector('a[href="/settings/security"]')).toBeNull();
     expect(screen.getByText('ANALYST · 当前工作空间')).toBeVisible();
+  });
+
+  it('为详情和编辑页面提供稳定的显式父级路由', () => {
+    expect(parentRouteFor('/ask/results')).toEqual({ to: '/', label: '返回问数据' });
+    expect(parentRouteFor('/datasources/source-1')).toEqual({ to: '/datasources', label: '返回数据源列表' });
+    expect(parentRouteFor('/datasources/source-1/workspace')).toEqual({ to: '/datasources/source-1', label: '返回数据源详情' });
+    expect(parentRouteFor('/semantic-models/model-1')).toEqual({ to: '/semantic-models', label: '返回语义模型列表' });
+    expect(parentRouteFor('/dashboards/dashboard-1')).toEqual({ to: '/dashboards', label: '返回看板列表' });
+    expect(parentRouteFor('/evaluation/run-1')).toEqual({ to: '/evaluation', label: '返回评测中心' });
+    expect(parentRouteFor('/settings/security')).toEqual({ to: '/settings/models', label: '返回系统设置' });
+    expect(parentRouteFor('/dashboards')).toBeUndefined();
   });
 });

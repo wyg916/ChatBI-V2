@@ -26,6 +26,7 @@ class SecurityPolicy(BaseModel):
     allowed_schemas: list[str] = Field(default_factory=list)
     allowed_tables: list[str] = Field(default_factory=list)
     allowed_columns: dict[str, list[str]] = Field(default_factory=dict)
+    sensitive_columns: list[str] = Field(default_factory=list)
 
 
 class QueryContext(BaseModel):
@@ -147,6 +148,7 @@ class ExecutionResult(BaseModel):
     dialect: str
     normalized_sql: str
     result_signature: str | None = None
+    masked_columns: list[str] = Field(default_factory=list)
     error_code: str | None = None
     error_message: str | None = None
 

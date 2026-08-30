@@ -4,7 +4,7 @@
 
 | 项 | 现场值 |
 |---|---|
-| source_repository | `E:/新能源企业经营分析智能平台`（只读核验；目标代码不得依赖该绝对路径） |
+| source_repository | 项目所有者授权的旧项目（本机绝对路径不进入公开仓库；目标代码不依赖外部路径） |
 | source_branch | `codex/integration-4.1-full` |
 | current_branch_head | `b2573a9dc1881a54581c5c556fb4a8c34046f9c3` |
 | source_commit（代码盘点） | `b6be894a7153f7ce8d31dfc65da7222bd7af1b5f` |

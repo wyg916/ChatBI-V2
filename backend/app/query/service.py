@@ -8,9 +8,16 @@ from threading import Event
 from time import perf_counter
 from sqlalchemy.orm import Session
 
-from app.core.access import Principal, ensure_resource_access, record_audit
+from app.core.access import (
+    Principal,
+    ensure_resource_access,
+    grant_created_resource,
+    record_audit,
+)
 from app.core.config import get_settings
+from app.core.data_safety import mask_result_rows, redact_public_sql_payload
 from app.model_gateway.contracts import BudgetMode, RequestContext
+from app.model_gateway.control import bind_model_request_control
 from app.model_gateway.ledger import bind_model_invocation_session
 from app.models import (
     AnswerVersion,
@@ -90,8 +97,8 @@ def _select_runtime(db: Session, request: AskRequest, workspace_id: str | None =
         raise PermissionError("Datasource belongs to another workspace")
     if request.semantic_model_id and model.datasource_id != datasource.id:
         raise ValueError("Semantic model and datasource do not match")
-    if datasource.type not in {"postgresql", "mysql"}:
-        raise ValueError("Only PostgreSQL and MySQL are supported")
+    if datasource.type not in {"postgresql", "mysql", "excel"}:
+        raise ValueError("Only PostgreSQL, MySQL and managed spreadsheet datasources are supported")
     return datasource, model
 
 
@@ -230,18 +237,66 @@ def query_response(run: QueryRun) -> QueryResponse:
     summary = _claim_summary(run, claims, narrative.get("conclusion") or fallback_summary)
     kpis = narrative.get("key_metrics") or fallback_kpis
     recommendations = run.follow_up_payload or narrative.get("recommended_questions") or fallback_recommendations
+    context = run.context_payload or {}
+    security_policy = context.get("security_policy") if isinstance(context, dict) else {}
+    sensitive_columns = (
+        list((security_policy or {}).get("sensitive_columns") or [])
+        if isinstance(security_policy, dict)
+        else []
+    )
+    dialect = str(
+        context.get("dialect")
+        or (run.execution_payload or {}).get("dialect")
+        or (run.guard_payload or {}).get("dialect")
+        or "postgresql"
+    )
+    public_context_source = {
+        key: value
+        for key, value in context.items()
+        if key not in {
+            "verified_sql_examples",
+            "request_context",
+            "request_id",
+            "trace_id",
+            "user_id",
+            "permission_hash",
+            "input_signature",
+            "token_budget",
+            "estimated_tokens",
+            "cache_role",
+        }
+    }
+    public_context = redact_public_sql_payload(
+        public_context_source, sensitive_columns, dialect=dialect,
+    )
+    public_plan = redact_public_sql_payload(
+        run.plan_payload or {}, sensitive_columns, dialect=dialect,
+    )
+    public_guard = redact_public_sql_payload(
+        run.guard_payload or {}, sensitive_columns, dialect=dialect,
+    )
+    public_execution = redact_public_sql_payload(
+        run.execution_payload or {}, sensitive_columns, dialect=dialect,
+    )
+    public_error = redact_public_sql_payload({
+        "error_code": run.error_code,
+        "error_message": run.error_message,
+    }, sensitive_columns, dialect=dialect)
+    public_question = redact_public_sql_payload(
+        {"question": run.question}, sensitive_columns, dialect=dialect,
+    )["question"]
     return QueryResponse(
         id=run.id,
-        question=run.question,
+        question=public_question,
         status=run.status,
         provider=run.provider,
         datasource_id=run.datasource_id,
         semantic_model_id=run.semantic_model_id,
         semantic_model_version=run.semantic_model_version,
-        context=run.context_payload or {},
-        plan=run.plan_payload or {},
-        guard=run.guard_payload or {},
-        execution=run.execution_payload or {},
+        context=public_context,
+        plan=public_plan,
+        guard=public_guard,
+        execution=public_execution,
         oracle=run.oracle_payload or {},
         chart_spec=run.chart_spec_payload or {},
         narrative=narrative,
@@ -257,8 +312,8 @@ def query_response(run: QueryRun) -> QueryResponse:
         summary=summary,
         kpis=kpis,
         recommended_questions=recommendations,
-        error_code=run.error_code,
-        error_message=run.error_message,
+        error_code=public_error["error_code"],
+        error_message=public_error["error_message"],
     )
 
 
@@ -301,7 +356,7 @@ class QueryPipeline:
         self, db: Session, request: AskRequest, principal: Principal | None = None,
         *, cancellation_event: Event | None = None, request_context: RequestContext | None = None,
     ) -> QueryRun:
-        with bind_model_invocation_session(db):
+        with bind_model_invocation_session(db), bind_model_request_control(cancellation_event):
             return self._execute(
                 db, request, principal,
                 cancellation_event=cancellation_event,
@@ -376,6 +431,7 @@ class QueryPipeline:
                 blocked_schema_names=list(query_security.get("blocked_schemas") or []),
                 cache_role=principal.role if principal is not None else "SYSTEM",
                 request_context=runtime_context,
+                principal=principal,
             )
             run.context_payload = {
                 **_json(context),
@@ -492,11 +548,14 @@ class QueryPipeline:
                 return run
 
             run.normalized_sql = guard.normalized_sql
-            explain = self.executor.explain(
+            explain_arguments = dict(
                 datasource=datasource,
                 normalized_sql=guard.normalized_sql or "",
                 timeout_ms=context.security_policy.timeout_ms,
             )
+            if cancellation_event is not None:
+                explain_arguments["cancellation_event"] = cancellation_event
+            explain = self.executor.explain(**explain_arguments)
             cost_assessment = self.explain_cost_guard.assess(
                 explain,
                 maximum_cost=settings.query_max_estimated_cost,
@@ -519,6 +578,20 @@ class QueryPipeline:
                 "duration_ms": cost_assessment.explain_duration_ms,
                 "reason": cost_assessment.reason,
             })
+            if explain.error_code == "QUERY_CANCELLED":
+                run.status = "FAILED"
+                run.error_code = "QUERY_CANCELLED"
+                run.error_message = explain.error_message or "Query was cancelled during EXPLAIN"
+                run.oracle_payload = _json(OracleResult(status="NOT_RUN", confidence=0))
+                db.commit()
+                db.refresh(run)
+                if principal is not None:
+                    record_audit(
+                        db, principal, action="QUERY_RUN", resource_type="QUERY_RUN", resource_id=run.id,
+                        status=run.status, details={"error_code": run.error_code},
+                    )
+                    db.commit()
+                return run
             if cost_assessment.status != "PASS":
                 run.status = "SECURITY_REJECTED"
                 run.error_code = (
@@ -545,7 +618,17 @@ class QueryPipeline:
             if cancellation_event is not None:
                 executor_arguments["cancellation_event"] = cancellation_event
             execution = self.executor.execute(**executor_arguments)
-            run.execution_payload = _json(execution)
+            masked_rows, masked_columns = mask_result_rows(
+                guard.normalized_sql or "",
+                execution.rows,
+                context.security_policy.sensitive_columns,
+                dialect=context.dialect,
+            )
+            public_execution = execution.model_copy(update={
+                "rows": masked_rows,
+                "masked_columns": masked_columns,
+            })
+            run.execution_payload = _json(public_execution)
             run.duration_ms = execution.duration_ms
             run.result_signature = execution.result_signature
             _audit(db, run, "QUERY_EXECUTED", "PASS" if execution.status == "SUCCEEDED" else "FAIL", {
@@ -707,7 +790,13 @@ def save_feedback(db: Session, run: QueryRun, data: FeedbackRequest) -> QueryFee
     return feedback
 
 
-def save_verified_answer(db: Session, run: QueryRun, data: SaveAnswerRequest) -> VerifiedAnswer:
+def save_verified_answer(
+    db: Session,
+    run: QueryRun,
+    data: SaveAnswerRequest,
+    *,
+    principal: Principal,
+) -> VerifiedAnswer:
     if run.status != "SUCCEEDED":
         raise ValueError("Only an Oracle-passed query can be saved as an answer")
     helpful = db.scalar(select(QueryFeedback).where(
@@ -751,6 +840,9 @@ def save_verified_answer(db: Session, run: QueryRun, data: SaveAnswerRequest) ->
     )
     db.add(answer)
     db.flush()
+    grant_created_resource(
+        db, principal, resource_type="ANSWER", resource_id=answer.id,
+    )
     db.add(AnswerVersion(
         answer_id=answer.id,
         version=1,

@@ -28,6 +28,7 @@
 .datasource-page .datasource-card>a{grid-template-columns:48px minmax(0,1fr) auto;gap:12px;height:74px;align-items:center}
 .datasource-page .db-icon{width:42px;height:42px;border-radius:10px;font-size:13px}
 .datasource-page .db-icon.mysql{background:#1599a8}
+.datasource-page .db-icon.excel{background:#16845b}
 .datasource-card-title{min-width:0}
 .datasource-card-title h2{font-size:15px;line-height:20px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .datasource-card-title strong{display:block;font-size:15px;line-height:20px;color:#111a2e}
@@ -38,6 +39,23 @@
 .datasource-page .card-stats strong{font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .datasource-page .card-stats small{font-size:10px;margin-top:7px}
 .datasource-page .empty-card{min-height:300px}
+
+.spreadsheet-import-form{min-width:min(760px,78vw)}
+.spreadsheet-import-form input[type=file]{height:auto;padding:10px;border:1px dashed #b8c3d6;border-radius:10px;background:#fafbfe}
+.spreadsheet-limit{display:block;margin-top:-4px;color:#7b879c;line-height:1.6}
+.spreadsheet-preview{max-height:340px;overflow:auto;border:1px solid #dfe5ef;border-radius:12px;background:#fff}
+.spreadsheet-preview>header{position:sticky;top:0;z-index:1;display:flex;justify-content:space-between;gap:16px;padding:12px 14px;border-bottom:1px solid #e7ebf2;background:#f7f9fc;color:#344057;font-size:12px}
+.spreadsheet-preview>header strong{color:#07835e}
+.spreadsheet-preview article{padding:13px 14px;border-bottom:1px solid #edf0f5}
+.spreadsheet-preview article:last-child{border-bottom:0}
+.spreadsheet-preview article>div:first-child{display:flex;justify-content:space-between;gap:14px;margin-bottom:9px;font-size:12px}
+.spreadsheet-preview article>div:first-child span{color:#7b879c}
+.spreadsheet-preview-scroll{overflow:auto}
+.spreadsheet-preview table{min-width:100%;border-collapse:collapse}
+.spreadsheet-preview th,.spreadsheet-preview td{padding:8px 10px;border-bottom:1px solid #edf0f5;text-align:left;white-space:nowrap;font-size:11px}
+.spreadsheet-preview th{background:#fbfcfe;color:#344057}
+.spreadsheet-preview th small{display:block;margin-top:4px;color:#8c97aa;font-size:9px;font-weight:500}
+.spreadsheet-preview td{color:#59667a}
 
 .datasource-detail-page .page-heading{margin-bottom:18px}
 .datasource-detail-page .page-heading h1{font-size:28px}

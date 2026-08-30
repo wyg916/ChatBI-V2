@@ -50,6 +50,46 @@ function renderRoute(initialEntry: string, detail = false) {
 afterEach(() => vi.restoreAllMocks());
 
 describe('数据源高保真页面', () => {
+  it('通过 Backend API 预览并导入 Excel 数据源', async () => {
+    vi.spyOn(datasourceApi, 'list').mockResolvedValue([]);
+    const preview = {
+      filename: '经营数据.xlsx', file_sha256: 'a'.repeat(64), file_size_bytes: 1024, format: 'xlsx' as const,
+      sheet_count: 1, row_count: 2, column_count: 2,
+      limits: { max_bytes: 10_485_760, max_rows: 100_000, max_columns_per_sheet: 256, max_sheets: 32 },
+      sheets: [{
+        source_name: '销售明细', table_name: 'sheet_销售明细', row_count: 2,
+        columns: [
+          { source_name: 'order_id', name: 'order_id', data_type: 'BIGINT', nullable: false },
+          { source_name: 'revenue', name: 'revenue', data_type: 'DOUBLE PRECISION', nullable: false },
+        ],
+        preview_rows: [{ order_id: 1, revenue: 88.5 }, { order_id: 2, revenue: 120 }],
+      }],
+    };
+    vi.spyOn(datasourceApi, 'previewSpreadsheet').mockResolvedValue(preview);
+    const importSpreadsheet = vi.spyOn(datasourceApi, 'importSpreadsheet').mockResolvedValue({
+      datasource: {
+        id: 'source-excel', name: '经营数据', type: 'excel', host: 'Backend managed', port: 0,
+        database: 'Imported spreadsheet', username: 'Managed read-only', status: 'SYNCED', table_count: 1,
+        column_count: 2, import_filename: '经营数据.xlsx', import_row_count: 2, import_sheet_count: 1,
+      },
+      preview,
+    });
+    const user = userEvent.setup();
+    renderRoute('/datasources');
+
+    await user.click(await screen.findByTestId('import-spreadsheet'));
+    const file = new File(['safe workbook'], '经营数据.xlsx', { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+    await user.upload(screen.getByLabelText('选择 Excel 或 CSV 文件'), file);
+
+    expect(await screen.findByLabelText('表格导入预览')).toHaveTextContent('校验通过');
+    expect(screen.getByLabelText('表格导入预览')).toHaveTextContent('销售明细');
+    expect(screen.getByDisplayValue('经营数据')).toBeVisible();
+    await user.click(screen.getByRole('button', { name: '确认导入并同步元数据' }));
+
+    await waitFor(() => expect(importSpreadsheet).toHaveBeenCalledWith('经营数据', file));
+    expect(await screen.findByRole('status')).toHaveTextContent('已导入：1 张工作表、2 行，可用于语义模型和问数');
+  });
+
   it('用 Backend API 统计渲染列表，并支持搜索和状态筛选', async () => {
     const list = vi.spyOn(datasourceApi, 'list').mockImplementation(async (options = {}) => sources.filter((item) => {
       const query = options.query?.trim().toLowerCase() ?? '';

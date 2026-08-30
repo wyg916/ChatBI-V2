@@ -13,13 +13,15 @@ describe('系统设置高保真页面', () => {
   it('从 Backend API 展示模型服务且不在浏览器提供密钥编辑', async () => {
     const user = userEvent.setup();
     vi.spyOn(systemApi, 'modelProviders').mockResolvedValue({
-      active_provider: 'kimi',
+      active_provider: 'mimo',
+      selection_strategy: 'capability-health-unrestricted',
+      usage_unrestricted: true,
       secrets_exposed: false,
       items: [
-        { id: 'kimi', display_name: 'Moonshot Kimi', model_name: 'kimi-k2.6', base_url: 'https://api.moonshot.cn/v1', configured: true, active: true, external_model: true, structured_output: true, protocol: 'openai-chat-completions', credential_env: 'CHATBI_KIMI_API_KEY' },
-        { id: 'mimo', display_name: 'Xiaomi MiMo', model_name: 'mimo-v2.5', base_url: 'https://api.xiaomimimo.com/v1', configured: true, active: false, external_model: true, structured_output: true, protocol: 'openai-chat-completions', credential_env: 'CHATBI_MIMO_API_KEY' },
-        { id: 'deepseek', display_name: 'DeepSeek', model_name: 'deepseek-v4-flash', base_url: 'https://api.deepseek.com', configured: true, active: false, external_model: true, structured_output: true, protocol: 'openai-chat-completions', credential_env: 'CHATBI_DEEPSEEK_API_KEY' },
-        { id: 'deterministic', display_name: 'Local Semantic Runtime', model_name: 'deterministic-semantic-v1', base_url: null, configured: true, active: false, external_model: false, structured_output: true, protocol: 'local', credential_env: null },
+        { id: 'kimi', display_name: 'Moonshot Kimi', model_name: 'kimi-k2.6', base_url: 'https://api.moonshot.cn/v1', configured: true, enabled: true, active: false, healthy: true, health_message: 'HEALTHY', capabilities: ['general', 'nl2sql', 'vision', 'structured', 'stream'], priority: 3, external_model: true, structured_output: true, protocol: 'openai-chat-completions', credential_env: 'CHATBI_KIMI_API_KEY' },
+        { id: 'mimo', display_name: 'Xiaomi MiMo', model_name: 'mimo-v2.5', base_url: 'https://api.xiaomimimo.com/v1', configured: true, enabled: true, active: true, healthy: true, health_message: 'HEALTHY', capabilities: ['general', 'classification', 'nl2sql', 'vision', 'structured', 'stream'], priority: 1, external_model: true, structured_output: true, protocol: 'openai-chat-completions', credential_env: 'CHATBI_MIMO_API_KEY' },
+        { id: 'deepseek', display_name: 'DeepSeek', model_name: 'deepseek-v4-flash', base_url: 'https://api.deepseek.com', configured: true, enabled: true, active: false, healthy: true, health_message: 'HEALTHY', capabilities: ['general', 'classification', 'nl2sql', 'structured', 'tool_call', 'stream'], priority: 2, external_model: true, structured_output: true, protocol: 'openai-chat-completions', credential_env: 'CHATBI_DEEPSEEK_API_KEY' },
+        { id: 'deterministic', display_name: 'Local Semantic Runtime', model_name: 'deterministic-semantic-v1', base_url: null, configured: true, enabled: true, active: false, healthy: true, health_message: 'LOCAL_READY', capabilities: ['semantic_fallback'], priority: 999, external_model: false, structured_output: true, protocol: 'local', credential_env: null },
       ],
     });
     vi.spyOn(systemApi, 'settings').mockResolvedValue({
@@ -32,11 +34,22 @@ describe('系统设置高保真页面', () => {
     render(<MemoryRouter><SettingsModelsPage /></MemoryRouter>);
 
     expect(screen.getByRole('heading', { name: '系统设置', level: 1 })).toBeInTheDocument();
-    expect(await screen.findByText('Xiaomi MiMo')).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'Xiaomi MiMo', level: 3 })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Moonshot Kimi', level: 3 })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'DeepSeek', level: 3 })).toBeInTheDocument();
     expect(screen.getAllByText('已配置').length).toBeGreaterThanOrEqual(3);
+    expect(screen.getByText('三模型不限内部计费')).toBeInTheDocument();
+    expect(screen.getAllByText('不限内部计费').length).toBeGreaterThanOrEqual(3);
+    expect(screen.getByText('可直接路由 + 回答验证')).toBeInTheDocument();
     expect(screen.queryByText('UI 演示')).not.toBeInTheDocument();
+
+    expect(screen.getByText('通用回答 / 最终润色')).toBeInTheDocument();
+    expect(screen.getByText('SQL Guard + Result Oracle')).toBeInTheDocument();
+    expect(screen.getByText('复杂分析 / 高级视觉')).toBeInTheDocument();
+    expect(screen.getAllByText('DeepSeek').length).toBeGreaterThanOrEqual(2);
+    expect(screen.getAllByText('Moonshot Kimi').length).toBeGreaterThanOrEqual(2);
+    expect(screen.getByLabelText('Xiaomi MiMo能力')).toHaveTextContent('流式输出');
+    expect(screen.getAllByText('真实 Chat Completions 连接成功').length).toBeGreaterThanOrEqual(3);
 
     const providerSwitch = screen.getByRole('switch', { name: 'Moonshot Kimi已启用' });
     expect(providerSwitch).toHaveAttribute('aria-checked', 'true');
@@ -63,6 +76,13 @@ describe('系统设置高保真页面', () => {
         { name: 'ANALYST', permissions: ['query.ask', 'datasource.read'], user_count: 1 },
       ],
       audit_events: [{ id: 'e1', actor_email: 'analyst@chatbi.local', action: 'RESOURCE_ACCESS', resource_type: 'DATASOURCE', status: 'DENIED', details: {}, created_at: '2026-08-17T12:00:00Z' }],
+      permission_resources: [
+        { resource_type: 'DATASOURCE', resource_id: 'ds1', name: '销售数据源' },
+        { resource_type: 'SEMANTIC_MODEL', resource_id: 'sm1', name: '经营语义模型' },
+      ],
+      resource_grants: [
+        { id: 'g1', user_id: 'u2', resource_type: 'DATASOURCE', resource_id: 'ds1', can_read: true, can_query: false },
+      ],
     };
     const loadOverview = vi.spyOn(securityApi, 'overview').mockImplementation(async (options = {}) => ({
       ...overview,
@@ -72,6 +92,10 @@ describe('系统设置高保真页面', () => {
           && (!options.status || options.status === 'ALL' || item.status === options.status);
       }),
     }));
+    const savePermission = vi.spyOn(securityApi, 'setResourcePermission').mockResolvedValue({
+      id: 'g1', user_id: 'u2', resource_type: 'DATASOURCE', resource_id: 'ds1', can_read: true, can_query: true,
+    });
+    const revokePermission = vi.spyOn(securityApi, 'revokeResourcePermission').mockResolvedValue(undefined);
     render(<MemoryRouter><SecurityAuditPage /></MemoryRouter>);
 
     expect(screen.getByRole('heading', { name: '用户、角色与审计', level: 1 })).toBeInTheDocument();
@@ -87,16 +111,46 @@ describe('系统设置高保真页面', () => {
 
     await user.click(screen.getByRole('tab', { name: '权限策略' }));
     expect(screen.getByText('query.ask')).toBeInTheDocument();
+    expect(screen.getByRole('combobox', { name: '选择权限成员' })).toHaveValue('u2');
+    expect(screen.getByRole('checkbox', { name: '读取 销售数据源' })).toBeChecked();
+    expect(screen.getByRole('checkbox', { name: '查询 销售数据源' })).not.toBeChecked();
+    await user.click(screen.getByRole('checkbox', { name: '查询 销售数据源' }));
+    await user.click(screen.getByRole('button', { name: '保存 销售数据源 权限' }));
+    await waitFor(() => expect(savePermission).toHaveBeenCalledWith('u2', 'DATASOURCE', 'ds1', { can_read: true, can_query: true }));
+    await user.click(screen.getByRole('button', { name: '撤销 销售数据源 权限' }));
+    await waitFor(() => expect(revokePermission).toHaveBeenCalledWith('u2', 'DATASOURCE', 'ds1'));
+    await user.selectOptions(screen.getByRole('combobox', { name: '选择权限成员' }), 'u1');
+    expect(screen.getByText('管理员为隐式全权')).toBeInTheDocument();
+    expect(screen.queryByRole('table', { name: '资源权限编辑器' })).not.toBeInTheDocument();
     await user.click(screen.getByRole('tab', { name: '审计日志' }));
     expect(screen.getByText(/RESOURCE_ACCESS/)).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: '＋ 邀请成员' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: '邀请成员' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: '＋ 添加成员' })).toBeEnabled();
+  });
+
+  it('兼容尚未返回资源授权字段的旧 Backend 响应', async () => {
+    const user = userEvent.setup();
+    vi.spyOn(securityApi, 'overview').mockResolvedValue({
+      current_actor: { id: 'u1', email: 'admin@chatbi.local', display_name: '管理员', role: 'ADMIN', status: 'ACTIVE' },
+      user_count: 1, role_count: 2, active_user_count: 1, audit_event_count: 0,
+      users: [{ id: 'u1', email: 'admin@chatbi.local', display_name: '管理员', role: 'ADMIN', status: 'ACTIVE' }],
+      roles: [{ name: 'ADMIN', permissions: ['settings.manage'], user_count: 1 }],
+      audit_events: [],
+    } as unknown as SecurityOverview);
+
+    render(<MemoryRouter><SecurityAuditPage /></MemoryRouter>);
+    await user.click(await screen.findByRole('tab', { name: '权限策略' }));
+
+    expect(screen.getByText('管理员为隐式全权')).toBeInTheDocument();
+    expect(screen.queryByRole('table', { name: '资源权限编辑器' })).not.toBeInTheDocument();
   });
 
   it('显示真实 Permission Denied 状态', async () => {
     vi.spyOn(securityApi, 'overview').mockRejectedValue(new ApiError(403, 'Permission denied: audit.read'));
     render(<MemoryRouter><SecurityAuditPage /></MemoryRouter>);
     expect(await screen.findByTestId('permission-denied')).toHaveTextContent('仅 ADMIN');
-    expect(screen.queryByRole('button', { name: '＋ 邀请成员' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '邀请成员' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '＋ 添加成员' })).not.toBeInTheDocument();
     expect(screen.queryByRole('tab', { name: '角色' })).not.toBeInTheDocument();
   });
 

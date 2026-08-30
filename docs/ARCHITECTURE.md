@@ -60,7 +60,7 @@ The controlled V1.3.0 mapping of the governing V1.2.0 Runtime Architecture, IBM 
 
 外部模型密钥只允许由 Backend 环境变量提供。V1.3.0 的 `app/model_gateway/` 是 Provider Chat Completions 的唯一网络边界；General、Intent、Vision 与 NL2SQL 都必须通过同一 `RequestContext → RouterDecision → ModelRequest → ModelGateway → ModelResponse` 契约。`GET /api/v1/query-capabilities` 只返回安全的 Provider 健康、路由/预算摘要和价格版本，不返回密钥；前端不得提供密钥回显或把凭据保存到浏览器。完整约束见 [`docs/runtime/MODEL_CONTROL_PLANE.md`](runtime/MODEL_CONTROL_PLANE.md)。
 
-MiMo 是 Balanced 普通请求的低成本默认 Provider，DeepSeek 是 NL2SQL/Structured 默认 Provider；Kimi 仅在 Quality 预算且复杂度或显式 Premium Trigger 满足时升级，Vision 可在 MiMo 失败后受控回退到 Kimi。所有价格均配置化并记录官方来源与生效日期，Provider 返回 usage 时才形成真实 Token/成本。重试、熔断、回退和取消均在 Gateway 内执行，模型思考字段不持久化。
+MiMo 是 Balanced 普通请求的低成本默认 Provider，DeepSeek 是 NL2SQL/Structured 默认 Provider；Kimi 仅在 Quality 预算且复杂度或显式 Premium Trigger 满足时升级，Vision 可在 MiMo 失败后受控回退到 Kimi。所有价格均配置化并记录官方来源与生效日期，Provider 返回 usage 时才形成真实 Token/成本。重试、熔断、回退和取消均在 Gateway 内执行；本机 unrestricted 三 Provider 使用首轮跨 Provider 公平回退，普通 governed 模式仍保持 Provider 内重试优先。模型思考字段不持久化。
 
 ## 5. Day 2 查询运行时
 
@@ -86,6 +86,6 @@ MiMo 是 Balanced 普通请求的低成本默认 Provider，DeepSeek 是 NL2SQL/
 
 RAG Runtime 保持 ChatBI 自有 FastAPI/HMAC/Workspace/RBAC/ACL 服务边界，但其内部索引、BM25、确定性向量、RRF、rerank 与注入检测直接调用项目负责人已授权旧项目 commit `b2573a9d...` 的三个 checksum-locked selected-source 模块。Runtime 先验证用户与 Workspace 归属，再按 `knowledge_acl` 与场景过滤文档版本，只有授权 Chunk 才进入旧 RAG 算法；返回引用后继续通过唯一 ChatBI Model Gateway、Citation/Answer Guard、AnswerEnvelope 与 SSE。旧项目的 Auth、Workspace、数据库模型、Conversation、Model Gateway、SQL Executor 和 SSE 均未复制。完整锁定与回滚见 [`docs/runtime/V1_3_PHASE3_OWNER_AUTHORIZED_LEGACY_RAG_LOCK.md`](runtime/V1_3_PHASE3_OWNER_AUTHORIZED_LEGACY_RAG_LOCK.md)。
 
-契约位于根目录 `packages/`。Multi-Agent 固定为 `PlannerAgent`、`DataAnalystAgent`、`KnowledgeAgent`、`VerificationAgent`、`InsightAgent`；统一 `ToolExecutor` 只暴露 `QUERY_DATA`、`RETRIEVE_KNOWLEDGE`、`VERIFY_RESULT`、`VERIFY_CITATION`、`GENERATE_CHART`、`GENERATE_INSIGHT`。最大步骤 8、工具调用 12、重规划 2、深度 2、总超时 30 秒。Agent 不能获得数据库连接、Connector、文件、任意 URL 或动态工具；`QUERY_DATA` 始终执行 `Semantic Context → NL2SQL → SQL Guard → Query Executor → Result Oracle`。
+契约位于根目录 `packages/`。Multi-Agent 固定为 `PlannerAgent`、`DataAnalystAgent`、`KnowledgeAgent`、`VerificationAgent`、`InsightAgent`；统一 `ToolExecutor` 只暴露 `QUERY_DATA`、`RETRIEVE_KNOWLEDGE`、`VERIFY_RESULT`、`VERIFY_CITATION`、`GENERATE_CHART`、`GENERATE_INSIGHT`。最大步骤 8、工具调用 12、重规划 2、深度 2；Deterministic/Level0 总超时 30 秒，本机 Auto/Live 三家受控 Provider 总超时最多 120 秒。绝对 deadline 与取消信号继续传入模型 HTTP、RAG、SQL/EXPLAIN 和 Sandbox；网络读取终态后不能触碰账本、数据库或公开回答，Sandbox 迟到提交由幂等任务 ID 与取消 tombstone 拦截。Agent 不能获得数据库连接、Connector、文件、任意 URL 或动态工具；`QUERY_DATA` 始终执行 `Semantic Context → NL2SQL → SQL Guard → Query Executor → Result Oracle`。
 
 `POST /api/v1/analysis/stream` 只流式输出 `UNDERSTANDING`、`QUERYING_DATA`、`RETRIEVING_KNOWLEDGE`、`VERIFYING`、`GENERATING_INSIGHT`、`COMPLETED` 及耗时，不输出模型思维过程。运行记录保存 TTFT、总耗时、工具耗时、角色、步骤、工具、结果签名、引用与验证状态。

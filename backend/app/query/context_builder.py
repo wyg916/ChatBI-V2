@@ -8,19 +8,23 @@ from datetime import datetime, timezone
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.core.access import Principal
 from app.core.config import get_settings
+from app.core.data_safety import SENSITIVE_COMMENT_MARKER, is_sensitive_column, redact_public_sql
 from app.model_gateway.contracts import RequestContext
 from app.models import (
     DataSource,
     DataSourceColumn,
     DataSourceSchema,
     DataSourceTable,
+    ResourceGrant,
     SemanticModel,
     VerifiedAnswer,
     Workspace,
 )
 from app.query.contracts import LinkedObject, QueryContext, SecurityPolicy
 from app.services.semantic import get_semantic_model
+from app.services.datasources import runtime_dialect
 
 
 def _tokens(value: str) -> set[str]:
@@ -75,6 +79,7 @@ class ContextBuilder:
         blocked_schema_names: list[str] | None = None,
         cache_role: str = "SYSTEM",
         request_context: RequestContext | None = None,
+        principal: Principal | None = None,
     ) -> QueryContext:
         model = get_semantic_model(db, semantic_model.id)
         if model is None:
@@ -152,15 +157,57 @@ class ContextBuilder:
             allowed_columns.setdefault(tables_by_id[column.table_id].name.lower(), []).append(column.name.lower())
         for values in allowed_columns.values():
             values.sort()
+        sensitive_columns = sorted({
+            column.name.lower()
+            for column in column_rows
+            if is_sensitive_column(column.name)
+            or SENSITIVE_COMMENT_MARKER in (column.comment or "")
+        })
 
-        examples = list(db.scalars(
-            select(VerifiedAnswer)
-            .where(VerifiedAnswer.workspace_id == workspace.id, VerifiedAnswer.sql_text.is_not(None))
-            .order_by(VerifiedAnswer.accuracy_percent.desc(), VerifiedAnswer.updated_at.desc())
-            .limit(8)
-        ))
+        example_statement = select(VerifiedAnswer).where(
+            VerifiedAnswer.workspace_id == workspace.id,
+            VerifiedAnswer.datasource_id == datasource.id,
+            VerifiedAnswer.semantic_model_id == model.id,
+            VerifiedAnswer.status == "VERIFIED",
+            VerifiedAnswer.oracle_status == "PASSED",
+            VerifiedAnswer.sql_text.is_not(None),
+        )
+        if (
+            principal is None
+            or not principal.user_id
+            or principal.workspace_id != workspace.id
+        ):
+            examples: list[VerifiedAnswer] = []
+        elif principal.role == "ADMIN":
+            examples = list(db.scalars(
+                example_statement
+                .order_by(VerifiedAnswer.accuracy_percent.desc(), VerifiedAnswer.updated_at.desc())
+                .limit(8)
+            ))
+        else:
+            example_statement = example_statement.join(
+                ResourceGrant,
+                (ResourceGrant.resource_id == VerifiedAnswer.id)
+                & (ResourceGrant.resource_type == "ANSWER")
+                & (ResourceGrant.user_id == principal.user_id)
+                & ResourceGrant.can_read.is_(True)
+                & ResourceGrant.can_query.is_(True),
+            )
+            examples = list(db.scalars(
+                example_statement
+                .order_by(VerifiedAnswer.accuracy_percent.desc(), VerifiedAnswer.updated_at.desc())
+                .limit(8)
+            ))
         verified_examples = [
-            {"question": item.question, "sql": item.sql_text, "signature": item.result_signature}
+            {
+                "question": item.question,
+                "sql": redact_public_sql(
+                    item.sql_text,
+                    sensitive_columns,
+                    dialect=runtime_dialect(datasource),
+                ),
+                "signature": item.result_signature,
+            }
             for item in examples
         ]
         entities = [
@@ -228,7 +275,7 @@ class ContextBuilder:
             workspace_name=workspace.name,
             datasource_id=datasource.id,
             datasource_name=datasource.name,
-            dialect=datasource.type,
+            dialect=runtime_dialect(datasource),
             schema_name=datasource.schema,
             semantic_model_id=model.id,
             semantic_model_name=model.name,
@@ -258,5 +305,6 @@ class ContextBuilder:
                 allowed_schemas=sorted({item.name.lower() for item in schema_rows}),
                 allowed_tables=sorted(item.name.lower() for item in table_rows),
                 allowed_columns=allowed_columns,
+                sensitive_columns=sensitive_columns,
             ),
         )

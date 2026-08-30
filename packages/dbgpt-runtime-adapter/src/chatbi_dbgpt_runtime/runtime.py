@@ -75,9 +75,21 @@ class RuntimeRequest:
         }
 
 
+class _CancellationSignal(Protocol):
+    def is_set(self) -> bool: ...
+
+
+class _CompositeCancellationSignal:
+    def __init__(self, *events: threading.Event | None) -> None:
+        self._events = tuple(event for event in events if event is not None)
+
+    def is_set(self) -> bool:
+        return any(event.is_set() for event in self._events)
+
+
 @dataclass(frozen=True)
 class RuntimeControl:
-    cancellation_event: threading.Event
+    cancellation_event: _CancellationSignal
     deadline_monotonic: float
 
     @property
@@ -89,6 +101,41 @@ class RuntimeControl:
             raise DbgptRuntimeCancelled("DB-GPT workflow was cancelled")
         if self.remaining_seconds <= 0:
             raise DbgptRuntimeTimeout("DB-GPT workflow exceeded its deadline")
+
+
+RuntimeCallback = Callable[[RuntimeControl], Any]
+
+
+@dataclass(frozen=True)
+class _RegisteredDeadlineAwareCallback:
+    callback: RuntimeCallback
+
+    def __call__(self, control: RuntimeControl) -> Any:
+        return self.callback(control)
+
+
+def register_deadline_aware_callback(
+    callback: RuntimeCallback,
+) -> RuntimeCallback:
+    """Register a trusted code-owned callback for inline AWEL execution.
+
+    Registration is a production trust boundary, not a cancellation adapter.
+    The callback must keep all blocking work behind ``RuntimeControl``-aware
+    operations and must never be created from dynamic or user-provided code.
+    """
+
+    if isinstance(callback, _RegisteredDeadlineAwareCallback):
+        return callback
+    if not callable(callback):
+        raise TypeError("runtime callback must be callable")
+    return _RegisteredDeadlineAwareCallback(callback)
+
+
+def _require_registered_callback(callback: RuntimeCallback) -> None:
+    if not isinstance(callback, _RegisteredDeadlineAwareCallback):
+        raise DbgptRuntimePolicyError(
+            "runtime callback must be registered as deadline-aware"
+        )
 
 
 @dataclass(frozen=True)
@@ -214,12 +261,13 @@ class DbgptAwelRuntime:
     def run(
         self,
         request: RuntimeRequest,
-        callback: Callable[[RuntimeControl], Any],
+        callback: RuntimeCallback,
         *,
         cancellation_event: threading.Event | None = None,
         deadline_monotonic: float | None = None,
         timeout_seconds: float = 30.0,
     ) -> DbgptRuntimeResult:
+        _require_registered_callback(callback)
         try:
             asyncio.get_running_loop()
         except RuntimeError:
@@ -237,14 +285,15 @@ class DbgptAwelRuntime:
     async def run_async(
         self,
         request: RuntimeRequest,
-        callback: Callable[[RuntimeControl], Any],
+        callback: RuntimeCallback,
         *,
         cancellation_event: threading.Event | None = None,
         deadline_monotonic: float | None = None,
         timeout_seconds: float = 30.0,
     ) -> DbgptRuntimeResult:
-        if timeout_seconds <= 0 or timeout_seconds > 30:
-            raise DbgptRuntimePolicyError("timeout must be within 0..30 seconds")
+        _require_registered_callback(callback)
+        if timeout_seconds <= 0 or timeout_seconds > 120:
+            raise DbgptRuntimePolicyError("timeout must be within 0..120 seconds")
         safe_payload = request.safe_payload()
         upstream = self._loader()
         if upstream.revision != UPSTREAM_REVISION:
@@ -256,7 +305,10 @@ class DbgptAwelRuntime:
             deadline_monotonic or float("inf"),
             time.monotonic() + timeout_seconds,
         )
-        control = RuntimeControl(workflow_cancel, effective_deadline)
+        control = RuntimeControl(
+            _CompositeCancellationSignal(workflow_cancel, caller_cancel),
+            effective_deadline,
+        )
         callback_output: dict[str, Any] = {}
         trace_stages = ["agent.runtime.start", "agent.runtime.dbgpt.awel.build"]
 
@@ -268,7 +320,13 @@ class DbgptAwelRuntime:
             if inspect.iscoroutinefunction(callback):
                 output = await callback(control)
             else:
-                output = await asyncio.to_thread(callback, control)
+                # The selected production callback owns a request-scoped DB
+                # session. Running it in asyncio's default executor makes
+                # cancellation unsafe: cancelling ``to_thread`` cannot stop
+                # that thread, and ``asyncio.run`` waits for it during loop
+                # shutdown. Execute inline and require the tool boundary to
+                # honour this control before any terminal is returned.
+                output = callback(control)
                 if inspect.isawaitable(output):
                     output = await output
             control.checkpoint()

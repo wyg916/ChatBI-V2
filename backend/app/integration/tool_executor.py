@@ -3,7 +3,7 @@ from __future__ import annotations
 import hashlib
 import json
 import re
-from time import perf_counter
+from time import monotonic, perf_counter
 from threading import Event
 
 from chatbi_agent_contracts import (
@@ -79,6 +79,36 @@ ROLE_TOOLS: dict[AgentRole, frozenset[ToolName]] = {
 }
 
 
+class _RuntimeCancellationScope:
+    """One event-like signal for user cancellation and the Agent deadline."""
+
+    def __init__(
+        self,
+        *events: Event | None,
+        deadline_monotonic: float | None = None,
+    ) -> None:
+        self._events = tuple(event for event in events if event is not None)
+        self.deadline_monotonic = deadline_monotonic
+
+    @property
+    def remaining_seconds(self) -> float | None:
+        if self.deadline_monotonic is None:
+            return None
+        return max(0.0, self.deadline_monotonic - monotonic())
+
+    def is_set(self) -> bool:
+        return any(event.is_set() for event in self._events) or (
+            self.deadline_monotonic is not None and self.remaining_seconds == 0
+        )
+
+
+def _remaining_timeout_ms(context: AgentExecutionContext, signal: _RuntimeCancellationScope) -> int:
+    remaining = signal.remaining_seconds
+    if remaining is None:
+        return context.timeout_ms
+    return min(context.timeout_ms, max(1, int(remaining * 1000)))
+
+
 class ChatBIToolExecutor:
     """The sole six-tool bridge; it exposes no connector, URL, SQL or file tool."""
 
@@ -102,7 +132,46 @@ class ChatBIToolExecutor:
         self.citation_verifier = CitationVerifierV1()
 
     def execute(self, call: ToolCall, context: AgentExecutionContext) -> ToolResult:
+        return self._execute(
+            call,
+            context,
+            cancellation_event=_RuntimeCancellationScope(self.cancellation_event),
+            deadline_monotonic=None,
+        )
+
+    def execute_controlled(
+        self,
+        call: ToolCall,
+        context: AgentExecutionContext,
+        *,
+        cancellation_event: Event,
+        deadline_monotonic: float,
+    ) -> ToolResult:
+        signal = _RuntimeCancellationScope(
+            self.cancellation_event,
+            cancellation_event,
+            deadline_monotonic=deadline_monotonic,
+        )
+        return self._execute(
+            call,
+            context,
+            cancellation_event=signal,
+            deadline_monotonic=deadline_monotonic,
+        )
+
+    def _execute(
+        self,
+        call: ToolCall,
+        context: AgentExecutionContext,
+        *,
+        cancellation_event: _RuntimeCancellationScope,
+        deadline_monotonic: float | None,
+    ) -> ToolResult:
         started = perf_counter()
+        if cancellation_event.is_set():
+            return self._result(
+                call.tool_name, started, "FAILED", "TOOL_RUNTIME_CANCELLED",
+            )
         try:
             tool = ToolName(call.tool_name)
         except ValueError:
@@ -111,16 +180,25 @@ class ChatBIToolExecutor:
             return self._result(call.tool_name, started, "REFUSED", "UNAUTHORIZED_TOOL_CALL")
         if tool not in ROLE_TOOLS.get(call.agent_role, frozenset()):
             return self._result(call.tool_name, started, "REFUSED", "AGENT_ROLE_TOOL_DENIED")
-        handlers = {
-            ToolName.QUERY_DATA: self._query_data,
-            ToolName.RETRIEVE_KNOWLEDGE: self._retrieve_knowledge,
+        controlled_handlers = {
+            ToolName.QUERY_DATA: lambda: self._query_data(
+                call, context, cancellation_event, deadline_monotonic,
+            ),
+            ToolName.RETRIEVE_KNOWLEDGE: lambda: self._retrieve_knowledge(
+                call, context, cancellation_event,
+            ),
+        }
+        local_handlers = {
             ToolName.VERIFY_RESULT: self._verify_result,
             ToolName.VERIFY_CITATION: self._verify_citation,
             ToolName.GENERATE_CHART: self._generate_chart,
             ToolName.GENERATE_INSIGHT: self._generate_insight,
         }
         try:
-            status, output, error_code = handlers[tool](call, context)
+            if tool in controlled_handlers:
+                status, output, error_code = controlled_handlers[tool]()
+            else:
+                status, output, error_code = local_handlers[tool](call, context)
         except Exception as exc:  # fail closed and never expose exception text
             return self._result(
                 call.tool_name,
@@ -128,9 +206,19 @@ class ChatBIToolExecutor:
                 "FAILED",
                 f"TOOL_RUNTIME_{type(exc).__name__.upper()}",
             )
+        if cancellation_event.is_set():
+            return self._result(
+                call.tool_name, started, "FAILED", "TOOL_RUNTIME_CANCELLED",
+            )
         return self._result(call.tool_name, started, status, error_code, output)
 
-    def _query_data(self, call: ToolCall, context: AgentExecutionContext):
+    def _query_data(
+        self,
+        call: ToolCall,
+        context: AgentExecutionContext,
+        cancellation_event: _RuntimeCancellationScope,
+        deadline_monotonic: float | None,
+    ):
         datasource_id = call.arguments.get("datasource_id")
         semantic_model_id = call.arguments.get("semantic_model_id")
         if datasource_id and datasource_id not in context.allowed_datasources:
@@ -152,7 +240,7 @@ class ChatBIToolExecutor:
                 semantic_model_id=semantic_model_id,
             ),
             principal=self.principal,
-            cancellation_event=self.cancellation_event,
+            cancellation_event=cancellation_event,
             request_context=(
                 self.request_context.model_copy(update={
                     "question": question,
@@ -174,12 +262,28 @@ class ChatBIToolExecutor:
         if self.file_evidence:
             payload = self._file_database_comparison(payload)
         elif re.search(r"(?:Python|相关性|相关系数)", question, re.IGNORECASE):
-            payload, sandbox_error = self._correlation_result(payload, context)
+            payload, sandbox_error = self._correlation_result(
+                payload, context, cancellation_event, deadline_monotonic,
+            )
             if sandbox_error:
                 return "FAILED", payload, sandbox_error
         return "SUCCEEDED", payload, None
 
-    def _correlation_result(self, payload: dict, context: AgentExecutionContext) -> tuple[dict, str | None]:
+    def _correlation_result(
+        self,
+        payload: dict,
+        context: AgentExecutionContext,
+        cancellation_event: _RuntimeCancellationScope | None = None,
+        deadline_monotonic: float | None = None,
+    ) -> tuple[dict, str | None]:
+        cancellation_scope = cancellation_event or _RuntimeCancellationScope(
+            deadline_monotonic=deadline_monotonic,
+        )
+        effective_deadline = (
+            deadline_monotonic
+            if deadline_monotonic is not None
+            else cancellation_scope.deadline_monotonic
+        )
         rows = list((payload.get("execution") or {}).get("rows") or [])
         code = (
             "rows = datasets['rows']\n"
@@ -200,8 +304,9 @@ class ChatBIToolExecutor:
                 environment={"rows": rows},
                 trace_id=context.trace_id,
                 workspace_id=context.workspace_id,
-                timeout_ms=min(context.timeout_ms, 15_000),
-                cancellation_event=self.cancellation_event,
+                timeout_ms=min(_remaining_timeout_ms(context, cancellation_scope), 15_000),
+                cancellation_event=cancellation_scope,
+                deadline_monotonic=effective_deadline,
             ),
             SandboxControllerClient(get_settings().sandbox_controller_url),
         )
@@ -279,7 +384,12 @@ class ChatBIToolExecutor:
             ),
         )
 
-    def _retrieve_knowledge(self, call: ToolCall, context: AgentExecutionContext):
+    def _retrieve_knowledge(
+        self,
+        call: ToolCall,
+        context: AgentExecutionContext,
+        cancellation_event: _RuntimeCancellationScope,
+    ):
         if self.rag_adapter is None:
             return "FAILED", {}, "RAG_RUNTIME_UNAVAILABLE"
         try:
@@ -294,17 +404,20 @@ class ChatBIToolExecutor:
                         allowed_semantic_models=context.allowed_semantic_models,
                         allowed_tools=frozenset({ToolName.RETRIEVE_KNOWLEDGE.value}),
                         trace_id=context.trace_id,
-                        timeout_ms=context.timeout_ms,
+                        timeout_ms=min(
+                            _remaining_timeout_ms(context, cancellation_event),
+                            30_000,
+                        ),
                         max_steps=context.max_steps,
                         token_budget=context.token_budget,
                     ),
                 )
             if isinstance(self.rag_adapter, LiveRagAdapter):
                 result = self.rag_adapter.retrieve(
-                    rag_request, cancellation_event=self.cancellation_event,
+                    rag_request, cancellation_event=cancellation_event,
                 )
             else:
-                if self.cancellation_event is not None and self.cancellation_event.is_set():
+                if cancellation_event.is_set():
                     raise RagAdapterError("live RAG request cancelled")
                 result = self.rag_adapter.retrieve(rag_request)
         except RagAdapterError:

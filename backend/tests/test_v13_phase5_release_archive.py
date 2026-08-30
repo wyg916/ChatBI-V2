@@ -10,7 +10,7 @@ import pytest
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 SCRIPT_PATH = PROJECT_ROOT / "scripts" / "extract_git_archive.py"
-DRY_RUN_PATH = PROJECT_ROOT / "scripts" / "test-v13-phase5-rollback-dry-run.ps1"
+DRY_RUN_PATH = PROJECT_ROOT / "scripts" / "test-v131-historical-rollback-dry-run.ps1"
 SPEC = importlib.util.spec_from_file_location("phase5_extract_git_archive", SCRIPT_PATH)
 assert SPEC and SPEC.loader
 MODULE = importlib.util.module_from_spec(SPEC)

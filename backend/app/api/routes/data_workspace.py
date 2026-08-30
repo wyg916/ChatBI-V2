@@ -7,8 +7,9 @@ from sqlglot.errors import ParseError
 
 from app.core.access import Principal, ensure_resource_access, require_permission
 from app.core.config import get_settings
+from app.core.data_safety import redact_public_sql, redact_public_sql_payload
 from app.db.session import get_db
-from app.models import SqlWorkspaceRun
+from app.models import ResourceGrant, SqlWorkspaceRun
 from app.schemas.data_workspace import (
     CatalogSearchResponse,
     FormatSqlRequest,
@@ -22,6 +23,7 @@ from app.schemas.data_workspace import (
     WorkspaceRunRead,
 )
 from app.services import data_workspace as service
+from app.services.datasources import runtime_dialect
 
 
 router = APIRouter(prefix="/data-workspace", tags=["data workspace"])
@@ -41,12 +43,49 @@ def _datasource(db: Session, principal: Principal, datasource_id: str, *, query_
         raise HTTPException(status_code=422, detail=str(exc)) from exc
 
 
-def _run_read(run: SqlWorkspaceRun) -> WorkspaceRunRead:
+def _run_read(db: Session, run: SqlWorkspaceRun) -> WorkspaceRunRead:
+    dialect = str((run.guard_payload or {}).get("dialect") or "postgresql")
+    guard_payload = dict(run.guard_payload or {})
+    snapshot = guard_payload.pop("_sensitive_columns_snapshot", [])
+    snapshot_columns = [
+        item for item in snapshot if isinstance(item, str)
+    ] if isinstance(snapshot, list) else []
+    if run.datasource_id is None:
+        sensitive_columns = snapshot_columns
+    else:
+        try:
+            current_columns = service.security_policy(
+                db, run.datasource_id, get_settings().query_row_limit,
+            ).sensitive_columns
+            sensitive_columns = sorted(set(current_columns) | set(snapshot_columns))
+        except (LookupError, ValueError):
+            # A historical run must remain safe to read even if its catalog has
+            # since been removed or is no longer available.
+            sensitive_columns = snapshot_columns
+    public_error = redact_public_sql_payload({
+        "error_code": run.error_code,
+        "error_message": run.error_message,
+    }, sensitive_columns, dialect=dialect)
     return WorkspaceRunRead(
-        id=run.id, datasource_id=run.datasource_id, operation=run.operation, sql_text=run.sql_text,
-        normalized_sql=run.normalized_sql, status=run.status, guard=run.guard_payload or {},
-        execution=run.execution_payload or {}, oracle=run.oracle_payload or {}, duration_ms=run.duration_ms,
-        error_code=run.error_code, error_message=run.error_message,
+        id=run.id, datasource_id=run.datasource_id, operation=run.operation,
+        sql_text=redact_public_sql(
+            run.sql_text, sensitive_columns, dialect=dialect,
+        ) or "",
+        normalized_sql=redact_public_sql(
+            run.normalized_sql, sensitive_columns, dialect=dialect,
+        ),
+        status=run.status,
+        guard=redact_public_sql_payload(
+            guard_payload, sensitive_columns, dialect=dialect,
+        ),
+        execution=redact_public_sql_payload(
+            run.execution_payload or {}, sensitive_columns, dialect=dialect,
+        ),
+        oracle=redact_public_sql_payload(
+            run.oracle_payload or {}, sensitive_columns, dialect=dialect,
+        ),
+        duration_ms=run.duration_ms,
+        error_code=public_error["error_code"], error_message=public_error["error_message"],
         verified_answer_id=run.verified_answer_id, created_at=run.created_at,
     )
 
@@ -57,7 +96,23 @@ def _run_or_404(db: Session, principal: Principal, run_id: str) -> SqlWorkspaceR
         raise HTTPException(status_code=404, detail="SQL workspace run not found")
     if run.workspace_id != principal.workspace_id or run.user_id != principal.user_id:
         raise HTTPException(status_code=403, detail="SQL workspace run access denied")
+    if run.datasource_id is None:
+        # Once the live source and grants are gone, there is no revocable ACL to
+        # evaluate. Detached evidence therefore remains admin-only until a
+        # durable historical entitlement snapshot is introduced.
+        if principal.role != "ADMIN":
+            raise HTTPException(status_code=403, detail="SQL workspace run access denied")
+    else:
+        ensure_resource_access(
+            db, principal, resource_type="DATASOURCE", resource_id=run.datasource_id, query=True,
+        )
     return run
+
+
+def _attached_datasource_id(run: SqlWorkspaceRun) -> str:
+    if run.datasource_id is None:
+        raise HTTPException(status_code=409, detail="SQL_WORKSPACE_DATASOURCE_DELETED")
+    return run.datasource_id
 
 
 @router.get("/datasources/{datasource_id}/search", response_model=CatalogSearchResponse)
@@ -105,7 +160,10 @@ def sample_values(
     except LookupError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     if run.status != "SUCCEEDED":
-        raise HTTPException(status_code=422, detail=run.error_message or run.error_code or "Sample query failed")
+        raise HTTPException(
+            status_code=422,
+            detail=f"Sample query failed ({run.error_code or run.status})",
+        )
     return SampleResponse(
         datasource_id=datasource_id, schema_name=schema_name, table_name=table_name,
         columns=list((run.execution_payload or {}).get("columns", [])), rows=rows, row_count=len(rows),
@@ -122,10 +180,13 @@ def format_workspace_sql(
 ):
     datasource = _datasource(db, principal, data.datasource_id, query_access=True)
     try:
-        formatted = service.format_sql(data.sql, datasource.type)
+        formatted = service.format_sql(data.sql, runtime_dialect(datasource))
     except (ParseError, ValueError) as exc:
-        raise HTTPException(status_code=422, detail=f"SQL parse error: {str(exc)[:500]}") from exc
-    return SqlFormatResponse(dialect=datasource.type, formatted_sql=formatted)
+        raise HTTPException(
+            status_code=422,
+            detail="SQL parse error; the statement could not be formatted",
+        ) from exc
+    return SqlFormatResponse(dialect=runtime_dialect(datasource), formatted_sql=formatted)
 
 
 @router.post("/sql/execute", response_model=WorkspaceRunRead, status_code=status.HTTP_201_CREATED)
@@ -135,7 +196,7 @@ def execute_workspace_sql(
     principal: Principal = Depends(require_permission("query.ask")),
 ):
     datasource = _datasource(db, principal, data.datasource_id, query_access=True)
-    return _run_read(service.execute_sql(db, principal, datasource, data.sql, row_limit=data.row_limit))
+    return _run_read(db, service.execute_sql(db, principal, datasource, data.sql, row_limit=data.row_limit))
 
 
 @router.post("/sql/explain", response_model=WorkspaceRunRead, status_code=status.HTTP_201_CREATED)
@@ -145,7 +206,7 @@ def explain_workspace_sql(
     principal: Principal = Depends(require_permission("query.ask")),
 ):
     datasource = _datasource(db, principal, data.datasource_id, query_access=True)
-    return _run_read(service.execute_sql(
+    return _run_read(db, service.execute_sql(
         db, principal, datasource, data.sql, row_limit=data.row_limit, operation="EXPLAIN",
     ))
 
@@ -162,15 +223,22 @@ def workspace_history(
         SqlWorkspaceRun.workspace_id == principal.workspace_id,
         SqlWorkspaceRun.user_id == principal.user_id,
     ]
+    if principal.role != "ADMIN":
+        authorized_datasources = select(ResourceGrant.resource_id).where(
+            ResourceGrant.user_id == principal.user_id,
+            ResourceGrant.resource_type == "DATASOURCE",
+            ResourceGrant.can_query.is_(True),
+        )
+        filters.append(SqlWorkspaceRun.datasource_id.in_(authorized_datasources))
     if datasource_id:
-        _datasource(db, principal, datasource_id)
+        _datasource(db, principal, datasource_id, query_access=True)
         filters.append(SqlWorkspaceRun.datasource_id == datasource_id)
     total = int(db.scalar(select(func.count(SqlWorkspaceRun.id)).where(*filters)) or 0)
     items = list(db.scalars(
         select(SqlWorkspaceRun).where(*filters).order_by(SqlWorkspaceRun.created_at.desc())
         .offset((page - 1) * page_size).limit(page_size)
     ))
-    return WorkspaceHistoryResponse(items=[_run_read(item) for item in items], total=total, page=page, page_size=page_size)
+    return WorkspaceHistoryResponse(items=[_run_read(db, item) for item in items], total=total, page=page, page_size=page_size)
 
 
 @router.post("/sql/history/{run_id}/replay", response_model=WorkspaceRunRead, status_code=status.HTTP_201_CREATED)
@@ -180,8 +248,10 @@ def replay_workspace_sql(
     principal: Principal = Depends(require_permission("query.ask")),
 ):
     previous = _run_or_404(db, principal, run_id)
-    datasource = _datasource(db, principal, previous.datasource_id, query_access=True)
-    return _run_read(service.execute_sql(
+    datasource = _datasource(
+        db, principal, _attached_datasource_id(previous), query_access=True,
+    )
+    return _run_read(db, service.execute_sql(
         db, principal, datasource, previous.sql_text, row_limit=get_settings().query_row_limit,
         operation="EXPLAIN" if previous.operation == "EXPLAIN" else "REPLAY",
     ))
@@ -195,7 +265,7 @@ def verify_workspace_sql(
     principal: Principal = Depends(require_permission("answer.manage")),
 ):
     run = _run_or_404(db, principal, run_id)
-    _datasource(db, principal, run.datasource_id, query_access=True)
+    _datasource(db, principal, _attached_datasource_id(run), query_access=True)
     try:
         answer = service.save_verified_sql(
             db, principal, run, owner_name=data.owner_name, status=data.status,

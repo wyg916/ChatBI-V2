@@ -1,4 +1,4 @@
-import { useDeferredValue, useEffect, useMemo, useState, type FormEvent } from 'react';
+import { useDeferredValue, useEffect, useMemo, useRef, useState, type FormEvent, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useParams } from 'react-router-dom';
 import { semanticApi } from '../api/semantic';
@@ -6,7 +6,6 @@ import { useSemanticModel } from '../hooks/useData';
 import { ErrorNotice, Field, FormActions, Loading, Modal } from '../components/UI';
 import type { SemanticModel, SemanticResource, SemanticVersion } from '../types/api';
 import canvasGrid from '../assets/semantic/canvas-grid.png';
-import relationEndpoint from '../assets/semantic/relation-endpoint.svg';
 import tagDot from '../assets/semantic/tag-dot.svg';
 import toggleOn from '../assets/semantic/toggle-on.svg';
 import './semantic.css';
@@ -21,6 +20,64 @@ const resourceConfig = {
 
 type Kind = keyof typeof resourceConfig;
 type ResourceItem = SemanticResource & { id?: string };
+type NodePosition = { x: number; y: number };
+
+const NODE_WIDTH = 220;
+const NODE_HEIGHT = 144;
+const NODE_GAP = 30;
+const NODE_PADDING = 28;
+
+function resourceKey(item: ResourceItem, kind: Kind, index: number) {
+  const title = kind === 'business-terms' ? item.term : kind === 'relationships' ? `${item.left_entity}-${item.right_entity}` : item.name ?? item.label;
+  return String(item.id ?? `${kind}:${title ?? index}`);
+}
+
+function autoNodePositions(keys: string[], width: number) {
+  const safeWidth = Math.max(width, NODE_WIDTH + NODE_PADDING * 2);
+  const columns = Math.max(1, Math.min(3, Math.floor((safeWidth - NODE_PADDING * 2 + NODE_GAP) / (NODE_WIDTH + NODE_GAP))));
+  const usedWidth = columns * NODE_WIDTH + (columns - 1) * NODE_GAP;
+  const startX = Math.max(NODE_PADDING, (safeWidth - usedWidth) / 2);
+  return Object.fromEntries(keys.map((key, index) => [key, {
+    x: Math.round(startX + (index % columns) * (NODE_WIDTH + NODE_GAP)),
+    y: NODE_PADDING + Math.floor(index / columns) * (NODE_HEIGHT + NODE_GAP),
+  }])) as Record<string, NodePosition>;
+}
+
+function clampNode(position: NodePosition, width: number, height: number) {
+  return {
+    x: Math.max(0, Math.min(position.x, Math.max(0, width - NODE_WIDTH))),
+    y: Math.max(0, Math.min(position.y, Math.max(0, height - NODE_HEIGHT))),
+  };
+}
+
+function nodeOverlaps(left: NodePosition, right: NodePosition) {
+  const clearance = 10;
+  return left.x < right.x + NODE_WIDTH + clearance
+    && left.x + NODE_WIDTH + clearance > right.x
+    && left.y < right.y + NODE_HEIGHT + clearance
+    && left.y + NODE_HEIGHT + clearance > right.y;
+}
+
+function nearestFreePosition(key: string, desired: NodePosition, positions: Record<string, NodePosition>, width: number, height: number) {
+  const occupied = Object.entries(positions).filter(([otherKey]) => otherKey !== key).map(([, value]) => value);
+  const available = (candidate: NodePosition) => !occupied.some((other) => nodeOverlaps(candidate, other));
+  const origin = clampNode(desired, width, height);
+  if (available(origin)) return origin;
+  const step = 26;
+  for (let radius = 1; radius <= 24; radius += 1) {
+    for (let offset = -radius; offset <= radius; offset += 1) {
+      const candidates = [
+        { x: origin.x + offset * step, y: origin.y - radius * step },
+        { x: origin.x + offset * step, y: origin.y + radius * step },
+        { x: origin.x - radius * step, y: origin.y + offset * step },
+        { x: origin.x + radius * step, y: origin.y + offset * step },
+      ].map((candidate) => clampNode(candidate, width, height));
+      const match = candidates.find(available);
+      if (match) return match;
+    }
+  }
+  return origin;
+}
 
 function itemsFor(model: SemanticModel, kind: Kind): ResourceItem[] {
   if (kind === 'business-terms') return model.business_terms ?? [];
@@ -127,6 +184,11 @@ export function SemanticEditorPage() {
   const [history, setHistory] = useState<SemanticVersion[]>([]);
   const [historyError, setHistoryError] = useState<unknown>();
   const deferredResourceSearch = useDeferredValue(resourceSearch);
+  const graphViewportRef = useRef<HTMLDivElement>(null);
+  const [graphSize, setGraphSize] = useState({ width: 720, height: 500 });
+  const [nodePositions, setNodePositions] = useState<Record<string, NodePosition>>({});
+  const [layoutReady, setLayoutReady] = useState(false);
+  const [dragState, setDragState] = useState<{ key: string; pointerId: number; clientX: number; clientY: number; origin: NodePosition }>();
 
   const items = useMemo(() => model.data ? itemsFor(model.data, active) : [], [active, model.data]);
   const resourceResults = useQuery({
@@ -136,6 +198,48 @@ export function SemanticEditorPage() {
   });
   const filteredItems = deferredResourceSearch.trim() ? ((resourceResults.data ?? []) as ResourceItem[]) : items;
   const selected = items.find((item) => item.id === selectedId) ?? items[0];
+  const allNodeKeys = useMemo(() => items.map((item, index) => resourceKey(item, active, index)), [active, items]);
+  const layoutStorageKey = `chatbi:semantic-layout:${id}:${active}`;
+
+  useEffect(() => {
+    const element = graphViewportRef.current;
+    if (!element || typeof ResizeObserver === 'undefined') return;
+    const update = () => {
+      if (element.clientWidth > 0 && element.clientHeight > 0) setGraphSize({ width: element.clientWidth, height: element.clientHeight });
+    };
+    update();
+    const observer = new ResizeObserver(update);
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, [model.data]);
+
+  useEffect(() => {
+    const automatic = autoNodePositions(allNodeKeys, graphSize.width);
+    let saved: Record<string, NodePosition> = {};
+    try {
+      saved = JSON.parse(localStorage.getItem(layoutStorageKey) ?? '{}') as Record<string, NodePosition>;
+    } catch {
+      saved = {};
+    }
+    const rows = Math.max(1, Math.ceil(allNodeKeys.length / Math.max(1, Math.floor((graphSize.width - NODE_PADDING * 2 + NODE_GAP) / (NODE_WIDTH + NODE_GAP)))));
+    const height = Math.max(graphSize.height, NODE_PADDING * 2 + rows * NODE_HEIGHT + Math.max(0, rows - 1) * NODE_GAP);
+    const next: Record<string, NodePosition> = {};
+    allNodeKeys.forEach((key) => {
+      const requested = saved[key] && Number.isFinite(saved[key].x) && Number.isFinite(saved[key].y) ? saved[key] : automatic[key];
+      next[key] = nearestFreePosition(key, requested, next, graphSize.width, height);
+    });
+    setNodePositions(next);
+    setLayoutReady(true);
+  }, [allNodeKeys, graphSize.height, graphSize.width, layoutStorageKey]);
+
+  useEffect(() => {
+    if (!layoutReady) return;
+    try {
+      localStorage.setItem(layoutStorageKey, JSON.stringify(nodePositions));
+    } catch {
+      // Browser storage may be disabled; the in-memory layout remains stable for this session.
+    }
+  }, [layoutReady, layoutStorageKey, nodePositions]);
 
   useEffect(() => {
     const next = items[0];
@@ -217,6 +321,71 @@ export function SemanticEditorPage() {
     setConfigDraft(draftFrom(item, active));
   };
 
+  const visibleNodes = filteredItems.map((item, index) => ({ item, key: resourceKey(item, active, index), index }));
+  const columns = Math.max(1, Math.min(3, Math.floor((graphSize.width - NODE_PADDING * 2 + NODE_GAP) / (NODE_WIDTH + NODE_GAP))));
+  const rows = Math.max(1, Math.ceil(allNodeKeys.length / columns));
+  const automaticHeight = NODE_PADDING * 2 + rows * NODE_HEIGHT + Math.max(0, rows - 1) * NODE_GAP;
+  const positionedHeight = Object.values(nodePositions).reduce((maximum, position) => Math.max(maximum, position.y + NODE_HEIGHT + NODE_PADDING), 0);
+  const graphSurfaceHeight = Math.max(graphSize.height, automaticHeight, positionedHeight);
+  const visibleEntityKeys = new Map(visibleNodes.map(({ item, key }) => [String(item.name ?? item.source_table ?? ''), key]));
+  const relationshipLines = active === 'entities' ? (model.data.relationships ?? []).flatMap((relationship, index) => {
+    const fromKey = visibleEntityKeys.get(String(relationship.left_entity));
+    const toKey = visibleEntityKeys.get(String(relationship.right_entity));
+    const from = fromKey ? nodePositions[fromKey] : undefined;
+    const to = toKey ? nodePositions[toKey] : undefined;
+    if (!fromKey || !toKey || !from || !to) return [];
+    const startX = from.x + NODE_WIDTH / 2;
+    const startY = from.y + NODE_HEIGHT / 2;
+    const endX = to.x + NODE_WIDTH / 2;
+    const endY = to.y + NODE_HEIGHT / 2;
+    const bend = Math.max(36, Math.abs(endX - startX) * 0.42);
+    return [{ key: String(relationship.id ?? `relationship-${index}`), path: `M ${startX} ${startY} C ${startX + bend} ${startY}, ${endX - bend} ${endY}, ${endX} ${endY}` }];
+  }) : [];
+
+  const startNodeDrag = (event: ReactPointerEvent<HTMLButtonElement>, item: ResourceItem, key: string) => {
+    const position = nodePositions[key];
+    if (!position) return;
+    updateSelected(item);
+    event.currentTarget.setPointerCapture?.(event.pointerId);
+    setDragState({ key, pointerId: event.pointerId, clientX: Number.isFinite(event.clientX) ? event.clientX : 0, clientY: Number.isFinite(event.clientY) ? event.clientY : 0, origin: position });
+  };
+
+  const moveNode = (event: ReactPointerEvent<HTMLButtonElement>) => {
+    if (!dragState || dragState.pointerId !== event.pointerId) return;
+    const clientX = Number.isFinite(event.clientX) ? event.clientX : dragState.clientX;
+    const clientY = Number.isFinite(event.clientY) ? event.clientY : dragState.clientY;
+    const next = clampNode({
+      x: dragState.origin.x + clientX - dragState.clientX,
+      y: dragState.origin.y + clientY - dragState.clientY,
+    }, graphSize.width, graphSurfaceHeight);
+    setNodePositions((current) => ({ ...current, [dragState.key]: next }));
+  };
+
+  const finishNodeDrag = (event: ReactPointerEvent<HTMLButtonElement>) => {
+    if (!dragState || dragState.pointerId !== event.pointerId) return;
+    event.currentTarget.releasePointerCapture?.(event.pointerId);
+    setNodePositions((current) => ({
+      ...current,
+      [dragState.key]: nearestFreePosition(dragState.key, current[dragState.key] ?? dragState.origin, current, graphSize.width, graphSurfaceHeight),
+    }));
+    setDragState(undefined);
+  };
+
+  const moveNodeWithKeyboard = (event: ReactKeyboardEvent<HTMLButtonElement>, key: string) => {
+    const direction: Record<string, NodePosition> = {
+      ArrowLeft: { x: -1, y: 0 }, ArrowRight: { x: 1, y: 0 }, ArrowUp: { x: 0, y: -1 }, ArrowDown: { x: 0, y: 1 },
+    };
+    const delta = direction[event.key];
+    if (!delta) return;
+    event.preventDefault();
+    const step = event.shiftKey ? 40 : 12;
+    setNodePositions((current) => {
+      const origin = current[key] ?? { x: 0, y: 0 };
+      const requested = { x: origin.x + delta.x * step, y: origin.y + delta.y * step };
+      return { ...current, [key]: nearestFreePosition(key, requested, current, graphSize.width, graphSurfaceHeight) };
+    });
+  };
+
   return (
     <section className="semantic-editor-page" aria-label="语义模型编辑器">
       <header className="semantic-editor-heading">
@@ -254,19 +423,39 @@ export function SemanticEditorPage() {
         </aside>
 
         <main className="semantic-graph" style={{ backgroundImage: `url(${canvasGrid})` }} aria-label={`${config.label}关系画布`}>
-          {filteredItems.length > 1 && <div className="semantic-connectors" aria-hidden="true"><span><img src={relationEndpoint} alt="" /></span><span><img src={relationEndpoint} alt="" /></span><span><img src={relationEndpoint} alt="" /></span></div>}
-          <div className="semantic-graph-nodes">
-            {filteredItems.slice(0, 4).map((item, index) => (
-              <button className={`semantic-node ${selected?.id === item.id ? 'active' : ''}`} onClick={() => updateSelected(item)} key={item.id ?? index}>
-                <header><strong>{itemTitle(item, active, index)}</strong><span>{config.shortLabel}</span></header>
-                {itemRows(item, active).map(([icon, value, label], rowIndex) => (
-                  <div className="semantic-node-row" key={`${String(value)}-${rowIndex}`}><span><i>{String(icon)}</i>{String(value ?? '未设置')}</span><small>{String(label)}</small></div>
-                ))}
-              </button>
-            ))}
+          <div className="semantic-graph-toolbar"><span>拖动画布卡片可自由排布，位置会自动保存</span><b>{active === 'entities' ? `${relationshipLines.length} 条关系` : `${visibleNodes.length} 个资源`}</b></div>
+          <div className="semantic-graph-viewport" ref={graphViewportRef}>
+            <div className="semantic-graph-surface" style={{ height: graphSurfaceHeight }}>
+              {relationshipLines.length > 0 && <svg className="semantic-connectors" width={graphSize.width} height={graphSurfaceHeight} viewBox={`0 0 ${graphSize.width} ${graphSurfaceHeight}`} aria-hidden="true">
+                <defs><marker id="semantic-arrow" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 Z" /></marker></defs>
+                {relationshipLines.map((line) => <path key={line.key} d={line.path} markerEnd="url(#semantic-arrow)" />)}
+              </svg>}
+              <div className="semantic-graph-nodes">
+                {visibleNodes.map(({ item, key, index }) => {
+                  const position = nodePositions[key] ?? autoNodePositions([key], graphSize.width)[key];
+                  return <button
+                    className={`semantic-node ${selected?.id === item.id ? 'active' : ''} ${dragState?.key === key ? 'dragging' : ''}`}
+                    data-node-key={key}
+                    style={{ transform: `translate3d(${position.x}px, ${position.y}px, 0)` }}
+                    onPointerDown={(event) => startNodeDrag(event, item, key)}
+                    onPointerMove={moveNode}
+                    onPointerUp={finishNodeDrag}
+                    onPointerCancel={finishNodeDrag}
+                    onKeyDown={(event) => moveNodeWithKeyboard(event, key)}
+                    aria-label={`${itemTitle(item, active, index)}，可拖动`}
+                    title="拖动调整位置；也可使用方向键微调"
+                    key={key}
+                  >
+                    <header><strong>{itemTitle(item, active, index)}</strong><span>{config.shortLabel}</span></header>
+                    {itemRows(item, active).map(([icon, value, label], rowIndex) => (
+                      <div className="semantic-node-row" key={`${String(value)}-${rowIndex}`}><span><i>{String(icon)}</i>{String(value ?? '未设置')}</span><small>{String(label)}</small></div>
+                    ))}
+                  </button>;
+                })}
+              </div>
+              {!filteredItems.length && <div className="semantic-graph-empty"><span>{config.shortLabel[0]}</span><h2>暂无{config.label}</h2><p>从左侧当前类型中添加资源，继续完善语义模型。</p><button className="button primary" onClick={() => setAdding(active)}>添加{config.label}</button></div>}
+            </div>
           </div>
-          {!filteredItems.length && <div className="semantic-graph-empty"><span>{config.shortLabel[0]}</span><h2>暂无{config.label}</h2><p>从左侧当前类型中添加资源，继续完善语义模型。</p><button className="button primary" onClick={() => setAdding(active)}>添加{config.label}</button></div>}
-          {filteredItems.length > 4 && <span className="semantic-more-resources">另有 {filteredItems.length - 4} 项资源</span>}
           <section className="semantic-alignment" aria-labelledby="alignment-title">
             <header><div><h2 id="alignment-title">命名语义对齐</h2><p>基于语义命名规范识别字段命名差异与潜在异常</p></div><span>{alignedFields}/{totalFields} 已定义</span><button className="button primary" onClick={() => setMessage(`语义对齐检查：${alignedFields}/${totalFields} 个字段具备有效定义`)}>运行对齐</button></header>
             <div><article><small>总字段数</small><strong>{totalFields}</strong></article><article><small>对齐字段</small><strong>{alignedFields}</strong></article><article><small>对齐率</small><strong>{alignmentRate}</strong></article></div>

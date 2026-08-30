@@ -13,11 +13,14 @@
 ## 本地验证
 
 ```powershell
-cd backend
-.\.venv\Scripts\python.exe -m pytest -q
-.\.venv\Scripts\python.exe scripts\run_day4_golden.py
+py -3.11 -m venv .venv
+.\.venv\Scripts\python.exe -m pip install --upgrade pip
+.\.venv\Scripts\python.exe -m pip install -r backend\requirements.txt
+$env:PYTHONPATH = (Resolve-Path backend)
+.\.venv\Scripts\python.exe -m pytest backend\tests -q
+.\.venv\Scripts\python.exe backend\scripts\run_day4_golden.py
 
-cd ..\frontend
+cd frontend
 npm ci
 npm run typecheck
 npm test -- --run
@@ -34,7 +37,7 @@ cd ..
 .\.venv\Scripts\python.exe scripts\release\generate_sbom.py
 ```
 
-涉及共享状态、迁移、语义发布或评测的变更还应执行 5-worker E2E。不得通过 retry、固定 sleep 或降低 worker 数量掩盖竞态。
+涉及共享状态、迁移、语义发布或评测的变更应先执行串行的默认核心 E2E（`npm run e2e`），避免不同文件并发污染同一受控元数据状态。10M Data Workspace、Phase5 控件认证和录制视觉用例必须使用各自的隔离 Schema、fixture 与显式 profile；并发竞态由专门的并发/负载门禁验证，不得通过 retry、固定 sleep 或删减断言掩盖。
 
 ## Pull Request 要求
 

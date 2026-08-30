@@ -1,11 +1,15 @@
 from __future__ import annotations
 
+import gzip
 from types import SimpleNamespace
-from threading import Event
+from threading import Event, Timer
+from time import monotonic, sleep
 from pathlib import Path
 import json
 
+import httpx
 import pytest
+import chatbi_rag_adapter.legacy as legacy_rag
 from chatbi_rag_contracts import Citation, RagResult
 from chatbi_rag_contracts import RagExecutionContext, RagRequest
 from chatbi_rag_adapter import LiveRagAdapter, RagAdapterError
@@ -28,6 +32,31 @@ from app.rag_runtime.legacy_selected_source import (
     selected_source_status,
 )
 from app.rag_runtime.service import RuntimeIdentity, retrieve
+
+
+class _SlowRagBody(httpx.SyncByteStream):
+    def __init__(self) -> None:
+        self.exited = Event()
+        self.read_count = 0
+
+    def __iter__(self):
+        try:
+            for _ in range(500):
+                sleep(0.005)
+                self.read_count += 1
+                yield b"x"
+        finally:
+            self.exited.set()
+
+
+class _GzipBombBody(httpx.SyncByteStream):
+    def __init__(self) -> None:
+        self.iterated = False
+        self.compressed = gzip.compress(b"x" * (16 * 1024 * 1024 + 1))
+
+    def __iter__(self):
+        self.iterated = True
+        yield self.compressed
 from app.services.chat import ChatService
 from app.services.runtime_seed import seed_v1_runtime
 from app.services.seed import seed_demo_semantic_model
@@ -256,3 +285,341 @@ def test_live_rag_observes_cancellation_before_opening_http_client():
     with pytest.raises(RagAdapterError, match="cancelled"):
         adapter.retrieve(request, cancellation_event=event)
     assert opened == 0
+
+
+def test_live_rag_absolute_deadline_reaps_slow_drip_reader():
+    body = _SlowRagBody()
+    transport = httpx.MockTransport(lambda _request: httpx.Response(
+        200,
+        headers={"X-ChatBI-Workspace-Id": "WS-1"},
+        stream=body,
+    ))
+    adapter = LiveRagAdapter(
+        base_url="http://rag-runtime:8001",
+        client_factory=lambda **kwargs: httpx.Client(transport=transport, **kwargs),
+    )
+    request = RagRequest(
+        query="slow body",
+        context=RagExecutionContext(
+            workspace_id="WS-1",
+            user_id="USER-1",
+            roles=frozenset({"ADMIN"}),
+            allowed_datasources=frozenset(),
+            allowed_semantic_models=frozenset(),
+            allowed_tools=frozenset({"RETRIEVE_KNOWLEDGE"}),
+            trace_id="TRACE-RAG-DEADLINE",
+            timeout_ms=100,
+            max_steps=8,
+            token_budget=1_000,
+        ),
+    )
+    started = monotonic()
+
+    with pytest.raises(RagAdapterError, match="timed out"):
+        adapter.retrieve(request)
+
+    assert monotonic() - started < 0.3
+    assert body.exited.wait(0.05)
+    reads_at_terminal = body.read_count
+    sleep(0.03)
+    assert body.read_count == reads_at_terminal
+
+
+def test_live_rag_midflight_cancel_reaps_reader_without_retry():
+    body = _SlowRagBody()
+    calls = 0
+
+    def handler(_request: httpx.Request) -> httpx.Response:
+        nonlocal calls
+        calls += 1
+        return httpx.Response(
+            200,
+            headers={"X-ChatBI-Workspace-Id": "WS-1"},
+            stream=body,
+        )
+
+    adapter = LiveRagAdapter(
+        base_url="http://rag-runtime:8001",
+        retry_count=2,
+        client_factory=lambda **kwargs: httpx.Client(
+            transport=httpx.MockTransport(handler), **kwargs,
+        ),
+    )
+    request = RagRequest(
+        query="cancel body",
+        context=RagExecutionContext(
+            workspace_id="WS-1",
+            user_id="USER-1",
+            roles=frozenset({"ADMIN"}),
+            allowed_datasources=frozenset(),
+            allowed_semantic_models=frozenset(),
+            allowed_tools=frozenset({"RETRIEVE_KNOWLEDGE"}),
+            trace_id="TRACE-RAG-CANCEL",
+            timeout_ms=1_000,
+            max_steps=8,
+            token_budget=1_000,
+        ),
+    )
+    cancellation = Event()
+    timer = Timer(0.05, cancellation.set)
+    timer.start()
+    started = monotonic()
+    try:
+        with pytest.raises(RagAdapterError, match="cancelled"):
+            adapter.retrieve(request, cancellation_event=cancellation)
+    finally:
+        timer.join(timeout=1)
+
+    assert monotonic() - started < 0.25
+    assert calls == 1
+    assert body.exited.wait(0.05)
+    reads_at_terminal = body.read_count
+    sleep(0.03)
+    assert body.read_count == reads_at_terminal
+
+
+def test_live_rag_rejects_streamed_response_before_exceeding_size_limit(monkeypatch):
+    monkeypatch.setattr(legacy_rag, "_NETWORK_STREAM_MAX_RESPONSE_BYTES", 8)
+    adapter = LiveRagAdapter(
+        base_url="http://rag-runtime:8001",
+        client_factory=lambda **kwargs: httpx.Client(
+            transport=httpx.MockTransport(lambda _request: httpx.Response(
+                200,
+                headers={"X-ChatBI-Workspace-Id": "WS-1"},
+                stream=httpx.ByteStream(b"123456789"),
+            )),
+            **kwargs,
+        ),
+    )
+    request = RagRequest(
+        query="oversized response",
+        context=RagExecutionContext(
+            workspace_id="WS-1",
+            user_id="USER-1",
+            roles=frozenset({"ADMIN"}),
+            allowed_datasources=frozenset(),
+            allowed_semantic_models=frozenset(),
+            allowed_tools=frozenset({"RETRIEVE_KNOWLEDGE"}),
+            trace_id="TRACE-RAG-OVERSIZE",
+            timeout_ms=1_000,
+            max_steps=8,
+            token_budget=1_000,
+        ),
+    )
+
+    with pytest.raises(RagAdapterError, match="exceeds 16 MiB limit"):
+        adapter.retrieve(request)
+
+
+def test_live_rag_rejects_gzip_bomb_before_iter_bytes_and_requests_identity():
+    body = _GzipBombBody()
+    observed_headers = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        observed_headers["accept_encoding"] = request.headers.get("Accept-Encoding")
+        return httpx.Response(
+            200,
+            headers={
+                "X-ChatBI-Workspace-Id": "WS-1",
+                "Content-Encoding": "identity, GZip",
+            },
+            stream=body,
+        )
+
+    adapter = LiveRagAdapter(
+        base_url="http://rag-runtime:8001",
+        client_factory=lambda **kwargs: httpx.Client(
+            transport=httpx.MockTransport(handler), **kwargs,
+        ),
+    )
+    request = RagRequest(
+        query="gzip bomb",
+        context=RagExecutionContext(
+            workspace_id="WS-1",
+            user_id="USER-1",
+            roles=frozenset({"ADMIN"}),
+            allowed_datasources=frozenset(),
+            allowed_semantic_models=frozenset(),
+            allowed_tools=frozenset({"RETRIEVE_KNOWLEDGE"}),
+            trace_id="TRACE-RAG-GZIP-BOMB",
+            timeout_ms=1_000,
+            max_steps=8,
+            token_budget=1_000,
+        ),
+    )
+
+    with pytest.raises(RagAdapterError, match="unsupported Content-Encoding"):
+        adapter.retrieve(request)
+    assert observed_headers["accept_encoding"] == "identity"
+    assert body.iterated is False
+
+
+def test_live_rag_stops_when_json_parsing_sets_cancellation(monkeypatch):
+    cancellation = Event()
+    monkeypatch.setattr(
+        httpx.Response,
+        "json",
+        lambda _response: (cancellation.set() or {"citations": []}),
+    )
+    adapter = LiveRagAdapter(
+        base_url="http://rag-runtime:8001",
+        client_factory=lambda **kwargs: httpx.Client(
+            transport=httpx.MockTransport(lambda _request: httpx.Response(
+                200,
+                headers={"X-ChatBI-Workspace-Id": "WS-1"},
+                content=b"{}",
+            )),
+            **kwargs,
+        ),
+    )
+    request = RagRequest(
+        query="cancel during json",
+        context=RagExecutionContext(
+            workspace_id="WS-1",
+            user_id="USER-1",
+            roles=frozenset({"ADMIN"}),
+            allowed_datasources=frozenset(),
+            allowed_semantic_models=frozenset(),
+            allowed_tools=frozenset({"RETRIEVE_KNOWLEDGE"}),
+            trace_id="TRACE-RAG-JSON-CANCEL",
+            timeout_ms=1_000,
+            max_steps=8,
+            token_budget=1_000,
+        ),
+    )
+
+    with pytest.raises(RagAdapterError, match="cancelled"):
+        adapter.retrieve(request, cancellation_event=cancellation)
+
+
+def test_live_rag_stops_inside_citation_materialization_when_cancelled(monkeypatch):
+    cancellation = Event()
+    calls = 0
+    original_citation = LiveRagAdapter._citation
+
+    def cancel_after_first_citation(item, index):
+        nonlocal calls
+        calls += 1
+        cancellation.set()
+        return original_citation(item, index)
+
+    monkeypatch.setattr(
+        LiveRagAdapter,
+        "_citation",
+        staticmethod(cancel_after_first_citation),
+    )
+    raw_citation = {
+        "citation_id": "CIT-1",
+        "document_id": "DOC-1",
+        "document_version_id": "VER-1",
+        "chunk_id": "CHK-1",
+        "citation_text": "收入按不含税口径确认。",
+        "source": "knowledge/revenue.md",
+    }
+    adapter = LiveRagAdapter(
+        base_url="http://rag-runtime:8001",
+        client_factory=lambda **kwargs: httpx.Client(
+            transport=httpx.MockTransport(lambda _request: httpx.Response(
+                200,
+                headers={"X-ChatBI-Workspace-Id": "WS-1"},
+                json={"citations": [raw_citation, raw_citation]},
+            )),
+            **kwargs,
+        ),
+    )
+    request = RagRequest(
+        query="cancel during citation",
+        context=RagExecutionContext(
+            workspace_id="WS-1",
+            user_id="USER-1",
+            roles=frozenset({"ADMIN"}),
+            allowed_datasources=frozenset(),
+            allowed_semantic_models=frozenset(),
+            allowed_tools=frozenset({"RETRIEVE_KNOWLEDGE"}),
+            trace_id="TRACE-RAG-CITATION-CANCEL",
+            timeout_ms=1_000,
+            max_steps=8,
+            token_budget=1_000,
+        ),
+    )
+
+    with pytest.raises(RagAdapterError, match="cancelled"):
+        adapter.retrieve(request, cancellation_event=cancellation)
+    assert calls == 1
+
+
+def test_live_rag_stops_before_return_when_cancellation_arrives(monkeypatch):
+    cancellation = Event()
+    original_result = legacy_rag.RagResult
+
+    def cancel_after_result(**kwargs):
+        result = original_result(**kwargs)
+        cancellation.set()
+        return result
+
+    monkeypatch.setattr(legacy_rag, "RagResult", cancel_after_result)
+    adapter = LiveRagAdapter(
+        base_url="http://rag-runtime:8001",
+        client_factory=lambda **kwargs: httpx.Client(
+            transport=httpx.MockTransport(lambda _request: httpx.Response(
+                200,
+                headers={"X-ChatBI-Workspace-Id": "WS-1"},
+                json={"citations": []},
+            )),
+            **kwargs,
+        ),
+    )
+    request = RagRequest(
+        query="cancel before return",
+        context=RagExecutionContext(
+            workspace_id="WS-1",
+            user_id="USER-1",
+            roles=frozenset({"ADMIN"}),
+            allowed_datasources=frozenset(),
+            allowed_semantic_models=frozenset(),
+            allowed_tools=frozenset({"RETRIEVE_KNOWLEDGE"}),
+            trace_id="TRACE-RAG-RETURN-CANCEL",
+            timeout_ms=1_000,
+            max_steps=8,
+            token_budget=1_000,
+        ),
+    )
+
+    with pytest.raises(RagAdapterError, match="cancelled"):
+        adapter.retrieve(request, cancellation_event=cancellation)
+
+
+def test_live_rag_limits_fast_500_retries_with_cancellation_event():
+    calls = 0
+
+    def handler(_request: httpx.Request) -> httpx.Response:
+        nonlocal calls
+        calls += 1
+        return httpx.Response(500, headers={"X-ChatBI-Workspace-Id": "WS-1"})
+
+    adapter = LiveRagAdapter(
+        base_url="http://rag-runtime:8001",
+        retry_count=2,
+        client_factory=lambda **kwargs: httpx.Client(
+            transport=httpx.MockTransport(handler), **kwargs,
+        ),
+    )
+    request = RagRequest(
+        query="fast failure",
+        context=RagExecutionContext(
+            workspace_id="WS-1",
+            user_id="USER-1",
+            roles=frozenset({"ADMIN"}),
+            allowed_datasources=frozenset(),
+            allowed_semantic_models=frozenset(),
+            allowed_tools=frozenset({"RETRIEVE_KNOWLEDGE"}),
+            trace_id="TRACE-RAG-FAST-500",
+            timeout_ms=30_000,
+            max_steps=8,
+            token_budget=1_000,
+        ),
+    )
+
+    with pytest.raises(RagAdapterError, match="HTTPStatusError"):
+        adapter.retrieve(request, cancellation_event=Event())
+    assert calls == 2

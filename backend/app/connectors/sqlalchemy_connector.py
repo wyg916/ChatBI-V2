@@ -101,7 +101,7 @@ class MySQLConnector(SQLAlchemyConnector):
 
 
 def connector_for(kind: str, **kwargs) -> DataSourceConnector:
-    connector_type = {"postgresql": PostgreSQLConnector, "mysql": MySQLConnector}.get(kind)
+    connector_type = {"postgresql": PostgreSQLConnector, "mysql": MySQLConnector, "excel": PostgreSQLConnector}.get(kind)
     if connector_type is None:
         raise ValueError(f"Unsupported datasource type: {kind}")
     return connector_type(**kwargs)

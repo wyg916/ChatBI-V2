@@ -19,7 +19,6 @@ from .contracts import (
     ParsedAttachment,
     TableData,
     TextEvidence,
-    canonical_sha256,
 )
 from .security import PromptInjectionDetected, reject_prompt_injection
 
@@ -127,7 +126,7 @@ def _table(name: str, frame: pd.DataFrame, *, max_rows: int) -> TableData:
 def _result_signature(
     *, kind: AttachmentKind, tables: tuple[TableData, ...], evidence: tuple[TextEvidence, ...], page_count: int
 ) -> str:
-    return canonical_sha256({
+    payload = {
         "kind": kind.value,
         "tables": [
             {"name": table.name, "columns": table.columns, "rows": table.rows, "row_count": table.row_count}
@@ -137,7 +136,19 @@ def _result_signature(
             {"text": item.text, "locator": item.locator.__dict__} for item in evidence
         ],
         "page_count": page_count,
-    })
+    }
+    # Preserve canonical_sha256's exact wire format without materialising a
+    # second full JSON byte string for large structured attachments.
+    digest = hashlib.sha256()
+    encoder = json.JSONEncoder(
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+        default=str,
+    )
+    for chunk in encoder.iterencode(payload):
+        digest.update(chunk.encode("utf-8"))
+    return digest.hexdigest()
 
 
 def parse_attachment(
@@ -159,12 +170,26 @@ def parse_attachment(
         tables = (_table("data", pd.read_csv(source, nrows=max_rows + 1), max_rows=max_rows),)
         kind = AttachmentKind.STRUCTURED
     elif extension in {".xls", ".xlsx"}:
-        frames = pd.read_excel(source, sheet_name=None, nrows=max_rows + 1)
-        if not frames:
+        collected: list[TableData] = []
+        remaining_rows = max_rows
+        with pd.ExcelFile(source) as workbook:
+            if not workbook.sheet_names:
+                raise FileParseError("EMPTY_WORKBOOK")
+            for name in workbook.sheet_names:
+                # Read at most one row beyond the remaining global allowance so
+                # a many-sheet workbook cannot allocate N * max_rows objects
+                # before the aggregate limit is checked.
+                frame = pd.read_excel(workbook, sheet_name=name, nrows=remaining_rows + 1)
+                if len(frame.columns) == 0:
+                    # Workbooks commonly keep blank template tabs. They are
+                    # not data tables and must not invalidate populated tabs.
+                    continue
+                table = _table(str(name), frame, max_rows=remaining_rows)
+                collected.append(table)
+                remaining_rows -= table.row_count
+        if not collected:
             raise FileParseError("EMPTY_WORKBOOK")
-        tables = tuple(_table(str(name), frame, max_rows=max_rows) for name, frame in frames.items())
-        if sum(table.row_count for table in tables) > max_rows:
-            raise FileParseError("FILE_ROW_LIMIT_EXCEEDED")
+        tables = tuple(collected)
         kind = AttachmentKind.STRUCTURED
     elif extension == ".parquet":
         if parquet.ParquetFile(source).metadata.num_rows > max_rows:

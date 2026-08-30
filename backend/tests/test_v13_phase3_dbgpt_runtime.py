@@ -6,6 +6,7 @@ import os
 import sys
 import threading
 from pathlib import Path
+from time import monotonic, sleep
 from types import SimpleNamespace
 
 import pytest
@@ -28,6 +29,7 @@ from chatbi_dbgpt_runtime import (  # noqa: E402
     DbgptRuntimeUnavailable,
     RuntimeRequest,
     preload_selected_runtime,
+    register_deadline_aware_callback,
     UPSTREAM_ARCHIVE_SHA256,
     UPSTREAM_ARCHIVE_URL,
     UPSTREAM_REVISION,
@@ -97,6 +99,53 @@ def request(**overrides):
     return RuntimeRequest(**values)
 
 
+def test_unregistered_blocking_callback_is_refused_before_loader_or_execution():
+    callback_started = threading.Event()
+    loader_called = False
+
+    def loader():
+        nonlocal loader_called
+        loader_called = True
+        return selected_loader()
+
+    def blocking_callback(control):
+        callback_started.set()
+        sleep(1)
+
+    started = monotonic()
+    with pytest.raises(DbgptRuntimePolicyError, match="registered as deadline-aware"):
+        DbgptAwelRuntime(loader=loader).run(
+            request(), blocking_callback, timeout_seconds=0.01
+        )
+    elapsed = monotonic() - started
+
+    assert elapsed < 0.1
+    assert not loader_called
+    assert not callback_started.is_set()
+
+
+def test_run_async_refuses_unregistered_blocking_callback_without_execution():
+    callback_started = threading.Event()
+
+    def blocking_callback(control):
+        callback_started.set()
+        sleep(1)
+
+    async def invoke():
+        await DbgptAwelRuntime(loader=selected_loader).run_async(
+            request(), blocking_callback, timeout_seconds=0.01
+        )
+
+    started = monotonic()
+    with pytest.raises(DbgptRuntimePolicyError, match="registered as deadline-aware"):
+        asyncio.run(invoke())
+    elapsed = monotonic() - started
+
+    assert elapsed < 0.1
+    assert not callback_started.is_set()
+    assert not FakeDAG.created
+
+
 def test_awel_call_invokes_chatbi_callback_and_reports_selected_runtime():
     runtime = DbgptAwelRuntime(loader=selected_loader)
     callback_calls = []
@@ -106,7 +155,7 @@ def test_awel_call_invokes_chatbi_callback_and_reports_selected_runtime():
         callback_calls.append(control)
         return {"verified_answer": 42, "raw_sql": "kept inside ChatBI"}
 
-    result = runtime.run(request(), callback)
+    result = runtime.run(request(), register_deadline_aware_callback(callback))
 
     assert result.output["verified_answer"] == 42
     assert result.upstream_revision == UPSTREAM_REVISION
@@ -146,8 +195,14 @@ def test_preload_selected_runtime_validates_and_returns_public_provenance(monkey
 
 def test_runtime_counter_records_each_real_base_operator_call():
     runtime = DbgptAwelRuntime(loader=selected_loader)
-    first = runtime.run(request(trace_id="trace-1"), lambda control: 1)
-    second = runtime.run(request(trace_id="trace-2"), lambda control: 2)
+    first = runtime.run(
+        request(trace_id="trace-1"),
+        register_deadline_aware_callback(lambda control: 1),
+    )
+    second = runtime.run(
+        request(trace_id="trace-2"),
+        register_deadline_aware_callback(lambda control: 2),
+    )
     assert first.total_runtime_calls == 1
     assert second.total_runtime_calls == 2
     assert len(FakeMapOperator.calls) == 2
@@ -157,7 +212,9 @@ def test_callback_result_is_not_put_back_into_awel_state():
     runtime = DbgptAwelRuntime(loader=selected_loader)
     result = runtime.run(
         request(),
-        lambda control: {"api_key": "must-not-leak", "connector": object()},
+        register_deadline_aware_callback(
+            lambda control: {"api_key": "must-not-leak", "connector": object()}
+        ),
     )
     assert "api_key" not in str(result.awel_acknowledgement).lower()
     assert "connector" not in str(result.awel_acknowledgement).lower()
@@ -173,7 +230,10 @@ def test_unselected_route_is_refused_before_loader(route):
         return selected_loader()
 
     with pytest.raises(DbgptRuntimePolicyError):
-        DbgptAwelRuntime(loader=loader).run(request(route=route), lambda control: None)
+        DbgptAwelRuntime(loader=loader).run(
+            request(route=route),
+            register_deadline_aware_callback(lambda control: None),
+        )
     assert not called
 
 
@@ -184,7 +244,8 @@ def test_unselected_route_is_refused_before_loader(route):
 def test_invalid_budget_or_trace_is_refused(field, value):
     with pytest.raises(DbgptRuntimePolicyError):
         DbgptAwelRuntime(loader=selected_loader).run(
-            request(**{field: value}), lambda control: None
+            request(**{field: value}),
+            register_deadline_aware_callback(lambda control: None),
         )
     assert not FakeMapOperator.calls
 
@@ -201,7 +262,7 @@ def test_missing_dependency_fails_closed_without_callback():
 
     runtime = DbgptAwelRuntime(loader=unavailable)
     with pytest.raises(DbgptRuntimeUnavailable):
-        runtime.run(request(), callback)
+        runtime.run(request(), register_deadline_aware_callback(callback))
     assert runtime.total_runtime_calls == 0
     assert not callback_called
 
@@ -213,7 +274,9 @@ def test_wrong_revision_fails_closed_without_awel_call():
         return loaded
 
     with pytest.raises(DbgptRuntimeProvenanceError):
-        DbgptAwelRuntime(loader=wrong_revision).run(request(), lambda control: None)
+        DbgptAwelRuntime(loader=wrong_revision).run(
+            request(), register_deadline_aware_callback(lambda control: None)
+        )
     assert not FakeMapOperator.calls
 
 
@@ -278,7 +341,9 @@ def test_cancellation_cancels_awel_call():
 
     with pytest.raises(DbgptRuntimeCancelled):
         DbgptAwelRuntime(loader=selected_loader).run(
-            request(), callback, cancellation_event=cancellation
+            request(),
+            register_deadline_aware_callback(callback),
+            cancellation_event=cancellation,
         )
 
 
@@ -288,15 +353,86 @@ def test_deadline_cancels_awel_call():
 
     with pytest.raises(DbgptRuntimeTimeout):
         DbgptAwelRuntime(loader=selected_loader).run(
-            request(), callback, timeout_seconds=0.02
+            request(),
+            register_deadline_aware_callback(callback),
+            timeout_seconds=0.02,
         )
+
+
+def test_sync_callback_deadline_runs_inline_and_has_no_late_writes():
+    writes: list[int] = []
+    callback_threads: list[int] = []
+    exited = threading.Event()
+    caller_thread = threading.get_ident()
+
+    def callback(control):
+        callback_threads.append(threading.get_ident())
+        try:
+            while True:
+                control.checkpoint()
+                writes.append(len(writes) + 1)
+                sleep(0.002)
+        finally:
+            exited.set()
+
+    started = monotonic()
+    with pytest.raises(DbgptRuntimeTimeout):
+        DbgptAwelRuntime(loader=selected_loader).run(
+            request(),
+            register_deadline_aware_callback(callback),
+            timeout_seconds=0.02,
+        )
+    elapsed = monotonic() - started
+
+    assert elapsed < 0.25
+    assert callback_threads == [caller_thread]
+    assert exited.is_set()
+    writes_at_terminal = list(writes)
+    sleep(0.05)
+    assert writes == writes_at_terminal
+
+
+def test_sync_callback_observes_caller_cancel_without_late_writes():
+    cancellation = threading.Event()
+    writes: list[int] = []
+    exited = threading.Event()
+
+    def callback(control):
+        try:
+            while True:
+                control.checkpoint()
+                writes.append(len(writes) + 1)
+                sleep(0.002)
+        finally:
+            exited.set()
+
+    timer = threading.Timer(0.02, cancellation.set)
+    timer.start()
+    started = monotonic()
+    try:
+        with pytest.raises(DbgptRuntimeCancelled):
+            DbgptAwelRuntime(loader=selected_loader).run(
+                request(),
+                register_deadline_aware_callback(callback),
+                cancellation_event=cancellation,
+                timeout_seconds=1,
+            )
+    finally:
+        timer.join(timeout=1)
+    elapsed = monotonic() - started
+
+    assert elapsed < 0.25
+    assert exited.is_set()
+    writes_at_terminal = list(writes)
+    sleep(0.05)
+    assert writes == writes_at_terminal
 
 
 def test_sync_run_refuses_nested_event_loop():
     async def invoke():
         with pytest.raises(DbgptRuntimePolicyError):
             DbgptAwelRuntime(loader=selected_loader).run(
-                request(), lambda control: None
+                request(), register_deadline_aware_callback(lambda control: None)
             )
 
     asyncio.run(invoke())
@@ -310,13 +446,16 @@ def test_callable_returning_awaitable_is_supported():
 
             return complete()
 
-    result = DbgptAwelRuntime(loader=selected_loader).run(request(), Callback())
+    result = DbgptAwelRuntime(loader=selected_loader).run(
+        request(), register_deadline_aware_callback(Callback())
+    )
     assert result.output == "awaited"
 
 
 class SuccessfulToolExecutor:
     def __init__(self) -> None:
         self.calls = []
+        self.controls = []
 
     def execute(self, call, context):
         self.calls.append(call)
@@ -333,6 +472,14 @@ class SuccessfulToolExecutor:
             status="SUCCEEDED",
             output=outputs[call.tool_name],
         )
+
+    def execute_controlled(
+        self, call, context, *, cancellation_event, deadline_monotonic,
+    ):
+        assert not cancellation_event.is_set()
+        assert deadline_monotonic > monotonic()
+        self.controls.append((cancellation_event, deadline_monotonic))
+        return self.execute(call, context)
 
 
 def orchestration_request():
@@ -381,6 +528,70 @@ def test_agent_orchestrator_formally_routes_through_selected_awel_runtime():
     assert "datasource-1" not in str(awel_payload)
     assert "semantic-1" not in str(awel_payload)
     assert "sql" not in str(awel_payload).lower()
+
+
+def test_selected_orchestrator_registers_callback_and_propagates_absolute_deadline():
+    executor = SuccessfulToolExecutor()
+    cancellation = threading.Event()
+    deadline = monotonic() + 1
+
+    result = DbgptSelectedRuntimeOrchestrator(
+        executor,
+        runtime=DbgptAwelRuntime(loader=selected_loader),
+    ).run(
+        orchestration_request(),
+        cancellation_event=cancellation,
+        deadline_monotonic=deadline,
+    )
+
+    assert result.status == "SUCCEEDED"
+    assert len(executor.controls) == 6
+    assert all(
+        control_deadline == deadline for _, control_deadline in executor.controls
+    )
+    cancellation.set()
+    assert all(signal.is_set() for signal, _ in executor.controls)
+
+
+def test_live_agent_deadline_accepts_120_seconds_but_remains_bounded():
+    base = orchestration_request()
+    live_context = AgentExecutionContext(**{
+        **base.context.model_dump(),
+        "timeout_ms": 120_000,
+    })
+    live_request = base.model_copy(update={"context": live_context})
+    result = DbgptSelectedRuntimeOrchestrator(
+        SuccessfulToolExecutor(),
+        runtime=DbgptAwelRuntime(loader=selected_loader),
+    ).run(live_request)
+    assert result.status == "SUCCEEDED"
+
+    with pytest.raises(ValueError):
+        AgentExecutionContext(**{
+            **base.context.model_dump(),
+            "timeout_ms": 120_001,
+        })
+
+
+def test_selected_runtime_fails_closed_without_deadline_aware_executor():
+    class LegacyOnlyExecutor:
+        def __init__(self) -> None:
+            self.calls = 0
+
+        def execute(self, call, context):
+            self.calls += 1
+            return ToolResult(tool_name=call.tool_name, status="SUCCEEDED", output={})
+
+    executor = LegacyOnlyExecutor()
+    runtime = DbgptAwelRuntime(loader=selected_loader)
+    result = DbgptSelectedRuntimeOrchestrator(executor, runtime=runtime).run(
+        orchestration_request(),
+    )
+
+    assert result.status == "REFUSED"
+    assert result.error_code == "DBGPT_RUNTIME_POLICY"
+    assert result.runtime_calls == 0
+    assert executor.calls == 0
 
 
 def test_selected_runtime_loader_reuses_verified_immutable_runtime(monkeypatch):
@@ -449,7 +660,9 @@ def test_agent_orchestrator_missing_selected_runtime_returns_failed_not_fallback
     reason="set CHATBI_TEST_REAL_DBGPT=1 with the exact pinned dependency installed",
 )
 def test_real_selected_dbgpt_awel_call():
-    result = DbgptAwelRuntime().run(request(), lambda control: "real-awel")
+    result = DbgptAwelRuntime().run(
+        request(), register_deadline_aware_callback(lambda control: "real-awel")
+    )
     assert result.output == "real-awel"
     assert result.upstream_revision == UPSTREAM_REVISION
     assert result.upstream_package_version == "0.8.1"

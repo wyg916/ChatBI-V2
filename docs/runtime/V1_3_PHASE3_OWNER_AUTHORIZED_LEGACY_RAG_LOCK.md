@@ -1,13 +1,16 @@
-# V1.3.0 Phase 3 owner-authorized Legacy RAG lock
+# V1.3.0 Phase 3 owner-attested original Legacy RAG contribution lock
 
 ## Decision
 
-- Source project: `E:\新能源企业经营分析智能平台`
+- Source project: owner-attested legacy project (absolute local path intentionally omitted)
 - Source commit: `b2573a9dc1881a54581c5c556fb4a8c34046f9c3`
-- Ownership: `OWNER_ATTESTED_PASS`
-- External provenance audit: `NOT_REQUIRED`
-- Integration mode: `SELECTED_SOURCE_INTERNAL_PACKAGE`
-- Direct reuse state: `PASS_OWNER_AUTHORIZED_INTERNAL_REUSE`
+- Ownership and redistribution basis: `OWNER_ATTESTED_ORIGINAL_CONTRIBUTION_APACHE_2_0`
+- Public license: Apache License 2.0, limited to the three checksum-locked selected files identified by `LOCK.json` and `LICENSE.owner-attested.md`
+- Distribution scope: `THREE_CHECKSUM_LOCKED_SELECTED_FILES_ONLY`
+- Runtime integration mode: `SELECTED_SOURCE_VENDORED_RUNTIME`
+- Release-governance state: `OWNER_ATTESTED_ORIGINAL_CONTRIBUTION_LOCKED`; this is a provenance and license statement, not a publication PASS
+
+`VENDORED_RUNTIME` describes only how ChatBI loads the three files at runtime. It does not describe a private/internal license or a separate public package. Public redistribution is governed independently and exclusively by the owner-attested original contribution under Apache-2.0.
 
 The source project contains a complete modular-monolith knowledge subsystem, but its API and retrieval service depend on the old project's identity, governance and database schema. It is not a stable standalone service that can be reused without importing those second control planes. ChatBI therefore directly reuses only the minimum deterministic ranking and injection-detection source modules. The byte-identical Git blobs are stored below `backend/vendor/legacy_energy_rag/b2573a9d...`; `LOCK.json` is verified before import, and a mismatch fails closed.
 

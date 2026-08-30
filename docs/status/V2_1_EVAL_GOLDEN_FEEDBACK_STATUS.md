@@ -25,7 +25,7 @@
 
 ## 隔离与边界
 
-- Worktree：`E:/ChatBI-V2-wt-eval-feedback`。
+- Worktree：独立短生命周期评测 worktree（历史本机绝对路径已脱敏）。
 - Backend/Frontend：`18080` / `15173`。
 - Metadata：本机 PostgreSQL 独立 schema `chatbi_eval_feedback_v21_0818`。
 - Docker/Compose：未启动、未修改。

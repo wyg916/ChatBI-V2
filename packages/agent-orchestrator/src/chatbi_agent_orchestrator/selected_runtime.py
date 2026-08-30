@@ -7,6 +7,7 @@ from pydantic import Field
 
 from chatbi_agent_contracts import (
     AgentExecutionContext,
+    DeadlineAwareToolExecutor,
     OrchestrationRequest,
     OrchestrationResult,
     ToolCall,
@@ -25,9 +26,13 @@ from chatbi_dbgpt_runtime import (
     DbgptRuntimeUnavailable,
     RuntimeControl,
     RuntimeRequest,
+    register_deadline_aware_callback,
 )
 
 from .runtime import BoundedAgentOrchestrator, ProgressCallback
+
+
+MAX_SELECTED_RUNTIME_TIMEOUT_SECONDS = 120.0
 
 
 class _ControlledToolExecutor:
@@ -37,7 +42,16 @@ class _ControlledToolExecutor:
 
     def execute(self, call: ToolCall, context: AgentExecutionContext) -> ToolResult:
         self._control.checkpoint()
-        result = self._executor.execute(call, context)
+        if not isinstance(self._executor, DeadlineAwareToolExecutor):
+            raise DbgptRuntimePolicyError(
+                "selected runtime requires a deadline-aware tool executor"
+            )
+        result = self._executor.execute_controlled(
+            call,
+            context,
+            cancellation_event=self._control.cancellation_event,
+            deadline_monotonic=self._control.deadline_monotonic,
+        )
         self._control.checkpoint()
         return result
 
@@ -81,6 +95,8 @@ class DbgptSelectedRuntimeOrchestrator:
         cancellation_event: threading.Event | None = None,
         deadline_monotonic: float | None = None,
     ) -> DbgptOrchestrationResult:
+        if not isinstance(self._executor, DeadlineAwareToolExecutor):
+            return self._failure(request, "REFUSED", "DBGPT_RUNTIME_POLICY")
         runtime_request = RuntimeRequest(
             question=request.question,
             route=request.route.value,
@@ -88,7 +104,10 @@ class DbgptSelectedRuntimeOrchestrator:
             max_steps=request.context.max_steps,
             max_tool_calls=request.context.max_tool_calls,
         )
-        timeout_seconds = min(30.0, request.context.timeout_ms / 1000)
+        timeout_seconds = min(
+            MAX_SELECTED_RUNTIME_TIMEOUT_SECONDS,
+            request.context.timeout_ms / 1000,
+        )
 
         def invoke_chatbi(control: RuntimeControl) -> OrchestrationResult:
             control.checkpoint()
@@ -102,7 +121,7 @@ class DbgptSelectedRuntimeOrchestrator:
         try:
             selected = self._runtime.run(
                 runtime_request,
-                invoke_chatbi,
+                register_deadline_aware_callback(invoke_chatbi),
                 cancellation_event=cancellation_event,
                 deadline_monotonic=deadline_monotonic,
                 timeout_seconds=timeout_seconds,

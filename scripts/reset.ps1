@@ -30,15 +30,7 @@ try {
   & (Join-Path $PSScriptRoot 'stop.ps1') -EnvFile $resolvedEnv
   if ($LASTEXITCODE -ne 0) { throw 'Unable to stop the scoped Compose project' }
 
-  $storage = Resolve-ChatBIDataPath -Path $configuration.StorageRoot
-  $projectFull = [IO.Path]::GetFullPath($projectRoot).TrimEnd('\')
-  $storageFull = [IO.Path]::GetFullPath($storage).TrimEnd('\')
-  $rootPath = [IO.Path]::GetPathRoot($storageFull).TrimEnd('\')
-  if ($storageFull -eq $projectFull -or $storageFull -eq $rootPath) { throw 'Unsafe storage reset target was rejected' }
-  if (-not $storageFull.StartsWith($projectFull + '\', [StringComparison]::OrdinalIgnoreCase)) {
-    $allowExternal = Get-ChatBIValue -Values $configuration.Values -Name 'CHATBI_ALLOW_EXTERNAL_STORAGE_RESET' -Default 'NO'
-    if ($allowExternal -ne 'YES') { throw 'External storage reset is denied unless CHATBI_ALLOW_EXTERNAL_STORAGE_RESET=YES.' }
-  }
+  $storageFull = Assert-ChatBISafeStorageTarget -Path $configuration.StorageRoot -Values $configuration.Values -ProjectRoot $projectRoot
   if (Test-Path -LiteralPath $storageFull) { Remove-Item -LiteralPath $storageFull -Recurse -Force }
   [void][IO.Directory]::CreateDirectory($storageFull)
 

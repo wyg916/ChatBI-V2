@@ -27,13 +27,13 @@ The protection branch resolves exactly to the Phase 2 SHA. The integration workt
 Worktrees observed:
 
 ```text
-E:/ChatBI V2 项目                         6cdbf12 main
-E:/ChatBI-V2-wt-eval-feedback             39b689c codex/v2.1-eval-golden-feedback
-E:/ChatBI-V2-wt-final-integration         cceeb1c codex/v2.1-final-integration
-E:/ChatBI-V2-wt-v2.1-data-workspace       9e2525c codex/v2.1-data-workspace
-E:/ChatBI-V2-wt-v2.1-data10m-performance  6cdbf12 codex/v2.1-data10m-performance
-E:/ChatBI-V2-wt-v2.1-rag-agent-file       6cdbf12 codex/v2.1-rag-agent-file
-E:/ChatBI-V2-wt-v2.1-semantic             6cdbf12 codex/v2.1-semantic-runtime
+<project-root>                             6cdbf12 main
+<worktree-root>/eval-feedback              39b689c codex/v2.1-eval-golden-feedback
+<worktree-root>/final-integration          cceeb1c codex/v2.1-final-integration
+<worktree-root>/data-workspace             9e2525c codex/v2.1-data-workspace
+<worktree-root>/data10m-performance        6cdbf12 codex/v2.1-data10m-performance
+<worktree-root>/rag-agent-file             6cdbf12 codex/v2.1-rag-agent-file
+<worktree-root>/semantic                   6cdbf12 codex/v2.1-semantic-runtime
 ```
 
 Commands executed and retained in the task log:

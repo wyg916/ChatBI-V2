@@ -15,7 +15,7 @@ from sqlalchemy.exc import DBAPIError, OperationalError
 from app.core.config import get_settings
 from app.models import DataSource
 from app.query.contracts import ExecutionResult
-from app.services.datasources import build_connector
+from app.services.datasources import build_connector, runtime_dialect
 
 
 def json_value(value: Any) -> Any:
@@ -105,6 +105,19 @@ class QueryExecutor:
             return cls._semaphore
 
     @staticmethod
+    def _bounded_timeout_ms(timeout_ms: int, cancellation_event: Any | None) -> int:
+        remaining = getattr(cancellation_event, "remaining_seconds", None)
+        if callable(remaining):
+            remaining = remaining()
+        if remaining is None:
+            return max(1, timeout_ms)
+        try:
+            remaining_ms = max(1, int(float(remaining) * 1000))
+        except (TypeError, ValueError):
+            return max(1, timeout_ms)
+        return min(max(1, timeout_ms), remaining_ms)
+
+    @staticmethod
     def _acquire_slot(
         semaphore: threading.BoundedSemaphore | _FairBoundedSemaphore,
         *,
@@ -162,12 +175,14 @@ class QueryExecutor:
         timeout_ms: int,
         cancellation_event: threading.Event | None = None,
     ) -> ExecutionResult:
+        dialect = runtime_dialect(datasource)
         if cancellation_event is not None and cancellation_event.is_set():
             return ExecutionResult(
-                status="FAILED", datasource_id=datasource.id, dialect=datasource.type,
+                status="FAILED", datasource_id=datasource.id, dialect=dialect,
                 normalized_sql=normalized_sql, error_code="QUERY_CANCELLED",
                 error_message="Query was cancelled before execution",
             )
+        timeout_ms = self._bounded_timeout_ms(timeout_ms, cancellation_event)
         semaphore = self._limit_semaphore()
         acquired, cancelled = self._acquire_slot(
             semaphore,
@@ -177,24 +192,31 @@ class QueryExecutor:
         if not acquired:
             if cancelled:
                 return ExecutionResult(
-                    status="FAILED", datasource_id=datasource.id, dialect=datasource.type,
+                    status="FAILED", datasource_id=datasource.id, dialect=dialect,
                     normalized_sql=normalized_sql, error_code="QUERY_CANCELLED",
                     error_message="Query was cancelled while waiting for execution capacity",
                 )
             return ExecutionResult(
-                status="CONCURRENCY_LIMIT", datasource_id=datasource.id, dialect=datasource.type,
+                status="CONCURRENCY_LIMIT", datasource_id=datasource.id, dialect=dialect,
                 normalized_sql=normalized_sql, error_code="QUERY_CONCURRENCY_LIMIT",
                 error_message="Timed out while waiting for query execution capacity",
             )
         started = time.perf_counter()
         engine = None
         try:
+            timeout_ms = self._bounded_timeout_ms(timeout_ms, cancellation_event)
+            if cancellation_event is not None and cancellation_event.is_set():
+                return ExecutionResult(
+                    status="FAILED", datasource_id=datasource.id, dialect=dialect,
+                    normalized_sql=normalized_sql, error_code="QUERY_CANCELLED",
+                    error_message="Query was cancelled before database execution",
+                )
             connector = build_connector(datasource)
             engine = connector._engine()  # Connector owns URL construction and credentials.
             with engine.connect() as connection:
                 monitor_stop = threading.Event()
                 monitor = None
-                if cancellation_event is not None and datasource.type == "postgresql":
+                if cancellation_event is not None and dialect == "postgresql":
                     def cancel_on_disconnect() -> None:
                         while not monitor_stop.wait(0.02):
                             if cancellation_event.is_set():
@@ -209,7 +231,7 @@ class QueryExecutor:
                     )
                     monitor.start()
                 try:
-                    if datasource.type == "postgresql":
+                    if dialect == "postgresql":
                         with connection.begin():
                             self._prepare_postgres_transaction(connection, datasource, timeout_ms)
                             result = connection.execute(text(normalized_sql))
@@ -229,34 +251,50 @@ class QueryExecutor:
                     monitor_stop.set()
                     if monitor is not None:
                         monitor.join(timeout=0.1)
+            if cancellation_event is not None and cancellation_event.is_set():
+                return ExecutionResult(
+                    status="FAILED",
+                    duration_ms=round((time.perf_counter() - started) * 1000),
+                    datasource_id=datasource.id,
+                    dialect=dialect,
+                    normalized_sql=normalized_sql,
+                    error_code="QUERY_CANCELLED",
+                    error_message="Query was cancelled during execution",
+                )
             rows = [{key: json_value(row[key]) for key in keys} for row in raw_rows]
             duration_ms = round((time.perf_counter() - started) * 1000)
             signature = result_signature(keys, rows)
             return ExecutionResult(
                 status="SUCCEEDED", columns=keys, column_types=types or ["unknown"] * len(keys), rows=rows,
                 row_count=len(rows), truncated=len(rows) >= row_limit, duration_ms=duration_ms,
-                datasource_id=datasource.id, dialect=datasource.type, normalized_sql=normalized_sql,
+                datasource_id=datasource.id, dialect=dialect, normalized_sql=normalized_sql,
                 result_signature=signature,
             )
         except (OperationalError, DBAPIError) as exc:
             duration_ms = round((time.perf_counter() - started) * 1000)
             message = str(getattr(exc, "orig", exc))
             lowered = message.lower()
-            if "timeout" in lowered or "statement timeout" in lowered or "max_execution_time" in lowered:
+            if cancellation_event is not None and cancellation_event.is_set():
+                status, code = "FAILED", "QUERY_CANCELLED"
+                message = "Query was cancelled during execution"
+            elif "timeout" in lowered or "statement timeout" in lowered or "max_execution_time" in lowered:
                 status, code = "TIMEOUT", "QUERY_TIMEOUT"
             elif "permission" in lowered or "denied" in lowered or "read-only" in lowered:
                 status, code = "FAILED", "QUERY_PERMISSION_DENIED"
             else:
                 status, code = "FAILED", "QUERY_EXECUTION_ERROR"
             return ExecutionResult(
-                status=status, duration_ms=duration_ms, datasource_id=datasource.id, dialect=datasource.type,
+                status=status, duration_ms=duration_ms, datasource_id=datasource.id, dialect=dialect,
                 normalized_sql=normalized_sql, error_code=code, error_message=message[:1000],
             )
         except Exception as exc:
             duration_ms = round((time.perf_counter() - started) * 1000)
+            cancelled = cancellation_event is not None and cancellation_event.is_set()
             return ExecutionResult(
-                status="FAILED", duration_ms=duration_ms, datasource_id=datasource.id, dialect=datasource.type,
-                normalized_sql=normalized_sql, error_code="QUERY_EXECUTION_ERROR", error_message=str(exc)[:1000],
+                status="FAILED", duration_ms=duration_ms, datasource_id=datasource.id, dialect=dialect,
+                normalized_sql=normalized_sql,
+                error_code="QUERY_CANCELLED" if cancelled else "QUERY_EXECUTION_ERROR",
+                error_message=("Query was cancelled during execution" if cancelled else str(exc)[:1000]),
             )
         finally:
             if engine is not None:
@@ -269,55 +307,120 @@ class QueryExecutor:
         datasource: DataSource,
         normalized_sql: str,
         timeout_ms: int,
+        cancellation_event: threading.Event | None = None,
     ) -> ExecutionResult:
         """Explain a statement only after the caller has passed it through SqlGuard."""
+        dialect = runtime_dialect(datasource)
+        if cancellation_event is not None and cancellation_event.is_set():
+            return ExecutionResult(
+                status="FAILED", datasource_id=datasource.id, dialect=dialect,
+                normalized_sql=normalized_sql, error_code="QUERY_CANCELLED",
+                error_message="Query was cancelled before EXPLAIN",
+            )
+        timeout_ms = self._bounded_timeout_ms(timeout_ms, cancellation_event)
         semaphore = self._limit_semaphore()
-        acquired, _ = self._acquire_slot(semaphore, timeout_ms=timeout_ms)
+        acquired, cancelled = self._acquire_slot(
+            semaphore,
+            timeout_ms=timeout_ms,
+            cancellation_event=cancellation_event,
+        )
         if not acquired:
             return ExecutionResult(
-                status="CONCURRENCY_LIMIT", datasource_id=datasource.id, dialect=datasource.type,
-                normalized_sql=normalized_sql, error_code="QUERY_CONCURRENCY_LIMIT",
-                error_message="Timed out while waiting for query execution capacity",
+                status="FAILED" if cancelled else "CONCURRENCY_LIMIT",
+                datasource_id=datasource.id, dialect=dialect,
+                normalized_sql=normalized_sql,
+                error_code="QUERY_CANCELLED" if cancelled else "QUERY_CONCURRENCY_LIMIT",
+                error_message=(
+                    "Query was cancelled while waiting to EXPLAIN"
+                    if cancelled
+                    else "Timed out while waiting for query execution capacity"
+                ),
             )
         started = time.perf_counter()
         engine = None
         try:
+            timeout_ms = self._bounded_timeout_ms(timeout_ms, cancellation_event)
+            if cancellation_event is not None and cancellation_event.is_set():
+                return ExecutionResult(
+                    status="FAILED", datasource_id=datasource.id, dialect=dialect,
+                    normalized_sql=normalized_sql, error_code="QUERY_CANCELLED",
+                    error_message="Query was cancelled before EXPLAIN execution",
+                )
             connector = build_connector(datasource)
             engine = connector._engine()
-            prefix = "EXPLAIN (FORMAT JSON) " if datasource.type == "postgresql" else "EXPLAIN FORMAT=JSON "
+            prefix = "EXPLAIN (FORMAT JSON) " if dialect == "postgresql" else "EXPLAIN FORMAT=JSON "
             with engine.connect() as connection:
-                if datasource.type == "postgresql":
-                    with connection.begin():
-                        self._prepare_postgres_transaction(connection, datasource, timeout_ms)
-                        value = connection.execute(text(prefix + normalized_sql)).scalar_one()
-                else:
-                    connection.exec_driver_sql(f"SET SESSION MAX_EXECUTION_TIME = {int(timeout_ms)}")
-                    connection.commit()
-                    with connection.begin():
-                        connection.exec_driver_sql("SET TRANSACTION READ ONLY")
-                        value = connection.execute(text(prefix + normalized_sql)).scalar_one()
+                monitor_stop = threading.Event()
+                monitor = None
+                if cancellation_event is not None and dialect == "postgresql":
+                    def cancel_explain_on_disconnect() -> None:
+                        while not monitor_stop.wait(0.02):
+                            if cancellation_event.is_set():
+                                try:
+                                    connection.connection.driver_connection.cancel()
+                                except Exception:
+                                    pass
+                                return
+
+                    monitor = threading.Thread(
+                        target=cancel_explain_on_disconnect,
+                        name="chatbi-explain-cancel",
+                        daemon=True,
+                    )
+                    monitor.start()
+                try:
+                    if dialect == "postgresql":
+                        with connection.begin():
+                            self._prepare_postgres_transaction(connection, datasource, timeout_ms)
+                            value = connection.execute(text(prefix + normalized_sql)).scalar_one()
+                    else:
+                        connection.exec_driver_sql(f"SET SESSION MAX_EXECUTION_TIME = {int(timeout_ms)}")
+                        connection.commit()
+                        with connection.begin():
+                            connection.exec_driver_sql("SET TRANSACTION READ ONLY")
+                            value = connection.execute(text(prefix + normalized_sql)).scalar_one()
+                finally:
+                    monitor_stop.set()
+                    if monitor is not None:
+                        monitor.join(timeout=0.1)
+            if cancellation_event is not None and cancellation_event.is_set():
+                return ExecutionResult(
+                    status="FAILED", duration_ms=round((time.perf_counter() - started) * 1000),
+                    datasource_id=datasource.id, dialect=dialect, normalized_sql=normalized_sql,
+                    error_code="QUERY_CANCELLED", error_message="Query was cancelled during EXPLAIN",
+                )
             rows = [{"plan": json_value(value)}]
             duration_ms = round((time.perf_counter() - started) * 1000)
             return ExecutionResult(
                 status="SUCCEEDED", columns=["plan"], column_types=["json"], rows=rows,
                 row_count=1, duration_ms=duration_ms, datasource_id=datasource.id,
-                dialect=datasource.type, normalized_sql=normalized_sql,
+                dialect=dialect, normalized_sql=normalized_sql,
                 result_signature=result_signature(["plan"], rows),
             )
         except (OperationalError, DBAPIError) as exc:
             duration_ms = round((time.perf_counter() - started) * 1000)
             message = str(getattr(exc, "orig", exc))
-            code = "QUERY_TIMEOUT" if "timeout" in message.lower() else "QUERY_EXPLAIN_ERROR"
+            if cancellation_event is not None and cancellation_event.is_set():
+                status, code = "FAILED", "QUERY_CANCELLED"
+                message = "Query was cancelled during EXPLAIN"
+            elif "timeout" in message.lower():
+                status, code = "TIMEOUT", "QUERY_TIMEOUT"
+            else:
+                status, code = "FAILED", "QUERY_EXPLAIN_ERROR"
             return ExecutionResult(
-                status="TIMEOUT" if code == "QUERY_TIMEOUT" else "FAILED",
-                duration_ms=duration_ms, datasource_id=datasource.id, dialect=datasource.type,
+                status=status,
+                duration_ms=duration_ms, datasource_id=datasource.id, dialect=dialect,
                 normalized_sql=normalized_sql, error_code=code, error_message=message[:1000],
             )
         except Exception as exc:
+            cancelled = cancellation_event is not None and cancellation_event.is_set()
             return ExecutionResult(
                 status="FAILED", duration_ms=round((time.perf_counter() - started) * 1000),
-                datasource_id=datasource.id, dialect=datasource.type, normalized_sql=normalized_sql,
-                error_code="QUERY_EXPLAIN_ERROR", error_message=str(exc)[:1000],
+                datasource_id=datasource.id, dialect=dialect, normalized_sql=normalized_sql,
+                error_code="QUERY_CANCELLED" if cancelled else "QUERY_EXPLAIN_ERROR",
+                error_message=(
+                    "Query was cancelled during EXPLAIN" if cancelled else str(exc)[:1000]
+                ),
             )
         finally:
             if engine is not None:

@@ -47,7 +47,7 @@
 
 画面：Streaming → 一句话结论 → KPI → ECharts → 洞察 → 明细 → 追问。
 
-补充：Showcase 使用 deterministic/LEVEL0，保证录屏可重复且不产生付费调用；正式 V1.3 支持 MiMo/DeepSeek/Kimi 的统一控制平面。
+补充：根目录一键启动默认使用 `Auto`，有凭据时会真实路由 MiMo/DeepSeek/Kimi。需要保证录屏可重复且不产生付费调用时，录屏前显式执行 `showcase.ps1 -Action Start -ProviderMode Deterministic`。
 
 ## 4:30～5:25 功能 5：依据与安全失败关闭
 
@@ -69,7 +69,7 @@
 
 - 固定 `Planner/DataAnalyst/Knowledge/Verification/Insight` 五角色。
 - 固定 `QUERY_DATA/RETRIEVE_KNOWLEDGE/VERIFY_RESULT/VERIFY_CITATION/GENERATE_CHART/GENERATE_INSIGHT` 六工具。
-- 最大 8 步、12 次工具、2 次重规划、深度 2、30 秒。
+- 最大 8 步、12 次工具、2 次重规划、深度 2；发布回归与 `Deterministic`/`Level0` 为 30 秒，本机 `Auto`/`Live` 三模型实测最多 120 秒并共享同一绝对截止时间。
 - 不输出内部思维过程，不允许动态工具、任意 URL 或数据库连接。
 
 ## 6:25～7:25 功能 7：答案、看板和评测闭环

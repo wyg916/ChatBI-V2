@@ -167,6 +167,8 @@ def test_trace_detail_is_one_trace_and_redacts_sensitive_payloads(db_session: Se
         status="SUCCEEDED",
         provider="deepseek",
         context_payload={
+            "dialect": "postgresql",
+            "security_policy": {"sensitive_columns": ["email"]},
             "request_context": {
                 "trace_id": "TRACE-GOVERNANCE-TRACE",
                 "request_id": "REQUEST-GOVERNANCE-TRACE",
@@ -184,8 +186,8 @@ def test_trace_detail_is_one_trace_and_redacts_sensitive_payloads(db_session: Se
         guard_payload={"allowed": True},
         execution_payload={"status": "SUCCEEDED", "columns": ["revenue"], "rows": [{"revenue": 12}]},
         oracle_payload={"status": "PASSED"},
-        generated_sql="select sum(revenue) from sales",
-        normalized_sql="SELECT SUM(revenue) FROM sales",
+        generated_sql="select sum(revenue) from sales where email='victim@example.com'",
+        normalized_sql="SELECT SUM(revenue) FROM sales WHERE email = 'victim@example.com'",
         result_signature="signature",
         duration_ms=55,
     )
@@ -247,8 +249,13 @@ def test_trace_detail_is_one_trace_and_redacts_sensitive_payloads(db_session: Se
     chat_stage = next(stage for stage in detail.stages if stage.stage == "chat.route")
     assert chat_stage.duration_ms == 9
     assert chat_stage.timing_source == "CHAT_STAGE"
-    assert next(stage for stage in detail.stages if stage.stage == "SQL_GUARD").sql == "SELECT SUM(revenue) FROM sales"
-    for forbidden in ("must-not-leak", "reasoning_content", "api_key", "raw_tool_payload"):
+    public_sql = next(stage for stage in detail.stages if stage.stage == "SQL_GUARD").sql
+    assert public_sql == "SELECT SUM(revenue) FROM sales WHERE email = '***MASKED***'"
+    assert "victim@example.com" in (run.normalized_sql or "")
+    for forbidden in (
+        "must-not-leak", "reasoning_content", "api_key", "raw_tool_payload",
+        "victim@example.com",
+    ):
         assert forbidden not in serialized
     dashboard = TraceDashboardResponse.model_validate(trace_dashboard(
         db_session,

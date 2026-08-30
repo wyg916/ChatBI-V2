@@ -6,15 +6,20 @@ from secrets import token_urlsafe
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from fastapi.responses import StreamingResponse
 from sqlalchemy import func, or_, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.core.access import ROLE_PERMISSIONS, Principal, record_audit, require_permission
-from app.core.auth import token_digest
+from app.core.auth import hash_password, token_digest
 from app.db.session import get_db
-from app.models import AppUser, AuditEvent, WorkspaceInvitation
+from app.models import (
+    AppUser, AuditEvent, Dashboard, DataSource, ResourceGrant, SemanticModel,
+    VerifiedAnswer, WorkspaceInvitation,
+)
 from app.schemas.security import (
     AuditEventRead, AuditPage, InvitationCreate, InvitationCreated, InvitationRead,
-    RoleRead, SecurityOverview, UserRead, UserUpdate,
+    PermissionResourceRead, ResourcePermissionRead, ResourcePermissionUpdate,
+    RoleRead, SecurityOverview, UserCreate, UserRead, UserUpdate,
 )
 
 
@@ -52,6 +57,35 @@ def security_overview(
     invitations = list(db.scalars(select(WorkspaceInvitation).where(WorkspaceInvitation.workspace_id == principal.workspace_id).order_by(WorkspaceInvitation.created_at.desc())))
     counts = dict(db.execute(select(AppUser.role, func.count(AppUser.id)).where(AppUser.workspace_id == principal.workspace_id).group_by(AppUser.role)).all())
     current = db.get(AppUser, principal.user_id)
+    permission_resources = [
+        PermissionResourceRead(resource_type="DATASOURCE", resource_id=item.id, name=item.name)
+        for item in db.scalars(
+            select(DataSource).where(DataSource.workspace_id == principal.workspace_id).order_by(DataSource.name)
+        )
+    ] + [
+        PermissionResourceRead(resource_type="SEMANTIC_MODEL", resource_id=item.id, name=item.name)
+        for item in db.scalars(
+            select(SemanticModel).where(SemanticModel.workspace_id == principal.workspace_id).order_by(SemanticModel.name)
+        )
+    ] + [
+        PermissionResourceRead(resource_type="ANSWER", resource_id=item.id, name=item.question)
+        for item in db.scalars(
+            select(VerifiedAnswer)
+            .where(VerifiedAnswer.workspace_id == principal.workspace_id)
+            .order_by(VerifiedAnswer.question, VerifiedAnswer.id)
+        )
+    ] + [
+        PermissionResourceRead(resource_type="DASHBOARD", resource_id=item.id, name=item.name)
+        for item in db.scalars(
+            select(Dashboard).where(Dashboard.workspace_id == principal.workspace_id).order_by(Dashboard.name)
+        )
+    ]
+    workspace_user_ids = select(AppUser.id).where(AppUser.workspace_id == principal.workspace_id)
+    resource_grants = list(db.scalars(
+        select(ResourceGrant)
+        .where(ResourceGrant.user_id.in_(workspace_user_ids))
+        .order_by(ResourceGrant.user_id, ResourceGrant.resource_type, ResourceGrant.resource_id)
+    ))
     return SecurityOverview(
         current_actor=UserRead.model_validate(current) if current and current.workspace_id == principal.workspace_id else None,
         user_count=db.scalar(select(func.count(AppUser.id)).where(AppUser.workspace_id == principal.workspace_id)) or 0,
@@ -62,6 +96,8 @@ def security_overview(
         roles=[RoleRead(name=name, permissions=sorted(permissions), user_count=counts.get(name, 0)) for name, permissions in ROLE_PERMISSIONS.items()],
         audit_events=[AuditEventRead.model_validate(item) for item in events],
         invitations=[InvitationRead.model_validate(item) for item in invitations],
+        permission_resources=permission_resources,
+        resource_grants=[ResourcePermissionRead.model_validate(item) for item in resource_grants],
     )
 
 
@@ -76,6 +112,96 @@ def _active_admin_count(db: Session, workspace_id: str) -> int:
     return db.scalar(select(func.count(AppUser.id)).where(
         AppUser.workspace_id == workspace_id, AppUser.role == "ADMIN", AppUser.status == "ACTIVE",
     )) or 0
+
+
+def _permission_resource(
+    db: Session, principal: Principal, resource_type: str, resource_id: str,
+) -> DataSource | SemanticModel | VerifiedAnswer | Dashboard:
+    resource_class = {
+        "DATASOURCE": DataSource,
+        "SEMANTIC_MODEL": SemanticModel,
+        "ANSWER": VerifiedAnswer,
+        "DASHBOARD": Dashboard,
+    }.get(resource_type)
+    if resource_class is None:
+        raise HTTPException(status_code=422, detail="RESOURCE_TYPE_NOT_MANAGEABLE")
+
+    # Grant changes and managed-resource deletion share this lock protocol.
+    # Otherwise a concurrent grant can commit after deletion removed the old
+    # grants and leave an orphaned polymorphic ResourceGrant row.
+    if resource_type == "SEMANTIC_MODEL":
+        datasource_id = db.scalar(select(SemanticModel.datasource_id).where(
+            SemanticModel.id == resource_id,
+            SemanticModel.workspace_id == principal.workspace_id,
+        ))
+        if datasource_id is None:
+            raise HTTPException(status_code=404, detail="Permission resource not found")
+        parent = db.scalar(
+            select(DataSource).where(
+                DataSource.id == datasource_id,
+                DataSource.workspace_id == principal.workspace_id,
+            ).with_for_update()
+        )
+        if parent is None:
+            raise HTTPException(status_code=404, detail="Permission resource not found")
+        resource = db.scalar(
+            select(SemanticModel).where(
+                SemanticModel.id == resource_id,
+                SemanticModel.workspace_id == principal.workspace_id,
+                SemanticModel.datasource_id == parent.id,
+            ).with_for_update()
+        )
+    else:
+        resource = db.scalar(
+            select(resource_class).where(
+                resource_class.id == resource_id,
+                resource_class.workspace_id == principal.workspace_id,
+            ).with_for_update()
+        )
+    if resource is None:
+        raise HTTPException(status_code=404, detail="Permission resource not found")
+    return resource
+
+
+@router.post("/users", response_model=UserRead, status_code=status.HTTP_201_CREATED)
+def create_user(
+    payload: UserCreate,
+    db: Session = Depends(get_db),
+    principal: Principal = Depends(require_permission("settings.manage")),
+):
+    email = payload.email.strip().lower()
+    display_name = payload.display_name.strip()
+    if not display_name:
+        raise HTTPException(status_code=422, detail="Display name cannot be blank")
+    if db.scalar(select(AppUser.id).where(func.lower(AppUser.email) == email)):
+        raise HTTPException(status_code=409, detail="USER_ALREADY_EXISTS")
+    now = datetime.now(timezone.utc)
+    user = AppUser(
+        workspace_id=principal.workspace_id,
+        email=email,
+        display_name=display_name,
+        role=payload.role,
+        status="ACTIVE",
+        password_hash=hash_password(payload.password),
+        password_changed_at=now,
+    )
+    db.add(user)
+    try:
+        db.flush()
+    except IntegrityError as exc:
+        db.rollback()
+        raise HTTPException(status_code=409, detail="USER_ALREADY_EXISTS") from exc
+    record_audit(
+        db,
+        principal,
+        action="CREATE_MEMBER",
+        resource_type="USER",
+        resource_id=user.id,
+        details={"email": email, "display_name": display_name, "role": payload.role},
+    )
+    db.commit()
+    db.refresh(user)
+    return UserRead.model_validate(user)
 
 
 @router.patch("/users/{user_id}", response_model=UserRead)
@@ -121,6 +247,107 @@ def remove_user(
         raise HTTPException(status_code=409, detail="LAST_ACTIVE_ADMIN_PROTECTED")
     record_audit(db, principal, action="REMOVE_MEMBER", resource_type="USER", resource_id=user.id, details={"email": user.email, "role": user.role})
     db.delete(user)
+    db.commit()
+
+
+@router.get("/users/{user_id}/resource-permissions", response_model=list[ResourcePermissionRead])
+def list_resource_permissions(
+    user_id: str,
+    db: Session = Depends(get_db),
+    principal: Principal = Depends(require_permission("settings.manage")),
+):
+    user = _workspace_user(db, principal, user_id)
+    return list(db.scalars(
+        select(ResourceGrant)
+        .where(ResourceGrant.user_id == user.id)
+        .order_by(ResourceGrant.resource_type, ResourceGrant.resource_id)
+    ))
+
+
+@router.put(
+    "/users/{user_id}/resource-permissions/{resource_type}/{resource_id}",
+    response_model=ResourcePermissionRead,
+)
+def set_resource_permission(
+    user_id: str,
+    resource_type: str,
+    resource_id: str,
+    payload: ResourcePermissionUpdate,
+    db: Session = Depends(get_db),
+    principal: Principal = Depends(require_permission("settings.manage")),
+):
+    user = _workspace_user(db, principal, user_id)
+    normalized_type = resource_type.upper()
+    resource = _permission_resource(db, principal, normalized_type, resource_id)
+    if user.role == "ADMIN":
+        raise HTTPException(status_code=409, detail="ADMIN_HAS_IMPLICIT_RESOURCE_ACCESS")
+    if payload.can_query and not payload.can_read:
+        raise HTTPException(status_code=422, detail="QUERY_PERMISSION_REQUIRES_READ")
+    if not payload.can_read and not payload.can_query:
+        raise HTTPException(status_code=422, detail="USE_DELETE_TO_REVOKE_PERMISSION")
+    grant = db.scalar(select(ResourceGrant).where(
+        ResourceGrant.user_id == user.id,
+        ResourceGrant.resource_type == normalized_type,
+        ResourceGrant.resource_id == resource.id,
+    ))
+    if grant is None:
+        grant = ResourceGrant(
+            user_id=user.id,
+            resource_type=normalized_type,
+            resource_id=resource.id,
+        )
+        db.add(grant)
+    grant.can_read = payload.can_read
+    grant.can_query = payload.can_query
+    db.flush()
+    record_audit(
+        db,
+        principal,
+        action="SET_RESOURCE_PERMISSION",
+        resource_type=normalized_type,
+        resource_id=resource.id,
+        details={
+            "target_user_id": user.id,
+            "can_read": grant.can_read,
+            "can_query": grant.can_query,
+        },
+    )
+    db.commit()
+    db.refresh(grant)
+    return ResourcePermissionRead.model_validate(grant)
+
+
+@router.delete(
+    "/users/{user_id}/resource-permissions/{resource_type}/{resource_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+def revoke_resource_permission(
+    user_id: str,
+    resource_type: str,
+    resource_id: str,
+    db: Session = Depends(get_db),
+    principal: Principal = Depends(require_permission("settings.manage")),
+):
+    user = _workspace_user(db, principal, user_id)
+    normalized_type = resource_type.upper()
+    resource = _permission_resource(db, principal, normalized_type, resource_id)
+    if user.role == "ADMIN":
+        raise HTTPException(status_code=409, detail="ADMIN_HAS_IMPLICIT_RESOURCE_ACCESS")
+    grant = db.scalar(select(ResourceGrant).where(
+        ResourceGrant.user_id == user.id,
+        ResourceGrant.resource_type == normalized_type,
+        ResourceGrant.resource_id == resource.id,
+    ))
+    if grant is not None:
+        db.delete(grant)
+    record_audit(
+        db,
+        principal,
+        action="REVOKE_RESOURCE_PERMISSION",
+        resource_type=normalized_type,
+        resource_id=resource.id,
+        details={"target_user_id": user.id},
+    )
     db.commit()
 
 

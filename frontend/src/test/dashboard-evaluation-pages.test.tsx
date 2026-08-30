@@ -46,7 +46,13 @@ test('经营看板详情渲染 API 指标、图表和洞察', async () => {
   renderRoute('/dashboards/d1', <DashboardDetailPage />);
   expect(await screen.findByTestId('dashboard-detail')).toBeInTheDocument();
   expect(screen.getByText('经营总览看板')).toBeInTheDocument();
+  expect(screen.getByText('经营总览', { selector: '.dashboard-kind-badge' })).toBeInTheDocument();
   expect(screen.getByText('华东收入领先。')).toBeInTheDocument();
+  expect(screen.getByTestId('dashboard-detail')).toHaveAttribute('data-dashboard-kind', 'executive');
+  expect(screen.getAllByRole('img')).toHaveLength(3);
+  expect(screen.getByRole('img', { name: '收入趋势' })).toBeInTheDocument();
+  expect(screen.getByRole('img', { name: '区域收入排名' })).toBeInTheDocument();
+  expect(screen.getByRole('img', { name: '区域利润率' })).toBeInTheDocument();
   expect(screen.getByRole('button', { name: '编辑看板' })).toBeDisabled();
   expect(screen.getByRole('button', { name: '＋ 从已验证答案添加卡片' })).toBeEnabled();
 });

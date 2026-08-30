@@ -1,8 +1,10 @@
 # ChatBI V2 v1.3.1
 
-ChatBI V2 v1.3.1 is an **Enterprise-oriented Open-source ChatBI / NL2SQL Platform** source release. It supports local deployment, Enterprise PoC, private-deployment validation and secondary development. It is not a production-deployment certification.
+## Immutable published release
 
-## Highlights
+ChatBI V2 v1.3.1 is an **Enterprise-oriented Open-source ChatBI / NL2SQL Platform** source release. The published annotated tag `chatbi-v2-v1.3.1` peels to commit `dddca12d3f4a337c51a12ce5cd9a880239b8429d`. It supports local deployment, Enterprise PoC, private-deployment validation and secondary development. It is not a production-deployment certification.
+
+### Published highlights
 
 1. Fixed conversation intent routing, context isolation and stale-answer handling.
 2. Improved chart/table rendering and automatic positioning for long answers.
@@ -13,11 +15,11 @@ ChatBI V2 v1.3.1 is an **Enterprise-oriented Open-source ChatBI / NL2SQL Platfor
 7. Preserved the independently certified actionable-control baseline: 894/894 PASS, with integration-delta controls PASS.
 8. Added enterprise quick-deployment workflows for Doctor, Bootstrap, Start/Stop, Backup/Restore, Configuration and Troubleshooting.
 9. Unified three supported modes: Default Open Source, Local Showcase and Enterprise PoC.
-10. Advanced the unique Alembic migration head to `20260828_0013`; the V1.3.0 rollback target remains `20260822_0012`.
+10. Advanced the unique Alembic migration head to `20260828_0013`; the immutable V1.3.0 rollback target remains `20260822_0012`.
 11. Passed Golden 50 execution, result-value and semantic/Oracle gates.
 12. Passed two independent clean Enterprise deployment validations.
 
-## Certified release evidence
+### Certified tag evidence
 
 - Backend: 704 collected, 697 passed, 7 designed skips, 0 failed, 0 errors.
 - Frontend: 64/64 tests, TypeScript diagnostics 0, production build PASS.
@@ -27,7 +29,15 @@ ChatBI V2 v1.3.1 is an **Enterprise-oriented Open-source ChatBI / NL2SQL Platfor
 - Migration: empty database to `0013`, `0013 → 0012 → 0013`, and existing `0012 → 0013` PASS.
 - Fresh Enterprise deployment: 2/2 PASS.
 
-The final Release SHA, annotated-tag object, GitHub Release ID/URL, checksums and exact publication timestamp are recorded in the external V1.3.1 Final Release Manifest because a Git commit cannot self-record its own immutable identity.
+These totals and claims certify only the immutable published tag above. They must not be reused as evidence for later `main` changes. The annotated-tag object, GitHub Release ID/URL, checksums and exact publication timestamp remain recorded in the external V1.3.1 Final Release Manifest.
+
+## Unreleased `0015` main successor
+
+The current working-tree successor is not part of `chatbi-v2-v1.3.1` and has not been published as a release. It introduces migration `20260829_0014` for managed spreadsheet datasource metadata and head `20260829_0015` for nullable `SQLWorkspaceRun → Datasource` history links with `ON DELETE SET NULL`; the direct downgrade target is `20260829_0014`. It also moves new backups to the `chatbi-enterprise-backup-v3` contract and requires matching-source restore semantics.
+
+Current source regression covers empty database to `0015`, existing `0013 → 0014 → 0015`, managed-datasource deletion with preserved SQL-workspace history, and fail-closed downgrade guards for both managed storage and detached history. That incremental regression does not inherit the tag's Backend, Frontend, browser, Provider or fresh-deployment totals. The successor requires its own complete release gates and evidence before any new release claim; current progress and remaining gates are tracked in `docs/STATUS.md`.
+
+The successor also unifies guarded final presentation across the authenticated `/chat/stream`, `/analysis` and `/analysis/stream` contracts. Presentation runs only after deterministic publication evidence is valid, preserves the exact source answer, records the resolved Provider/Model, and falls back to the verified source without changing a successful analysis into a failure.
 
 ## Known risks
 

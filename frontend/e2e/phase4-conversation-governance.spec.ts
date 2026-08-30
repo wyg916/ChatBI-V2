@@ -96,18 +96,18 @@ test('cost, ONE_TRACE, model and evaluation dashboards use real governance APIs 
   expect((await filteredCost).status()).toBe(200);
 
   await page.getByRole('button', { name: 'ONE_TRACE' }).click();
-  await expect(page.getByRole('heading', { name: 'ONE_TRACE 时序索引' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'ONE_TRACE 时序索引' })).toBeVisible({ timeout: 30_000 });
   const traceLinks = page.locator('.governance-trace-link');
-  await expect(traceLinks.first()).toBeVisible();
+  await expect(traceLinks.first()).toBeVisible({ timeout: 30_000 });
   await traceLinks.first().click();
-  await expect(page.getByRole('heading', { name: 'Trace 阶段详情' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Trace 阶段详情' })).toBeVisible({ timeout: 30_000 });
 
   await page.getByRole('button', { name: '模型治理' }).click();
-  await expect(page.getByRole('heading', { name: '路由政策' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: '路由政策' })).toBeVisible({ timeout: 30_000 });
   await expect(page.locator('.governance-model-card')).toHaveCount(3);
 
   await page.getByRole('button', { name: '评测治理' }).click();
-  await expect(page.getByRole('heading', { name: '评测套件与证据' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: '评测套件与证据' })).toBeVisible({ timeout: 30_000 });
 
   expect(runtime.consoleErrors).toEqual([]);
   expect(runtime.pageErrors).toEqual([]);

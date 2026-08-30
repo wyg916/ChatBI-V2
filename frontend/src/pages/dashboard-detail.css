@@ -5,7 +5,14 @@
   max-width: 1600px;
   margin: 0 auto;
   color: #172033;
+  --dashboard-accent: #5b5cf6;
+  --dashboard-soft: #eeedff;
 }
+.dashboard-regional { --dashboard-accent: #2563eb; --dashboard-soft: #eaf2ff; }
+.dashboard-customer { --dashboard-accent: #7c3aed; --dashboard-soft: #f2ebff; }
+.dashboard-supply { --dashboard-accent: #0f9f7f; --dashboard-soft: #e8f8f4; }
+.dashboard-marketing { --dashboard-accent: #e86f2d; --dashboard-soft: #fff1e8; }
+.dashboard-finance { --dashboard-accent: #1677b8; --dashboard-soft: #e8f5fc; }
 .detail-heading {
   display: flex;
   align-items: center;
@@ -33,6 +40,17 @@
   border: 1px solid #b9ecd9;
   color: #059b70;
   font-size: 12px;
+  font-weight: 750;
+}
+.dashboard-kind-badge {
+  display: inline-flex;
+  align-items: center;
+  height: 28px;
+  padding: 0 11px;
+  border-radius: 999px;
+  background: var(--dashboard-soft);
+  color: var(--dashboard-accent);
+  font-size: 11px;
   font-weight: 750;
 }
 .detail-actions {
@@ -115,6 +133,7 @@
   margin-bottom: 13px;
 }
 .detail-kpi-grid article {
+  position: relative;
   height: 103px;
   border: 1px solid var(--line);
   border-radius: 14px;
@@ -122,6 +141,15 @@
   padding: 14px;
   display: flex;
   flex-direction: column;
+  overflow: hidden;
+}
+.detail-kpi-grid article::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 3px;
+  background: var(--dashboard-accent);
+  opacity: .78;
 }
 .detail-kpi-grid small {
   color: #74819a;
@@ -144,9 +172,10 @@
 }
 .detail-chart-grid {
   display: grid;
-  grid-template-columns: minmax(0, 1.38fr) minmax(350px, 1fr);
+  grid-template-columns: minmax(0, 1.55fr) minmax(340px, .9fr);
   gap: 13px;
   margin-bottom: 13px;
+  min-height: 336px;
 }
 .detail-card {
   background: #fff;
@@ -170,13 +199,18 @@
   margin: 7px 0 0;
 }
 .chart-card {
-  height: 280px;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  contain: layout paint;
 }
 .chart-card header span {
   padding: 5px 10px;
   border-radius: 999px;
-  background: #eeedff;
-  color: #5b5cf6;
+  background: var(--dashboard-soft);
+  color: var(--dashboard-accent);
   font-size: 12px;
   font-weight: 700;
 }
@@ -185,9 +219,23 @@
   font-size: 10px;
 }
 .chart-card .data-echart {
-  height: 214px;
+  flex: 1 1 auto;
+  height: auto;
+  min-height: 0;
   width: 100%;
+  max-width: 100%;
+  overflow: hidden;
 }
+.detail-primary-chart { height: 336px; }
+.detail-chart-stack { display: grid; grid-template-rows: repeat(2,minmax(0,1fr)); gap: 13px; min-width: 0; height: 336px; }
+.detail-secondary-chart { height: auto; }
+.detail-secondary-chart > header { padding-top: 11px; }
+.detail-secondary-chart header p { margin-top: 3px; }
+.dashboard-layout-regional { grid-template-columns: minmax(0,1.4fr) minmax(360px,1fr); }
+.dashboard-layout-customer .detail-primary-chart,
+.dashboard-layout-finance .detail-primary-chart { background: linear-gradient(180deg,var(--dashboard-soft) 0,#fff 24%); }
+.dashboard-layout-supply .detail-secondary-chart:last-child,
+.dashboard-layout-marketing .detail-secondary-chart:last-child { border-left: 3px solid var(--dashboard-accent); }
 .detail-bottom-grid {
   display: grid;
   grid-template-columns: minmax(0, 1.85fr) minmax(300px, 1fr);
@@ -243,8 +291,8 @@
   width: 32px;
   height: 32px;
   border-radius: 9px;
-  background: #eeedff;
-  color: #5b5cf6;
+  background: var(--dashboard-soft);
+  color: var(--dashboard-accent);
   display: grid;
   place-items: center;
   font-size: 13px;
@@ -261,21 +309,24 @@
 .insight-card > button {
   width: 100%;
   height: 42px;
-  border: 1px solid #d6d0ff;
+  border: 1px solid color-mix(in srgb, var(--dashboard-accent) 24%, white);
   border-radius: 10px;
-  background: #eeedff;
-  color: #5b5cf6;
+  background: var(--dashboard-soft);
+  color: var(--dashboard-accent);
   font-weight: 750;
 }
 .data-echart {
   min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  isolation: isolate;
 }
 @media (max-width: 1280px) {
   .detail-actions .button {
     padding: 0 12px;
   }
   .detail-chart-grid {
-    grid-template-columns: minmax(0, 1.25fr) minmax(330px, 1fr);
+    grid-template-columns: minmax(0, 1.35fr) minmax(330px, 1fr);
   }
   .region-table-card th,
   .region-table-card td {
@@ -307,12 +358,13 @@
   .detail-bottom-grid {
     grid-template-columns: 1fr;
   }
-  .chart-card,
+  .detail-primary-chart,
   .region-table-card,
   .insight-card {
     height: auto;
     min-height: 290px;
   }
+  .detail-chart-stack { height: 336px; }
 }
 .verified-dashboard-cards { margin-top: 16px; }
 .verified-dashboard-cards > header h2 { margin: 0; font-size: 17px; }

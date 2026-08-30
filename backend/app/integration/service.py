@@ -59,6 +59,9 @@ from app.query.service import QueryPipeline, query_response
 from app.services.datasources import default_workspace
 
 
+MAX_AGENT_TIMEOUT_MS = 120_000
+
+
 def _now() -> datetime:
     return datetime.now(timezone.utc)
 
@@ -261,7 +264,10 @@ class AnalysisService:
                 prompt_versions=self._prompt_versions(db, context.workspace_id),
             ),
             cancellation_event=cancellation_event,
-            deadline_monotonic=monotonic() + min(settings.agent_timeout_ms, 30_000) / 1000,
+            deadline_monotonic=(
+                monotonic()
+                + min(max(settings.agent_timeout_ms, 1_000), MAX_AGENT_TIMEOUT_MS) / 1000
+            ),
         )
         self._record_orchestration(db, principal, request, result, idempotency_key)
         if result.status not in {"SUCCEEDED", "PARTIAL"} and settings.agent_fallback_enabled:
@@ -414,7 +420,10 @@ class AnalysisService:
             allowed_semantic_models=models,
             allowed_tools=frozenset({ToolName.RETRIEVE_KNOWLEDGE.value}),
             trace_id=trace_id,
-            timeout_ms=settings.agent_timeout_ms,
+            # The governed RAG Bridge has a 30-second per-retrieval contract;
+            # the enclosing Live Agent may continue to use its 120-second
+            # end-to-end budget across multiple bounded phases.
+            timeout_ms=min(settings.agent_timeout_ms, 30_000),
             max_steps=settings.agent_max_steps,
             token_budget=settings.agent_token_budget,
         )

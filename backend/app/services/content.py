@@ -1,12 +1,31 @@
+import re
 from datetime import date, datetime, timedelta, timezone
 
 from sqlalchemy import case, func, or_, select
 from sqlalchemy.orm import Session
 
-from app.models import AnswerVersion, AuditEvent, Dashboard, DashboardCard, DataSource, QueryRun, VerifiedAnswer
+from app.models import (
+    AnswerVersion,
+    AuditEvent,
+    Dashboard,
+    DashboardCard,
+    DataSource,
+    DataSourceColumn,
+    DataSourceSchema,
+    DataSourceTable,
+    QueryRun,
+    VerifiedAnswer,
+)
 from app.core.access import Principal
+from app.core.data_safety import (
+    SENSITIVE_COMMENT_MARKER,
+    is_sensitive_column,
+    redact_public_sql,
+    redact_public_sql_payload,
+)
 from app.query.contracts import SecurityPolicy
 from app.services.data_workspace import execute_sql
+from app.services.datasources import runtime_dialect
 
 
 _DASHBOARD_READ_POLICY = SecurityPolicy(
@@ -21,8 +40,119 @@ _DASHBOARD_READ_POLICY = SecurityPolicy(
     },
 )
 
+_ANSWER_PUBLIC_FIELDS = (
+    "id", "question", "module", "sql_synced", "model_name", "owner_name", "status",
+    "accuracy_percent", "adoption_count", "is_favorite", "query_run_id", "sql_text",
+    "result_signature", "semantic_model_version", "semantic_intent", "sql_plan",
+    "result_snapshot", "chart_spec", "narrative", "semantic_model_id", "datasource_id",
+    "oracle_status", "feedback", "created_at", "updated_at",
+)
 
-def answer_summary(db: Session, workspace_id: str | None = None) -> dict[str, int | float]:
+
+def _answer_redaction_context(
+    db: Session,
+    answer: VerifiedAnswer,
+) -> tuple[str, list[str]]:
+    datasource = db.get(DataSource, answer.datasource_id) if answer.datasource_id else None
+    dialect = (
+        runtime_dialect(datasource)
+        if datasource is not None
+        else str(
+            (answer.sql_plan or {}).get("dialect")
+            or (answer.result_snapshot or {}).get("dialect")
+            or "postgresql"
+        )
+    )
+    if datasource is None:
+        return dialect, []
+    rows = db.execute(
+        select(DataSourceColumn.name, DataSourceColumn.comment)
+        .join(DataSourceTable, DataSourceColumn.table_id == DataSourceTable.id)
+        .join(DataSourceSchema, DataSourceTable.schema_id == DataSourceSchema.id)
+        .where(DataSourceSchema.datasource_id == datasource.id)
+    )
+    sensitive_columns = sorted({
+        name
+        for name, comment in rows
+        if is_sensitive_column(name) or SENSITIVE_COMMENT_MARKER in (comment or "")
+    })
+    return dialect, sensitive_columns
+
+
+def _redact_sql_workspace_question(
+    value: object,
+    sensitive_columns: list[str],
+    *,
+    dialect: str,
+) -> object:
+    prefix = "SQL 工作台验证："
+    if not isinstance(value, str):
+        return value
+    if value.startswith(prefix):
+        public_sql = redact_public_sql(
+            value[len(prefix):], sensitive_columns, dialect=dialect,
+        )
+        return prefix + (public_sql or "")
+    if re.match(r"^\s*(?:SELECT|WITH)\b", value, re.IGNORECASE):
+        return redact_public_sql(value, sensitive_columns, dialect=dialect)
+    return value
+
+
+def public_answer_payload(
+    db: Session,
+    answer: VerifiedAnswer,
+    *,
+    include_versions: bool = False,
+) -> dict:
+    """Serialize an answer for API consumers without exposing SQL literals."""
+
+    dialect, sensitive_columns = _answer_redaction_context(db, answer)
+    payload = {field: getattr(answer, field) for field in _ANSWER_PUBLIC_FIELDS}
+    payload = redact_public_sql_payload(
+        payload, sensitive_columns, dialect=dialect,
+    )
+    payload["question"] = _redact_sql_workspace_question(
+        payload.get("question"), sensitive_columns, dialect=dialect,
+    )
+    if include_versions:
+        versions = []
+        for version in sorted(answer.versions, key=lambda item: item.version):
+            snapshot = redact_public_sql_payload(
+                version.snapshot or {}, sensitive_columns, dialect=dialect,
+            )
+            if "question" in snapshot:
+                snapshot["question"] = _redact_sql_workspace_question(
+                    snapshot.get("question"), sensitive_columns, dialect=dialect,
+                )
+            versions.append({
+                "id": version.id,
+                "version": version.version,
+                "snapshot": snapshot,
+                "created_at": version.created_at,
+            })
+        payload["versions"] = versions
+    return payload
+
+
+def _public_answer_bound_payload(
+    db: Session,
+    answer: VerifiedAnswer | None,
+    payload,
+):
+    if answer is None:
+        return redact_public_sql_payload(payload, [], dialect="postgresql")
+    dialect, sensitive_columns = _answer_redaction_context(db, answer)
+    return redact_public_sql_payload(
+        payload, sensitive_columns, dialect=dialect,
+    )
+
+
+def answer_summary(
+    db: Session,
+    workspace_id: str | None = None,
+    *,
+    allowed_ids: list[str] | None = None,
+) -> dict[str, int | float]:
     statement = select(
             func.count(VerifiedAnswer.id),
             func.coalesce(func.avg(VerifiedAnswer.accuracy_percent), 0),
@@ -36,6 +166,8 @@ def answer_summary(db: Session, workspace_id: str | None = None) -> dict[str, in
         )
     if workspace_id:
         statement = statement.where(VerifiedAnswer.workspace_id == workspace_id)
+    if allowed_ids is not None:
+        statement = statement.where(VerifiedAnswer.id.in_(allowed_ids))
     row = db.execute(statement).one()
     return {
         "total": row[0],
@@ -59,10 +191,13 @@ def list_answers(
     page: int = 1,
     page_size: int = 6,
     workspace_id: str | None = None,
+    allowed_ids: list[str] | None = None,
 ) -> tuple[list[VerifiedAnswer], int]:
     statement = select(VerifiedAnswer)
     if workspace_id:
         statement = statement.where(VerifiedAnswer.workspace_id == workspace_id)
+    if allowed_ids is not None:
+        statement = statement.where(VerifiedAnswer.id.in_(allowed_ids))
     if query.strip():
         keyword = f"%{query.strip()}%"
         statement = statement.where(or_(
@@ -90,17 +225,26 @@ def list_answers(
     return items, total
 
 
-def dashboard_summary(db: Session, workspace_id: str | None = None) -> dict[str, int]:
+def dashboard_summary(
+    db: Session,
+    workspace_id: str | None = None,
+    *,
+    allowed_ids: list[str] | None = None,
+) -> dict[str, int]:
     statement = select(
         func.count(Dashboard.id),
         func.coalesce(func.sum(case((Dashboard.is_shared.is_(True), 1), else_=0)), 0),
     )
     if workspace_id:
         statement = statement.where(Dashboard.workspace_id == workspace_id)
+    if allowed_ids is not None:
+        statement = statement.where(Dashboard.id.in_(allowed_ids))
     row = db.execute(statement).one()
     cards_statement = select(func.count(DashboardCard.id)).join(Dashboard, DashboardCard.dashboard_id == Dashboard.id)
     if workspace_id:
         cards_statement = cards_statement.where(Dashboard.workspace_id == workspace_id)
+    if allowed_ids is not None:
+        cards_statement = cards_statement.where(Dashboard.id.in_(allowed_ids))
     today_start = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
     refreshes_statement = select(func.count(AuditEvent.id)).where(
         AuditEvent.action == "REFRESH_CARD",
@@ -110,6 +254,8 @@ def dashboard_summary(db: Session, workspace_id: str | None = None) -> dict[str,
     )
     if workspace_id:
         refreshes_statement = refreshes_statement.where(AuditEvent.workspace_id == workspace_id)
+    if allowed_ids is not None:
+        refreshes_statement = refreshes_statement.where(AuditEvent.resource_id.in_(allowed_ids))
     return {
         "total": row[0],
         "cards": db.scalar(cards_statement) or 0,
@@ -140,6 +286,7 @@ def list_dashboards(
     page: int = 1,
     page_size: int = 6,
     workspace_id: str | None = None,
+    allowed_ids: list[str] | None = None,
 ) -> tuple[list[dict], int]:
     actual_card_count = func.count(DashboardCard.id).label("actual_card_count")
     today_start = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
@@ -164,6 +311,9 @@ def list_dashboards(
     if workspace_id:
         statement = statement.where(Dashboard.workspace_id == workspace_id)
         total_statement = total_statement.where(Dashboard.workspace_id == workspace_id)
+    if allowed_ids is not None:
+        statement = statement.where(Dashboard.id.in_(allowed_ids))
+        total_statement = total_statement.where(Dashboard.id.in_(allowed_ids))
     if query.strip():
         keyword = f"%{query.strip()}%"
         statement = statement.where(or_(Dashboard.name.ilike(keyword), Dashboard.description.ilike(keyword)))
@@ -325,7 +475,13 @@ def dashboard_detail(db: Session, dashboard: Dashboard, principal: Principal) ->
     for card in db.scalars(select(DashboardCard).where(DashboardCard.dashboard_id == dashboard.id).order_by(DashboardCard.created_at)):
         answer = db.get(VerifiedAnswer, card.answer_id)
         run = db.get(QueryRun, card.query_run_id)
-        cards.append({
+        source_question = answer.question if answer else ""
+        if answer is not None:
+            dialect, sensitive_columns = _answer_redaction_context(db, answer)
+            source_question = _redact_sql_workspace_question(
+                source_question, sensitive_columns, dialect=dialect,
+            )
+        cards.append(_public_answer_bound_payload(db, answer, {
             "id": card.id,
             "dashboard_id": card.dashboard_id,
             "answer_id": card.answer_id,
@@ -338,11 +494,11 @@ def dashboard_detail(db: Session, dashboard: Dashboard, principal: Principal) ->
             "semantic_model_version": card.semantic_model_version,
             "result_signature": card.result_signature,
             "refresh_policy": card.refresh_policy,
-            "source_question": answer.question if answer else "",
+            "source_question": source_question,
             "result_snapshot": run.execution_payload if run else {},
             "created_at": card.created_at,
             "updated_at": card.updated_at,
-        })
+        }))
     return {
         "dashboard": _dashboard_payload(
             dashboard,
@@ -431,7 +587,12 @@ def create_dashboard_card(db: Session, dashboard: Dashboard, *, answer: Verified
     return card
 
 
-def refresh_dashboard_card(db: Session, card: DashboardCard) -> DashboardCard:
+def refresh_dashboard_card(
+    db: Session,
+    card: DashboardCard,
+    *,
+    principal: Principal,
+) -> DashboardCard:
     from app.query.contracts import AskRequest
     from app.query.service import QueryPipeline
 
@@ -442,7 +603,7 @@ def refresh_dashboard_card(db: Session, card: DashboardCard) -> DashboardCard:
         question=answer.question,
         datasource_id=answer.datasource_id,
         semantic_model_id=answer.semantic_model_id,
-    ))
+    ), principal=principal)
     if run.status != "SUCCEEDED":
         raise ValueError(f"Card refresh query failed: {run.status}")
     card.query_run_id = run.id
@@ -460,11 +621,17 @@ def refresh_dashboard_card(db: Session, card: DashboardCard) -> DashboardCard:
 def dashboard_card_payload(db: Session, card: DashboardCard) -> dict:
     answer = db.get(VerifiedAnswer, card.answer_id)
     run = db.get(QueryRun, card.query_run_id)
-    return {
+    source_question = answer.question if answer else ""
+    if answer is not None:
+        dialect, sensitive_columns = _answer_redaction_context(db, answer)
+        source_question = _redact_sql_workspace_question(
+            source_question, sensitive_columns, dialect=dialect,
+        )
+    return _public_answer_bound_payload(db, answer, {
         **{name: getattr(card, name) for name in (
             "id", "dashboard_id", "answer_id", "query_run_id", "chart_spec", "title", "position", "size",
             "filter_context", "semantic_model_version", "result_signature", "refresh_policy", "created_at", "updated_at",
         )},
-        "source_question": answer.question if answer else "",
+        "source_question": source_question,
         "result_snapshot": run.execution_payload if run else {},
-    }
+    })

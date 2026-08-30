@@ -1,5 +1,12 @@
 import { api, unwrapList } from './client';
-import type { ColumnInfo, Datasource, DatasourceInput, DatasourceUpdateInput, SchemaInfo, TableInfo } from '../types/api';
+import type { ColumnInfo, Datasource, DatasourceInput, DatasourceUpdateInput, SchemaInfo, SpreadsheetImportResult, SpreadsheetPreview, TableInfo } from '../types/api';
+
+function spreadsheetForm(file: File, name?: string) {
+  const body = new FormData();
+  if (name !== undefined) body.set('name', name);
+  body.set('file', file);
+  return body;
+}
 
 export const datasourceApi = {
   list: (options: { query?: string; type?: string; status?: string } = {}) => {
@@ -12,6 +19,8 @@ export const datasourceApi = {
   },
   get: (id: string) => api<Datasource>(`/datasources/${id}`),
   create: (input: DatasourceInput) => api<Datasource>('/datasources', { method: 'POST', body: JSON.stringify(input) }),
+  previewSpreadsheet: (file: File) => api<SpreadsheetPreview>('/datasources/import/preview', { method: 'POST', body: spreadsheetForm(file) }),
+  importSpreadsheet: (name: string, file: File) => api<SpreadsheetImportResult>('/datasources/import', { method: 'POST', body: spreadsheetForm(file, name) }),
   update: (id: string, input: DatasourceUpdateInput) => api<Datasource>(`/datasources/${id}`, { method: 'PUT', body: JSON.stringify(input) }),
   test: (id: string) => api<{ success: boolean; message?: string }>(`/datasources/${id}/test`, { method: 'POST' }),
   sync: (id: string) => api<{ success?: boolean; tables?: number; columns?: number }>(`/datasources/${id}/sync`, { method: 'POST' }),

@@ -571,6 +571,56 @@ def _zero_cost_response(provider: str, *, latency_ms: int, retry_count: int = 0,
     )
 
 
+def test_paid_ledger_keeps_provider_local_retry_count_when_response_reports_total_retries(tmp_path: Path) -> None:
+    controller = _cost_controller(_level1_environment(tmp_path))
+    context = _unique_context()
+    request = _request()
+    failed = controller.reserve_attempt(
+        provider="mimo",
+        model="mimo-test",
+        request=request,
+        context=context,
+        estimated_cost_cny=0,
+        retry_count=0,
+        recorded_transport=False,
+        premium_escalation=False,
+    )
+    controller.complete_attempt(
+        failed,
+        status="FAILED",
+        error_code="HTTP_503",
+        latency_ms=10,
+    )
+    retried = controller.reserve_attempt(
+        provider="mimo",
+        model="mimo-test",
+        request=request,
+        context=context,
+        estimated_cost_cny=0,
+        retry_count=1,
+        recorded_transport=False,
+        premium_escalation=False,
+    )
+    controller.complete_attempt(
+        retried,
+        status="SUCCEEDED",
+        response=_zero_cost_response(
+            "mimo",
+            latency_ms=20,
+            retry_count=2,
+        ),
+        latency_ms=20,
+    )
+
+    summary = controller.summary()
+    succeeded = next(
+        record for record in summary["ledger_records"]
+        if record["status"] == "SUCCEEDED"
+    )
+    assert succeeded["retry_count"] == 1
+    assert summary["unbounded_retry"] == 0
+
+
 def test_paid_ledger_v3_covers_success_failure_retry_fallback_and_premium_without_network(tmp_path: Path) -> None:
     environment = _level1_environment(
         tmp_path,

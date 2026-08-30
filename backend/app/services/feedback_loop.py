@@ -6,10 +6,16 @@ from datetime import datetime, timezone
 from difflib import SequenceMatcher
 from typing import Any
 
-from sqlalchemy import func, select
-from sqlalchemy.orm import Session
+from sqlalchemy import and_, func, select
+from sqlalchemy.orm import Session, aliased
 
-from app.core.access import Principal
+from app.core.access import (
+    Principal,
+    ensure_query_run_access,
+    ensure_resource_access,
+    grant_created_resource,
+    has_resource_access,
+)
 from app.models import (
     AnswerVersion,
     BusinessTerm,
@@ -17,6 +23,7 @@ from app.models import (
     EvaluationRun,
     QueryFeedback,
     QueryRun,
+    ResourceGrant,
     SemanticModel,
     VerifiedAnswer,
 )
@@ -31,6 +38,7 @@ from app.schemas.evaluation import (
     FeedbackReviewRequest,
     UserFeedbackCreate,
 )
+from app.services.content import public_answer_payload
 
 
 FLOW_ID = "SQLBOT_FEEDBACK_V2_1"
@@ -142,10 +150,108 @@ def _workflow(answer: VerifiedAnswer, version: int) -> dict[str, Any]:
     }
 
 
-def _run(db: Session, query_run_id: str, workspace_id: str | None) -> QueryRun:
+def _public_workflow(
+    db: Session,
+    answer: VerifiedAnswer,
+    version: int,
+) -> dict[str, Any]:
+    """Return one workflow without exposing stored SQL literals or errors."""
+
+    payload = _workflow(answer, version)
+    public_answer = public_answer_payload(db, answer)
+    public_feedback = public_answer.get("feedback") or {}
+    payload["question"] = public_answer.get("question") or answer.question
+    payload["corrected_sql"] = (
+        public_answer.get("sql_text")
+        or public_feedback.get("corrected_sql")
+        or public_feedback.get("candidate_sql")
+    )
+    payload["feedback"] = public_feedback
+    return payload
+
+
+def _public_candidate(
+    db: Session,
+    answer: VerifiedAnswer,
+    *,
+    score: float,
+) -> dict[str, Any]:
+    public_answer = public_answer_payload(db, answer)
+    return {
+        "answer_id": answer.id,
+        "question": str(public_answer.get("question") or ""),
+        "sql": str(public_answer.get("sql_text") or ""),
+        "score": score,
+        "version": _version(db, answer.id),
+        "status": answer.status,
+    }
+
+
+def _authorized_answer_statement(statement, principal: Principal):
+    """Scope Answer reads through all three executable resource grants."""
+
+    statement = statement.where(VerifiedAnswer.workspace_id == principal.workspace_id)
+    if principal.role == "ADMIN":
+        return statement
+    if not principal.user_id:
+        return statement.where(VerifiedAnswer.id == "")
+
+    answer_grant = aliased(ResourceGrant)
+    datasource_grant = aliased(ResourceGrant)
+    model_grant = aliased(ResourceGrant)
+    return (
+        statement
+        .join(answer_grant, and_(
+            answer_grant.user_id == principal.user_id,
+            answer_grant.resource_type == "ANSWER",
+            answer_grant.resource_id == VerifiedAnswer.id,
+            answer_grant.can_read.is_(True),
+            answer_grant.can_query.is_(True),
+        ))
+        .join(datasource_grant, and_(
+            datasource_grant.user_id == principal.user_id,
+            datasource_grant.resource_type == "DATASOURCE",
+            datasource_grant.resource_id == VerifiedAnswer.datasource_id,
+            datasource_grant.can_query.is_(True),
+        ))
+        .join(model_grant, and_(
+            model_grant.user_id == principal.user_id,
+            model_grant.resource_type == "SEMANTIC_MODEL",
+            model_grant.resource_id == VerifiedAnswer.semantic_model_id,
+            model_grant.can_query.is_(True),
+        ))
+    )
+
+
+def _ensure_answer_query_access(
+    db: Session,
+    principal: Principal,
+    answer: VerifiedAnswer,
+) -> None:
+    ensure_resource_access(
+        db, principal, resource_type="ANSWER", resource_id=answer.id, query=True,
+    )
+    ensure_resource_access(
+        db,
+        principal,
+        resource_type="DATASOURCE",
+        resource_id=answer.datasource_id or "",
+        query=True,
+    )
+    ensure_resource_access(
+        db,
+        principal,
+        resource_type="SEMANTIC_MODEL",
+        resource_id=answer.semantic_model_id or "",
+        query=True,
+    )
+
+
+def _run(db: Session, query_run_id: str, principal: Principal) -> QueryRun:
     run = db.get(QueryRun, query_run_id)
-    if run is None or (workspace_id and run.workspace_id != workspace_id):
+    if run is None or run.workspace_id != principal.workspace_id:
         raise LookupError("Query run not found")
+    ensure_query_run_access(db, principal, run, require_owner=True)
     return run
 
 
@@ -154,9 +260,9 @@ def record_correct_feedback(
     *,
     query_run_id: str,
     comment: str | None,
-    workspace_id: str | None,
+    principal: Principal,
 ) -> QueryFeedback:
-    run = _run(db, query_run_id, workspace_id)
+    run = _run(db, query_run_id, principal)
     if run.status != "SUCCEEDED" or (run.oracle_payload or {}).get("status") != "PASSED":
         raise ValueError("Only an Oracle-passed answer can receive correct feedback")
     feedback = db.scalar(select(QueryFeedback).where(
@@ -180,7 +286,7 @@ def record_user_feedback(
     principal: Principal,
 ) -> dict[str, Any]:
     """Create one persisted OPEN review item without promoting user SQL."""
-    source = _run(db, data.query_run_id, principal.workspace_id)
+    source = _run(db, data.query_run_id, principal)
     if data.sentiment == "THUMB_DOWN" and not data.reason:
         raise ValueError("Thumb down feedback requires a reason")
     if data.sentiment == "THUMB_UP" and (
@@ -255,10 +361,13 @@ def record_user_feedback(
     )
     db.add(answer)
     db.flush()
+    grant_created_resource(
+        db, principal, resource_type="ANSWER", resource_id=answer.id,
+    )
     db.add(AnswerVersion(answer_id=answer.id, version=1, snapshot=_snapshot(answer)))
     db.commit()
     db.refresh(answer)
-    return _workflow(answer, 1)
+    return _public_workflow(db, answer, 1)
 
 
 def start_feedback_review(
@@ -271,6 +380,7 @@ def start_feedback_review(
     answer = db.get(VerifiedAnswer, answer_id)
     if answer is None or answer.workspace_id != principal.workspace_id:
         raise LookupError("Feedback review not found")
+    _ensure_answer_query_access(db, principal, answer)
     feedback = answer.feedback or {}
     if feedback.get("flow") != PHASE4_FLOW_ID:
         raise ValueError("Answer is not a Phase 4 feedback review")
@@ -297,7 +407,7 @@ def start_feedback_review(
     db.add(AnswerVersion(answer_id=answer.id, version=next_version, snapshot=_snapshot(answer)))
     db.commit()
     db.refresh(answer)
-    return _workflow(answer, next_version)
+    return _public_workflow(db, answer, next_version)
 
 
 def _feedback_regression_case(
@@ -373,6 +483,7 @@ def decide_feedback_review(
     answer = db.get(VerifiedAnswer, answer_id)
     if answer is None or answer.workspace_id != principal.workspace_id:
         raise LookupError("Feedback review not found")
+    _ensure_answer_query_access(db, principal, answer)
     feedback = answer.feedback or {}
     if feedback.get("flow") != PHASE4_FLOW_ID:
         raise ValueError("Answer is not a Phase 4 feedback review")
@@ -403,9 +514,9 @@ def decide_feedback_review(
         db.add(AnswerVersion(answer_id=answer.id, version=next_version, snapshot=_snapshot(answer)))
         db.commit()
         db.refresh(answer)
-        return _workflow(answer, next_version)
+        return _public_workflow(db, answer, next_version)
 
-    source = _run(db, str(feedback.get("source_query_run_id") or ""), principal.workspace_id)
+    source = _run(db, str(feedback.get("source_query_run_id") or ""), principal)
     if source.datasource_id != answer.datasource_id or source.semantic_model_id != answer.semantic_model_id:
         raise ValueError("Feedback resource binding changed before verification")
     sql = data.corrected_sql or feedback.get("candidate_sql")
@@ -476,7 +587,7 @@ def decide_feedback_review(
     db.add(AnswerVersion(answer_id=answer.id, version=next_version, snapshot=_snapshot(answer)))
     db.commit()
     db.refresh(answer)
-    return _workflow(answer, next_version)
+    return _public_workflow(db, answer, next_version)
 
 
 def submit_correction(
@@ -485,7 +596,7 @@ def submit_correction(
     data: FeedbackCorrectionCreate,
     principal: Principal,
 ) -> dict[str, Any]:
-    source = _run(db, data.query_run_id, principal.workspace_id)
+    source = _run(db, data.query_run_id, principal)
     feedback = db.scalar(select(QueryFeedback).where(
         QueryFeedback.query_run_id == source.id,
         QueryFeedback.feedback_type == "INCORRECT",
@@ -560,10 +671,13 @@ def submit_correction(
     )
     db.add(answer)
     db.flush()
+    grant_created_resource(
+        db, principal, resource_type="ANSWER", resource_id=answer.id,
+    )
     db.add(AnswerVersion(answer_id=answer.id, version=1, snapshot=_snapshot(answer)))
     db.commit()
     db.refresh(answer)
-    return _workflow(answer, 1)
+    return _public_workflow(db, answer, 1)
 
 
 def review_correction(
@@ -571,12 +685,12 @@ def review_correction(
     *,
     answer_id: str,
     data: FeedbackReviewRequest,
-    reviewer: str,
-    workspace_id: str | None,
+    principal: Principal,
 ) -> dict[str, Any]:
     answer = db.get(VerifiedAnswer, answer_id)
-    if answer is None or (workspace_id and answer.workspace_id != workspace_id):
+    if answer is None or answer.workspace_id != principal.workspace_id:
         raise LookupError("Feedback correction not found")
+    _ensure_answer_query_access(db, principal, answer)
     if (answer.feedback or {}).get("flow") != FLOW_ID:
         raise ValueError("Answer is not a feedback correction")
     if answer.status != "DRAFT":
@@ -586,7 +700,12 @@ def review_correction(
 
     next_version = _version(db, answer.id) + 1
     history = list((answer.feedback or {}).get("review_history") or [])
-    history.append({"decision": data.decision, "comment": data.comment, "reviewer": reviewer, "at": _now()})
+    history.append({
+        "decision": data.decision,
+        "comment": data.comment,
+        "reviewer": principal.email,
+        "at": _now(),
+    })
     answer.status = "VERIFIED" if data.decision == "APPROVE" else "REJECTED"
     answer.sql_synced = data.decision == "APPROVE"
     if data.decision == "APPROVE":
@@ -605,28 +724,31 @@ def review_correction(
     db.add(AnswerVersion(answer_id=answer.id, version=next_version, snapshot=_snapshot(answer)))
     db.commit()
     db.refresh(answer)
-    return _workflow(answer, next_version)
+    return _public_workflow(db, answer, next_version)
 
 
 def recall_candidates(
     db: Session,
     *,
     data: FeedbackRecallRequest,
-    workspace_id: str | None,
+    principal: Principal,
     limit: int = 5,
 ) -> list[dict[str, Any]]:
-    statement = select(VerifiedAnswer).where(
+    statement = _authorized_answer_statement(select(VerifiedAnswer).where(
         VerifiedAnswer.status == "VERIFIED",
         VerifiedAnswer.oracle_status == "PASSED",
         VerifiedAnswer.sql_text.is_not(None),
-    )
-    if workspace_id:
-        statement = statement.where(VerifiedAnswer.workspace_id == workspace_id)
+    ), principal)
     if data.datasource_id:
         statement = statement.where(VerifiedAnswer.datasource_id == data.datasource_id)
     if data.semantic_model_id:
         statement = statement.where(VerifiedAnswer.semantic_model_id == data.semantic_model_id)
-    answers = list(db.scalars(statement.order_by(VerifiedAnswer.accuracy_percent.desc(), VerifiedAnswer.updated_at.desc()).limit(100)))
+    answers = list(db.scalars(
+        statement.order_by(
+            VerifiedAnswer.accuracy_percent.desc(),
+            VerifiedAnswer.updated_at.desc(),
+        ).limit(100)
+    ))
     # Preserve the database's accuracy/freshness order when lexical scores tie.
     # Sorting tied rows by random UUID makes a newly approved correction fall
     # outside the top five after repeated feedback runs with the same wording.
@@ -635,14 +757,7 @@ def recall_candidates(
         key=lambda item: (-item[0], item[1], item[2].id),
     )
     return [
-        {
-            "answer_id": answer.id,
-            "question": answer.question,
-            "sql": answer.sql_text or "",
-            "score": score,
-            "version": _version(db, answer.id),
-            "status": answer.status,
-        }
+        _public_candidate(db, answer, score=score)
         for score, _, answer in ranked[:limit]
         if score > 0
     ]
@@ -658,6 +773,7 @@ def replay_verified_sql(
     answer = db.get(VerifiedAnswer, answer_id)
     if answer is None or answer.workspace_id != principal.workspace_id:
         raise LookupError("Verified SQL not found")
+    _ensure_answer_query_access(db, principal, answer)
     if answer.status != "VERIFIED" or answer.oracle_status != "PASSED" or not answer.sql_text:
         raise ValueError("Candidate is not an approved Verified SQL")
     _assert_verified_sql_integrity(answer)
@@ -665,7 +781,7 @@ def replay_verified_sql(
         raise ValueError("Verified SQL datasource binding does not match replay request")
     if data.semantic_model_id and data.semantic_model_id != answer.semantic_model_id:
         raise ValueError("Verified SQL semantic-model binding does not match replay request")
-    candidates = recall_candidates(db, data=data, workspace_id=principal.workspace_id)
+    candidates = recall_candidates(db, data=data, principal=principal)
     candidate = next((item for item in candidates if item["answer_id"] == answer.id), None)
     if candidate is None:
         raise ValueError("Verified SQL was not recalled for the similar question")
@@ -719,7 +835,7 @@ def replay_verified_sql(
     db.flush()
     db.add(AnswerVersion(answer_id=answer.id, version=next_version, snapshot=_snapshot(answer)))
     db.commit()
-    total, passed = replay_totals(db, workspace_id=principal.workspace_id)
+    total, passed = replay_totals(db, principal=principal)
     return {
         "candidate": candidate,
         "query_run_id": replay.id,
@@ -731,10 +847,11 @@ def replay_verified_sql(
     }
 
 
-def replay_totals(db: Session, *, workspace_id: str | None) -> tuple[int, int]:
-    statement = select(VerifiedAnswer).where(VerifiedAnswer.status == "VERIFIED")
-    if workspace_id:
-        statement = statement.where(VerifiedAnswer.workspace_id == workspace_id)
+def replay_totals(db: Session, *, principal: Principal) -> tuple[int, int]:
+    statement = _authorized_answer_statement(
+        select(VerifiedAnswer).where(VerifiedAnswer.status == "VERIFIED"),
+        principal,
+    )
     events = [event for answer in db.scalars(statement) for event in ((answer.feedback or {}).get("replays") or [])]
     return len(events), sum(bool(event.get("passed")) for event in events)
 
@@ -746,15 +863,22 @@ def _term_business_key(item: BusinessTerm) -> tuple[str, str]:
     )
 
 
-def feedback_dashboard(db: Session, *, workspace_id: str) -> dict[str, Any]:
-    workflow_statement = select(VerifiedAnswer).where(VerifiedAnswer.feedback.is_not(None))
-    if workspace_id:
-        workflow_statement = workflow_statement.where(VerifiedAnswer.workspace_id == workspace_id)
-    answers = [answer for answer in db.scalars(workflow_statement.order_by(VerifiedAnswer.updated_at.desc())) if (answer.feedback or {}).get("flow") in {FLOW_ID, PHASE4_FLOW_ID}]
-    term_rows = list(db.scalars(
-        select(BusinessTerm)
+def feedback_dashboard(db: Session, *, principal: Principal) -> dict[str, Any]:
+    workflow_statement = _authorized_answer_statement(
+        select(VerifiedAnswer).where(VerifiedAnswer.feedback.is_not(None)),
+        principal,
+    )
+    answers = [
+        answer
+        for answer in db.scalars(
+            workflow_statement.order_by(VerifiedAnswer.updated_at.desc())
+        )
+        if (answer.feedback or {}).get("flow") in {FLOW_ID, PHASE4_FLOW_ID}
+    ]
+    term_rows = list(db.execute(
+        select(BusinessTerm, SemanticModel)
         .join(SemanticModel, SemanticModel.id == BusinessTerm.semantic_model_id)
-        .where(SemanticModel.workspace_id == workspace_id)
+        .where(SemanticModel.workspace_id == principal.workspace_id)
         .order_by(
             BusinessTerm.term,
             BusinessTerm.mapped_object,
@@ -762,26 +886,54 @@ def feedback_dashboard(db: Session, *, workspace_id: str) -> dict[str, Any]:
             BusinessTerm.id,
         )
     ))
+    if principal.role != "ADMIN":
+        term_rows = [
+            (item, model)
+            for item, model in term_rows
+            if has_resource_access(
+                db,
+                principal,
+                resource_type="SEMANTIC_MODEL",
+                resource_id=model.id,
+                query=True,
+            )
+            and has_resource_access(
+                db,
+                principal,
+                resource_type="DATASOURCE",
+                resource_id=model.datasource_id,
+                query=True,
+            )
+        ]
     # Duplicate copies of the same term-to-object mapping can exist across
     # semantic-model versions. Collapse that stable business key, but retain
     # the same term when it deliberately maps to a different semantic object.
     terms_by_key: dict[tuple[str, str], BusinessTerm] = {}
-    for item in term_rows:
+    for item, _ in term_rows:
         terms_by_key.setdefault(_term_business_key(item), item)
     terms = list(terms_by_key.values())
-    examples = recall_candidates(db, data=FeedbackRecallRequest(question="经营分析"), workspace_id=workspace_id, limit=20)
+    examples = recall_candidates(
+        db,
+        data=FeedbackRecallRequest(question="经营分析"),
+        principal=principal,
+        limit=20,
+    )
     # The dashboard shows all approved examples, even if a generic probe has no
     # lexical overlap. Recall endpoints still require a positive similarity.
     if not examples:
-        verified = list(db.scalars(select(VerifiedAnswer).where(
-            VerifiedAnswer.status == "VERIFIED", VerifiedAnswer.oracle_status == "PASSED", VerifiedAnswer.sql_text.is_not(None),
-            *([VerifiedAnswer.workspace_id == workspace_id] if workspace_id else []),
-        ).order_by(VerifiedAnswer.updated_at.desc()).limit(20)))
-        examples = [{
-            "answer_id": answer.id, "question": answer.question, "sql": answer.sql_text or "", "score": 1.0,
-            "version": _version(db, answer.id), "status": answer.status,
-        } for answer in verified]
-    total, passed = replay_totals(db, workspace_id=workspace_id)
+        verified_statement = _authorized_answer_statement(select(VerifiedAnswer).where(
+            VerifiedAnswer.status == "VERIFIED",
+            VerifiedAnswer.oracle_status == "PASSED",
+            VerifiedAnswer.sql_text.is_not(None),
+        ), principal)
+        verified = list(db.scalars(
+            verified_statement.order_by(VerifiedAnswer.updated_at.desc()).limit(20)
+        ))
+        examples = [
+            _public_candidate(db, answer, score=1.0)
+            for answer in verified
+        ]
+    total, passed = replay_totals(db, principal=principal)
     return {
         "provenance": feedback_provenance(),
         "terminology": [{
@@ -794,7 +946,10 @@ def feedback_dashboard(db: Session, *, workspace_id: str) -> dict[str, Any]:
             "mapped_object": item.mapped_object,
         } for item in terms],
         "sql_examples": examples,
-        "workflows": [_workflow(answer, _version(db, answer.id)) for answer in answers],
+        "workflows": [
+            _public_workflow(db, answer, _version(db, answer.id))
+            for answer in answers
+        ],
         "total_replays": total,
         "passed_replays": passed,
         "feedback_replay_rate": round(passed / total, 4) if total else 0.0,

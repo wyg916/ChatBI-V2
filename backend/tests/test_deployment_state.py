@@ -1,7 +1,12 @@
 from datetime import datetime, timedelta, timezone
 
 from app.core.config import get_settings
-from app.db.deployment_state import metadata_snapshot, provider_configuration_state
+from app.db.deployment_state import (
+    managed_spreadsheet_state,
+    metadata_snapshot,
+    provider_configuration_state,
+    spreadsheet_helper_state,
+)
 from app.models import AppUser, ProviderRuntimeSetting, ResourceGrant, Workspace, WorkspaceInvitation, WorkspaceSetting
 
 
@@ -65,8 +70,15 @@ def test_metadata_snapshot_covers_admin_rbac_invite_and_persistence(db_session):
     assert snapshot["counts"]["workspace_setting"] == 1
     assert snapshot["counts"]["provider_runtime_setting"] == 1
     assert snapshot["counts"]["invitation"] == 1
+    assert "datasource" in snapshot["counts"]
+    assert snapshot["counts"]["datasource_import"] == 0
+    assert snapshot["counts"]["excel_datasource"] == 0
     assert len(snapshot["metadata_sha256"]) == 64
     assert snapshot["secrets_included"] is False
+    assert managed_spreadsheet_state(db_session) == {
+        "datasource_import": 0,
+        "excel_datasource": 0,
+    }
 
 
 def test_provider_configuration_state_uses_runtime_toggle_without_live_call(db_session, monkeypatch):
@@ -101,3 +113,11 @@ def test_provider_configuration_state_uses_runtime_toggle_without_live_call(db_s
     }
     assert states["deepseek"]["configured"] is False
     assert states["deepseek"]["reachability"] == "NOT_TESTED"
+
+
+def test_spreadsheet_helper_state_is_explicitly_unsupported_off_postgres(db_session):
+    assert spreadsheet_helper_state(db_session) == {
+        "available": False,
+        "database": "unsupported",
+        "helpers": [],
+    }

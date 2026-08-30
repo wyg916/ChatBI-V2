@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 import re
 import signal
@@ -20,12 +21,15 @@ MAX_REQUEST_BYTES = 1024 * 1024
 MAX_JOBS = 16
 MAX_CONCURRENT_JOBS = 2
 COMPLETED_TTL_SECONDS = 60.0
+CANCEL_TOMBSTONE_TTL_SECONDS = 60.0
+MAX_CANCEL_TOMBSTONES = 1024
 _JOB_PATH = re.compile(r"^/v1/jobs/([0-9a-f]{32})$")
 
 
 @dataclass
 class _Job:
     job_id: str
+    request_sha256: str
     cancellation: threading.Event
     created_monotonic: float
     thread: threading.Thread | None = None
@@ -45,17 +49,50 @@ class JobRegistry:
             )
         )
         self._jobs: dict[str, _Job] = {}
+        self._cancel_tombstones: dict[str, float] = {}
+        self._cancel_admission_until = 0.0
         self._lock = threading.Lock()
         self._capacity = threading.BoundedSemaphore(MAX_CONCURRENT_JOBS)
 
-    def submit(self, payload: Mapping[str, Any]) -> str:
+    def submit(self, payload: Mapping[str, Any], *, job_id: str | None = None) -> str:
         code, datasets, timeout_ms = _validate_job_payload(payload)
+        request_sha256 = hashlib.sha256(json.dumps(
+            {
+                "code": code,
+                "datasets": datasets,
+                "timeout_ms": timeout_ms,
+            },
+            ensure_ascii=False,
+            sort_keys=True,
+            separators=(",", ":"),
+            allow_nan=False,
+        ).encode("utf-8")).hexdigest()
+        if job_id is not None and not re.fullmatch(r"[0-9a-f]{32}", job_id):
+            raise ControllerRequestError(400, "SANDBOX_JOB_ID_INVALID")
         with self._lock:
             self._reap_locked()
+            if job_id is not None and job_id in self._cancel_tombstones:
+                raise ControllerRequestError(409, "SANDBOX_JOB_ID_CANCELLED")
+            if self._cancel_admission_until > time.monotonic():
+                # A saturated tombstone set means at least one cancelled ID
+                # could not be represented individually.  Reject every new
+                # submission until that late-arrival window expires; otherwise
+                # an acknowledgement-lost PUT could start after its DELETE.
+                raise ControllerRequestError(409, "SANDBOX_JOB_ID_CANCELLED")
+            if job_id is not None and job_id in self._jobs:
+                existing = self._jobs[job_id]
+                if existing.request_sha256 != request_sha256:
+                    raise ControllerRequestError(409, "SANDBOX_JOB_ID_CONFLICT")
+                return job_id
             if len(self._jobs) >= MAX_JOBS or not self._capacity.acquire(blocking=False):
                 raise ControllerRequestError(429, "SANDBOX_CONTROLLER_CAPACITY")
-            job_id = uuid4().hex
-            job = _Job(job_id, threading.Event(), time.monotonic())
+            job_id = job_id or uuid4().hex
+            job = _Job(
+                job_id,
+                request_sha256,
+                threading.Event(),
+                time.monotonic(),
+            )
             self._jobs[job_id] = job
 
         def run() -> None:
@@ -95,12 +132,16 @@ class JobRegistry:
 
     def cancel(self, job_id: str) -> Mapping[str, Any]:
         with self._lock:
+            self._reap_locked()
             job = self._jobs.get(job_id)
             if job is None:
-                raise ControllerRequestError(404, "SANDBOX_JOB_NOT_FOUND")
+                self._remember_cancel_locked(job_id)
+                return _job_response(job_id, "ABSENT")
+            self._remember_cancel_locked(job_id)
             if job.result is not None:
+                result = asdict(job.result)
                 self._jobs.pop(job_id, None)
-                return _job_response(job_id, "COMPLETED")
+                return _job_response(job_id, "COMPLETED", result)
             job.cancellation.set()
             return _job_response(job_id, "RUNNING")
 
@@ -126,6 +167,13 @@ class JobRegistry:
 
     def _reap_locked(self) -> None:
         now = time.monotonic()
+        self._cancel_tombstones = {
+            job_id: expires
+            for job_id, expires in self._cancel_tombstones.items()
+            if expires > now
+        }
+        if self._cancel_admission_until <= now:
+            self._cancel_admission_until = 0.0
         expired = [
             job_id
             for job_id, job in self._jobs.items()
@@ -134,6 +182,21 @@ class JobRegistry:
         ]
         for job_id in expired:
             self._jobs.pop(job_id, None)
+
+    def _remember_cancel_locked(self, job_id: str) -> None:
+        """Make every DELETE reject a delayed submission without unbounded state."""
+
+        expires = time.monotonic() + CANCEL_TOMBSTONE_TTL_SECONDS
+        if job_id in self._cancel_tombstones:
+            self._cancel_tombstones[job_id] = expires
+            return
+        if len(self._cancel_tombstones) < MAX_CANCEL_TOMBSTONES:
+            self._cancel_tombstones[job_id] = expires
+            return
+        # Capacity exhaustion must reduce availability, never cancellation
+        # safety.  This global gate also protects the exact ID that could not
+        # be stored and is extended by every subsequent DELETE.
+        self._cancel_admission_until = max(self._cancel_admission_until, expires)
 
 
 class ControllerRequestError(RuntimeError):
@@ -188,6 +251,20 @@ class SandboxControllerHandler(BaseHTTPRequestHandler):
             self._write(exc.status, {"error_code": exc.error_code})
             return
         self._write(202, _job_response(job_id, "RUNNING"))
+
+    def do_PUT(self) -> None:
+        match = _JOB_PATH.fullmatch(self.path)
+        if not match:
+            self._write(404, {"error_code": "SANDBOX_ENDPOINT_NOT_FOUND"})
+            return
+        try:
+            payload = self._read_payload()
+            job_id = self.registry.submit(payload, job_id=match.group(1))
+            response = self.registry.get(job_id)
+        except ControllerRequestError as exc:
+            self._write(exc.status, {"error_code": exc.error_code})
+            return
+        self._write(202, response)
 
     def do_DELETE(self) -> None:
         match = _JOB_PATH.fullmatch(self.path)

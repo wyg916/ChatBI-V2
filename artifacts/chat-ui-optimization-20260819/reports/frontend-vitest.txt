@@ -3,7 +3,7 @@
 > vitest run
 
 
- RUN  v3.2.6 E:/ChatBI V2 项目/frontend
+ RUN  v3.2.6 <project-root>/frontend
 
  ✓ src/test/routes.test.tsx (2 tests) 226ms
  ✓ src/test/components.test.tsx (3 tests) 191ms

@@ -118,7 +118,7 @@ Running 82 tests using 1 worker
       95 |     expect(errors).toEqual([]);
       96 |   } finally {
       97 |     expect((await request.delete(`${apiBase}/conversations/${conversation.id}`)).status()).toBe(204);
-        at E:\ChatBI V2 项目\frontend\e2e\day3-final-product.spec.ts:94:53
+        at <project-root>\frontend\e2e\day3-final-product.spec.ts:94:53
 
     Error Context: test-results\day3-final-product-Day3-FI-01428-mposer-and-return-to-latest\error-context.md
 

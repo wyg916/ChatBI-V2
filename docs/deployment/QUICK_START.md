@@ -30,16 +30,15 @@ Edit `.env`:
 
 Do not set Provider keys merely to start the base product.
 
-## 3. Diagnose, bootstrap, and start
+## 3. Bootstrap, diagnose, and start
 
 ```powershell
-.\scripts\doctor.ps1
 .\scripts\bootstrap.ps1
-.\scripts\bootstrap.ps1 -SkipBuild
-.\scripts\start.ps1 -SkipBuild
+.\scripts\doctor.ps1
+.\scripts\start.ps1 -SkipBuild -SkipBootstrap
 ```
 
-The first Bootstrap builds the Backend image, authenticates to PostgreSQL, applies Alembic migrations, creates the default Workspace, creates or rotates the two local login identities, and seeds governed RAG/Agent control records. The second Bootstrap proves idempotence.
+Bootstrap builds the Backend image, authenticates to PostgreSQL, applies Alembic migrations, creates the default Workspace, creates or rotates the two local login identities, and seeds governed RAG/Agent control records. It is idempotent and can be run again safely.
 
 Start checks configuration and port conflicts before Compose starts. Success prints Frontend, Backend, RAG, and deployment mode.
 
@@ -83,8 +82,9 @@ This legacy convenience path uses locally installed PostgreSQL/MySQL and writes 
 Every deployment script accepts `-EnvFile`:
 
 ```powershell
+.\scripts\bootstrap.ps1 -EnvFile D:\secure\chatbi.env
 .\scripts\doctor.ps1 -EnvFile D:\secure\chatbi.env
-.\scripts\start.ps1 -EnvFile D:\secure\chatbi.env
+.\scripts\start.ps1 -EnvFile D:\secure\chatbi.env -SkipBuild -SkipBootstrap
 .\scripts\stop.ps1 -EnvFile D:\secure\chatbi.env
 ```
 

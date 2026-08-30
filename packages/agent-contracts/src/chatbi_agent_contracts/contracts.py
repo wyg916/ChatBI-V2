@@ -58,7 +58,7 @@ class AgentExecutionContext(BaseModel):
     allowed_semantic_models: frozenset[str]
     allowed_tools: frozenset[str]
     trace_id: str = Field(min_length=8, max_length=96)
-    timeout_ms: int = Field(ge=100, le=30_000)
+    timeout_ms: int = Field(ge=100, le=120_000)
     max_steps: int = Field(default=8, ge=1, le=8)
     max_tool_calls: int = Field(default=12, ge=1, le=12)
     max_replan: int = Field(default=2, ge=0, le=2)
@@ -145,6 +145,27 @@ class OrchestrationResult(BaseModel):
 @runtime_checkable
 class ToolExecutor(Protocol):
     def execute(self, call: ToolCall, context: AgentExecutionContext) -> ToolResult: ...
+
+
+@runtime_checkable
+class CancellationSignal(Protocol):
+    """Small structural contract shared by caller and runtime cancellation."""
+
+    def is_set(self) -> bool: ...
+
+
+@runtime_checkable
+class DeadlineAwareToolExecutor(ToolExecutor, Protocol):
+    """Tool boundary that stops cooperatively before a runtime terminal."""
+
+    def execute_controlled(
+        self,
+        call: ToolCall,
+        context: AgentExecutionContext,
+        *,
+        cancellation_event: CancellationSignal,
+        deadline_monotonic: float,
+    ) -> ToolResult: ...
 
 
 @runtime_checkable

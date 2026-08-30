@@ -57,9 +57,10 @@ describe('答案库和看板列表高保真界面', () => {
     await user.click(screen.getByRole('button', { name: '＋ 新建标准答案' }));
     await user.type(screen.getByLabelText('标准问题'), '近 12 个月订单量是多少？');
     await user.type(screen.getByLabelText('语义模型'), '订单量');
+    await user.type(screen.getByLabelText('责任人'), '示例负责人');
     await user.click(screen.getByRole('button', { name: '保存标准答案' }));
 
-    await waitFor(() => expect(create).toHaveBeenCalledWith(expect.objectContaining({ question: '近 12 个月订单量是多少？', model_name: '订单量' })));
+    await waitFor(() => expect(create).toHaveBeenCalledWith(expect.objectContaining({ question: '近 12 个月订单量是多少？', model_name: '订单量', owner_name: '示例负责人' })));
   });
 
   it('仅在 Backend 前置条件完整时启用答案复用和加入看板', async () => {
@@ -111,6 +112,12 @@ describe('答案库和看板列表高保真界面', () => {
     expect(screen.getAllByTestId('dashboard-card')).toHaveLength(2);
     expect(screen.getAllByText('数据库卡片')).toHaveLength(2);
     expect(document.querySelectorAll('.dashboard-trend img')).toHaveLength(0);
+    expect(document.querySelector('.dashboard-preview-executive')).toBeInTheDocument();
+    expect(document.querySelector('.dashboard-preview-regional')).toBeInTheDocument();
+    expect(document.querySelector('.dashboard-mini-line')).toBeInTheDocument();
+    expect(document.querySelector('.dashboard-mini-bars')).toBeInTheDocument();
+    expect(screen.getByText('经营总览', { selector: '.dashboard-preview-head span' })).toBeVisible();
+    expect(screen.getByText('区域经营', { selector: '.dashboard-preview-head span' })).toBeVisible();
     expect(screen.getByText('经营总览看板', { selector: 'h2' })).toBeVisible();
     await user.click(screen.getByRole('button', { name: '列表视图' }));
     expect(screen.getByRole('button', { name: '列表视图' })).toHaveClass('active');

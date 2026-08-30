@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { NavLink, Outlet, useLocation } from 'react-router-dom';
+import { Link, NavLink, Outlet, useLocation } from 'react-router-dom';
 import onlineIcon from '../assets/semantic/online.svg';
 import { systemApi } from '../api/system';
 import { useAuth } from '../auth';
@@ -23,6 +23,18 @@ const titles: Record<string, [string, string]> = {
   '/settings/models': ['管理 / 系统设置', '系统设置'], '/settings/security': ['系统设置 / 用户角色与审计', '系统设置'],
 };
 
+export function parentRouteFor(pathname: string): { to: string; label: string } | undefined {
+  const workspace = pathname.match(/^\/datasources\/([^/]+)\/workspace$/);
+  if (workspace) return { to: `/datasources/${workspace[1]}`, label: '返回数据源详情' };
+  if (/^\/datasources\/[^/]+$/.test(pathname)) return { to: '/datasources', label: '返回数据源列表' };
+  if (/^\/semantic-models\/[^/]+$/.test(pathname)) return { to: '/semantic-models', label: '返回语义模型列表' };
+  if (/^\/dashboards\/[^/]+$/.test(pathname)) return { to: '/dashboards', label: '返回看板列表' };
+  if (/^\/evaluation\/[^/]+$/.test(pathname)) return { to: '/evaluation', label: '返回评测中心' };
+  if (pathname === '/ask/results') return { to: '/', label: '返回问数据' };
+  if (pathname === '/settings/security') return { to: '/settings/models', label: '返回系统设置' };
+  return undefined;
+}
+
 export function AppShell() {
   const { user, logout } = useAuth();
   const { pathname } = useLocation();
@@ -45,6 +57,7 @@ export function AppShell() {
   const isDatasourceDetail = Boolean(datasourceId);
   const isEvaluationDetail = /^\/evaluation\/[^/]+$/.test(pathname);
   const isSettings = pathname.startsWith('/settings/');
+  const parentRoute = parentRouteFor(pathname);
   const isAdmin = user.role === 'ADMIN';
   const headerCrumb = isSemanticEditor
     ? '语义模型 / 模型管理'
@@ -90,10 +103,10 @@ export function AppShell() {
         {isAdmin && <><div className="nav-caption manage">管理</div><NavLink to="/settings/models" className={isSettings ? 'nav-item active' : 'nav-item'}><span>设</span>系统设置</NavLink></>}
         <div className="side-spacer" />
         <div className="user-card">{isAdmin ? <NavLink to="/settings/security"><span>{user.display_name.slice(0, 1)}</span><div><strong>{user.display_name}</strong><small>{user.role} · 当前工作空间</small></div></NavLink> : <><span>{user.display_name.slice(0, 1)}</span><div><strong>{user.display_name}</strong><small>{user.role} · 当前工作空间</small></div></>}<button type="button" aria-label="退出登录" onClick={() => void logout()}>退出</button></div>
-        <small className="version">v1.3.1 · 开源企业版</small>
+        <small className="version">v1.4.0 · 开源企业版</small>
       </aside>
       <div className="app-frame">
-        <header className="topbar"><div><small>{headerCrumb}</small><h2>{title}</h2></div><div className="header-actions"><div className="context-pill" aria-label="当前页面上下文"><img src={onlineIcon} alt="" />{contextLabel}</div>{isDashboardDetail ? <button className="icon-button" type="button" aria-label="返回看板列表" onClick={() => history.back()}>←</button> : <button className="icon-button" type="button" aria-label="帮助" disabled title="当前版本未提供独立帮助中心">?</button>}{(isContentLibrary || isDashboardDetail || isEvaluation || isSettings) && <button className="icon-button" type="button" aria-label="更多操作" disabled title="当前页面没有额外操作">{isDashboardDetail || isEvaluation ? '↑' : '⋯'}</button>}</div></header>
+        <header className="topbar"><div><small>{headerCrumb}</small><h2>{title}</h2></div><div className="header-actions"><div className="context-pill" aria-label="当前页面上下文"><img src={onlineIcon} alt="" />{contextLabel}</div>{parentRoute ? <Link className="icon-button" aria-label={parentRoute.label} title={parentRoute.label} to={parentRoute.to}>←</Link> : <button className="icon-button" type="button" aria-label="帮助" disabled title="当前版本未提供独立帮助中心">?</button>}{(isContentLibrary || isDashboardDetail || isEvaluation || isSettings) && <button className="icon-button" type="button" aria-label="更多操作" disabled title="当前页面没有额外操作">{isDashboardDetail || isEvaluation ? '↑' : '⋯'}</button>}</div></header>
         <main className={isAskRoute ? 'page ask-page-canvas' : isContentLibrary ? 'page content-library-canvas' : isDashboardDetail ? 'page dashboard-detail-canvas' : isEvaluation ? 'page evaluation-canvas' : isEvaluationDetail ? 'page evaluation-detail-canvas' : 'page'}><Outlet /></main>
       </div>
     </div>

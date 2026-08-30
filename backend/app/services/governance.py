@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session
 
 from app import models as model_module
 from app.core.config import get_settings
+from app.core.data_safety import redact_public_sql
 from app.model_gateway.configuration import PROVIDER_DEFINITIONS, configured_providers, load_control_config
 from app.models import (
     ChatMessage,
@@ -356,11 +357,12 @@ def _collect_trace_records(
     for event in events:
         events_by_run[event.query_run_id].append(event)
     for run in query_runs:
-        context = (run.context_payload or {}).get("request_context") or {}
-        trace_id = str(context.get("trace_id") or f"TRACE-{run.id}")
+        run_context = run.context_payload or {}
+        request_context = run_context.get("request_context") or {}
+        trace_id = str(request_context.get("trace_id") or f"TRACE-{run.id}")
         record = _trace_record(records, trace_id, run.workspace_id, run.created_at)
         record.update({
-            "user_id": context.get("user_id") or record["user_id"],
+            "user_id": request_context.get("user_id") or record["user_id"],
             "route": record["route"] or "DATA_QUERY",
             "status": run.status,
             "duration_ms": max(record["duration_ms"], _int(run.duration_ms)),
@@ -372,6 +374,23 @@ def _collect_trace_records(
         if model_trace:
             record["provider"] = model_trace.get("resolved_provider") or record["provider"]
             record["model"] = model_trace.get("resolved_model") or record["model"]
+        policy = run_context.get("security_policy") or {}
+        sensitive_columns = (
+            list(policy.get("sensitive_columns") or [])
+            if isinstance(policy, dict)
+            else []
+        )
+        dialect = str(
+            run_context.get("dialect")
+            or (run.execution_payload or {}).get("dialect")
+            or (run.guard_payload or {}).get("dialect")
+            or "postgresql"
+        )
+        public_sql = redact_public_sql(
+            run.normalized_sql or run.generated_sql,
+            sensitive_columns,
+            dialect=dialect,
+        )
         for event in events_by_run.get(run.id, []):
             details = event.details or {}
             _append_stage(
@@ -384,7 +403,7 @@ def _collect_trace_records(
                 provider=details.get("provider") if event.event_type == "SQL_PLAN_GENERATED" else None,
                 model=None,
                 tool=None,
-                sql=(run.normalized_sql or run.generated_sql) if event.event_type in {"SQL_GUARD", "QUERY_EXECUTED"} else None,
+                sql=public_sql if event.event_type in {"SQL_GUARD", "QUERY_EXECUTED"} else None,
                 error_code=run.error_code if event.status in {"FAIL", "REJECTED"} else None,
                 metadata=_safe_metadata(details),
             )
