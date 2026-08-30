@@ -1,4 +1,4 @@
-# ChatBI V2
+# ChatBI Studio
 
 简体中文 | [English](README.en.md)
 
@@ -11,9 +11,9 @@
 
 ![ChatBI V2 v1.4.0 问数据工作区](docs/images/chatbi-v1.4-ask-data.png)
 
-ChatBI V2 始终是 ChatBI-first 产品：数据源、语义模型、问数据、可验证答案、看板和评测处于同一条主链路。它不是通用 AI、知识库、Agent 或模型管理平台。Local Showcase 仅用于本机体验、作品集演示和面试讲解，不代表生产部署认证。
+ChatBI Studio 始终是 ChatBI-first 产品：数据源、语义模型、问数据、可验证答案、看板和评测处于同一条主链路。它不是通用 AI、知识库、Agent 或模型管理平台。Local Showcase 仅用于本机体验、作品集演示和面试讲解，不代表生产部署认证。
 
-## 为什么选择 ChatBI V2
+## 为什么选择 ChatBI Studio
 
 - **结果可验证**：SQL AST Guard、只读执行、Result Oracle、结果签名和审计记录共同约束答案。
 - **轻量语义层**：Metric、Dimension、Entity、Relationship、Business Term、Synonym。
