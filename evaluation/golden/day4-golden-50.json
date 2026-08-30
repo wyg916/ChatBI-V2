@@ -1,10 +1,10 @@
 {
   "name": "ChatBI V2 Day 4 Golden 50",
-  "version": "4.1.0",
+  "version": "4.1.1",
   "source_manifest_sha256": "741da55b7dd41046a6f8411522a3cf92afb45ca1ac38b90b202b49c87f8eef0e",
   "frozen": true,
-  "frozen_at": "2026-08-21T16:30:00+00:00",
-  "manifest_sha256": "67a1d43d53232644df86a8e46ee66fc51baaeeb724881679d53855dde49e0dc4",
+  "frozen_at": "2026-08-30T09:29:40+00:00",
+  "manifest_sha256": "ff83e727331fb137cd8cc692aa780c3ba016c48adeec4246d4464874fbf7db1d",
   "cases": [
     {
       "id": "G01",
@@ -1335,7 +1335,7 @@
       "expected_sql": "SELECT c.customer_name AS customer, SUM(o.revenue) AS revenue FROM demo_business.orders o JOIN demo_business.customers c ON c.customer_id = o.customer_id GROUP BY c.customer_name, c.customer_id ORDER BY revenue DESC, c.customer_id ASC LIMIT 5",
       "expected_result": [
         {
-          "customer": "客户-009",
+          "customer": "华东新能源综合服务集团股份有限公司上海运营中心",
           "revenue": 34612.5
         },
         {
@@ -1355,7 +1355,7 @@
           "revenue": 32475.0
         }
       ],
-      "expected_signature": "f86c12a92413d6ede38c06dea9a602022ceebc7528751e93725be979eff765e5",
+      "expected_signature": "cf961888cd396d1d3b9c63d1d5086cdd88d5464e869284fe673a9acd6d25882e",
       "expected_outcome": "PASSED"
     },
     {
