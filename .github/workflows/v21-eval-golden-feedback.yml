@@ -61,7 +61,7 @@ jobs:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5, Node 24
         with:
           fetch-depth: 0
-      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6, Node 24
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v6, Node 24
         with:
           python-version: "3.11"
           cache: pip
@@ -148,7 +148,7 @@ jobs:
       PHASE3_EVIDENCE_DIR: docs/evidence/v1.3/phase3-ci
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5, Node 24
-      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6, Node 24
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v6, Node 24
         with:
           python-version: "3.11"
           cache: pip
@@ -359,7 +359,7 @@ jobs:
           repository: IBM/text2sql-eval-toolkit
           ref: 60dd4515236adb335f2053b7c069397d7d88fe0a
           path: vendor/ibm-text2sql-eval-toolkit
-      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6, Node 24
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v6, Node 24
         with:
           python-version: "3.11"
           cache: pip
