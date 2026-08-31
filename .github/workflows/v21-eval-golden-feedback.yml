@@ -126,7 +126,7 @@ jobs:
             --output "$PHASE5_EVIDENCE_DIR/security-supply-gate.json"
       - name: Upload Phase5 security and supply evidence
         if: always()
-        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6, Node 24
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v6, Node 24
         with:
           name: v13-phase5-security-supply-${{ github.sha }}
           path: artifacts/v1.3/phase5-security-supply
@@ -313,7 +313,7 @@ jobs:
           docker network rm chatbi-sandbox-docker-control-ci || true
       - name: Upload Phase3 runtime evidence
         if: always()
-        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6, Node 24
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v6, Node 24
         with:
           name: v13-phase3-runtime-${{ github.sha }}
           path: docs/evidence/v1.3/phase3-ci
@@ -477,7 +477,7 @@ jobs:
       - name: Upload IBM Gate evidence
         id: ibm_artifact
         if: always() && steps.collect_evidence.outcome == 'success'
-        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6, Node 24
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v6, Node 24
         with:
           name: v13-ibm-official-${{ github.sha }}
           path: docs/evidence/v1.3/ibm-official-ci
