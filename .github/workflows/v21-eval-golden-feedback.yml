@@ -58,7 +58,7 @@ jobs:
       PYTHONPATH: >-
         backend:packages/agent-contracts/src:packages/agent-orchestrator/src:packages/prompt-registry/src:packages/rag-adapter/src:packages/rag-contracts/src:packages/dbgpt-runtime-adapter/src:packages/pandasai-selected-runtime/src
     steps:
-      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5, Node 24
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v5, Node 24
         with:
           fetch-depth: 0
       - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6, Node 24
@@ -147,7 +147,7 @@ jobs:
       CHATBI_SANDBOX_CONTROLLER_URL: http://127.0.0.1:8765
       PHASE3_EVIDENCE_DIR: docs/evidence/v1.3/phase3-ci
     steps:
-      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5, Node 24
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v5, Node 24
       - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6, Node 24
         with:
           python-version: "3.11"
@@ -352,9 +352,9 @@ jobs:
       IBM_UPSTREAM_COMMIT: 60dd4515236adb335f2053b7c069397d7d88fe0a
       IBM_EVIDENCE_DIR: docs/evidence/v1.3/ibm-official-ci
     steps:
-      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5, Node 24
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v5, Node 24
       - name: Checkout pinned IBM Text-to-SQL selected source
-        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5, Node 24
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v5, Node 24
         with:
           repository: IBM/text2sql-eval-toolkit
           ref: 60dd4515236adb335f2053b7c069397d7d88fe0a
