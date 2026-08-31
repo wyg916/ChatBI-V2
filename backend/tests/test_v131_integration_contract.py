@@ -194,7 +194,7 @@ def test_current_product_release_identity_is_published_v140():
 
 
 def test_public_readmes_use_native_video_and_governed_flow_diagrams():
-    native_video = "https://github.com/user-attachments/assets/217ddbba-2915-4650-80ca-8fbf799615ef"
+    native_video = "https://github.com/user-attachments/assets/dc7edfd7-d9db-4b4c-8b42-715688cdc849"
     required_routes = {"DATA_QUERY", "KNOWLEDGE_QUERY", "HYBRID_ANALYSIS", "COMPLEX_ANALYSIS"}
 
     for relative_path in ("README.md", "README.en.md"):
