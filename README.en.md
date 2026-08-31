@@ -21,9 +21,9 @@ Natural-language analytics · Semantic layer · Guarded NL2SQL · Result verific
 
 ## Project introduction video
 
-https://github.com/user-attachments/assets/217ddbba-2915-4650-80ca-8fbf799615ef
+https://github.com/user-attachments/assets/dc7edfd7-d9db-4b4c-8b42-715688cdc849
 
-> A 2:12 live product walkthrough. The README uses GitHub's native video-attachment player for click-to-play viewing instead of an automatic download. Footage comes from this repository's `v1.4.0` Local Showcase and reproducible demo data.
+> A 1:47 walkthrough of ChatBI Studio's core advantages. The README uses GitHub's native video-attachment player for click-to-play viewing instead of an automatic download. Footage comes from this repository's `v1.4.0` Local Showcase and reproducible demo data.
 
 ## ChatBI Studio in 30 seconds
 
