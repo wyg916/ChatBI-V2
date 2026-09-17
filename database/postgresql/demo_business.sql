@@ -1,4 +1,4 @@
-SET search_path TO demo_business;
+SET search_path TO business;
 
 CREATE TABLE regions (
     region_id integer PRIMARY KEY,
