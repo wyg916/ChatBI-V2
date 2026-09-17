@@ -91,7 +91,7 @@ jobs:
           python backend/scripts/run_v13_phase5_fault_regression_gate.py \
             --faults-only \
             --output docs/evidence/v1.3/phase5-ci/fault-production-boundaries.json
-      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5, Node 24
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v5, Node 24
         with:
           node-version: "22"
           cache: npm
@@ -181,7 +181,7 @@ jobs:
             backend/requirements-phase3-upstream.txt
             backend/requirements-runtime-hardening.txt
             scripts/release/requirements-audit.txt
-      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5, Node 24
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v5, Node 24
         with:
           node-version: "22"
           cache: npm
