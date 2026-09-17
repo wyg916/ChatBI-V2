@@ -1,0 +1,22 @@
+{
+  "status": "PASS",
+  "tested_sha": "d3582dc5054da48f1f4b0dff365b8e05224f368a",
+  "executed_at": "2026-08-19T01:15:32+08:00",
+  "run_id": "f5500cd0-3fc5-489d-850d-9e901c640e19",
+  "command": "python scripts/run_v21_release_gate.py --api-base http://127.0.0.1:8000/api/v1 --run-id f5500cd0-3fc5-489d-850d-9e901c640e19 --require-feedback",
+  "golden_count": 50,
+  "sql_execution_rate": 1.0,
+  "result_value_accuracy": 1.0,
+  "dangerous_sql_total": 38,
+  "dangerous_sql_block_rate": 1.0,
+  "multiple_ground_truth": true,
+  "evidence_path": "artifacts/v2_1/day2/b/eval-feedback-release-gate.json",
+  "raw_sha256": "1a24c66955d8efcd22ec34530cdffa22777e63509da661d9e2cf6d1d3dab1559",
+  "frozen_zone_intersection": 4,
+  "migration_impact": "NONE",
+  "license_impact": "NONE_BEYOND_B_NOTICE",
+  "security_result": "38_OF_38_DANGEROUS_SQL_BLOCKED",
+  "failures": [],
+  "blockers": [],
+  "rollback": "revert d3582dc5054da48f1f4b0dff365b8e05224f368a"
+}

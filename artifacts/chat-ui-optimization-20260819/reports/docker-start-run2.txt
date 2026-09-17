@@ -1,0 +1,48 @@
+ Container chatbi-v2-frontend-1 Stopping
+ Container chatbi-v2-frontend-1 Stopped
+ Container chatbi-v2-frontend-1 Removing
+ Container chatbi-v2-frontend-1 Removed
+ Container chatbi-v2-rag-runtime-1 Stopping
+ Container chatbi-v2-rag-runtime-1 Stopped
+ Container chatbi-v2-rag-runtime-1 Removing
+ Container chatbi-v2-rag-runtime-1 Removed
+ Container chatbi-v2-backend-1 Stopping
+ Container chatbi-v2-backend-1 Stopped
+ Container chatbi-v2-backend-1 Removing
+ Container chatbi-v2-backend-1 Removed
+ Network chatbi-v2_default Removing
+ Network chatbi-v2_default Removed
+ Network chatbi-v2_default Creating
+ Network chatbi-v2_default Created
+ Container chatbi-v2-backend-1 Creating
+ Container chatbi-v2-backend-1 Created
+ Container chatbi-v2-rag-runtime-1 Creating
+ Container chatbi-v2-rag-runtime-1 Created
+ Container chatbi-v2-frontend-1 Creating
+ Container chatbi-v2-frontend-1 Created
+ Container chatbi-v2-backend-1 Starting
+ Container chatbi-v2-backend-1 Started
+ Container chatbi-v2-backend-1 Waiting
+ Container chatbi-v2-backend-1 Healthy
+ Container chatbi-v2-rag-runtime-1 Starting
+ Container chatbi-v2-rag-runtime-1 Started
+ Container chatbi-v2-rag-runtime-1 Waiting
+ Container chatbi-v2-rag-runtime-1 Healthy
+ Container chatbi-v2-frontend-1 Starting
+ Container chatbi-v2-frontend-1 Started
+
+frontend_http           : 200
+backend_http            : 200
+backend_version         : 1.1.0
+live_rag                : HEALTHY_AUTH_REQUIRED
+protected_api_auth      : 5_OF_5_RETURN_401
+local_metadata_postgres : READY
+local_demo_postgres     : PORT_REACHABLE_STARTUP_CHECK
+local_demo_mysql        : PORT_REACHABLE_STARTUP_CHECK
+
+DOCKER_STOPPED_START_RUN=2
+ELAPSED_SECONDS=26.506
+NAME                      IMAGE                COMMAND                  SERVICE       CREATED          STATUS                    PORTS
+chatbi-v2-backend-1       chatbi-v2-backend    "sh -c 'alembic upgr…"   backend       30 seconds ago   Up 23 seconds (healthy)   0.0.0.0:8000->8000/tcp, [::]:8000->8000/tcp
+chatbi-v2-frontend-1      chatbi-v2-frontend   "/docker-entrypoint.…"   frontend      27 seconds ago   Up 6 seconds (healthy)    0.0.0.0:5173->80/tcp, [::]:5173->80/tcp
+chatbi-v2-rag-runtime-1   chatbi-v2-backend    "uvicorn app.rag_run…"   rag-runtime   29 seconds ago   Up 12 seconds (healthy)   0.0.0.0:8001->8001/tcp, [::]:8001->8001/tcp

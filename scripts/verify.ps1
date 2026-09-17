@@ -46,5 +46,7 @@ foreach ($path in $protectedPaths) {
   live_rag = 'HEALTHY_AUTH_REQUIRED'
   protected_api_auth = '5_OF_5_RETURN_401'
   local_metadata_postgres = 'READY'
+  local_demo_postgres = 'PORT_REACHABLE_STARTUP_CHECK'
+  local_demo_mysql = 'PORT_REACHABLE_STARTUP_CHECK'
 } | Format-List
 Write-Host 'VERIFY=PASS' -ForegroundColor Green

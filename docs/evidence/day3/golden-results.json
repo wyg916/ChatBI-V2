@@ -1,0 +1,239 @@
+{
+  "run": {
+    "id": "2dec1444-909b-4d5c-9564-281285b84d48",
+    "release_name": "ChatBI V2 V1 RC Golden 20",
+    "model_name": "Local Runtime Provider",
+    "status": "PASS",
+    "is_current": true,
+    "golden_set_count": 20,
+    "sql_generation_rate": 100.0,
+    "result_accuracy": 100.0,
+    "semantic_accuracy": 100.0,
+    "relevance_accuracy": 100.0,
+    "average_response_seconds": 0.114,
+    "error_distribution": [
+      {
+        "label": "无错误",
+        "percent": 100,
+        "color": "#16a36a"
+      }
+    ],
+    "trend_points": [
+      {
+        "date": "08/17 10:27",
+        "value": 100.0
+      }
+    ],
+    "completed_at": "2026-08-17T18:27:49.725016+08:00",
+    "duration_seconds": 4,
+    "manifest_sha256": "d40bb690a4208240ecf347abe47e045cd74c8eb89b9162d5d53890ecf24bc282",
+    "sql_execution_pass_count": 20,
+    "result_value_pass_count": 20,
+    "semantic_pass_count": 20,
+    "dangerous_sql_total": 38,
+    "dangerous_sql_block_count": 38
+  },
+  "case_count": 20,
+  "cases": [
+    {
+      "id": "G01",
+      "status": "PASS",
+      "execution_ok": true,
+      "result_ok": true,
+      "semantic_ok": true,
+      "error_category": null,
+      "query_run_id": "4ffa2a0e-74d1-4df5-a989-0928a951f07d",
+      "result_diff": []
+    },
+    {
+      "id": "G02",
+      "status": "PASS",
+      "execution_ok": true,
+      "result_ok": true,
+      "semantic_ok": true,
+      "error_category": null,
+      "query_run_id": "5dfe59aa-3ceb-4cda-a2d2-eaddd9517298",
+      "result_diff": []
+    },
+    {
+      "id": "G03",
+      "status": "PASS",
+      "execution_ok": true,
+      "result_ok": true,
+      "semantic_ok": true,
+      "error_category": null,
+      "query_run_id": "b37d3e97-8e8d-4301-b656-fd29f189f625",
+      "result_diff": []
+    },
+    {
+      "id": "G04",
+      "status": "PASS",
+      "execution_ok": true,
+      "result_ok": true,
+      "semantic_ok": true,
+      "error_category": null,
+      "query_run_id": "6b707f95-1867-40bb-83a6-00efcb1e05a1",
+      "result_diff": []
+    },
+    {
+      "id": "G05",
+      "status": "PASS",
+      "execution_ok": true,
+      "result_ok": true,
+      "semantic_ok": true,
+      "error_category": null,
+      "query_run_id": "f956076b-91f9-431c-b7bc-a76ffde64491",
+      "result_diff": []
+    },
+    {
+      "id": "G06",
+      "status": "PASS",
+      "execution_ok": true,
+      "result_ok": true,
+      "semantic_ok": true,
+      "error_category": null,
+      "query_run_id": "11755aaf-89f9-4d6a-9821-62684738bb24",
+      "result_diff": []
+    },
+    {
+      "id": "G07",
+      "status": "PASS",
+      "execution_ok": true,
+      "result_ok": true,
+      "semantic_ok": true,
+      "error_category": null,
+      "query_run_id": "d63341b9-812b-4ea0-9aa6-82e5de154505",
+      "result_diff": []
+    },
+    {
+      "id": "G08",
+      "status": "PASS",
+      "execution_ok": true,
+      "result_ok": true,
+      "semantic_ok": true,
+      "error_category": null,
+      "query_run_id": "72e07af7-13e1-447b-b0b7-86caa88accde",
+      "result_diff": []
+    },
+    {
+      "id": "G09",
+      "status": "PASS",
+      "execution_ok": true,
+      "result_ok": true,
+      "semantic_ok": true,
+      "error_category": null,
+      "query_run_id": "951daf67-7f6d-4bc4-a929-38e0de6b0550",
+      "result_diff": []
+    },
+    {
+      "id": "G10",
+      "status": "PASS",
+      "execution_ok": true,
+      "result_ok": true,
+      "semantic_ok": true,
+      "error_category": null,
+      "query_run_id": "bd8fc14d-ab4f-4b02-b062-b9516f40b63b",
+      "result_diff": []
+    },
+    {
+      "id": "G11",
+      "status": "PASS",
+      "execution_ok": true,
+      "result_ok": true,
+      "semantic_ok": true,
+      "error_category": null,
+      "query_run_id": "29ad9a2a-0c35-4d0f-a76e-cf60f7c3d2f4",
+      "result_diff": []
+    },
+    {
+      "id": "G12",
+      "status": "PASS",
+      "execution_ok": true,
+      "result_ok": true,
+      "semantic_ok": true,
+      "error_category": null,
+      "query_run_id": "46e069b3-f67e-4ae9-940f-95080894c915",
+      "result_diff": []
+    },
+    {
+      "id": "G13",
+      "status": "PASS",
+      "execution_ok": true,
+      "result_ok": true,
+      "semantic_ok": true,
+      "error_category": null,
+      "query_run_id": "7f6b4601-f745-4526-9f60-4eb9af288e17",
+      "result_diff": []
+    },
+    {
+      "id": "G14",
+      "status": "PASS",
+      "execution_ok": true,
+      "result_ok": true,
+      "semantic_ok": true,
+      "error_category": null,
+      "query_run_id": "673eae52-14c6-4e16-9d89-2b2075afc0d6",
+      "result_diff": []
+    },
+    {
+      "id": "G15",
+      "status": "PASS",
+      "execution_ok": true,
+      "result_ok": true,
+      "semantic_ok": true,
+      "error_category": null,
+      "query_run_id": "a21b9266-e901-4dc5-9043-090352a69acd",
+      "result_diff": []
+    },
+    {
+      "id": "G16",
+      "status": "PASS",
+      "execution_ok": true,
+      "result_ok": true,
+      "semantic_ok": true,
+      "error_category": null,
+      "query_run_id": "3de50320-b92e-45b0-8a82-c9fcda82b70d",
+      "result_diff": []
+    },
+    {
+      "id": "G17",
+      "status": "PASS",
+      "execution_ok": true,
+      "result_ok": true,
+      "semantic_ok": true,
+      "error_category": null,
+      "query_run_id": "8707eec1-e200-4533-bd3a-51fac81b5ce6",
+      "result_diff": []
+    },
+    {
+      "id": "G18",
+      "status": "PASS",
+      "execution_ok": true,
+      "result_ok": true,
+      "semantic_ok": true,
+      "error_category": null,
+      "query_run_id": "eb4cd0c5-6c5d-43c3-9505-1ad5de2ed307",
+      "result_diff": []
+    },
+    {
+      "id": "G19",
+      "status": "PASS",
+      "execution_ok": true,
+      "result_ok": true,
+      "semantic_ok": true,
+      "error_category": null,
+      "query_run_id": "13effb19-e98a-4d8c-899a-b5a73040f8f7",
+      "result_diff": []
+    },
+    {
+      "id": "G20",
+      "status": "PASS",
+      "execution_ok": true,
+      "result_ok": true,
+      "semantic_ok": true,
+      "error_category": null,
+      "query_run_id": "f60d6427-498c-4cbf-a459-0d50f6b7afa0",
+      "result_diff": []
+    }
+  ]
+}

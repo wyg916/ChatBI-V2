@@ -1,0 +1,2127 @@
+{
+  "name": "ChatBI V2.1 Day3 Final Memory 30x5",
+  "version": "1.0.0",
+  "generated_at": "2026-08-18T20:33:17.637393+00:00",
+  "conversation_count": 30,
+  "turns_per_conversation": 5,
+  "conversations": [
+    {
+      "id": "FM-01",
+      "family": "DATA_CONTEXT",
+      "turn_count": 5,
+      "fixture": null,
+      "turns": [
+        {
+          "question": "2025年华东区销售额是多少？",
+          "route": "DATA_QUERY",
+          "expect": [
+            "metric",
+            "time",
+            "regions",
+            "datasource",
+            "semantic_model",
+            "previous_sql",
+            "previous_result"
+          ]
+        },
+        {
+          "question": "继续按产品维度看产品 储能柜。",
+          "route": "DATA_QUERY",
+          "expect": [
+            "metric",
+            "time",
+            "regions",
+            "dimensions",
+            "product",
+            "previous_sql",
+            "previous_result"
+          ]
+        },
+        {
+          "question": "再按客户维度看客户 远景能源，仅有效订单。",
+          "route": "DATA_QUERY",
+          "expect": [
+            "metric",
+            "time",
+            "regions",
+            "dimensions",
+            "customer",
+            "filters",
+            "previous_sql",
+            "previous_result"
+          ]
+        },
+        {
+          "question": "基于上一轮结果，前面的SQL按月展示趋势。",
+          "route": "DATA_QUERY",
+          "expect": [
+            "metric",
+            "time",
+            "regions",
+            "dimensions",
+            "granularity",
+            "references",
+            "previous_sql",
+            "previous_result"
+          ]
+        },
+        {
+          "question": "刚才的结果和这个依据是否一致？",
+          "route": "DATA_QUERY",
+          "expect": [
+            "metric",
+            "time",
+            "regions",
+            "references",
+            "previous_sql",
+            "previous_result"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "FM-02",
+      "family": "DATA_CONTEXT",
+      "turn_count": 5,
+      "fixture": null,
+      "turns": [
+        {
+          "question": "2025年华南区销售额是多少？",
+          "route": "DATA_QUERY",
+          "expect": [
+            "metric",
+            "time",
+            "regions",
+            "datasource",
+            "semantic_model",
+            "previous_sql",
+            "previous_result"
+          ]
+        },
+        {
+          "question": "继续按产品维度看产品 逆变器。",
+          "route": "DATA_QUERY",
+          "expect": [
+            "metric",
+            "time",
+            "regions",
+            "dimensions",
+            "product",
+            "previous_sql",
+            "previous_result"
+          ]
+        },
+        {
+          "question": "再按客户维度看客户 华能集团，仅有效订单。",
+          "route": "DATA_QUERY",
+          "expect": [
+            "metric",
+            "time",
+            "regions",
+            "dimensions",
+            "customer",
+            "filters",
+            "previous_sql",
+            "previous_result"
+          ]
+        },
+        {
+          "question": "基于上一轮结果，前面的SQL按月展示趋势。",
+          "route": "DATA_QUERY",
+          "expect": [
+            "metric",
+            "time",
+            "regions",
+            "dimensions",
+            "granularity",
+            "references",
+            "previous_sql",
+            "previous_result"
+          ]
+        },
+        {
+          "question": "刚才的结果和这个依据是否一致？",
+          "route": "DATA_QUERY",
+          "expect": [
+            "metric",
+            "time",
+            "regions",
+            "references",
+            "previous_sql",
+            "previous_result"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "FM-03",
+      "family": "DATA_CONTEXT",
+      "turn_count": 5,
+      "fixture": null,
+      "turns": [
+        {
+          "question": "2025年华北区销售额是多少？",
+          "route": "DATA_QUERY",
+          "expect": [
+            "metric",
+            "time",
+            "regions",
+            "datasource",
+            "semantic_model",
+            "previous_sql",
+            "previous_result"
+          ]
+        },
+        {
+          "question": "继续按产品维度看产品 充电桩。",
+          "route": "DATA_QUERY",
+          "expect": [
+            "metric",
+            "time",
+            "regions",
+            "dimensions",
+            "product",
+            "previous_sql",
+            "previous_result"
+          ]
+        },
+        {
+          "question": "再按客户维度看客户 协鑫科技，仅有效订单。",
+          "route": "DATA_QUERY",
+          "expect": [
+            "metric",
+            "time",
+            "regions",
+            "dimensions",
+            "customer",
+            "filters",
+            "previous_sql",
+            "previous_result"
+          ]
+        },
+        {
+          "question": "基于上一轮结果，前面的SQL按月展示趋势。",
+          "route": "DATA_QUERY",
+          "expect": [
+            "metric",
+            "time",
+            "regions",
+            "dimensions",
+            "granularity",
+            "references",
+            "previous_sql",
+            "previous_result"
+          ]
+        },
+        {
+          "question": "刚才的结果和这个依据是否一致？",
+          "route": "DATA_QUERY",
+          "expect": [
+            "metric",
+            "time",
+            "regions",
+            "references",
+            "previous_sql",
+            "previous_result"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "FM-04",
+      "family": "DATA_CONTEXT",
+      "turn_count": 5,
+      "fixture": null,
+      "turns": [
+        {
+          "question": "2025年华中区销售额是多少？",
+          "route": "DATA_QUERY",
+          "expect": [
+            "metric",
+            "time",
+            "regions",
+            "datasource",
+            "semantic_model",
+            "previous_sql",
+            "previous_result"
+          ]
+        },
+        {
+          "question": "继续按产品维度看产品 光伏组件。",
+          "route": "DATA_QUERY",
+          "expect": [
+            "metric",
+            "time",
+            "regions",
+            "dimensions",
+            "product",
+            "previous_sql",
+            "previous_result"
+          ]
+        },
+        {
+          "question": "再按客户维度看客户 国电投，仅有效订单。",
+          "route": "DATA_QUERY",
+          "expect": [
+            "metric",
+            "time",
+            "regions",
+            "dimensions",
+            "customer",
+            "filters",
+            "previous_sql",
+            "previous_result"
+          ]
+        },
+        {
+          "question": "基于上一轮结果，前面的SQL按月展示趋势。",
+          "route": "DATA_QUERY",
+          "expect": [
+            "metric",
+            "time",
+            "regions",
+            "dimensions",
+            "granularity",
+            "references",
+            "previous_sql",
+            "previous_result"
+          ]
+        },
+        {
+          "question": "刚才的结果和这个依据是否一致？",
+          "route": "DATA_QUERY",
+          "expect": [
+            "metric",
+            "time",
+            "regions",
+            "references",
+            "previous_sql",
+            "previous_result"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "FM-05",
+      "family": "DATA_CONTEXT",
+      "turn_count": 5,
+      "fixture": null,
+      "turns": [
+        {
+          "question": "2025年西部区销售额是多少？",
+          "route": "DATA_QUERY",
+          "expect": [
+            "metric",
+            "time",
+            "regions",
+            "datasource",
+            "semantic_model",
+            "previous_sql",
+            "previous_result"
+          ]
+        },
+        {
+          "question": "继续按产品维度看产品 控制器。",
+          "route": "DATA_QUERY",
+          "expect": [
+            "metric",
+            "time",
+            "regions",
+            "dimensions",
+            "product",
+            "previous_sql",
+            "previous_result"
+          ]
+        },
+        {
+          "question": "再按客户维度看客户 三峡能源，仅有效订单。",
+          "route": "DATA_QUERY",
+          "expect": [
+            "metric",
+            "time",
+            "regions",
+            "dimensions",
+            "customer",
+            "filters",
+            "previous_sql",
+            "previous_result"
+          ]
+        },
+        {
+          "question": "基于上一轮结果，前面的SQL按月展示趋势。",
+          "route": "DATA_QUERY",
+          "expect": [
+            "metric",
+            "time",
+            "regions",
+            "dimensions",
+            "granularity",
+            "references",
+            "previous_sql",
+            "previous_result"
+          ]
+        },
+        {
+          "question": "刚才的结果和这个依据是否一致？",
+          "route": "DATA_QUERY",
+          "expect": [
+            "metric",
+            "time",
+            "regions",
+            "references",
+            "previous_sql",
+            "previous_result"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "FM-06",
+      "family": "DATA_CONTEXT",
+      "turn_count": 5,
+      "fixture": null,
+      "turns": [
+        {
+          "question": "2025年华东区销售额是多少？",
+          "route": "DATA_QUERY",
+          "expect": [
+            "metric",
+            "time",
+            "regions",
+            "datasource",
+            "semantic_model",
+            "previous_sql",
+            "previous_result"
+          ]
+        },
+        {
+          "question": "继续按产品维度看产品 储能柜。",
+          "route": "DATA_QUERY",
+          "expect": [
+            "metric",
+            "time",
+            "regions",
+            "dimensions",
+            "product",
+            "previous_sql",
+            "previous_result"
+          ]
+        },
+        {
+          "question": "再按客户维度看客户 远景能源，仅有效订单。",
+          "route": "DATA_QUERY",
+          "expect": [
+            "metric",
+            "time",
+            "regions",
+            "dimensions",
+            "customer",
+            "filters",
+            "previous_sql",
+            "previous_result"
+          ]
+        },
+        {
+          "question": "基于上一轮结果，前面的SQL按月展示趋势。",
+          "route": "DATA_QUERY",
+          "expect": [
+            "metric",
+            "time",
+            "regions",
+            "dimensions",
+            "granularity",
+            "references",
+            "previous_sql",
+            "previous_result"
+          ]
+        },
+        {
+          "question": "刚才的结果和这个依据是否一致？",
+          "route": "DATA_QUERY",
+          "expect": [
+            "metric",
+            "time",
+            "regions",
+            "references",
+            "previous_sql",
+            "previous_result"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "FM-07",
+      "family": "DATA_CONTEXT",
+      "turn_count": 5,
+      "fixture": null,
+      "turns": [
+        {
+          "question": "2025年华南区销售额是多少？",
+          "route": "DATA_QUERY",
+          "expect": [
+            "metric",
+            "time",
+            "regions",
+            "datasource",
+            "semantic_model",
+            "previous_sql",
+            "previous_result"
+          ]
+        },
+        {
+          "question": "继续按产品维度看产品 逆变器。",
+          "route": "DATA_QUERY",
+          "expect": [
+            "metric",
+            "time",
+            "regions",
+            "dimensions",
+            "product",
+            "previous_sql",
+            "previous_result"
+          ]
+        },
+        {
+          "question": "再按客户维度看客户 华能集团，仅有效订单。",
+          "route": "DATA_QUERY",
+          "expect": [
+            "metric",
+            "time",
+            "regions",
+            "dimensions",
+            "customer",
+            "filters",
+            "previous_sql",
+            "previous_result"
+          ]
+        },
+        {
+          "question": "基于上一轮结果，前面的SQL按月展示趋势。",
+          "route": "DATA_QUERY",
+          "expect": [
+            "metric",
+            "time",
+            "regions",
+            "dimensions",
+            "granularity",
+            "references",
+            "previous_sql",
+            "previous_result"
+          ]
+        },
+        {
+          "question": "刚才的结果和这个依据是否一致？",
+          "route": "DATA_QUERY",
+          "expect": [
+            "metric",
+            "time",
+            "regions",
+            "references",
+            "previous_sql",
+            "previous_result"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "FM-08",
+      "family": "DATA_CONTEXT",
+      "turn_count": 5,
+      "fixture": null,
+      "turns": [
+        {
+          "question": "2025年华北区销售额是多少？",
+          "route": "DATA_QUERY",
+          "expect": [
+            "metric",
+            "time",
+            "regions",
+            "datasource",
+            "semantic_model",
+            "previous_sql",
+            "previous_result"
+          ]
+        },
+        {
+          "question": "继续按产品维度看产品 充电桩。",
+          "route": "DATA_QUERY",
+          "expect": [
+            "metric",
+            "time",
+            "regions",
+            "dimensions",
+            "product",
+            "previous_sql",
+            "previous_result"
+          ]
+        },
+        {
+          "question": "再按客户维度看客户 协鑫科技，仅有效订单。",
+          "route": "DATA_QUERY",
+          "expect": [
+            "metric",
+            "time",
+            "regions",
+            "dimensions",
+            "customer",
+            "filters",
+            "previous_sql",
+            "previous_result"
+          ]
+        },
+        {
+          "question": "基于上一轮结果，前面的SQL按月展示趋势。",
+          "route": "DATA_QUERY",
+          "expect": [
+            "metric",
+            "time",
+            "regions",
+            "dimensions",
+            "granularity",
+            "references",
+            "previous_sql",
+            "previous_result"
+          ]
+        },
+        {
+          "question": "刚才的结果和这个依据是否一致？",
+          "route": "DATA_QUERY",
+          "expect": [
+            "metric",
+            "time",
+            "regions",
+            "references",
+            "previous_sql",
+            "previous_result"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "FM-09",
+      "family": "DATA_CONTEXT",
+      "turn_count": 5,
+      "fixture": null,
+      "turns": [
+        {
+          "question": "2025年华中区销售额是多少？",
+          "route": "DATA_QUERY",
+          "expect": [
+            "metric",
+            "time",
+            "regions",
+            "datasource",
+            "semantic_model",
+            "previous_sql",
+            "previous_result"
+          ]
+        },
+        {
+          "question": "继续按产品维度看产品 光伏组件。",
+          "route": "DATA_QUERY",
+          "expect": [
+            "metric",
+            "time",
+            "regions",
+            "dimensions",
+            "product",
+            "previous_sql",
+            "previous_result"
+          ]
+        },
+        {
+          "question": "再按客户维度看客户 国电投，仅有效订单。",
+          "route": "DATA_QUERY",
+          "expect": [
+            "metric",
+            "time",
+            "regions",
+            "dimensions",
+            "customer",
+            "filters",
+            "previous_sql",
+            "previous_result"
+          ]
+        },
+        {
+          "question": "基于上一轮结果，前面的SQL按月展示趋势。",
+          "route": "DATA_QUERY",
+          "expect": [
+            "metric",
+            "time",
+            "regions",
+            "dimensions",
+            "granularity",
+            "references",
+            "previous_sql",
+            "previous_result"
+          ]
+        },
+        {
+          "question": "刚才的结果和这个依据是否一致？",
+          "route": "DATA_QUERY",
+          "expect": [
+            "metric",
+            "time",
+            "regions",
+            "references",
+            "previous_sql",
+            "previous_result"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "FM-10",
+      "family": "DATA_CONTEXT",
+      "turn_count": 5,
+      "fixture": null,
+      "turns": [
+        {
+          "question": "2025年西部区销售额是多少？",
+          "route": "DATA_QUERY",
+          "expect": [
+            "metric",
+            "time",
+            "regions",
+            "datasource",
+            "semantic_model",
+            "previous_sql",
+            "previous_result"
+          ]
+        },
+        {
+          "question": "继续按产品维度看产品 控制器。",
+          "route": "DATA_QUERY",
+          "expect": [
+            "metric",
+            "time",
+            "regions",
+            "dimensions",
+            "product",
+            "previous_sql",
+            "previous_result"
+          ]
+        },
+        {
+          "question": "再按客户维度看客户 三峡能源，仅有效订单。",
+          "route": "DATA_QUERY",
+          "expect": [
+            "metric",
+            "time",
+            "regions",
+            "dimensions",
+            "customer",
+            "filters",
+            "previous_sql",
+            "previous_result"
+          ]
+        },
+        {
+          "question": "基于上一轮结果，前面的SQL按月展示趋势。",
+          "route": "DATA_QUERY",
+          "expect": [
+            "metric",
+            "time",
+            "regions",
+            "dimensions",
+            "granularity",
+            "references",
+            "previous_sql",
+            "previous_result"
+          ]
+        },
+        {
+          "question": "刚才的结果和这个依据是否一致？",
+          "route": "DATA_QUERY",
+          "expect": [
+            "metric",
+            "time",
+            "regions",
+            "references",
+            "previous_sql",
+            "previous_result"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "FM-11",
+      "family": "DATA_CONTEXT",
+      "turn_count": 5,
+      "fixture": null,
+      "turns": [
+        {
+          "question": "2025年华东区销售额是多少？",
+          "route": "DATA_QUERY",
+          "expect": [
+            "metric",
+            "time",
+            "regions",
+            "datasource",
+            "semantic_model",
+            "previous_sql",
+            "previous_result"
+          ]
+        },
+        {
+          "question": "继续按产品维度看产品 储能柜。",
+          "route": "DATA_QUERY",
+          "expect": [
+            "metric",
+            "time",
+            "regions",
+            "dimensions",
+            "product",
+            "previous_sql",
+            "previous_result"
+          ]
+        },
+        {
+          "question": "再按客户维度看客户 远景能源，仅有效订单。",
+          "route": "DATA_QUERY",
+          "expect": [
+            "metric",
+            "time",
+            "regions",
+            "dimensions",
+            "customer",
+            "filters",
+            "previous_sql",
+            "previous_result"
+          ]
+        },
+        {
+          "question": "基于上一轮结果，前面的SQL按月展示趋势。",
+          "route": "DATA_QUERY",
+          "expect": [
+            "metric",
+            "time",
+            "regions",
+            "dimensions",
+            "granularity",
+            "references",
+            "previous_sql",
+            "previous_result"
+          ]
+        },
+        {
+          "question": "刚才的结果和这个依据是否一致？",
+          "route": "DATA_QUERY",
+          "expect": [
+            "metric",
+            "time",
+            "regions",
+            "references",
+            "previous_sql",
+            "previous_result"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "FM-12",
+      "family": "DATA_CONTEXT",
+      "turn_count": 5,
+      "fixture": null,
+      "turns": [
+        {
+          "question": "2025年华南区销售额是多少？",
+          "route": "DATA_QUERY",
+          "expect": [
+            "metric",
+            "time",
+            "regions",
+            "datasource",
+            "semantic_model",
+            "previous_sql",
+            "previous_result"
+          ]
+        },
+        {
+          "question": "继续按产品维度看产品 逆变器。",
+          "route": "DATA_QUERY",
+          "expect": [
+            "metric",
+            "time",
+            "regions",
+            "dimensions",
+            "product",
+            "previous_sql",
+            "previous_result"
+          ]
+        },
+        {
+          "question": "再按客户维度看客户 华能集团，仅有效订单。",
+          "route": "DATA_QUERY",
+          "expect": [
+            "metric",
+            "time",
+            "regions",
+            "dimensions",
+            "customer",
+            "filters",
+            "previous_sql",
+            "previous_result"
+          ]
+        },
+        {
+          "question": "基于上一轮结果，前面的SQL按月展示趋势。",
+          "route": "DATA_QUERY",
+          "expect": [
+            "metric",
+            "time",
+            "regions",
+            "dimensions",
+            "granularity",
+            "references",
+            "previous_sql",
+            "previous_result"
+          ]
+        },
+        {
+          "question": "刚才的结果和这个依据是否一致？",
+          "route": "DATA_QUERY",
+          "expect": [
+            "metric",
+            "time",
+            "regions",
+            "references",
+            "previous_sql",
+            "previous_result"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "FM-13",
+      "family": "HYBRID_CONTEXT",
+      "turn_count": 5,
+      "fixture": null,
+      "turns": [
+        {
+          "question": "2025年华北区销售额是多少，并按知识口径说明依据？",
+          "route": "HYBRID_ANALYSIS",
+          "expect": [
+            "metric",
+            "time",
+            "regions",
+            "datasource",
+            "semantic_model",
+            "previous_sql",
+            "previous_result"
+          ]
+        },
+        {
+          "question": "继续按产品维度看产品 充电桩。",
+          "route": "DATA_QUERY",
+          "expect": [
+            "metric",
+            "time",
+            "regions",
+            "dimensions",
+            "product",
+            "previous_sql",
+            "previous_result"
+          ]
+        },
+        {
+          "question": "再按客户维度看客户 协鑫科技，仅有效订单。",
+          "route": "DATA_QUERY",
+          "expect": [
+            "metric",
+            "time",
+            "regions",
+            "dimensions",
+            "customer",
+            "filters",
+            "previous_sql",
+            "previous_result"
+          ]
+        },
+        {
+          "question": "基于上一轮结果，前面的SQL按月展示趋势。",
+          "route": "DATA_QUERY",
+          "expect": [
+            "metric",
+            "time",
+            "regions",
+            "dimensions",
+            "granularity",
+            "references",
+            "previous_sql",
+            "previous_result"
+          ]
+        },
+        {
+          "question": "刚才的结果和这个依据是否一致？",
+          "route": "HYBRID_ANALYSIS",
+          "expect": [
+            "metric",
+            "time",
+            "regions",
+            "references",
+            "previous_sql",
+            "previous_result",
+            "citation"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "FM-14",
+      "family": "HYBRID_CONTEXT",
+      "turn_count": 5,
+      "fixture": null,
+      "turns": [
+        {
+          "question": "2025年华中区销售额是多少，并按知识口径说明依据？",
+          "route": "HYBRID_ANALYSIS",
+          "expect": [
+            "metric",
+            "time",
+            "regions",
+            "datasource",
+            "semantic_model",
+            "previous_sql",
+            "previous_result"
+          ]
+        },
+        {
+          "question": "继续按产品维度看产品 光伏组件。",
+          "route": "DATA_QUERY",
+          "expect": [
+            "metric",
+            "time",
+            "regions",
+            "dimensions",
+            "product",
+            "previous_sql",
+            "previous_result"
+          ]
+        },
+        {
+          "question": "再按客户维度看客户 国电投，仅有效订单。",
+          "route": "DATA_QUERY",
+          "expect": [
+            "metric",
+            "time",
+            "regions",
+            "dimensions",
+            "customer",
+            "filters",
+            "previous_sql",
+            "previous_result"
+          ]
+        },
+        {
+          "question": "基于上一轮结果，前面的SQL按月展示趋势。",
+          "route": "DATA_QUERY",
+          "expect": [
+            "metric",
+            "time",
+            "regions",
+            "dimensions",
+            "granularity",
+            "references",
+            "previous_sql",
+            "previous_result"
+          ]
+        },
+        {
+          "question": "刚才的结果和这个依据是否一致？",
+          "route": "HYBRID_ANALYSIS",
+          "expect": [
+            "metric",
+            "time",
+            "regions",
+            "references",
+            "previous_sql",
+            "previous_result",
+            "citation"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "FM-15",
+      "family": "HYBRID_CONTEXT",
+      "turn_count": 5,
+      "fixture": null,
+      "turns": [
+        {
+          "question": "2025年西部区销售额是多少，并按知识口径说明依据？",
+          "route": "HYBRID_ANALYSIS",
+          "expect": [
+            "metric",
+            "time",
+            "regions",
+            "datasource",
+            "semantic_model",
+            "previous_sql",
+            "previous_result"
+          ]
+        },
+        {
+          "question": "继续按产品维度看产品 控制器。",
+          "route": "DATA_QUERY",
+          "expect": [
+            "metric",
+            "time",
+            "regions",
+            "dimensions",
+            "product",
+            "previous_sql",
+            "previous_result"
+          ]
+        },
+        {
+          "question": "再按客户维度看客户 三峡能源，仅有效订单。",
+          "route": "DATA_QUERY",
+          "expect": [
+            "metric",
+            "time",
+            "regions",
+            "dimensions",
+            "customer",
+            "filters",
+            "previous_sql",
+            "previous_result"
+          ]
+        },
+        {
+          "question": "基于上一轮结果，前面的SQL按月展示趋势。",
+          "route": "DATA_QUERY",
+          "expect": [
+            "metric",
+            "time",
+            "regions",
+            "dimensions",
+            "granularity",
+            "references",
+            "previous_sql",
+            "previous_result"
+          ]
+        },
+        {
+          "question": "刚才的结果和这个依据是否一致？",
+          "route": "HYBRID_ANALYSIS",
+          "expect": [
+            "metric",
+            "time",
+            "regions",
+            "references",
+            "previous_sql",
+            "previous_result",
+            "citation"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "FM-16",
+      "family": "HYBRID_CONTEXT",
+      "turn_count": 5,
+      "fixture": null,
+      "turns": [
+        {
+          "question": "2025年华东区销售额是多少，并按知识口径说明依据？",
+          "route": "HYBRID_ANALYSIS",
+          "expect": [
+            "metric",
+            "time",
+            "regions",
+            "datasource",
+            "semantic_model",
+            "previous_sql",
+            "previous_result"
+          ]
+        },
+        {
+          "question": "继续按产品维度看产品 储能柜。",
+          "route": "DATA_QUERY",
+          "expect": [
+            "metric",
+            "time",
+            "regions",
+            "dimensions",
+            "product",
+            "previous_sql",
+            "previous_result"
+          ]
+        },
+        {
+          "question": "再按客户维度看客户 远景能源，仅有效订单。",
+          "route": "DATA_QUERY",
+          "expect": [
+            "metric",
+            "time",
+            "regions",
+            "dimensions",
+            "customer",
+            "filters",
+            "previous_sql",
+            "previous_result"
+          ]
+        },
+        {
+          "question": "基于上一轮结果，前面的SQL按月展示趋势。",
+          "route": "DATA_QUERY",
+          "expect": [
+            "metric",
+            "time",
+            "regions",
+            "dimensions",
+            "granularity",
+            "references",
+            "previous_sql",
+            "previous_result"
+          ]
+        },
+        {
+          "question": "刚才的结果和这个依据是否一致？",
+          "route": "HYBRID_ANALYSIS",
+          "expect": [
+            "metric",
+            "time",
+            "regions",
+            "references",
+            "previous_sql",
+            "previous_result",
+            "citation"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "FM-17",
+      "family": "HYBRID_CONTEXT",
+      "turn_count": 5,
+      "fixture": null,
+      "turns": [
+        {
+          "question": "2025年华南区销售额是多少，并按知识口径说明依据？",
+          "route": "HYBRID_ANALYSIS",
+          "expect": [
+            "metric",
+            "time",
+            "regions",
+            "datasource",
+            "semantic_model",
+            "previous_sql",
+            "previous_result"
+          ]
+        },
+        {
+          "question": "继续按产品维度看产品 逆变器。",
+          "route": "DATA_QUERY",
+          "expect": [
+            "metric",
+            "time",
+            "regions",
+            "dimensions",
+            "product",
+            "previous_sql",
+            "previous_result"
+          ]
+        },
+        {
+          "question": "再按客户维度看客户 华能集团，仅有效订单。",
+          "route": "DATA_QUERY",
+          "expect": [
+            "metric",
+            "time",
+            "regions",
+            "dimensions",
+            "customer",
+            "filters",
+            "previous_sql",
+            "previous_result"
+          ]
+        },
+        {
+          "question": "基于上一轮结果，前面的SQL按月展示趋势。",
+          "route": "DATA_QUERY",
+          "expect": [
+            "metric",
+            "time",
+            "regions",
+            "dimensions",
+            "granularity",
+            "references",
+            "previous_sql",
+            "previous_result"
+          ]
+        },
+        {
+          "question": "刚才的结果和这个依据是否一致？",
+          "route": "HYBRID_ANALYSIS",
+          "expect": [
+            "metric",
+            "time",
+            "regions",
+            "references",
+            "previous_sql",
+            "previous_result",
+            "citation"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "FM-18",
+      "family": "HYBRID_CONTEXT",
+      "turn_count": 5,
+      "fixture": null,
+      "turns": [
+        {
+          "question": "2025年华北区销售额是多少，并按知识口径说明依据？",
+          "route": "HYBRID_ANALYSIS",
+          "expect": [
+            "metric",
+            "time",
+            "regions",
+            "datasource",
+            "semantic_model",
+            "previous_sql",
+            "previous_result"
+          ]
+        },
+        {
+          "question": "继续按产品维度看产品 充电桩。",
+          "route": "DATA_QUERY",
+          "expect": [
+            "metric",
+            "time",
+            "regions",
+            "dimensions",
+            "product",
+            "previous_sql",
+            "previous_result"
+          ]
+        },
+        {
+          "question": "再按客户维度看客户 协鑫科技，仅有效订单。",
+          "route": "DATA_QUERY",
+          "expect": [
+            "metric",
+            "time",
+            "regions",
+            "dimensions",
+            "customer",
+            "filters",
+            "previous_sql",
+            "previous_result"
+          ]
+        },
+        {
+          "question": "基于上一轮结果，前面的SQL按月展示趋势。",
+          "route": "DATA_QUERY",
+          "expect": [
+            "metric",
+            "time",
+            "regions",
+            "dimensions",
+            "granularity",
+            "references",
+            "previous_sql",
+            "previous_result"
+          ]
+        },
+        {
+          "question": "刚才的结果和这个依据是否一致？",
+          "route": "HYBRID_ANALYSIS",
+          "expect": [
+            "metric",
+            "time",
+            "regions",
+            "references",
+            "previous_sql",
+            "previous_result",
+            "citation"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "FM-19",
+      "family": "HYBRID_CONTEXT",
+      "turn_count": 5,
+      "fixture": null,
+      "turns": [
+        {
+          "question": "2025年华中区销售额是多少，并按知识口径说明依据？",
+          "route": "HYBRID_ANALYSIS",
+          "expect": [
+            "metric",
+            "time",
+            "regions",
+            "datasource",
+            "semantic_model",
+            "previous_sql",
+            "previous_result"
+          ]
+        },
+        {
+          "question": "继续按产品维度看产品 光伏组件。",
+          "route": "DATA_QUERY",
+          "expect": [
+            "metric",
+            "time",
+            "regions",
+            "dimensions",
+            "product",
+            "previous_sql",
+            "previous_result"
+          ]
+        },
+        {
+          "question": "再按客户维度看客户 国电投，仅有效订单。",
+          "route": "DATA_QUERY",
+          "expect": [
+            "metric",
+            "time",
+            "regions",
+            "dimensions",
+            "customer",
+            "filters",
+            "previous_sql",
+            "previous_result"
+          ]
+        },
+        {
+          "question": "基于上一轮结果，前面的SQL按月展示趋势。",
+          "route": "DATA_QUERY",
+          "expect": [
+            "metric",
+            "time",
+            "regions",
+            "dimensions",
+            "granularity",
+            "references",
+            "previous_sql",
+            "previous_result"
+          ]
+        },
+        {
+          "question": "刚才的结果和这个依据是否一致？",
+          "route": "HYBRID_ANALYSIS",
+          "expect": [
+            "metric",
+            "time",
+            "regions",
+            "references",
+            "previous_sql",
+            "previous_result",
+            "citation"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "FM-20",
+      "family": "HYBRID_CONTEXT",
+      "turn_count": 5,
+      "fixture": null,
+      "turns": [
+        {
+          "question": "2025年西部区销售额是多少，并按知识口径说明依据？",
+          "route": "HYBRID_ANALYSIS",
+          "expect": [
+            "metric",
+            "time",
+            "regions",
+            "datasource",
+            "semantic_model",
+            "previous_sql",
+            "previous_result"
+          ]
+        },
+        {
+          "question": "继续按产品维度看产品 控制器。",
+          "route": "DATA_QUERY",
+          "expect": [
+            "metric",
+            "time",
+            "regions",
+            "dimensions",
+            "product",
+            "previous_sql",
+            "previous_result"
+          ]
+        },
+        {
+          "question": "再按客户维度看客户 三峡能源，仅有效订单。",
+          "route": "DATA_QUERY",
+          "expect": [
+            "metric",
+            "time",
+            "regions",
+            "dimensions",
+            "customer",
+            "filters",
+            "previous_sql",
+            "previous_result"
+          ]
+        },
+        {
+          "question": "基于上一轮结果，前面的SQL按月展示趋势。",
+          "route": "DATA_QUERY",
+          "expect": [
+            "metric",
+            "time",
+            "regions",
+            "dimensions",
+            "granularity",
+            "references",
+            "previous_sql",
+            "previous_result"
+          ]
+        },
+        {
+          "question": "刚才的结果和这个依据是否一致？",
+          "route": "HYBRID_ANALYSIS",
+          "expect": [
+            "metric",
+            "time",
+            "regions",
+            "references",
+            "previous_sql",
+            "previous_result",
+            "citation"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "FM-21",
+      "family": "HYBRID_CONTEXT",
+      "turn_count": 5,
+      "fixture": null,
+      "turns": [
+        {
+          "question": "2025年华东区销售额是多少，并按知识口径说明依据？",
+          "route": "HYBRID_ANALYSIS",
+          "expect": [
+            "metric",
+            "time",
+            "regions",
+            "datasource",
+            "semantic_model",
+            "previous_sql",
+            "previous_result"
+          ]
+        },
+        {
+          "question": "继续按产品维度看产品 储能柜。",
+          "route": "DATA_QUERY",
+          "expect": [
+            "metric",
+            "time",
+            "regions",
+            "dimensions",
+            "product",
+            "previous_sql",
+            "previous_result"
+          ]
+        },
+        {
+          "question": "再按客户维度看客户 远景能源，仅有效订单。",
+          "route": "DATA_QUERY",
+          "expect": [
+            "metric",
+            "time",
+            "regions",
+            "dimensions",
+            "customer",
+            "filters",
+            "previous_sql",
+            "previous_result"
+          ]
+        },
+        {
+          "question": "基于上一轮结果，前面的SQL按月展示趋势。",
+          "route": "DATA_QUERY",
+          "expect": [
+            "metric",
+            "time",
+            "regions",
+            "dimensions",
+            "granularity",
+            "references",
+            "previous_sql",
+            "previous_result"
+          ]
+        },
+        {
+          "question": "刚才的结果和这个依据是否一致？",
+          "route": "HYBRID_ANALYSIS",
+          "expect": [
+            "metric",
+            "time",
+            "regions",
+            "references",
+            "previous_sql",
+            "previous_result",
+            "citation"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "FM-22",
+      "family": "HYBRID_CONTEXT",
+      "turn_count": 5,
+      "fixture": null,
+      "turns": [
+        {
+          "question": "2025年华南区销售额是多少，并按知识口径说明依据？",
+          "route": "HYBRID_ANALYSIS",
+          "expect": [
+            "metric",
+            "time",
+            "regions",
+            "datasource",
+            "semantic_model",
+            "previous_sql",
+            "previous_result"
+          ]
+        },
+        {
+          "question": "继续按产品维度看产品 逆变器。",
+          "route": "DATA_QUERY",
+          "expect": [
+            "metric",
+            "time",
+            "regions",
+            "dimensions",
+            "product",
+            "previous_sql",
+            "previous_result"
+          ]
+        },
+        {
+          "question": "再按客户维度看客户 华能集团，仅有效订单。",
+          "route": "DATA_QUERY",
+          "expect": [
+            "metric",
+            "time",
+            "regions",
+            "dimensions",
+            "customer",
+            "filters",
+            "previous_sql",
+            "previous_result"
+          ]
+        },
+        {
+          "question": "基于上一轮结果，前面的SQL按月展示趋势。",
+          "route": "DATA_QUERY",
+          "expect": [
+            "metric",
+            "time",
+            "regions",
+            "dimensions",
+            "granularity",
+            "references",
+            "previous_sql",
+            "previous_result"
+          ]
+        },
+        {
+          "question": "刚才的结果和这个依据是否一致？",
+          "route": "HYBRID_ANALYSIS",
+          "expect": [
+            "metric",
+            "time",
+            "regions",
+            "references",
+            "previous_sql",
+            "previous_result",
+            "citation"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "FM-23",
+      "family": "HYBRID_CONTEXT",
+      "turn_count": 5,
+      "fixture": null,
+      "turns": [
+        {
+          "question": "2025年华北区销售额是多少，并按知识口径说明依据？",
+          "route": "HYBRID_ANALYSIS",
+          "expect": [
+            "metric",
+            "time",
+            "regions",
+            "datasource",
+            "semantic_model",
+            "previous_sql",
+            "previous_result"
+          ]
+        },
+        {
+          "question": "继续按产品维度看产品 充电桩。",
+          "route": "DATA_QUERY",
+          "expect": [
+            "metric",
+            "time",
+            "regions",
+            "dimensions",
+            "product",
+            "previous_sql",
+            "previous_result"
+          ]
+        },
+        {
+          "question": "再按客户维度看客户 协鑫科技，仅有效订单。",
+          "route": "DATA_QUERY",
+          "expect": [
+            "metric",
+            "time",
+            "regions",
+            "dimensions",
+            "customer",
+            "filters",
+            "previous_sql",
+            "previous_result"
+          ]
+        },
+        {
+          "question": "基于上一轮结果，前面的SQL按月展示趋势。",
+          "route": "DATA_QUERY",
+          "expect": [
+            "metric",
+            "time",
+            "regions",
+            "dimensions",
+            "granularity",
+            "references",
+            "previous_sql",
+            "previous_result"
+          ]
+        },
+        {
+          "question": "刚才的结果和这个依据是否一致？",
+          "route": "HYBRID_ANALYSIS",
+          "expect": [
+            "metric",
+            "time",
+            "regions",
+            "references",
+            "previous_sql",
+            "previous_result",
+            "citation"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "FM-24",
+      "family": "HYBRID_CONTEXT",
+      "turn_count": 5,
+      "fixture": null,
+      "turns": [
+        {
+          "question": "2025年华中区销售额是多少，并按知识口径说明依据？",
+          "route": "HYBRID_ANALYSIS",
+          "expect": [
+            "metric",
+            "time",
+            "regions",
+            "datasource",
+            "semantic_model",
+            "previous_sql",
+            "previous_result"
+          ]
+        },
+        {
+          "question": "继续按产品维度看产品 光伏组件。",
+          "route": "DATA_QUERY",
+          "expect": [
+            "metric",
+            "time",
+            "regions",
+            "dimensions",
+            "product",
+            "previous_sql",
+            "previous_result"
+          ]
+        },
+        {
+          "question": "再按客户维度看客户 国电投，仅有效订单。",
+          "route": "DATA_QUERY",
+          "expect": [
+            "metric",
+            "time",
+            "regions",
+            "dimensions",
+            "customer",
+            "filters",
+            "previous_sql",
+            "previous_result"
+          ]
+        },
+        {
+          "question": "基于上一轮结果，前面的SQL按月展示趋势。",
+          "route": "DATA_QUERY",
+          "expect": [
+            "metric",
+            "time",
+            "regions",
+            "dimensions",
+            "granularity",
+            "references",
+            "previous_sql",
+            "previous_result"
+          ]
+        },
+        {
+          "question": "刚才的结果和这个依据是否一致？",
+          "route": "HYBRID_ANALYSIS",
+          "expect": [
+            "metric",
+            "time",
+            "regions",
+            "references",
+            "previous_sql",
+            "previous_result",
+            "citation"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "FM-25",
+      "family": "FILE_CONTEXT",
+      "turn_count": 5,
+      "fixture": "phase2-regional-revenue.csv",
+      "turns": [
+        {
+          "question": "请按地区汇总这个附件的销售额。",
+          "route": "FILE_QUERY",
+          "expect": [
+            "dimensions",
+            "attachment",
+            "file_context"
+          ]
+        },
+        {
+          "question": "继续看这个文件的销售额最高记录。",
+          "route": "FILE_QUERY",
+          "expect": [
+            "dimensions",
+            "attachment",
+            "file_context",
+            "references"
+          ]
+        },
+        {
+          "question": "再计算这个附件的销售额平均值。",
+          "route": "FILE_QUERY",
+          "expect": [
+            "metric",
+            "attachment",
+            "file_context"
+          ]
+        },
+        {
+          "question": "基于刚才的文件筛选销售额大于100的记录。",
+          "route": "FILE_QUERY",
+          "expect": [
+            "metric",
+            "attachment",
+            "file_context",
+            "references"
+          ]
+        },
+        {
+          "question": "上一份附件一共有多少行？",
+          "route": "FILE_QUERY",
+          "expect": [
+            "attachment",
+            "file_context",
+            "references"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "FM-26",
+      "family": "FILE_CONTEXT",
+      "turn_count": 5,
+      "fixture": "phase2-regional-revenue.csv",
+      "turns": [
+        {
+          "question": "请按地区汇总这个附件的销售额。",
+          "route": "FILE_QUERY",
+          "expect": [
+            "dimensions",
+            "attachment",
+            "file_context"
+          ]
+        },
+        {
+          "question": "继续看这个文件的销售额最高记录。",
+          "route": "FILE_QUERY",
+          "expect": [
+            "dimensions",
+            "attachment",
+            "file_context",
+            "references"
+          ]
+        },
+        {
+          "question": "再计算这个附件的销售额平均值。",
+          "route": "FILE_QUERY",
+          "expect": [
+            "metric",
+            "attachment",
+            "file_context"
+          ]
+        },
+        {
+          "question": "基于刚才的文件筛选销售额大于100的记录。",
+          "route": "FILE_QUERY",
+          "expect": [
+            "metric",
+            "attachment",
+            "file_context",
+            "references"
+          ]
+        },
+        {
+          "question": "上一份附件一共有多少行？",
+          "route": "FILE_QUERY",
+          "expect": [
+            "attachment",
+            "file_context",
+            "references"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "FM-27",
+      "family": "FILE_CONTEXT",
+      "turn_count": 5,
+      "fixture": "phase2-regional-revenue.csv",
+      "turns": [
+        {
+          "question": "请按地区汇总这个附件的销售额。",
+          "route": "FILE_QUERY",
+          "expect": [
+            "dimensions",
+            "attachment",
+            "file_context"
+          ]
+        },
+        {
+          "question": "继续看这个文件的销售额最高记录。",
+          "route": "FILE_QUERY",
+          "expect": [
+            "dimensions",
+            "attachment",
+            "file_context",
+            "references"
+          ]
+        },
+        {
+          "question": "再计算这个附件的销售额平均值。",
+          "route": "FILE_QUERY",
+          "expect": [
+            "metric",
+            "attachment",
+            "file_context"
+          ]
+        },
+        {
+          "question": "基于刚才的文件筛选销售额大于100的记录。",
+          "route": "FILE_QUERY",
+          "expect": [
+            "metric",
+            "attachment",
+            "file_context",
+            "references"
+          ]
+        },
+        {
+          "question": "上一份附件一共有多少行？",
+          "route": "FILE_QUERY",
+          "expect": [
+            "attachment",
+            "file_context",
+            "references"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "FM-28",
+      "family": "FILE_CONTEXT",
+      "turn_count": 5,
+      "fixture": "phase2-regional-revenue.csv",
+      "turns": [
+        {
+          "question": "请按地区汇总这个附件的销售额。",
+          "route": "FILE_QUERY",
+          "expect": [
+            "dimensions",
+            "attachment",
+            "file_context"
+          ]
+        },
+        {
+          "question": "继续看这个文件的销售额最高记录。",
+          "route": "FILE_QUERY",
+          "expect": [
+            "dimensions",
+            "attachment",
+            "file_context",
+            "references"
+          ]
+        },
+        {
+          "question": "再计算这个附件的销售额平均值。",
+          "route": "FILE_QUERY",
+          "expect": [
+            "metric",
+            "attachment",
+            "file_context"
+          ]
+        },
+        {
+          "question": "基于刚才的文件筛选销售额大于100的记录。",
+          "route": "FILE_QUERY",
+          "expect": [
+            "metric",
+            "attachment",
+            "file_context",
+            "references"
+          ]
+        },
+        {
+          "question": "上一份附件一共有多少行？",
+          "route": "FILE_QUERY",
+          "expect": [
+            "attachment",
+            "file_context",
+            "references"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "FM-29",
+      "family": "FILE_CONTEXT",
+      "turn_count": 5,
+      "fixture": "phase2-regional-revenue.csv",
+      "turns": [
+        {
+          "question": "请按地区汇总这个附件的销售额。",
+          "route": "FILE_QUERY",
+          "expect": [
+            "dimensions",
+            "attachment",
+            "file_context"
+          ]
+        },
+        {
+          "question": "继续看这个文件的销售额最高记录。",
+          "route": "FILE_QUERY",
+          "expect": [
+            "dimensions",
+            "attachment",
+            "file_context",
+            "references"
+          ]
+        },
+        {
+          "question": "再计算这个附件的销售额平均值。",
+          "route": "FILE_QUERY",
+          "expect": [
+            "metric",
+            "attachment",
+            "file_context"
+          ]
+        },
+        {
+          "question": "基于刚才的文件筛选销售额大于100的记录。",
+          "route": "FILE_QUERY",
+          "expect": [
+            "metric",
+            "attachment",
+            "file_context",
+            "references"
+          ]
+        },
+        {
+          "question": "上一份附件一共有多少行？",
+          "route": "FILE_QUERY",
+          "expect": [
+            "attachment",
+            "file_context",
+            "references"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "FM-30",
+      "family": "FILE_CONTEXT",
+      "turn_count": 5,
+      "fixture": "phase2-regional-revenue.csv",
+      "turns": [
+        {
+          "question": "请按地区汇总这个附件的销售额。",
+          "route": "FILE_QUERY",
+          "expect": [
+            "dimensions",
+            "attachment",
+            "file_context"
+          ]
+        },
+        {
+          "question": "继续看这个文件的销售额最高记录。",
+          "route": "FILE_QUERY",
+          "expect": [
+            "dimensions",
+            "attachment",
+            "file_context",
+            "references"
+          ]
+        },
+        {
+          "question": "再计算这个附件的销售额平均值。",
+          "route": "FILE_QUERY",
+          "expect": [
+            "metric",
+            "attachment",
+            "file_context"
+          ]
+        },
+        {
+          "question": "基于刚才的文件筛选销售额大于100的记录。",
+          "route": "FILE_QUERY",
+          "expect": [
+            "metric",
+            "attachment",
+            "file_context",
+            "references"
+          ]
+        },
+        {
+          "question": "上一份附件一共有多少行？",
+          "route": "FILE_QUERY",
+          "expect": [
+            "attachment",
+            "file_context",
+            "references"
+          ]
+        }
+      ]
+    }
+  ]
+}

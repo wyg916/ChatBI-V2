@@ -1,0 +1,128 @@
+{
+  "schema_version": "chatbi-v1.3-phase2-complex-v1",
+  "name": "ChatBI V1.3 Phase 2 Complex and Tricky 20",
+  "frozen": true,
+  "ground_truth_policy": "Each paraphrase inherits the complete expected semantics and result rows from its source case in day4-golden-50.json; the Phase 2 runner verifies that source manifest before execution.",
+  "cases": [
+    {
+      "id": "P2C01",
+      "source_golden_id": "G18",
+      "category": "multi_dimension_time_filter",
+      "question": "把2026年已支付订单收入按区域和月份展示趋势"
+    },
+    {
+      "id": "P2C02",
+      "source_golden_id": "G19",
+      "category": "time_filter_join_topn",
+      "question": "2026年已退款订单收入，按产品排前5名"
+    },
+    {
+      "id": "P2C03",
+      "source_golden_id": "G20",
+      "category": "time_filter_join_derived_topn",
+      "question": "2026年支付成功的订单，按类别查看利润前4名"
+    },
+    {
+      "id": "P2C04",
+      "source_golden_id": "G25",
+      "category": "null_filter",
+      "question": "订单状态是空时一共有多少单"
+    },
+    {
+      "id": "P2C05",
+      "source_golden_id": "G32",
+      "category": "multi_dimension_time_join",
+      "question": "请给出2026年各地区每月的订单成本"
+    },
+    {
+      "id": "P2C06",
+      "source_golden_id": "G33",
+      "category": "filter_join",
+      "question": "支付成功订单，按区域汇总成本"
+    },
+    {
+      "id": "P2C07",
+      "source_golden_id": "G34",
+      "category": "filter_join",
+      "question": "已退款订单量按类别分组"
+    },
+    {
+      "id": "P2C08",
+      "source_golden_id": "G35",
+      "category": "dimension_value_filter",
+      "question": "华东区域的总订单收入"
+    },
+    {
+      "id": "P2C09",
+      "source_golden_id": "G36",
+      "category": "multi_filter_derived",
+      "question": "华南已完成订单，按地区计算利润"
+    },
+    {
+      "id": "P2C10",
+      "source_golden_id": "G37",
+      "category": "category_value_filter",
+      "question": "充电设备这一品类的收入，按品类查看"
+    },
+    {
+      "id": "P2C11",
+      "source_golden_id": "G38",
+      "category": "category_status_filter",
+      "question": "储能设备退款单的成本，按类别汇总"
+    },
+    {
+      "id": "P2C12",
+      "source_golden_id": "G39",
+      "category": "two_join_dimensions",
+      "question": "用地区和产品类别两个维度交叉统计订单收入"
+    },
+    {
+      "id": "P2C13",
+      "source_golden_id": "G40",
+      "category": "two_dimensions",
+      "question": "订单量按商品和状态双维度展开"
+    },
+    {
+      "id": "P2C14",
+      "source_golden_id": "G41",
+      "category": "two_dimensions_join",
+      "question": "按用户类型和订单状态交叉汇总收入"
+    },
+    {
+      "id": "P2C15",
+      "source_golden_id": "G42",
+      "category": "three_metrics",
+      "question": "一次给出所有订单的收入、成本及利润"
+    },
+    {
+      "id": "P2C16",
+      "source_golden_id": "G43",
+      "category": "window_contribution",
+      "question": "每个区域对总收入的贡献度是多少"
+    },
+    {
+      "id": "P2C17",
+      "source_golden_id": "G44",
+      "category": "ratio_zero_safe",
+      "question": "分产品类别查看毛利率"
+    },
+    {
+      "id": "P2C18",
+      "source_golden_id": "G45",
+      "category": "month_over_month",
+      "question": "逐月展示收入以及月环比变化"
+    },
+    {
+      "id": "P2C19",
+      "source_golden_id": "G46",
+      "category": "year_over_year",
+      "question": "按月份列出收入和年同比"
+    },
+    {
+      "id": "P2C20",
+      "source_golden_id": "G48",
+      "category": "quarter_boundary_multi_metric",
+      "question": "2026年Q1各区域的收入与成本分别是多少"
+    }
+  ]
+}

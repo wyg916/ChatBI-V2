@@ -1,0 +1,37 @@
+{
+  "schema_version": "chatbi-recorded-real-sanitized-provider-response-v1",
+  "provider": "mimo",
+  "provenance": "RECORDED_REAL_SANITIZED_PROVIDER_RESPONSE_2026-08-25",
+  "source_evidence": {
+    "candidate_sha": "e9e4cf899329c6909c017a293a413def7c0f2134",
+    "case_id": "FINAL-NL2SQL-MIMO",
+    "evidence_sha256": "8fc0874495b46bd947523c791a70e998f1979cfbf1f903c7af4fb2c15f2fb7b2",
+    "raw_response_sha256": "e41afb37da9bf3fbe06ee794666282b4023929aefc9deddce692288fa3467d5a",
+    "response_shape_fingerprint": "91a2e4919b7b51968745678d4ab8a60cc691cd77404201c92b5d3e9b256f1475",
+    "sanitized": true
+  },
+  "response": {
+    "choices": [
+      {
+        "finish_reason": "stop",
+        "index": 0,
+        "message": {
+          "content": "{\n  \"question\": \"统计全部订单收入\",\n  \"intent\": \"Calculate the total revenue from all orders.\",\n  \"dialect\": \"mysql\",\n  \"provider\": \"Demo MySQL\",\n  \"semantic_model_id\": \"f5e7b3ee-62aa-41ff-aa7a-6e046c9c476d\",\n  \"semantic_model_version\": 1,\n  \"selected_entities\": [\"orders\"],\n  \"selected_tables\": [\"orders\"],\n  \"selected_columns\": [\"orders.revenue\"],\n  \"metrics\": [\"revenue\"],\n  \"dimensions\": [],\n  \"joins\": [],\n  \"filters\": [],\n  \"time_range\": null,\n  \"group_by\": [],\n  \"order_by\": [],\n  \"limit\": 1,\n  \"generated_sql\": \"SELECT SUM(`orders`.`revenue`) AS `revenue` FROM `orders`\",\n  \"confidence\": 1.0,\n  \"warnings\": [],\n  \"repair_count\": 0,\n  \"model_trace\": null\n}",
+          "role": "assistant",
+          "tool_calls": null
+        }
+      }
+    ],
+    "created": 1787671107,
+    "id": "9165bbfb-9415-4052-b2f2-f6a81214d4d5_76e2e98a77b74f83b9598eba7ede71d3",
+    "model": "mimo-v2.5",
+    "object": "chat.completion",
+    "usage": {
+      "completion_tokens": 220,
+      "completion_tokens_details": {"reasoning_tokens": 0},
+      "prompt_tokens": 5785,
+      "prompt_tokens_details": {"cached_tokens": 0},
+      "total_tokens": 6005
+    }
+  }
+}

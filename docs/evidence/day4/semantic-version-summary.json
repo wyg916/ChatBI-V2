@@ -1,0 +1,14 @@
+{
+  "checked_at": "2026-08-17T21:03:39+08:00",
+  "publish_v1": "PASS",
+  "draft_after_edit": "PASS",
+  "publish_v2": "PASS",
+  "rollback_target": 1,
+  "rollback_published_version": 3,
+  "rollback_source_trace": 1,
+  "versions_after_rollback": [3, 2, 1],
+  "relationship_validation": "PASS",
+  "metric_dependency_validation": "PASS",
+  "evidence": "Backend semantic tests plus Playwright Day4-E2E03",
+  "gate": "PASS"
+}

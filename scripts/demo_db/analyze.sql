@@ -1,0 +1,10 @@
+ANALYZE {{schema}}.dim_date;
+ANALYZE {{schema}}.dim_region;
+ANALYZE {{schema}}.dim_product;
+ANALYZE {{schema}}.dim_customer;
+ANALYZE {{schema}}.fact_sales;
+ANALYZE {{schema}}.fact_payment;
+ANALYZE {{schema}}.agg_monthly_sales;
+ANALYZE {{schema}}.agg_region_product;
+ANALYZE {{schema}}.agg_customer_contribution;
+ANALYZE {{schema}}.agg_receivable_aging;

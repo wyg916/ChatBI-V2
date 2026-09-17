@@ -1,0 +1,33 @@
+{
+  "status": "PASS",
+  "tested_sha": "b766275bd4cff015312b1d0fbdbae26d81611d71",
+  "executed_at": "2026-08-19T01:42:56+08:00",
+  "chain": [
+    "Authentication",
+    "Workspace Permission",
+    "SQLGlot Guard",
+    "Query Executor read-only transaction",
+    "Result Oracle",
+    "Audit"
+  ],
+  "dangerous_sql": {
+    "total": 8,
+    "blocked": 8,
+    "block_rate": 1.0,
+    "categories": ["DELETE", "UPDATE", "INSERT", "DROP", "ALTER", "CALL", "MULTI_STATEMENT", "COPY"]
+  },
+  "business_database_write_count": 0,
+  "postgresql_oracle": "PASSED",
+  "mysql_oracle": "PASSED",
+  "cross_workspace_leak": 0,
+  "cross_role_leak": 0,
+  "sensitive_field_masking": "PASS",
+  "history_workspace_user_scope": "PASS",
+  "browser_database_credentials": 0,
+  "frozen_zone_intersection": 5,
+  "migration_impact": "20260818_0010_ROUND_TRIP_PASS",
+  "license_impact": "NONE",
+  "failures": [],
+  "blockers": [],
+  "rollback": "downgrade 20260818_0010 to 20260818_0009"
+}

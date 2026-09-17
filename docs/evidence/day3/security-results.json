@@ -1,0 +1,331 @@
+{
+  "verified_at": "2026-08-17T10:28:34.544981+00:00",
+  "dangerous_sql_cases": 38,
+  "dangerous_sql_block_count": 38,
+  "dangerous_sql_block_rate": 1.0,
+  "actual_write_attempt_succeeded": 0,
+  "cases": [
+    {
+      "case": 1,
+      "dialect": "postgresql",
+      "status": "SECURITY_REJECTED",
+      "blocked": true,
+      "error_code": "STATEMENT_NOT_ALLOWED",
+      "execution_started": false
+    },
+    {
+      "case": 2,
+      "dialect": "postgresql",
+      "status": "SECURITY_REJECTED",
+      "blocked": true,
+      "error_code": "STATEMENT_NOT_ALLOWED",
+      "execution_started": false
+    },
+    {
+      "case": 3,
+      "dialect": "postgresql",
+      "status": "SECURITY_REJECTED",
+      "blocked": true,
+      "error_code": "STATEMENT_NOT_ALLOWED",
+      "execution_started": false
+    },
+    {
+      "case": 4,
+      "dialect": "postgresql",
+      "status": "SECURITY_REJECTED",
+      "blocked": true,
+      "error_code": "STATEMENT_NOT_ALLOWED",
+      "execution_started": false
+    },
+    {
+      "case": 5,
+      "dialect": "postgresql",
+      "status": "SECURITY_REJECTED",
+      "blocked": true,
+      "error_code": "STATEMENT_NOT_ALLOWED",
+      "execution_started": false
+    },
+    {
+      "case": 6,
+      "dialect": "postgresql",
+      "status": "SECURITY_REJECTED",
+      "blocked": true,
+      "error_code": "STATEMENT_NOT_ALLOWED",
+      "execution_started": false
+    },
+    {
+      "case": 7,
+      "dialect": "postgresql",
+      "status": "SECURITY_REJECTED",
+      "blocked": true,
+      "error_code": "STATEMENT_NOT_ALLOWED",
+      "execution_started": false
+    },
+    {
+      "case": 8,
+      "dialect": "postgresql",
+      "status": "SECURITY_REJECTED",
+      "blocked": true,
+      "error_code": "STATEMENT_NOT_ALLOWED",
+      "execution_started": false
+    },
+    {
+      "case": 9,
+      "dialect": "postgresql",
+      "status": "SECURITY_REJECTED",
+      "blocked": true,
+      "error_code": "STATEMENT_NOT_ALLOWED",
+      "execution_started": false
+    },
+    {
+      "case": 10,
+      "dialect": "postgresql",
+      "status": "SECURITY_REJECTED",
+      "blocked": true,
+      "error_code": "STATEMENT_NOT_ALLOWED",
+      "execution_started": false
+    },
+    {
+      "case": 11,
+      "dialect": "postgresql",
+      "status": "SECURITY_REJECTED",
+      "blocked": true,
+      "error_code": "STATEMENT_NOT_ALLOWED",
+      "execution_started": false
+    },
+    {
+      "case": 12,
+      "dialect": "postgresql",
+      "status": "SECURITY_REJECTED",
+      "blocked": true,
+      "error_code": "FUNCTION_NOT_ALLOWED",
+      "execution_started": false
+    },
+    {
+      "case": 13,
+      "dialect": "postgresql",
+      "status": "SECURITY_REJECTED",
+      "blocked": true,
+      "error_code": "FUNCTION_NOT_ALLOWED",
+      "execution_started": false
+    },
+    {
+      "case": 14,
+      "dialect": "postgresql",
+      "status": "SECURITY_REJECTED",
+      "blocked": true,
+      "error_code": "FUNCTION_NOT_ALLOWED",
+      "execution_started": false
+    },
+    {
+      "case": 15,
+      "dialect": "postgresql",
+      "status": "SECURITY_REJECTED",
+      "blocked": true,
+      "error_code": "FUNCTION_NOT_ALLOWED",
+      "execution_started": false
+    },
+    {
+      "case": 16,
+      "dialect": "postgresql",
+      "status": "SECURITY_REJECTED",
+      "blocked": true,
+      "error_code": "FUNCTION_NOT_ALLOWED",
+      "execution_started": false
+    },
+    {
+      "case": 17,
+      "dialect": "postgresql",
+      "status": "SECURITY_REJECTED",
+      "blocked": true,
+      "error_code": "SYSTEM_SCHEMA_DENIED",
+      "execution_started": false
+    },
+    {
+      "case": 18,
+      "dialect": "postgresql",
+      "status": "SECURITY_REJECTED",
+      "blocked": true,
+      "error_code": "SYSTEM_SCHEMA_DENIED",
+      "execution_started": false
+    },
+    {
+      "case": 19,
+      "dialect": "postgresql",
+      "status": "SECURITY_REJECTED",
+      "blocked": true,
+      "error_code": "WILDCARD_NOT_ALLOWED",
+      "execution_started": false
+    },
+    {
+      "case": 20,
+      "dialect": "postgresql",
+      "status": "SECURITY_REJECTED",
+      "blocked": true,
+      "error_code": "COLUMN_NOT_AUTHORIZED",
+      "execution_started": false
+    },
+    {
+      "case": 21,
+      "dialect": "postgresql",
+      "status": "SECURITY_REJECTED",
+      "blocked": true,
+      "error_code": "SCHEMA_NOT_AUTHORIZED",
+      "execution_started": false
+    },
+    {
+      "case": 22,
+      "dialect": "postgresql",
+      "status": "SECURITY_REJECTED",
+      "blocked": true,
+      "error_code": "TABLE_NOT_AUTHORIZED",
+      "execution_started": false
+    },
+    {
+      "case": 23,
+      "dialect": "postgresql",
+      "status": "SECURITY_REJECTED",
+      "blocked": true,
+      "error_code": "MULTI_STATEMENT",
+      "execution_started": false
+    },
+    {
+      "case": 24,
+      "dialect": "mysql",
+      "status": "SECURITY_REJECTED",
+      "blocked": true,
+      "error_code": "STATEMENT_NOT_ALLOWED",
+      "execution_started": false
+    },
+    {
+      "case": 25,
+      "dialect": "mysql",
+      "status": "SECURITY_REJECTED",
+      "blocked": true,
+      "error_code": "STATEMENT_NOT_ALLOWED",
+      "execution_started": false
+    },
+    {
+      "case": 26,
+      "dialect": "mysql",
+      "status": "SECURITY_REJECTED",
+      "blocked": true,
+      "error_code": "STATEMENT_NOT_ALLOWED",
+      "execution_started": false
+    },
+    {
+      "case": 27,
+      "dialect": "mysql",
+      "status": "SECURITY_REJECTED",
+      "blocked": true,
+      "error_code": "STATEMENT_NOT_ALLOWED",
+      "execution_started": false
+    },
+    {
+      "case": 28,
+      "dialect": "mysql",
+      "status": "SECURITY_REJECTED",
+      "blocked": true,
+      "error_code": "STATEMENT_NOT_ALLOWED",
+      "execution_started": false
+    },
+    {
+      "case": 29,
+      "dialect": "mysql",
+      "status": "SECURITY_REJECTED",
+      "blocked": true,
+      "error_code": "SQL_PARSE_ERROR",
+      "execution_started": false
+    },
+    {
+      "case": 30,
+      "dialect": "mysql",
+      "status": "SECURITY_REJECTED",
+      "blocked": true,
+      "error_code": "FUNCTION_NOT_ALLOWED",
+      "execution_started": false
+    },
+    {
+      "case": 31,
+      "dialect": "mysql",
+      "status": "SECURITY_REJECTED",
+      "blocked": true,
+      "error_code": "FUNCTION_NOT_ALLOWED",
+      "execution_started": false
+    },
+    {
+      "case": 32,
+      "dialect": "mysql",
+      "status": "SECURITY_REJECTED",
+      "blocked": true,
+      "error_code": "FUNCTION_NOT_ALLOWED",
+      "execution_started": false
+    },
+    {
+      "case": 33,
+      "dialect": "mysql",
+      "status": "SECURITY_REJECTED",
+      "blocked": true,
+      "error_code": "SYSTEM_SCHEMA_DENIED",
+      "execution_started": false
+    },
+    {
+      "case": 34,
+      "dialect": "mysql",
+      "status": "SECURITY_REJECTED",
+      "blocked": true,
+      "error_code": "SYSTEM_SCHEMA_DENIED",
+      "execution_started": false
+    },
+    {
+      "case": 35,
+      "dialect": "mysql",
+      "status": "SECURITY_REJECTED",
+      "blocked": true,
+      "error_code": "SQL_PARSE_ERROR",
+      "execution_started": false
+    },
+    {
+      "case": 36,
+      "dialect": "mysql",
+      "status": "SECURITY_REJECTED",
+      "blocked": true,
+      "error_code": "TABLE_NOT_AUTHORIZED",
+      "execution_started": false
+    },
+    {
+      "case": 37,
+      "dialect": "mysql",
+      "status": "SECURITY_REJECTED",
+      "blocked": true,
+      "error_code": "COLUMN_NOT_AUTHORIZED",
+      "execution_started": false
+    },
+    {
+      "case": 38,
+      "dialect": "mysql",
+      "status": "SECURITY_REJECTED",
+      "blocked": true,
+      "error_code": "MULTI_STATEMENT",
+      "execution_started": false
+    }
+  ],
+  "actual_write_attempts": [
+    {
+      "dialect": "mysql",
+      "write_succeeded": false,
+      "error_type": "OperationalError",
+      "row_count_before": 1095,
+      "row_count_after": 1095,
+      "unchanged": true
+    },
+    {
+      "dialect": "postgresql",
+      "write_succeeded": false,
+      "error_type": "ProgrammingError",
+      "row_count_before": 1095,
+      "row_count_after": 1095,
+      "unchanged": true
+    }
+  ]
+}

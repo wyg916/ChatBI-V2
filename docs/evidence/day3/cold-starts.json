@@ -1,0 +1,32 @@
+{
+  "verified_at": "2026-08-17T18:20:15+08:00",
+  "required_cycles": 2,
+  "from_stopped_state_required": true,
+  "cycle_1": {
+    "pre_stop": "PASS",
+    "image_build": "PASS",
+    "frontend_http": 200,
+    "backend_http": 200,
+    "backend_version": "1.0.0-rc1",
+    "local_metadata_postgres": "READY",
+    "local_demo_postgres": "READY",
+    "local_demo_mysql": "READY",
+    "container_health": "PASS",
+    "result": "PASS"
+  },
+  "full_stop_between_cycles": "PASS",
+  "cycle_2": {
+    "image_build": "PASS",
+    "frontend_http": 200,
+    "backend_http": 200,
+    "backend_version": "1.0.0-rc1",
+    "local_metadata_postgres": "READY",
+    "local_demo_postgres": "READY",
+    "local_demo_mysql": "READY",
+    "container_health": "PASS",
+    "result": "PASS"
+  },
+  "compose_services": ["backend", "frontend"],
+  "compose_database_services": 0,
+  "result": "PASS"
+}

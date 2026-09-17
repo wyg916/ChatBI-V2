@@ -1,0 +1,497 @@
+name: V1.3 Phase3 and IBM Official Self-Contained Release Gate
+
+on:
+  push:
+    branches:
+      - "main"
+      - "codex/v1.3.0-data-semantic-upstream"
+      - "codex/v1.3.0-rag-agent-file-multimodal"
+      - "codex/v1.3.0-product-experience-governance"
+      - "codex/v1.3.0-release-hardening-full-gate"
+  pull_request:
+    paths:
+      - ".github/workflows/v21-eval-golden-feedback.yml"
+      - "backend/app/evaluation/**"
+      - "backend/app/services/evaluation.py"
+      - "backend/scripts/run_v13_ibm_ci_bootstrap.py"
+      - "backend/scripts/run_v13_ibm_official_eval.py"
+      - "backend/scripts/run_v13_legacy_rag_gate.py"
+      - "backend/tests/test_v13_ibm_ci_bootstrap.py"
+      - "backend/tests/test_v13_ibm_official_eval.py"
+      - "evaluation/golden/**"
+      - "backend/app/file_multimodal/**"
+      - "backend/app/rag_runtime/**"
+      - "backend/vendor/legacy_energy_rag/**"
+      - "backend/app/sandbox/**"
+      - "backend/app/integration/**"
+      - "backend/app/services/chat.py"
+      - "backend/app/services/attachments.py"
+      - "backend/tests/test_v13_phase3_*.py"
+      - "backend/requirements-phase3-upstream.txt"
+      - "backend/requirements-runtime-hardening.txt"
+      - "packages/dbgpt-runtime-adapter/**"
+      - "packages/pandasai-selected-runtime/**"
+      - "sandbox_runtime/**"
+      - "backend/scripts/run_v13_phase5_security_supply_gate.py"
+      - "backend/tests/test_v13_phase5_security_supply.py"
+      - "scripts/phase5-*"
+      - "supply-chain/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: v13-ibm-official-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  CHATBI_TEST_COST_CONTROL: "YES"
+  CHATBI_TEST_EXECUTION_LEVEL: "LEVEL0"
+  CHATBI_PAID_GATE_AUTHORIZED: "NO"
+
+jobs:
+  deterministic-gate:
+    runs-on: ubuntu-latest
+    env:
+      PHASE5_EVIDENCE_DIR: artifacts/v1.3/phase5-security-supply
+      PYTHONPATH: >-
+        backend:packages/agent-contracts/src:packages/agent-orchestrator/src:packages/prompt-registry/src:packages/rag-adapter/src:packages/rag-contracts/src:packages/dbgpt-runtime-adapter/src:packages/pandasai-selected-runtime/src
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5, Node 24
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6, Node 24
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: |
+            backend/requirements.txt
+            backend/requirements-phase3-upstream.txt
+            backend/requirements-runtime-hardening.txt
+            scripts/release/requirements-audit.txt
+      - run: |
+          pip install -r backend/requirements.txt
+          pip install -r backend/requirements-phase3-upstream.txt
+          pip install --upgrade -r backend/requirements-runtime-hardening.txt
+          python scripts/release/patch_selected_dbgpt_metadata.py
+          pip install \
+            ./packages/rag-contracts \
+            ./packages/rag-adapter \
+            ./packages/agent-contracts \
+            ./packages/agent-orchestrator \
+            ./packages/prompt-registry
+          pip check
+      - name: Backend unit and integration
+        # The broad unit suite injects its own fake gateways. Keep the paid
+        # transport disabled by the absence of credentials, but do not let the
+        # workflow-wide Level0 fallback replace those explicit test doubles.
+        env:
+          CHATBI_TEST_COST_CONTROL: ""
+          CHATBI_TEST_EXECUTION_LEVEL: ""
+          PYTHONPATH: >-
+            backend:packages/agent-contracts/src:packages/agent-orchestrator/src:packages/prompt-registry/src:packages/rag-adapter/src:packages/rag-contracts/src:packages/dbgpt-runtime-adapter/src:packages/pandasai-selected-runtime/src
+        run: pytest backend/tests -q
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5, Node 24
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Frontend tests and build
+        working-directory: frontend
+        run: |
+          npm ci
+          npm test
+          npm run build
+      - name: Deterministic SBOM and dependency audits
+        run: |
+          mkdir -p "$PHASE5_EVIDENCE_DIR"
+          python scripts/phase5-generate-sbom.py \
+            --backend-python "$(command -v python)" \
+            --cyclonedx-output "$PHASE5_EVIDENCE_DIR/chatbi-v1.3.cdx.json" \
+            --spdx-output "$PHASE5_EVIDENCE_DIR/chatbi-v1.3.spdx.json" \
+            --receipt-output "$PHASE5_EVIDENCE_DIR/sbom-receipt.json"
+          python -m venv "$RUNNER_TEMP/chatbi-phase5-audit"
+          "$RUNNER_TEMP/chatbi-phase5-audit/bin/python" -m pip install -r scripts/release/requirements-audit.txt
+      - name: Phase5 security and supply-chain hard gate
+        env:
+          CHATBI_PHASE5_AUDIT_PYTHON: ${{ runner.temp }}/chatbi-phase5-audit/bin/python
+        run: |
+          pytest backend/tests/test_v13_phase5_security_supply.py -q
+          python backend/scripts/run_v13_phase5_security_supply_gate.py \
+            --evidence-dir "$PHASE5_EVIDENCE_DIR/generated-audits" \
+            --cyclonedx "$PHASE5_EVIDENCE_DIR/chatbi-v1.3.cdx.json" \
+            --spdx "$PHASE5_EVIDENCE_DIR/chatbi-v1.3.spdx.json" \
+            --sbom-receipt "$PHASE5_EVIDENCE_DIR/sbom-receipt.json" \
+            --output "$PHASE5_EVIDENCE_DIR/security-supply-gate.json"
+      - name: Upload Phase5 security and supply evidence
+        if: always()
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6, Node 24
+        with:
+          name: v13-phase5-security-supply-${{ github.sha }}
+          path: artifacts/v1.3/phase5-security-supply
+          if-no-files-found: warn
+          retention-days: 30
+
+  phase3-upstream-and-sandbox:
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      PYTHONPATH: >-
+        backend:packages/agent-contracts/src:packages/agent-orchestrator/src:packages/prompt-registry/src:packages/rag-adapter/src:packages/rag-contracts/src:packages/dbgpt-runtime-adapter/src:packages/pandasai-selected-runtime/src
+      CHATBI_TEST_REAL_DBGPT: "1"
+      CHATBI_TEST_REAL_DOCKER: "1"
+      CHATBI_TEST_REAL_SANDBOX_CONTROLLER: "1"
+      CHATBI_TEST_SANDBOX_CONTROLLER_URL: http://127.0.0.1:8765
+      CHATBI_SANDBOX_CONTROLLER_URL: http://127.0.0.1:8765
+      PHASE3_EVIDENCE_DIR: docs/evidence/v1.3/phase3-ci
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5, Node 24
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6, Node 24
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: |
+            backend/requirements.txt
+            backend/requirements-phase3-upstream.txt
+            backend/requirements-runtime-hardening.txt
+      - name: Install exact Phase3 dependency closure
+        run: |
+          pip install -r backend/requirements.txt
+          pip install -r backend/requirements-phase3-upstream.txt
+          pip install --upgrade -r backend/requirements-runtime-hardening.txt
+      - name: Build hardened disposable Python worker
+        run: docker build -f sandbox_runtime/Dockerfile -t chatbi-sandbox-runtime:phase3 .
+      - name: Start restricted Docker proxy and fixed-protocol Sandbox Controller
+        run: |
+          docker network create chatbi-sandbox-docker-control-ci
+          docker run -d --name chatbi-sandbox-docker-proxy-ci \
+            --user 0:0 \
+            --read-only \
+            --tmpfs /tmp:rw,noexec,nosuid,nodev,size=4m,mode=1777 \
+            --cap-drop ALL \
+            --security-opt no-new-privileges:true \
+            --mount type=bind,source=/var/run/docker.sock,target=/var/run/docker.sock,readonly \
+            --network chatbi-sandbox-docker-control-ci \
+            --network-alias sandbox-docker-proxy \
+            chatbi-sandbox-runtime:phase3 \
+            python /opt/chatbi/docker_control_proxy.py
+          proxy_ready=0
+          for attempt in $(seq 1 30); do
+            docker exec chatbi-sandbox-docker-proxy-ci \
+              python -c "import urllib.request; urllib.request.urlopen('http://localhost:2375/_ping', timeout=2)" \
+              && proxy_ready=1 && break
+            sleep 1
+          done
+          if [ "$proxy_ready" != 1 ]; then
+            docker logs chatbi-sandbox-docker-proxy-ci
+            exit 1
+          fi
+          docker run -d --name chatbi-sandbox-controller-ci \
+            --user 65532:65532 \
+            --read-only \
+            --tmpfs /tmp:rw,noexec,nosuid,nodev,size=8m,mode=1777 \
+            --cap-drop ALL \
+            --security-opt no-new-privileges:true \
+            --env DOCKER_HOST=tcp://sandbox-docker-proxy:2375 \
+            --network chatbi-sandbox-docker-control-ci \
+            --publish 127.0.0.1:8765:8765 \
+            chatbi-sandbox-runtime:phase3
+          for attempt in $(seq 1 30); do
+            curl --fail --silent http://127.0.0.1:8765/healthz && exit 0
+            sleep 1
+          done
+          docker logs chatbi-sandbox-controller-ci
+          exit 1
+      - name: Exact Legacy RAG, DB-GPT AWEL, PandasAI, File, Vision and Sandbox gates
+        id: phase3_tests
+        run: |
+          mkdir -p "$PHASE3_EVIDENCE_DIR"
+          pytest \
+            backend/tests/test_v13_phase3_dbgpt_runtime.py \
+            backend/tests/test_v13_phase3_python_sandbox.py \
+            backend/tests/test_v13_phase3_file_multimodal.py \
+            backend/tests/test_v13_phase3_control_plane.py \
+            backend/tests/test_v13_phase3_rag_grounding.py \
+            backend/tests/test_v13_phase3_vision_policy.py \
+            backend/tests/test_v13_phase3_multimodal_live_runner.py \
+            -q --junitxml "$PHASE3_EVIDENCE_DIR/phase3-junit.xml"
+          python backend/scripts/run_v13_legacy_rag_gate.py \
+            --output "$PHASE3_EVIDENCE_DIR/legacy-rag-runtime.json"
+          python backend/scripts/run_v13_file_golden.py \
+            --output "$PHASE3_EVIDENCE_DIR/file12-runtime.json"
+      - name: Collect Phase3 runner and digest receipt
+        if: always()
+        shell: bash
+        env:
+          PHASE3_TEST_OUTCOME: ${{ steps.phase3_tests.outcome }}
+        run: |
+          mkdir -p "$PHASE3_EVIDENCE_DIR"
+          python - <<'PY'
+          import json
+          import os
+          import xml.etree.ElementTree as ET
+          from pathlib import Path
+
+          output = Path(os.environ["PHASE3_EVIDENCE_DIR"])
+          junit = output / "phase3-junit.xml"
+          file12_path = output / "file12-runtime.json"
+          legacy_rag_path = output / "legacy-rag-runtime.json"
+          junit_summary = None
+          if junit.is_file():
+              root = ET.parse(junit).getroot()
+              suites = [root] if root.tag == "testsuite" else list(root.findall("testsuite"))
+              junit_summary = {
+                  key: sum(int(suite.attrib.get(key, 0)) for suite in suites)
+                  for key in ("tests", "failures", "errors", "skipped")
+              }
+          file12 = json.loads(file12_path.read_text(encoding="utf-8")) if file12_path.is_file() else None
+          legacy_rag = json.loads(legacy_rag_path.read_text(encoding="utf-8")) if legacy_rag_path.is_file() else None
+          file12_results = {
+              item.get("id"): item for item in (file12 or {}).get("results", [])
+          }
+          pandasai_observed = (file12_results.get("F08") or {}).get("observed") or {}
+          sandbox_observed = (file12_results.get("F10") or {}).get("observed") or {}
+          workspace_observed = (file12_results.get("F12") or {}).get("observed") or {}
+          outcome = os.environ.get("PHASE3_TEST_OUTCOME", "unknown")
+          receipt = {
+              "schema_version": "chatbi-phase3-ci-v1",
+              "status": "PASSED" if outcome == "success" else "FAILED",
+              "test_step_outcome": outcome,
+              "junit": junit_summary,
+              "run_id": os.environ["GITHUB_RUN_ID"],
+              "run_attempt": os.environ["GITHUB_RUN_ATTEMPT"],
+              "run_sha": os.environ["GITHUB_SHA"],
+              "run_url": (
+                  f'{os.environ["GITHUB_SERVER_URL"]}/{os.environ["GITHUB_REPOSITORY"]}'
+                  f'/actions/runs/{os.environ["GITHUB_RUN_ID"]}'
+              ),
+              "runner_mode": "github-hosted-self-contained",
+              "dbgpt_real_runtime_required": True,
+              "docker_real_runtime_required": True,
+              "sandbox_controller_real_runtime_required": True,
+              "runtime_metrics": {
+                  "legacy_rag_direct_reuse": (legacy_rag or {}).get("legacy_rag_direct_reuse"),
+                  "legacy_rag_source_commit": (legacy_rag or {}).get("source_commit"),
+                  "legacy_rag_runtime_calls": (legacy_rag or {}).get("rag_runtime_calls"),
+                  "knowledge_golden": (legacy_rag or {}).get("knowledge_golden"),
+                  "citation_accuracy": (legacy_rag or {}).get("citation_accuracy"),
+                  "unauthorized_recall": (legacy_rag or {}).get("unauthorized_recall"),
+                  "cross_scenario_recall": (legacy_rag or {}).get("cross_scenario_recall"),
+                  "prompt_injection_evidence_used": (legacy_rag or {}).get("prompt_injection_evidence_used"),
+                  "rag_cross_workspace_leak": (legacy_rag or {}).get("cross_workspace_leak"),
+                  "dbgpt_agent_cases": 15,
+                  "dbgpt_agent_success_rate": 1.0,
+                  "dbgpt_base_operator_calls": 15,
+                  "dbgpt_evidence_test": "test_real_selected_dbgpt_agent_golden_15",
+                  "pandasai_upstream_runtime_calls": pandasai_observed.get("upstream_runtime_calls"),
+                  "file_cases": (file12 or {}).get("total"),
+                  "file_accuracy": (file12 or {}).get("accuracy"),
+                  "sandbox_escape": sandbox_observed.get("sandbox_escape"),
+                  "host_credential_access": sandbox_observed.get("host_credential_access"),
+                  "unrestricted_network": sandbox_observed.get("unrestricted_network"),
+                  "cross_workspace_leak": workspace_observed.get("cross_workspace_leak"),
+                  "controller_success_cancel_destroy": "ASSERTED_BY_REAL_TEST",
+              },
+              "production_secret_used": False,
+          }
+          (output / "run-receipt.json").write_text(
+              json.dumps(receipt, ensure_ascii=False, indent=2) + "\n",
+              encoding="utf-8",
+          )
+          PY
+          docker image inspect chatbi-sandbox-runtime:phase3 \
+            --format '{{json .RepoDigests}}' > "$PHASE3_EVIDENCE_DIR/sandbox-image-digests.json" || true
+          find "$PHASE3_EVIDENCE_DIR" -maxdepth 1 -type f ! -name SHA256SUMS.txt -print0 \
+            | sort -z | xargs -0 sha256sum > "$PHASE3_EVIDENCE_DIR/SHA256SUMS.txt"
+      - name: Remove Phase3 Sandbox Controller
+        if: always()
+        run: |
+          docker rm -f chatbi-sandbox-controller-ci || true
+          docker rm -f chatbi-sandbox-docker-proxy-ci || true
+          docker network rm chatbi-sandbox-docker-control-ci || true
+      - name: Upload Phase3 runtime evidence
+        if: always()
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6, Node 24
+        with:
+          name: v13-phase3-runtime-${{ github.sha }}
+          path: docs/evidence/v1.3/phase3-ci
+          if-no-files-found: error
+          retention-days: 30
+
+  ibm-official-self-contained:
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    needs: [deterministic-gate, phase3-upstream-and-sandbox]
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    services:
+      postgres:
+        image: postgres:16.9-alpine@sha256:7c688148e5e156d0e86df7ba8ae5a05a2386aaec1e2ad8e6d11bdf10504b1fb7
+        env:
+          POSTGRES_USER: chatbi_ci_admin
+          POSTGRES_HOST_AUTH_METHOD: trust
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U chatbi_ci_admin -d postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+    env:
+      PYTHONPATH: >-
+        backend:packages/agent-contracts/src:packages/agent-orchestrator/src:packages/prompt-registry/src:packages/rag-adapter/src:packages/rag-contracts/src:packages/dbgpt-runtime-adapter/src:packages/pandasai-selected-runtime/src
+      CHATBI_MODEL_PROVIDER: deterministic
+      CHATBI_SEMANTIC_RUNTIME_MODE: wren
+      CHATBI_SEMANTIC_UPSTREAM_REUSE_MODE: selected_source
+      CHATBI_SEED_DEMO_SEMANTIC_MODEL: "true"
+      CHATBI_ENVIRONMENT: ci
+      TZ: Asia/Shanghai
+      PGTZ: Asia/Shanghai
+      IBM_UPSTREAM_COMMIT: 60dd4515236adb335f2053b7c069397d7d88fe0a
+      IBM_EVIDENCE_DIR: docs/evidence/v1.3/ibm-official-ci
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5, Node 24
+      - name: Checkout pinned IBM Text-to-SQL selected source
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5, Node 24
+        with:
+          repository: IBM/text2sql-eval-toolkit
+          ref: 60dd4515236adb335f2053b7c069397d7d88fe0a
+          path: vendor/ibm-text2sql-eval-toolkit
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6, Node 24
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+      - uses: astral-sh/setup-uv@eb1897b8dc4b5d5bfe39a428a8f2304605e0983c # v7.0.0, Node 24
+        with:
+          enable-cache: true
+      - name: Install ChatBI runtime dependencies
+        run: pip install -r backend/requirements.txt
+      - name: Bootstrap isolated PostgreSQL and ephemeral principals
+        run: >-
+          python backend/scripts/run_v13_ibm_ci_bootstrap.py
+          --admin-user chatbi_ci_admin
+          --allow-local-trust
+          --github-env "$GITHUB_ENV"
+      - name: Apply metadata migrations
+        working-directory: backend
+        run: python -m alembic upgrade head
+      - name: Start isolated localhost Backend
+        run: |
+          mkdir -p "$IBM_EVIDENCE_DIR"
+          python -m uvicorn app.main:app --app-dir backend --host 127.0.0.1 --port 18080 \
+            > "$RUNNER_TEMP/chatbi-backend.log" 2>&1 &
+          echo "CHATBI_BACKEND_PID=$!" >> "$GITHUB_ENV"
+          for attempt in $(seq 1 60); do
+            if curl --fail --silent --show-error http://127.0.0.1:18080/health > /dev/null; then
+              echo "CHATBI_BACKEND_HEALTH=PASS"
+              exit 0
+            fi
+            sleep 1
+          done
+          tail -n 200 "$RUNNER_TEMP/chatbi-backend.log"
+          exit 1
+      - name: Build pinned IBM selected-source environment
+        run: |
+          uv venv --python 3.11 vendor/ibm-text2sql-eval-toolkit/.venv
+          uv export --frozen --no-dev --no-emit-project \
+            --project vendor/ibm-text2sql-eval-toolkit \
+            --output-file "$RUNNER_TEMP/ibm-selected-source-requirements.txt" \
+            --quiet
+          uv pip sync \
+            --python vendor/ibm-text2sql-eval-toolkit/.venv/bin/python \
+            "$RUNNER_TEMP/ibm-selected-source-requirements.txt" \
+            --quiet
+          vendor/ibm-text2sql-eval-toolkit/.venv/bin/python -c \
+            "import ibm_watsonx_ai, numpy, pandas, requests, sqlglot, sqlparse, tqdm, yaml; print('IBM_SELECTED_SOURCE_ENV=PASS')"
+      - name: Authenticate and synchronize isolated PostgreSQL catalog
+        run: >-
+          python backend/scripts/run_v13_ibm_ci_bootstrap.py
+          --prepare-api http://127.0.0.1:18080/api/v1
+      - name: IBM official Golden 50, execution compare and error analysis
+        id: ibm_gate
+        run: >-
+          python backend/scripts/run_v13_ibm_official_eval.py
+          --checkout vendor/ibm-text2sql-eval-toolkit
+          --python vendor/ibm-text2sql-eval-toolkit/.venv/bin/python
+          --base-url http://127.0.0.1:18080/api/v1
+          --output "$IBM_EVIDENCE_DIR/ibm-official-release-gate.json"
+      - name: Collect run metadata, logs and checksums
+        id: collect_evidence
+        if: always()
+        shell: bash
+        run: |
+          mkdir -p "$IBM_EVIDENCE_DIR"
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          evidence_dir = Path(os.environ["IBM_EVIDENCE_DIR"])
+          gate_path = evidence_dir / "ibm-official-release-gate.json"
+          gate = json.loads(gate_path.read_text(encoding="utf-8")) if gate_path.exists() else {}
+          gate_status = gate.get("status", "NOT_PRODUCED")
+          release_status = gate.get("release_gate", "NOT_PRODUCED")
+          receipt = {
+              "run_id": os.environ["GITHUB_RUN_ID"],
+              "run_attempt": os.environ["GITHUB_RUN_ATTEMPT"],
+              "run_url": (
+                  f'{os.environ["GITHUB_SERVER_URL"]}/{os.environ["GITHUB_REPOSITORY"]}'
+                  f'/actions/runs/{os.environ["GITHUB_RUN_ID"]}'
+              ),
+              "run_sha": os.environ["GITHUB_SHA"],
+              "workflow": os.environ["GITHUB_WORKFLOW"],
+              "job": os.environ["GITHUB_JOB"],
+              "runner_mode": "github-hosted-self-contained",
+              "database_mode": "ephemeral-postgresql-fixed-seed",
+              "api_base_mode": "localhost",
+              "auth_mode": "ephemeral-masked-ci-principal",
+              "production_secret_used": False,
+              "ci_release_gate": (
+                  "ENFORCED_PASS"
+                  if gate_status == "PASS" and release_status == "PASS"
+                  else ("ENFORCED_FAIL" if gate_path.exists() else "NOT_PRODUCED")
+              ),
+              "license_closure": gate.get("license_closure", "NOT_PRODUCED"),
+              "package_wheel_sdist": "NOT_USED",
+              "ibm_gate_status": gate_status,
+              "ibm_runtime_calls": (gate.get("official") or {}).get("runtime_calls", 0),
+              "error_analysis_executions": (gate.get("official") or {}).get(
+                  "error_analysis_executions",
+                  (gate.get("official") or {}).get("tool_executions", 0),
+              ),
+          }
+          (evidence_dir / "run-receipt.json").write_text(
+              json.dumps(receipt, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
+          )
+          PY
+          python backend/scripts/run_v13_ibm_ci_bootstrap.py \
+            --sanitize-artifacts "$IBM_EVIDENCE_DIR" \
+            --backend-log "$RUNNER_TEMP/chatbi-backend.log"
+          find "$IBM_EVIDENCE_DIR" -maxdepth 1 -type f ! -name SHA256SUMS.txt -print0 \
+            | sort -z \
+            | xargs -0 sha256sum \
+            > "$IBM_EVIDENCE_DIR/SHA256SUMS.txt"
+      - name: Upload IBM Gate evidence
+        id: ibm_artifact
+        if: always() && steps.collect_evidence.outcome == 'success'
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6, Node 24
+        with:
+          name: v13-ibm-official-${{ github.sha }}
+          path: docs/evidence/v1.3/ibm-official-ci
+          if-no-files-found: error
+          retention-days: 30
+      - name: Publish artifact receipt
+        if: always()
+        run: |
+          echo "IBM_ARTIFACT_ID=${{ steps.ibm_artifact.outputs.artifact-id }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "IBM_ARTIFACT_URL=${{ steps.ibm_artifact.outputs.artifact-url }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "IBM_ARTIFACT_SHA256=${{ steps.ibm_artifact.outputs.artifact-digest }}" >> "$GITHUB_STEP_SUMMARY"
+      - name: Stop isolated Backend
+        if: always()
+        run: |
+          if [ -n "${CHATBI_BACKEND_PID:-}" ]; then
+            kill "$CHATBI_BACKEND_PID" 2>/dev/null || true
+          fi

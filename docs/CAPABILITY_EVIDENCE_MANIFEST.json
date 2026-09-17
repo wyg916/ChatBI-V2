@@ -1,0 +1,146 @@
+{
+  "schema_version": "v2.1-capability-evidence-v1",
+  "release": "V1.1.0",
+  "branch": "codex/v2.1-final-integration",
+  "matrix": "docs/v2_1/day3/V2_1_FINAL_CAPABILITY_MATRIX.json",
+  "final_evidence_root": "artifacts/v2_1/final/<tested_sha>/",
+  "sha_policy": "The tracked manifest maps evidence without claiming its own future commit SHA. FINAL_EVIDENCE_MANIFEST.json must bind every generated file and command to one tested_sha equal to origin and ls-remote; any mismatch or missing file blocks release.",
+  "capabilities": [
+    {
+      "id": "WRENAI",
+      "tracked_evidence": ["docs/v2_1/day1/WREN_RUNTIME_EVIDENCE.json"],
+      "final_evidence": ["open-questions.json", "backend-tests.log", "e2e.log", "performance.json"]
+    },
+    {
+      "id": "OPENCHATBI",
+      "tracked_evidence": ["docs/v2_1/day1/OPENCHATBI_SCHEMA_LINKING_EVIDENCE.json"],
+      "final_evidence": ["open-questions.json", "backend-tests.log", "performance.json"]
+    },
+    {
+      "id": "SUPERSONIC_CAPABILITY",
+      "tracked_evidence": ["docs/v2_1/day1/SUPERSONIC_SEMANTIC_PIPELINE_EVIDENCE.json"],
+      "final_evidence": ["open-questions.json", "backend-tests.log", "performance.json"]
+    },
+    {
+      "id": "IBM_EVAL",
+      "tracked_evidence": ["docs/v2_1/day2/IBM_EVAL_EVIDENCE.json"],
+      "final_evidence": ["golden50.json", "e2e.log", "performance.json"]
+    },
+    {
+      "id": "SQLBOT_CAPABILITY",
+      "tracked_evidence": ["docs/v2_1/day2/FEEDBACK_LOOP_EVIDENCE.json"],
+      "final_evidence": ["golden50.json", "open-questions.json", "e2e.log", "performance.json"]
+    },
+    {
+      "id": "CHAT2DB_CAPABILITY",
+      "tracked_evidence": ["docs/v2_1/day2/C_DATA_WORKSPACE_EVIDENCE.json"],
+      "final_evidence": ["backend-tests.log", "e2e.log", "security.json", "performance.json"]
+    },
+    {
+      "id": "DB_GPT",
+      "tracked_evidence": ["docs/v2_1/day2/D_AGENT_PRODUCT_EVIDENCE.json", "evaluation/golden/v2.1-agent-15.json"],
+      "final_evidence": ["product-targeted-tests.log", "open-questions.json", "security.json", "performance.json"]
+    },
+    {
+      "id": "PANDASAI",
+      "tracked_evidence": ["docs/v2_1/day2/D_FILE_PRODUCT_EVIDENCE.json", "evaluation/golden/v2.1-file-10.json"],
+      "final_evidence": ["product-targeted-tests.log", "e2e.log", "security.json", "performance.json"]
+    },
+    {
+      "id": "LEGACY_RAG",
+      "tracked_evidence": ["docs/v2_1/day2/D_RAG_PRODUCT_EVIDENCE.json", "evaluation/golden/v2.1-knowledge-20.json"],
+      "final_evidence": ["product-targeted-tests.log", "open-questions.json", "security.json", "performance.json"]
+    },
+    {
+      "id": "LEGACY_AGENT_ASSETS",
+      "tracked_evidence": ["docs/evidence/legacy-rag-agent/acceptance.json", "docs/migration/LEGACY_RAG_AGENT_MIGRATION_MANIFEST.md"],
+      "final_evidence": ["product-targeted-tests.log", "security.json", "e2e.log"]
+    },
+    {
+      "id": "DATA_10M_FIXED_GROUND_TRUTH",
+      "tracked_evidence": ["docs/v2_1/day1/DATA_MANIFEST_10M.json", "evaluation/golden/day4-golden-50.json"],
+      "final_evidence": ["golden50.json", "security.json", "performance.json"]
+    },
+    {
+      "id": "SSE",
+      "tracked_evidence": ["docs/v2_1/day1/SSE_PROTOCOL.md"],
+      "final_evidence": ["backend-tests.log", "e2e.log", "performance.json"]
+    },
+    {
+      "id": "OPEN_ENDED_CHAT",
+      "tracked_evidence": ["evaluation/golden/final-open-question-100.json"],
+      "final_evidence": ["open-questions.json", "e2e.log"]
+    },
+    {
+      "id": "CHAT_UI",
+      "tracked_evidence": ["frontend/e2e/day3-final-product.spec.ts"],
+      "final_evidence": ["frontend-tests.log", "e2e.log", "performance.json"]
+    },
+    {
+      "id": "AUTH_SESSION_RBAC_ACL_AUDIT",
+      "tracked_evidence": ["docs/AUTH_RUNTIME_AUDIT.md"],
+      "final_evidence": ["backend-tests.log", "e2e.log", "security.json", "consecutive-starts.json"]
+    },
+    {
+      "id": "SHORT_TERM_MEMORY",
+      "tracked_evidence": ["evaluation/golden/final-memory-30x5.json"],
+      "final_evidence": ["memory-30x5.json", "e2e.log", "security.json"]
+    },
+    {
+      "id": "FILE_DOCUMENT_IMAGE_MULTIMODAL",
+      "tracked_evidence": ["docs/v2_1/day1/FILE_DATASET_MANIFEST.json", "evaluation/golden/v2.1-file-10.json"],
+      "final_evidence": ["product-targeted-tests.log", "open-questions.json", "e2e.log", "security.json", "performance.json"]
+    },
+    {
+      "id": "SQL_GUARD_RESULT_ORACLE",
+      "tracked_evidence": ["docs/v2_1/day2/C_SQL_SECURITY_EVIDENCE.json", "evaluation/golden/day4-golden-50.json"],
+      "final_evidence": ["backend-tests.log", "golden50.json", "security.json", "performance.json"]
+    }
+  ],
+  "final_required_files": [
+    "commands.json",
+    "backend-tests.log",
+    "product-targeted-tests.log",
+    "frontend-typecheck.log",
+    "frontend-tests.log",
+    "frontend-build.log",
+    "e2e.log",
+    "open-questions.json",
+    "memory-30x5.json",
+    "golden50.json",
+    "security.json",
+    "performance.json",
+    "performance.csv",
+    "migration.json",
+    "cold-start-run1.json",
+    "cold-start-run2.json",
+    "consecutive-starts.json",
+    "npm-audit.json",
+    "pip-audit.json",
+    "FINAL_EVIDENCE_MANIFEST.json"
+  ],
+  "thresholds": {
+    "open_questions_min": 100,
+    "memory_conversations_min": 30,
+    "memory_turns_per_conversation_min": 5,
+    "follow_up_context_accuracy_min": 0.95,
+    "data_golden_min": 50,
+    "sql_execution_rate_min": 0.98,
+    "result_value_accuracy_min": 0.95,
+    "knowledge_golden_min": 20,
+    "citation_accuracy": 1.0,
+    "agent_cases_min": 15,
+    "agent_success_rate_min": 0.9,
+    "file_cases_min": 10,
+    "file_result_accuracy_min": 0.9,
+    "dangerous_sql_block_rate": 1.0,
+    "ttfe_p95_ms_max": 1000,
+    "heartbeat_max_gap_ms_max": 3000,
+    "cancel_cleanup_ms_max": 5000,
+    "load_concurrency": 20,
+    "load_duration_seconds_min": 900,
+    "load_error_rate_max_exclusive": 0.01,
+    "e2e_pass_min": 30,
+    "unknown_license_dependencies": 0
+  }
+}

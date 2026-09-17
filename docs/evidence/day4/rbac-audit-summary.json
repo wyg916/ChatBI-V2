@@ -1,0 +1,11 @@
+{
+  "checked_at": "2026-08-17T21:03:39+08:00",
+  "roles": ["ADMIN", "ANALYST"],
+  "analyst_allowed": ["authorized datasource", "authorized semantic model", "query", "answer", "dashboard", "evaluation"],
+  "analyst_denied": ["unauthorized datasource", "unauthorized semantic model", "model provider settings", "security audit overview"],
+  "unknown_actor": "401 AUDITED",
+  "disabled_actor": "403 AUDITED",
+  "permission_ui": "REAL BACKEND 403 PASS",
+  "audited_operations": ["query", "datasource sync", "semantic publish", "semantic rollback", "evaluation", "answer", "dashboard"],
+  "gate": "PASS"
+}

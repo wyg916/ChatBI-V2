@@ -1,0 +1,12 @@
+
+> chatbi-v2-frontend@0.1.0 e2e
+> playwright test e2e/day3-final-product.spec.ts --grep twenty-turn --workers=1 --reporter=list
+
+
+Running 1 test using 1 worker
+
+(node:3616) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ok 1 e2e\day3-final-product.spec.ts:50:1 › Day3-FINAL-02 twenty-turn conversation keeps independent scroll, fixed composer and return-to-latest (7.8s)
+
+  1 passed (11.5s)

@@ -31,14 +31,20 @@ function Get-ManagedSpreadsheetPreflight {
 try {
   $configuredValues = Read-ChatBIEnv -EnvFile $resolvedEnv
   $configuredProjectName = (Get-ChatBIValue -Values $configuredValues -Name 'COMPOSE_PROJECT_NAME' -Default 'chatbi-v2').ToLowerInvariant()
+  if ($ProjectName -and $ProjectName.ToLowerInvariant() -eq 'chatbi-v2-showcase') {
+    [void](Set-ChatBIShowcaseProcessEnvironment -EnvFile $resolvedEnv -ProviderMode Auto)
+  }
   $configuration = Assert-ChatBIConfiguration -EnvFile $resolvedEnv
   $effectiveProjectName = if ($ProjectName) { $ProjectName.ToLowerInvariant() } else { $configuration.ProjectName }
   if ($effectiveProjectName -notmatch '^[a-z0-9][a-z0-9_-]*$') { throw 'ProjectName contains unsupported characters' }
   $env:COMPOSE_PROJECT_NAME = $effectiveProjectName
+  if ($effectiveProjectName -eq 'chatbi-v2-showcase') {
+    Assert-ChatBIShowcaseDatabaseTarget -Configuration $configuration
+  }
   Assert-ChatBINoCompetingMetadataWriteStack `
     -EnvFile $resolvedEnv `
     -TargetProjectName $effectiveProjectName `
-    -KnownProjectNames @('chatbi-v2', $configuredProjectName) `
+    -KnownProjectNames @('chatbi-v2-showcase', 'chatbi-v2', $configuredProjectName) `
     -Operation restore
   if (-not $configuration.DatabaseUrl) { throw 'Restore requires an explicit CHATBI_DATABASE_URL.' }
   if ($Name -notmatch '^[A-Za-z0-9][A-Za-z0-9._-]+$') { throw 'Backup name contains unsupported characters' }

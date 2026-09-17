@@ -2,7 +2,7 @@
 
 This module deliberately does not provision PostgreSQL or bypass datasource APIs.
 It only creates the default Workspace, local login identities, and the governed
-RAG/Agent runtime records owned by ChatBI. Business resources are configured through the API.
+RAG/Agent runtime records owned by ChatBI. Demo business resources remain opt-in.
 """
 
 from __future__ import annotations
@@ -19,6 +19,7 @@ from app.models import AppUser
 from app.models.entities import utcnow
 from app.services.datasources import default_workspace
 from app.services.runtime_seed import seed_v1_runtime
+from app.services.seed import seed_demo_semantic_model
 
 
 BOOTSTRAP_USERS = (
@@ -27,7 +28,7 @@ BOOTSTRAP_USERS = (
 )
 
 
-def bootstrap_database(db: Session) -> dict[str, int | str]:
+def bootstrap_database(db: Session, *, demo_seed: bool = False) -> dict[str, int | str]:
     """Create deployment-owned baseline records and return non-secret counts."""
 
     settings = get_settings()
@@ -64,6 +65,9 @@ def bootstrap_database(db: Session) -> dict[str, int | str]:
                 updated_passwords += 1
     db.commit()
 
+    if demo_seed:
+        model = seed_demo_semantic_model(db)
+        workspace = db.get(type(workspace), model.workspace_id) or workspace
     seed_v1_runtime(db, workspace.id)
 
     user_count = len(list(db.scalars(select(AppUser).where(AppUser.workspace_id == workspace.id))))
@@ -72,16 +76,19 @@ def bootstrap_database(db: Session) -> dict[str, int | str]:
         "created_users": created_users,
         "updated_passwords": updated_passwords,
         "user_count": user_count,
+        "demo_seed": "ENABLED" if demo_seed else "DISABLED",
     }
 
 
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.parse_args()
+    parser.add_argument("--demo-seed", action="store_true", help="install the optional local demo dataset bindings")
+    args = parser.parse_args()
     with SessionLocal() as db:
-        result = bootstrap_database(db)
+        result = bootstrap_database(db, demo_seed=args.demo_seed)
     print("DEPLOYMENT_BOOTSTRAP=PASS")
     print(f"WORKSPACE_BOOTSTRAP=PASS USER_COUNT={result['user_count']}")
+    print(f"DEMO_SEED={result['demo_seed']}")
 
 
 if __name__ == "__main__":

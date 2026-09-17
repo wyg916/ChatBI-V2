@@ -1,32 +1,106 @@
-# 安装与运行
+# ChatBI V2 安装与验证
 
 ## 前置条件
 
-- Docker Engine / Docker Desktop、Docker Compose 和 PowerShell。
-- 可从容器访问的 PostgreSQL 元数据库与专用应用账号。容器访问宿主机数据库时使用 `host.docker.internal`。
-- 业务数据源账号仅授予查询所需的只读权限。不要使用数据库超级管理员运行应用。
+- Windows PowerShell 7+
+- Docker Desktop
+- Python 3.11
+- 本机 PostgreSQL 15+ 与 MySQL 8+
+- Node.js 20+（仅开发与测试需要）
 
-## 初始化
+数据库保存在本机服务中；Compose 只启动 Backend、RAG Runtime 与 Frontend，不创建数据库容器或数据库卷。Agent Runtime 和固定操作文件分析在 Backend 进程内执行，详见 `docs/ARCHITECTURE_RUNTIME.md`。
 
-复制 `.env.example` 为 `.env`，填写 `CHATBI_DATABASE_URL`。确认数据库连接可用后执行：
+## 首次安装
 
 ```powershell
+git clone https://github.com/wyg916/ChatBI-V2.git
+cd "ChatBI-V2"
+.\scripts\bootstrap-local-databases.ps1
 .\scripts\start.ps1
 ```
 
-启动流程生成服务端随机凭据、构建镜像、执行迁移和工作区初始化，再检查服务。默认前端 `http://localhost:5173`，后端 `http://localhost:8000`。
+初始化脚本会交互式请求本机数据库管理员口令，只用于当前进程创建最小权限账号与可复现模拟数据，不写入仓库。运行时 `.env` 被 Git 忽略，前端只通过 Backend API 访问数据。
 
-管理员登录名为 `admin@chatbi.local`，密码为本机 `.env` 中的 `CHATBI_BOOTSTRAP_ADMIN_PASSWORD`；分析员对应 `analyst@chatbi.local` 与 `CHATBI_BOOTSTRAP_ANALYST_PASSWORD`。请妥善保管该文件，不要提交到 Git。
+访问地址：
 
-首次登录后在数据源页面添加自己的数据库，同步 Schema，建立并发布语义模型，再进入问数据。知识检索需配置组织自己的知识内容。评测需由部署者配置已批准的数据集，格式见 [评测配置](docs/deployment/EVALUATION.md)。
+- Web：<http://localhost:5173>
+- API：<http://localhost:8000/api/v1/version>
+- Swagger：<http://localhost:8000/docs>
 
-## 运维
+## 日常操作
 
 ```powershell
-.\scripts\doctor.ps1
 .\scripts\status.ps1
 .\scripts\verify.ps1
 .\scripts\stop.ps1
+.\scripts\start.ps1
 ```
 
-根目录的一键启动和停止命令调用相同的标准脚本。更多内容见 [配置](docs/deployment/CONFIGURATION.md)、[备份恢复](docs/deployment/BACKUP_RESTORE.md) 和 [故障排查](docs/deployment/TROUBLESHOOTING.md)。
+只有明确需要重建模拟业务数据时才运行：
+
+```powershell
+.\scripts\bootstrap-local-databases.ps1 -ResetDemoData
+```
+
+该选项只重建演示业务 Schema/库，不应被用于清空 ChatBI 元数据。
+
+## 开发验收
+
+```powershell
+cd backend
+.\.venv\Scripts\python.exe -m pytest -q
+.\.venv\Scripts\python.exe -m pip check
+
+cd ..\frontend
+npm ci
+npm run typecheck
+npm test -- --run
+npm run build
+npx playwright test --workers=1
+
+cd ..
+.\.venv\Scripts\python.exe backend\scripts\run_day4_golden.py
+.\.venv\Scripts\python.exe -m pip install -r scripts\release\requirements-audit.txt
+$env:PYTHONUTF8 = '1'
+.\.venv\Scripts\python.exe -m pip_audit -r backend\requirements.txt --timeout 60 --format json --output artifacts\v2_1\day3\supply-chain\pip-audit.json
+cd frontend
+npm audit --json
+cd ..
+.\.venv\Scripts\python.exe scripts\release\generate_sbom.py
+```
+
+Golden runner 必须报告冻结 SHA-256 `ff83e727331fb137cd8cc692aa780c3ba016c48adeec4246d4464874fbf7db1d`，PostgreSQL 50/50、MySQL 兼容集 10/10；Expected Result 只能在独立 Oracle 证明业务契约需更新时变更。
+
+## 外部模型
+
+默认 deterministic runtime 无需外部密钥。OpenAI-compatible 配置只允许放在本机环境变量中；不得写入、提交、打印或复制 API Key。
+
+## V1 Live RAG Bridge 与最小 Multi-Agent
+
+本机数据库初始化会在 Git 忽略的 `.env` 生成 `CHATBI_RAG_SHARED_SECRET`；前端不会接收该值。Compose 启动 Backend、独立 `rag-runtime` 和 Frontend，PostgreSQL/MySQL 仍使用本机服务，不创建数据库容器或数据卷。
+
+```text
+CHATBI_RAG_MODE=on
+CHATBI_AGENT_MODE=on
+CHATBI_AGENT_ALLOWED_ROUTES=COMPLEX_ANALYSIS
+CHATBI_RAG_FALLBACK_ENABLED=true
+CHATBI_AGENT_FALLBACK_ENABLED=true
+CHATBI_LEGACY_RAG_BASE_URL=http://rag-runtime:8001
+CHATBI_RAG_SHARED_SECRET=<GENERATED_LOCAL_RAG_BRIDGE_SIGNING_KEY>
+CHATBI_AGENT_TIMEOUT_MS=30000
+CHATBI_AGENT_MAX_STEPS=8
+CHATBI_AGENT_MAX_TOOL_CALLS=12
+CHATBI_AGENT_MAX_REPLAN=2
+CHATBI_AGENT_MAX_DEPTH=2
+```
+
+`GET /api/v1/query-capabilities` 必须显示 live bridge、签名身份映射和五角色编排均可用。`off/shadow/canary` 只用于诊断或事故回滚，不满足 V1 发布门禁。
+
+一键启动不会自动登录、向浏览器注入 Token、创建匿名管理员或开启 Backend 认证绕过。首次打开受保护入口必须跳转 `/login`，只有真实登录后才能进入产品。
+
+离线迁移只接受已脱敏 JSON 快照，不接受旧数据库 URL，默认 dry-run：
+
+```powershell
+cd backend
+.\.venv\Scripts\python.exe scripts\migrate_legacy_rag_agent_snapshot.py --snapshot tests\fixtures\legacy_migration_empty.json
+```

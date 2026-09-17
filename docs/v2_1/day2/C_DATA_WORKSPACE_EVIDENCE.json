@@ -1,0 +1,56 @@
+{
+  "status": "PASS",
+  "tested_sha": "b766275bd4cff015312b1d0fbdbae26d81611d71",
+  "executed_at": "2026-08-19T01:42:56+08:00",
+  "commands": [
+    "pytest tests -q",
+    "npm test",
+    "npm run typecheck",
+    "npm run build",
+    "npm run e2e -- data-workspace.spec.ts --workers=1",
+    "alembic heads; alembic downgrade -1; alembic upgrade head; alembic heads",
+    "phase2_runtime_acceptance.py --base-url http://127.0.0.1:8000",
+    "run_v21_release_gate.py --require-feedback"
+  ],
+  "counts": {
+    "backend_tests": 181,
+    "frontend_test_files": 12,
+    "frontend_tests": 32,
+    "browser_e2e": 1,
+    "phase2_cases": 60
+  },
+  "gates": {
+    "postgresql_explorer": "PASS",
+    "mysql_explorer": "PASS",
+    "schema_search": "PASS",
+    "table_search": "PASS",
+    "column_search": "PASS",
+    "relationship_view": "PASS",
+    "sample_values": "PASS",
+    "sql_format": "PASS",
+    "sql_explain": "PASS",
+    "sql_execute_readonly": "PASS",
+    "query_history": "PASS",
+    "history_replay": "PASS",
+    "verified_sql_save": "PASS",
+    "ten_million_table_lazy_load": "PASS",
+    "sensitive_field_masking": "PASS"
+  },
+  "raw_evidence": [
+    {
+      "path": "artifacts/v2_1/day2/c/b-regression.json",
+      "sha256": "cee127c2dd5be5625174792c28c89e76cdf0edf0c5ea691fa8cf906175a4de32"
+    },
+    {
+      "path": "artifacts/v2_1/day2/c/phase2-runtime-acceptance.json",
+      "sha256": "72776307110a038716486fff500c9f5c1543fe4a0d84e256882156ac85bb7b48"
+    }
+  ],
+  "frozen_zone_intersection": 5,
+  "migration_impact": "ADD_20260818_0010_SINGLE_HEAD",
+  "license_impact": "CHAT2DB_REFERENCE_ONLY_NOTICE_AND_AUDIT",
+  "security_result": "PASS",
+  "failures": [],
+  "blockers": [],
+  "rollback": "revert C commits and downgrade to 20260818_0009"
+}

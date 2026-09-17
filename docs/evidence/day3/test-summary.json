@@ -1,0 +1,58 @@
+{
+  "verified_at": "2026-08-17T18:29:26+08:00",
+  "backend": {
+    "pytest_pass": 85,
+    "pytest_fail": 0,
+    "chart_rule_tests": 19,
+    "pip_check": "PASS"
+  },
+  "frontend": {
+    "typecheck": "PASS",
+    "vitest_files_pass": 10,
+    "vitest_tests_pass": 26,
+    "build": "PASS",
+    "vite_modules": 728,
+    "production_audit_vulnerabilities": 0
+  },
+  "playwright": {
+    "release_gate_mode": "serialized shared-state suite (--workers=1)",
+    "tests_pass": 34,
+    "tests_fail": 0,
+    "day3_tests_pass": 19,
+    "required_day3_cases": "15/15",
+    "day3_and_ui14_response_status_gate": "22/22",
+    "ui_routes": "14/14",
+    "viewports": ["1366x768", "1440x900", "1920x1080"],
+    "console_errors": 0,
+    "page_errors": 0,
+    "blocking_request_failures": 0,
+    "unexpected_4xx_5xx": 0,
+    "parallel_probe": {
+      "tests_pass": 33,
+      "tests_fail": 1,
+      "observation": "Concurrent schema-sync test temporarily produced an empty catalog allowlist; the same query and the complete serialized release suite passed.",
+      "release_gate_result": "NOT_USED"
+    }
+  },
+  "golden": {
+    "manifest_sha256": "d40bb690a4208240ecf347abe47e045cd74c8eb89b9162d5d53890ecf24bc282",
+    "postgresql_execution": "20/20",
+    "postgresql_result": "20/20",
+    "postgresql_semantic": "20/20",
+    "mysql_execution": "5/5",
+    "mysql_result": "5/5",
+    "dangerous_sql": "38/38"
+  },
+  "migration": {
+    "heads": 1,
+    "head": "20260817_0005",
+    "upgrade_base_upgrade": "PASS"
+  },
+  "docker": {
+    "one_click_start_run_1": "PASS",
+    "full_stop_between_runs": "PASS",
+    "one_click_start_run_2": "PASS"
+  },
+  "secret_scan": "PASS",
+  "result": "ALL_DAY3_RELEASE_GATES_PASS"
+}

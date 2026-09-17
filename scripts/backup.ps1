@@ -19,14 +19,20 @@ $publishedPaths = @()
 try {
   $configuredValues = Read-ChatBIEnv -EnvFile $resolvedEnv
   $configuredProjectName = (Get-ChatBIValue -Values $configuredValues -Name 'COMPOSE_PROJECT_NAME' -Default 'chatbi-v2').ToLowerInvariant()
+  if ($ProjectName -and $ProjectName.ToLowerInvariant() -eq 'chatbi-v2-showcase') {
+    [void](Set-ChatBIShowcaseProcessEnvironment -EnvFile $resolvedEnv -ProviderMode Auto)
+  }
   $configuration = Assert-ChatBIConfiguration -EnvFile $resolvedEnv
   $effectiveProjectName = if ($ProjectName) { $ProjectName.ToLowerInvariant() } else { $configuration.ProjectName }
   if ($effectiveProjectName -notmatch '^[a-z0-9][a-z0-9_-]*$') { throw 'ProjectName contains unsupported characters' }
   $env:COMPOSE_PROJECT_NAME = $effectiveProjectName
+  if ($effectiveProjectName -eq 'chatbi-v2-showcase') {
+    Assert-ChatBIShowcaseDatabaseTarget -Configuration $configuration
+  }
   Assert-ChatBINoCompetingMetadataWriteStack `
     -EnvFile $resolvedEnv `
     -TargetProjectName $effectiveProjectName `
-    -KnownProjectNames @('chatbi-v2', $configuredProjectName) `
+    -KnownProjectNames @('chatbi-v2-showcase', 'chatbi-v2', $configuredProjectName) `
     -Operation backup
   if (-not $configuration.DatabaseUrl) { throw 'Backup requires an explicit CHATBI_DATABASE_URL.' }
   if (-not $Name) { $Name = 'chatbi-metadata-' + (Get-Date -Format 'yyyyMMdd-HHmmss') }
@@ -133,7 +139,11 @@ try {
   }
   Remove-Item Env:CHATBI_PGTOOLS_DATABASE_URL -ErrorAction SilentlyContinue
   if ($resumeStack) {
-    & (Join-Path $PSScriptRoot 'start.ps1') -EnvFile $resolvedEnv -SkipBuild -SkipBootstrap
+    if ($effectiveProjectName -eq 'chatbi-v2-showcase') {
+      & (Join-Path $PSScriptRoot 'showcase.ps1') -Action Start -EnvFile $resolvedEnv -ProviderMode Auto -NoOpen
+    } else {
+      & (Join-Path $PSScriptRoot 'start.ps1') -EnvFile $resolvedEnv -SkipBuild -SkipBootstrap
+    }
     if ($LASTEXITCODE -ne 0) {
       Write-Host 'BACKUP_STACK_RESUME=FAIL' -ForegroundColor Red
       $operationExitCode = 1

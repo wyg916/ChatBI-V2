@@ -1,0 +1,42 @@
+{
+  "schema_version": "chatbi-recorded-real-sanitized-provider-response-v1",
+  "provider": "deepseek",
+  "provenance": "RECORDED_REAL_SANITIZED_PROVIDER_RESPONSE_2026-08-26",
+  "source_evidence": {
+    "candidate_sha": "67cdfa88d2d9a1eb239d74183b36551eb58b78d4",
+    "case_id": "FINAL-NL2SQL-DEEPSEEK",
+    "call_id": "c4f7136e-37b3-45c9-b3ac-4798eef4cdbe",
+    "raw_response_sha256": "bfe1e03f271a83355ce41e04ef25b071fde76e776394771e5264a29eb23eba64",
+    "response_shape_fingerprint": "ee9026625bddd9671d09db36f5f1979904e6a8a83208c8a501526570ce94c5b8",
+    "sanitized": true
+  },
+  "response": {
+    "choices": [
+      {
+        "finish_reason": "stop",
+        "index": 0,
+        "logprobs": null,
+        "message": {
+          "content": "{\n  \"question\": \"统计全部订单收入\",\n  \"intent\": \"计算所有订单的总收入\",\n  \"dialect\": \"postgresql\",\n  \"provider\": \"sql\",\n  \"semantic_model_id\": \"5d5598ce-7716-4cd6-bdd8-d525f8b5540e\",\n  \"semantic_model_version\": 1,\n  \"selected_entities\": [\"orders\"],\n  \"selected_tables\": [\"orders\"],\n  \"selected_columns\": [\"orders.revenue\"],\n  \"metrics\": [\"revenue\"],\n  \"dimensions\": [],\n  \"joins\": [],\n  \"filters\": [],\n  \"time_range\": null,\n  \"group_by\": [],\n  \"order_by\": [],\n  \"limit\": 500,\n  \"generated_sql\": \"SELECT SUM(revenue) AS total_revenue FROM orders\",\n  \"confidence\": 0.95,\n  \"warnings\": [],\n  \"repair_count\": 0\n}",
+          "role": "assistant"
+        }
+      }
+    ],
+    "created": 1787733038,
+    "id": "1f0b1bf8-84b2-4a12-8a57-985cda75a9b6",
+    "model": "deepseek-v4-flash",
+    "object": "chat.completion",
+    "usage": {
+      "completion_tokens": 208,
+      "prompt_cache_hit_tokens": 896,
+      "prompt_cache_miss_tokens": 4146,
+      "prompt_tokens": 5042,
+      "prompt_tokens_details": {"cached_tokens": 896},
+      "total_tokens": 5250
+    }
+  },
+  "expected_result": {
+    "columns": ["revenue"],
+    "rows": [{"revenue": 1725750.0}]
+  }
+}

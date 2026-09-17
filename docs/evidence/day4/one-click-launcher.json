@@ -1,0 +1,20 @@
+{
+  "checked_at": "2026-08-17T21:03:39+08:00",
+  "launcher": "一键启动-ChatBI-V2.cmd",
+  "powershell_entrypoint": "scripts/launch.ps1",
+  "powershell_parse": "PASS",
+  "full_stop_before_each_run": true,
+  "run1": "PASS",
+  "run2": "PASS",
+  "frontend_http": 200,
+  "backend_http": 200,
+  "backend_version": "1.0.0-rc1",
+  "local_metadata_postgres": "READY",
+  "local_demo_postgres": "READY",
+  "local_demo_mysql": "READY",
+  "backend_container_health": "healthy",
+  "frontend_container_health": "healthy",
+  "docker_database_services": 0,
+  "docker_database_volumes": 0,
+  "git_reset_performed": false
+}

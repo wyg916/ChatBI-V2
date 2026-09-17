@@ -1,0 +1,26 @@
+{
+  "verified_at": "2026-08-17T08:04:20.388400+00:00",
+  "first_run_counts": {
+    "datasource": 2,
+    "semantic_model": 2,
+    "semantic_entity": 8,
+    "metric": 10,
+    "dimension": 14,
+    "semantic_relation": 6,
+    "business_term": 16,
+    "verified_answer": 131,
+    "dashboard": 18
+  },
+  "second_run_counts": {
+    "datasource": 2,
+    "semantic_model": 2,
+    "semantic_entity": 8,
+    "metric": 10,
+    "dimension": 14,
+    "semantic_relation": 6,
+    "business_term": 16,
+    "verified_answer": 131,
+    "dashboard": 18
+  },
+  "idempotent": true
+}

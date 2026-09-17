@@ -1,0 +1,14 @@
+{
+  "schema_version": "chatbi-task-authorized-provider-variant-v1",
+  "provider": "deepseek",
+  "provenance": "TASK_AUTHORIZED_GENERIC_VARIANT_HISTORICAL_RAW_NOT_RETAINED",
+  "historical_evidence": {"error_class": "ValueError", "raw_response_available": false},
+  "response": {
+    "model": "deepseek-v4-flash",
+    "choices": [{
+      "finish_reason": "stop",
+      "message": {"content": "```json\n{\"question\":\"按地区统计收入\",\"intent\":\"aggregate revenue by region\",\"dialect\":\"postgresql\",\"provider\":\"deepseek\",\"semantic_model_id\":\"semantic-recorded\",\"semantic_model_version\":1,\"selected_entities\":[\"order\"],\"selected_tables\":[\"orders\"],\"selected_columns\":[\"orders.region\",\"orders.revenue\"],\"metrics\":[\"revenue\"],\"dimensions\":[\"region\"],\"joins\":[],\"filters\":[],\"time_range\":null,\"group_by\":[\"orders.region\"],\"order_by\":[\"revenue DESC\"],\"limit\":100,\"generated_sql\":\"SELECT region, SUM(revenue) AS revenue FROM orders GROUP BY region ORDER BY revenue DESC LIMIT 100\",\"confidence\":0.96,\"warnings\":[],\"repair_count\":0,\"model_trace\":{}}\n```"}
+    }],
+    "usage": {"prompt_tokens": 32, "completion_tokens": 24, "total_tokens": 56}
+  }
+}

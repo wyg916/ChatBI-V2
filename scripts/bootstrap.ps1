@@ -1,6 +1,7 @@
 [CmdletBinding()]
 param(
   [string]$EnvFile = '',
+  [switch]$DemoSeed,
   [switch]$SkipBuild,
   [switch]$NoGenerateSecrets
 )
@@ -14,6 +15,7 @@ Set-Location -LiteralPath $projectRoot
 try {
   if (-not $NoGenerateSecrets) { Initialize-ChatBISecrets -EnvFile $resolvedEnv }
   $configuration = Assert-ChatBIConfiguration -EnvFile $resolvedEnv
+  if ($DemoSeed) { $env:CHATBI_SEED_DEMO_SEMANTIC_MODEL = 'true'; $configuration.DemoSeed = $true }
   if (-not (Get-Command docker -ErrorAction SilentlyContinue)) {
     throw 'Docker CLI was not found. ACTION: Install Docker Desktop and rerun bootstrap.ps1.'
   }
@@ -53,6 +55,7 @@ try {
 
   Write-Host '[Bootstrap] Creating Workspace, login identities, and governed runtime records...'
   $bootstrapCommand = @('run', '--rm', '--no-deps', 'backend', 'python', '-m', 'app.db.deployment_bootstrap')
+  if ($configuration.DemoSeed) { $bootstrapCommand += '--demo-seed' }
   & docker @compose @bootstrapCommand
   if ($LASTEXITCODE -ne 0) { throw 'Workspace/bootstrap initialization failed' }
 

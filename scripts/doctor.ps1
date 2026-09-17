@@ -146,8 +146,11 @@ if ($configuration) {
     Add-DoctorResult WARN 'Provider configuration' 'base application can start, but live AI Provider calls are unavailable' 'Configure MiMo, DeepSeek, or Kimi server-side when live AI is required.'
   }
 
+  if ($configuration.DemoSeed) {
+    Add-DoctorResult PASS 'Datasource requirements' 'optional Demo Seed configuration is enabled'
+  } else {
     Add-DoctorResult PASS 'Datasource requirements' 'enterprise mode expects a read-only datasource to be added through the UI or API after login'
-
+  }
 }
 
 if ($failures -gt 0) {

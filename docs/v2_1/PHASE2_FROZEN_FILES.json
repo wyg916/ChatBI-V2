@@ -1,0 +1,654 @@
+{
+  "schema_version": 1,
+  "generated_at": "2026-08-18T12:50:20+08:00",
+  "classification": "CORE_FROZEN_ZONE",
+  "conflict_level": "HIGH_CONFLICT",
+  "phase2_sha": "6cdbf12f6c2e8494afe21262fd092795c4f784c3",
+  "phase2_tree_sha": "c96b4da813b17b8ab2e0dee4a33a01b114a6f644",
+  "core_frozen_file_count": 106,
+  "high_conflict_file_count": 106,
+  "rules": [
+    "Every listed path is anchored to its Git blob at PHASE2_SHA.",
+    "Any incoming change touching a listed path is HIGH_CONFLICT.",
+    "Do not accept an incoming branch version wholesale; integrate per file and preserve Phase 2 behavior.",
+    "Run the workflow-specific regression set immediately after each integration input."
+  ],
+  "files": [
+    {
+      "path": "backend/app/api/router.py",
+      "area": "ROUTING_STREAMING",
+      "conflict_level": "HIGH_CONFLICT",
+      "phase2_blob_sha": "3b1e234c6ba74fb58c6aab819b8cf6debbd44f01"
+    },
+    {
+      "path": "backend/app/api/routes/analysis.py",
+      "area": "ROUTING_STREAMING",
+      "conflict_level": "HIGH_CONFLICT",
+      "phase2_blob_sha": "e4676286c322118b6f2c7366fa960beaad7d5e36"
+    },
+    {
+      "path": "backend/app/api/routes/attachments.py",
+      "area": "CONVERSATION_ATTACHMENT",
+      "conflict_level": "HIGH_CONFLICT",
+      "phase2_blob_sha": "73c95a4f5c9a7142b2b963641e14d2535b7b6765"
+    },
+    {
+      "path": "backend/app/api/routes/auth.py",
+      "area": "AUTH_WORKSPACE",
+      "conflict_level": "HIGH_CONFLICT",
+      "phase2_blob_sha": "d89a95ddd62474f31d486edf7f3c956145dfbc7c"
+    },
+    {
+      "path": "backend/app/api/routes/chat.py",
+      "area": "ROUTING_STREAMING",
+      "conflict_level": "HIGH_CONFLICT",
+      "phase2_blob_sha": "e6600a86d90c910d39891a01f21bc8422b7f9547"
+    },
+    {
+      "path": "backend/app/api/routes/content.py",
+      "area": "AUTH_WORKSPACE",
+      "conflict_level": "HIGH_CONFLICT",
+      "phase2_blob_sha": "663abc6304d4692803aa9e5d6ce8e7832fa1c7aa"
+    },
+    {
+      "path": "backend/app/api/routes/datasources.py",
+      "area": "AUTH_WORKSPACE",
+      "conflict_level": "HIGH_CONFLICT",
+      "phase2_blob_sha": "2c47ff2dd1f6cc2f7bc9d7f441c8a6c910d0f0a8"
+    },
+    {
+      "path": "backend/app/api/routes/evaluation.py",
+      "area": "AUTH_WORKSPACE",
+      "conflict_level": "HIGH_CONFLICT",
+      "phase2_blob_sha": "ca7a4fc488d3249064aa6ae0eaae65896cbf04b8"
+    },
+    {
+      "path": "backend/app/api/routes/queries.py",
+      "area": "DATA_QUERY",
+      "conflict_level": "HIGH_CONFLICT",
+      "phase2_blob_sha": "ce85fca489f8d2a48633487ca0040e176eaf0ca1"
+    },
+    {
+      "path": "backend/app/api/routes/security.py",
+      "area": "AUTH_WORKSPACE",
+      "conflict_level": "HIGH_CONFLICT",
+      "phase2_blob_sha": "9c1cc5c4f6737b9443aee9f8d5e188439da62963"
+    },
+    {
+      "path": "backend/app/api/routes/semantic.py",
+      "area": "DATA_QUERY_SEMANTIC",
+      "conflict_level": "HIGH_CONFLICT",
+      "phase2_blob_sha": "0df6c0c60e5a5d24c6d5176db431a769faead96f"
+    },
+    {
+      "path": "backend/app/chart/contracts.py",
+      "area": "DATA_QUERY_PRESENTATION",
+      "conflict_level": "HIGH_CONFLICT",
+      "phase2_blob_sha": "d0396b878f6dc46025b45a9da0c5c3c3edcbf440"
+    },
+    {
+      "path": "backend/app/chart/engine.py",
+      "area": "DATA_QUERY_PRESENTATION",
+      "conflict_level": "HIGH_CONFLICT",
+      "phase2_blob_sha": "4ea218041e544d2f0530493da93c9418dd029663"
+    },
+    {
+      "path": "backend/app/core/access.py",
+      "area": "AUTH_WORKSPACE",
+      "conflict_level": "HIGH_CONFLICT",
+      "phase2_blob_sha": "16ef1fa8c0603047fdfb57887d3a72df26265d63"
+    },
+    {
+      "path": "backend/app/core/auth.py",
+      "area": "AUTH_WORKSPACE",
+      "conflict_level": "HIGH_CONFLICT",
+      "phase2_blob_sha": "2de13803fe39a63ebef9c8b66f694d0abd4cd6e4"
+    },
+    {
+      "path": "backend/app/core/config.py",
+      "area": "AUTH_WORKSPACE",
+      "conflict_level": "HIGH_CONFLICT",
+      "phase2_blob_sha": "d52324eea21d42f1ce84a961b16b3bd222333683"
+    },
+    {
+      "path": "backend/app/db/bootstrap_local.py",
+      "area": "AUTH_BOOTSTRAP",
+      "conflict_level": "HIGH_CONFLICT",
+      "phase2_blob_sha": "8821ec96dccd256ad32cb61105189b1c80bd02c7"
+    },
+    {
+      "path": "backend/app/insight/contracts.py",
+      "area": "DATA_QUERY_PRESENTATION",
+      "conflict_level": "HIGH_CONFLICT",
+      "phase2_blob_sha": "2eb6a33c79dc7286bc34b40bdbfb36577cf3928f"
+    },
+    {
+      "path": "backend/app/insight/engine.py",
+      "area": "DATA_QUERY_PRESENTATION",
+      "conflict_level": "HIGH_CONFLICT",
+      "phase2_blob_sha": "7adbedbb330282bb89a661ec4250108d7f10aaf8"
+    },
+    {
+      "path": "backend/app/integration/contracts.py",
+      "area": "ROUTING_STREAMING",
+      "conflict_level": "HIGH_CONFLICT",
+      "phase2_blob_sha": "8dbdfc381de41d012041622b262d51b52101daff"
+    },
+    {
+      "path": "backend/app/integration/feature_flags.py",
+      "area": "ROUTING_STREAMING",
+      "conflict_level": "HIGH_CONFLICT",
+      "phase2_blob_sha": "a08d8bbde2a19d2e7fc2e3231af7a0529be8cdd9"
+    },
+    {
+      "path": "backend/app/integration/model_gateway.py",
+      "area": "GENERAL_VISION",
+      "conflict_level": "HIGH_CONFLICT",
+      "phase2_blob_sha": "055628c0fa4b8b9d132804386bb7fddfbdab30a5"
+    },
+    {
+      "path": "backend/app/integration/question_router.py",
+      "area": "QUESTION_ROUTER",
+      "conflict_level": "HIGH_CONFLICT",
+      "phase2_blob_sha": "d2e4527e0808269b29f8167db24f4f55abf239f9"
+    },
+    {
+      "path": "backend/app/integration/service.py",
+      "area": "KNOWLEDGE_HYBRID_COMPLEX",
+      "conflict_level": "HIGH_CONFLICT",
+      "phase2_blob_sha": "de83c6caa2307ac1b04d42a058679efdbacf073a"
+    },
+    {
+      "path": "backend/app/integration/tool_executor.py",
+      "area": "KNOWLEDGE_HYBRID_COMPLEX",
+      "conflict_level": "HIGH_CONFLICT",
+      "phase2_blob_sha": "e62e301f5464a4ab859cae7772637b53bffad3b3"
+    },
+    {
+      "path": "backend/app/main.py",
+      "area": "AUTH_BOOTSTRAP",
+      "conflict_level": "HIGH_CONFLICT",
+      "phase2_blob_sha": "0cda1018877d963c8fabb6ba9fc4de144ef87244"
+    },
+    {
+      "path": "backend/app/models/__init__.py",
+      "area": "AUTH_CONVERSATION_MODEL",
+      "conflict_level": "HIGH_CONFLICT",
+      "phase2_blob_sha": "7cf1bfeb87bf03b5f35fd06060ad370400fabc90"
+    },
+    {
+      "path": "backend/app/models/entities.py",
+      "area": "AUTH_WORKSPACE",
+      "conflict_level": "HIGH_CONFLICT",
+      "phase2_blob_sha": "403a029360721051e5400df6359436f0040a9401"
+    },
+    {
+      "path": "backend/app/models/phase2.py",
+      "area": "AUTH_CONVERSATION_MODEL",
+      "conflict_level": "HIGH_CONFLICT",
+      "phase2_blob_sha": "381c626467b77072040b65d5faa29e49fae828da"
+    },
+    {
+      "path": "backend/app/query/context_builder.py",
+      "area": "DATA_QUERY",
+      "conflict_level": "HIGH_CONFLICT",
+      "phase2_blob_sha": "fe69f7f870da8e701565f277bcc034119677a4a8"
+    },
+    {
+      "path": "backend/app/query/contracts.py",
+      "area": "DATA_QUERY",
+      "conflict_level": "HIGH_CONFLICT",
+      "phase2_blob_sha": "7dcb96c6e3289a9b2019ca5389ceafefda76e396"
+    },
+    {
+      "path": "backend/app/query/executor.py",
+      "area": "DATA_QUERY",
+      "conflict_level": "HIGH_CONFLICT",
+      "phase2_blob_sha": "776b3ea2afd62a2c9477a8f2b5d78d118092de75"
+    },
+    {
+      "path": "backend/app/query/nl2sql.py",
+      "area": "DATA_QUERY",
+      "conflict_level": "HIGH_CONFLICT",
+      "phase2_blob_sha": "7c37461791c82f8b17be397c759e6d38811d91a7"
+    },
+    {
+      "path": "backend/app/query/oracle.py",
+      "area": "DATA_QUERY",
+      "conflict_level": "HIGH_CONFLICT",
+      "phase2_blob_sha": "11463fd39020f5e2b59d29524e8353da4e21d4d5"
+    },
+    {
+      "path": "backend/app/query/service.py",
+      "area": "DATA_QUERY",
+      "conflict_level": "HIGH_CONFLICT",
+      "phase2_blob_sha": "046d02741dd6fb66eff8f7d3337f43840241a5ba"
+    },
+    {
+      "path": "backend/app/query/sql_guard.py",
+      "area": "DATA_QUERY",
+      "conflict_level": "HIGH_CONFLICT",
+      "phase2_blob_sha": "763ab18866dffb88b4cb87d344d2e1d01dc7d728"
+    },
+    {
+      "path": "backend/app/rag_runtime/main.py",
+      "area": "KNOWLEDGE_HYBRID_COMPLEX",
+      "conflict_level": "HIGH_CONFLICT",
+      "phase2_blob_sha": "383897f0c23df304f4b3ba9d404bd53534941b64"
+    },
+    {
+      "path": "backend/app/rag_runtime/service.py",
+      "area": "KNOWLEDGE_HYBRID_COMPLEX",
+      "conflict_level": "HIGH_CONFLICT",
+      "phase2_blob_sha": "886b0efe4b16fb088e36b9b833101b9839946819"
+    },
+    {
+      "path": "backend/app/schemas/auth.py",
+      "area": "AUTH_WORKSPACE",
+      "conflict_level": "HIGH_CONFLICT",
+      "phase2_blob_sha": "65c713d6d952fdd2ab863638ae41c1419744ee9e"
+    },
+    {
+      "path": "backend/app/schemas/chat.py",
+      "area": "CONVERSATION_ATTACHMENT",
+      "conflict_level": "HIGH_CONFLICT",
+      "phase2_blob_sha": "302c5574d61527d6e664516714c9a4ed51efc0cc"
+    },
+    {
+      "path": "backend/app/schemas/semantic.py",
+      "area": "DATA_QUERY_SEMANTIC",
+      "conflict_level": "HIGH_CONFLICT",
+      "phase2_blob_sha": "fce131e0eeb754755512a9d8b3d3c75e59a70c9f"
+    },
+    {
+      "path": "backend/app/semantic/engine.py",
+      "area": "DATA_QUERY_SEMANTIC",
+      "conflict_level": "HIGH_CONFLICT",
+      "phase2_blob_sha": "cacdbc71d305c9ecb576660dcd2eebb53c86fa68"
+    },
+    {
+      "path": "backend/app/services/attachments.py",
+      "area": "FILE_DOCUMENT_VISION",
+      "conflict_level": "HIGH_CONFLICT",
+      "phase2_blob_sha": "57e9c84caedfcad9938f085a5258a67ddb7d8819"
+    },
+    {
+      "path": "backend/app/services/chat.py",
+      "area": "ROUTING_STREAMING",
+      "conflict_level": "HIGH_CONFLICT",
+      "phase2_blob_sha": "b0cd024f818553b82fcd81c365a4f3e1b8ec85a3"
+    },
+    {
+      "path": "backend/app/services/content.py",
+      "area": "AUTH_WORKSPACE",
+      "conflict_level": "HIGH_CONFLICT",
+      "phase2_blob_sha": "f3f920da6b58428a03f5606d57907590c1d72597"
+    },
+    {
+      "path": "backend/app/services/conversations.py",
+      "area": "CONVERSATION_MEMORY",
+      "conflict_level": "HIGH_CONFLICT",
+      "phase2_blob_sha": "cc72be76663b3c2d12cf2ad967f6d660f6295596"
+    },
+    {
+      "path": "backend/app/services/datasources.py",
+      "area": "AUTH_WORKSPACE",
+      "conflict_level": "HIGH_CONFLICT",
+      "phase2_blob_sha": "66e858e20327d39213e6ccc464e671adb212b982"
+    },
+    {
+      "path": "backend/app/services/evaluation.py",
+      "area": "AUTH_WORKSPACE",
+      "conflict_level": "HIGH_CONFLICT",
+      "phase2_blob_sha": "204cd366518be060adadf35a73ae7f5dcd166fba"
+    },
+    {
+      "path": "backend/app/services/seed.py",
+      "area": "AUTH_BOOTSTRAP",
+      "conflict_level": "HIGH_CONFLICT",
+      "phase2_blob_sha": "488fa672e997d325df3ca293459a5c6e533b5de8"
+    },
+    {
+      "path": "backend/app/services/semantic.py",
+      "area": "DATA_QUERY_SEMANTIC",
+      "conflict_level": "HIGH_CONFLICT",
+      "phase2_blob_sha": "820b60fd20854c8108c2645c0333e7fd2c508af4"
+    },
+    {
+      "path": "packages/agent-contracts/src/chatbi_agent_contracts/contracts.py",
+      "area": "ROUTING_CONTRACT",
+      "conflict_level": "HIGH_CONFLICT",
+      "phase2_blob_sha": "072a06c2410f9f2ca09a330ef098439a796e9a5f"
+    },
+    {
+      "path": "packages/agent-orchestrator/src/chatbi_agent_orchestrator/runtime.py",
+      "area": "KNOWLEDGE_HYBRID_COMPLEX",
+      "conflict_level": "HIGH_CONFLICT",
+      "phase2_blob_sha": "d4ebabda7292c6d5004072086aeb35d1dc7d96fd"
+    },
+    {
+      "path": "packages/rag-adapter/src/chatbi_rag_adapter/legacy.py",
+      "area": "KNOWLEDGE_HYBRID_COMPLEX",
+      "conflict_level": "HIGH_CONFLICT",
+      "phase2_blob_sha": "98ab40534b2c99bf8d75d49c6176734a505d2d10"
+    },
+    {
+      "path": "packages/rag-contracts/src/chatbi_rag_contracts/contracts.py",
+      "area": "KNOWLEDGE_HYBRID_COMPLEX",
+      "conflict_level": "HIGH_CONFLICT",
+      "phase2_blob_sha": "36f9c2dd605b12c13258b9441900558e369eaff6"
+    },
+    {
+      "path": "frontend/nginx.conf",
+      "area": "SSE_OPERATIONS",
+      "conflict_level": "HIGH_CONFLICT",
+      "phase2_blob_sha": "4b1c125acdd37b609c8ca127da1c7e2196b4459e"
+    },
+    {
+      "path": "frontend/src/api/auth.ts",
+      "area": "AUTH_UI",
+      "conflict_level": "HIGH_CONFLICT",
+      "phase2_blob_sha": "8cb22109ea431076f3a9a3251ddfcb41c148a31c"
+    },
+    {
+      "path": "frontend/src/api/chat.ts",
+      "area": "CHAT_SSE_ATTACHMENT_UI",
+      "conflict_level": "HIGH_CONFLICT",
+      "phase2_blob_sha": "785f1b47145ec87894f13591242861893652f355"
+    },
+    {
+      "path": "frontend/src/api/client.ts",
+      "area": "AUTH_UI",
+      "conflict_level": "HIGH_CONFLICT",
+      "phase2_blob_sha": "04d17694ed03808b856b5f22b5f17c29093632fa"
+    },
+    {
+      "path": "frontend/src/auth.tsx",
+      "area": "AUTH_UI",
+      "conflict_level": "HIGH_CONFLICT",
+      "phase2_blob_sha": "59d839ffcf218be754f50fec128c9a0097c07ba7"
+    },
+    {
+      "path": "frontend/src/components/AppShell.tsx",
+      "area": "AUTH_UI",
+      "conflict_level": "HIGH_CONFLICT",
+      "phase2_blob_sha": "942e6234c3276da269baa0e25c103d25194f3c24"
+    },
+    {
+      "path": "frontend/src/login.css",
+      "area": "AUTH_UI",
+      "conflict_level": "HIGH_CONFLICT",
+      "phase2_blob_sha": "68b763e85aa7538f53602b819aef2604d23a6b41"
+    },
+    {
+      "path": "frontend/src/pages/AskExperience.tsx",
+      "area": "CHAT_COMPOSER_UI",
+      "conflict_level": "HIGH_CONFLICT",
+      "phase2_blob_sha": "52c7a26404a0423c4ffba5b9e3b34116a83e503a"
+    },
+    {
+      "path": "frontend/src/pages/AskPage.tsx",
+      "area": "CHAT_COMPOSER_UI",
+      "conflict_level": "HIGH_CONFLICT",
+      "phase2_blob_sha": "adc8651017350e4290de133ced8b2817a355fe2a"
+    },
+    {
+      "path": "frontend/src/pages/LoginPage.tsx",
+      "area": "AUTH_UI",
+      "conflict_level": "HIGH_CONFLICT",
+      "phase2_blob_sha": "4b3656710d288d3901549fe7cc0a19599ae5008e"
+    },
+    {
+      "path": "frontend/src/pages/ask.css",
+      "area": "CHAT_COMPOSER_UI",
+      "conflict_level": "HIGH_CONFLICT",
+      "phase2_blob_sha": "92723e5fa6521a7aae57126b4b6e690e252ed9db"
+    },
+    {
+      "path": "frontend/src/router.tsx",
+      "area": "AUTH_UI",
+      "conflict_level": "HIGH_CONFLICT",
+      "phase2_blob_sha": "c613b39b0cadd48f96a772704a4bd6e43d61e5d2"
+    },
+    {
+      "path": "frontend/src/styles.css",
+      "area": "AUTH_UI",
+      "conflict_level": "HIGH_CONFLICT",
+      "phase2_blob_sha": "4fade699e55fb65706e064fd0d28078eeae02466"
+    },
+    {
+      "path": "frontend/src/types/api.ts",
+      "area": "CHAT_AUTH_CONTRACT",
+      "conflict_level": "HIGH_CONFLICT",
+      "phase2_blob_sha": "0d571738c9a101625cf2a46b6c5166fd86fa98f2"
+    },
+    {
+      "path": ".env.example",
+      "area": "AUTH_BOOTSTRAP",
+      "conflict_level": "HIGH_CONFLICT",
+      "phase2_blob_sha": "27945762e4a31ab9c993400333492429d6bec163"
+    },
+    {
+      "path": "backend/requirements.txt",
+      "area": "FILE_DOCUMENT_RUNTIME",
+      "conflict_level": "HIGH_CONFLICT",
+      "phase2_blob_sha": "6e2d82a14e3145270b713e1bacde5b692d2927b4"
+    },
+    {
+      "path": "docker-compose.yml",
+      "area": "ONE_CLICK_AUTH",
+      "conflict_level": "HIGH_CONFLICT",
+      "phase2_blob_sha": "afe6be37d2c402ab784ef409c3dbfe588a5e408a"
+    },
+    {
+      "path": "一键启动-ChatBI-V2.cmd",
+      "area": "ONE_CLICK_AUTH",
+      "conflict_level": "HIGH_CONFLICT",
+      "phase2_blob_sha": "d9945666eee6ca8aee3584af62183529390ec5cb"
+    },
+    {
+      "path": "scripts/launch.ps1",
+      "area": "ONE_CLICK_AUTH",
+      "conflict_level": "HIGH_CONFLICT",
+      "phase2_blob_sha": "0b2e57ac839c7977c654b16e885282a458df97ae"
+    },
+    {
+      "path": "scripts/verify.ps1",
+      "area": "ONE_CLICK_AUTH",
+      "conflict_level": "HIGH_CONFLICT",
+      "phase2_blob_sha": "8ce555f313b2e81dc00f4cb55a67f8cf384970a2"
+    },
+    {
+      "path": "scripts/test-release-cold-start.ps1",
+      "area": "ONE_CLICK_AUTH",
+      "conflict_level": "HIGH_CONFLICT",
+      "phase2_blob_sha": "546a04249134403542bfbbe662b0e27e40b2468f"
+    },
+    {
+      "path": "scripts/test-rollback-simulation.ps1",
+      "area": "ONE_CLICK_AUTH",
+      "conflict_level": "HIGH_CONFLICT",
+      "phase2_blob_sha": "25a1ab9e63400b7fc07543bbaf5493f6b89405a8"
+    },
+    {
+      "path": "backend/alembic/versions/20260818_0009_phase2_chat_auth_attachments.py",
+      "area": "PHASE2_MIGRATION",
+      "conflict_level": "HIGH_CONFLICT",
+      "phase2_blob_sha": "b804f47a501c0ad6c9b8b7be078cb4eeab14fa50"
+    },
+    {
+      "path": "backend/scripts/phase2_runtime_acceptance.py",
+      "area": "REGRESSION_GUARD",
+      "conflict_level": "HIGH_CONFLICT",
+      "phase2_blob_sha": "e6859f6b49f7ec3ea1c3ea27df9ea0fc921a52dd"
+    },
+    {
+      "path": "backend/tests/conftest.py",
+      "area": "REGRESSION_GUARD",
+      "conflict_level": "HIGH_CONFLICT",
+      "phase2_blob_sha": "749530d59792325a720cf232ea5582bc65731ba6"
+    },
+    {
+      "path": "backend/tests/test_legacy_rag_agent_integration.py",
+      "area": "REGRESSION_GUARD",
+      "conflict_level": "HIGH_CONFLICT",
+      "phase2_blob_sha": "70326d66eb7ed880daa2b9a66c45d8dbbdf329b8"
+    },
+    {
+      "path": "backend/tests/test_phase2_auth_chat_attachments.py",
+      "area": "REGRESSION_GUARD",
+      "conflict_level": "HIGH_CONFLICT",
+      "phase2_blob_sha": "21b523cfe1633d25381b8434f46d83f51596ed5f"
+    },
+    {
+      "path": "backend/tests/test_phase2_open_ended_manifest.py",
+      "area": "REGRESSION_GUARD",
+      "conflict_level": "HIGH_CONFLICT",
+      "phase2_blob_sha": "d89ac8880c28d9eaa7f0fda24f01b2cb74f4ec64"
+    },
+    {
+      "path": "backend/tests/test_query_pipeline.py",
+      "area": "REGRESSION_GUARD",
+      "conflict_level": "HIGH_CONFLICT",
+      "phase2_blob_sha": "e59e8ece81d52f64157b9b22aa10721f3cd16a6e"
+    },
+    {
+      "path": "backend/tests/test_security.py",
+      "area": "REGRESSION_GUARD",
+      "conflict_level": "HIGH_CONFLICT",
+      "phase2_blob_sha": "18fdfefb201bf0d33809526c7126ad49f8cbe113"
+    },
+    {
+      "path": "evaluation/fixtures/phase2-policy.txt",
+      "area": "REGRESSION_GUARD",
+      "conflict_level": "HIGH_CONFLICT",
+      "phase2_blob_sha": "42856896da1d06cadbc4c9b4a845639e5013151f"
+    },
+    {
+      "path": "evaluation/fixtures/phase2-regional-revenue.csv",
+      "area": "REGRESSION_GUARD",
+      "conflict_level": "HIGH_CONFLICT",
+      "phase2_blob_sha": "9f3a9a391babcbc8be2c8bdb1d70139984c7413c"
+    },
+    {
+      "path": "evaluation/golden/phase2-open-ended-60.json",
+      "area": "REGRESSION_GUARD",
+      "conflict_level": "HIGH_CONFLICT",
+      "phase2_blob_sha": "7e66953bdab97d36e1923f8438fd7bdd0198d655"
+    },
+    {
+      "path": "frontend/playwright.config.ts",
+      "area": "REGRESSION_GUARD",
+      "conflict_level": "HIGH_CONFLICT",
+      "phase2_blob_sha": "1f9db73d86a8843973a331609da87658afbce2b6"
+    },
+    {
+      "path": "frontend/e2e/auth.ts",
+      "area": "REGRESSION_GUARD",
+      "conflict_level": "HIGH_CONFLICT",
+      "phase2_blob_sha": "6a609d4f38fe169748dba5e682bf1bdf840ab7e5"
+    },
+    {
+      "path": "frontend/e2e/global-setup.ts",
+      "area": "REGRESSION_GUARD",
+      "conflict_level": "HIGH_CONFLICT",
+      "phase2_blob_sha": "30113fddb79033e0fede3e48059eef74f3389c0b"
+    },
+    {
+      "path": "frontend/e2e/phase2-chat-auth-multimodal.spec.ts",
+      "area": "REGRESSION_GUARD",
+      "conflict_level": "HIGH_CONFLICT",
+      "phase2_blob_sha": "39864433970458cfe35455e40df6143b2ef76a63"
+    },
+    {
+      "path": "frontend/e2e/day1-core-flow.spec.ts",
+      "area": "REGRESSION_GUARD",
+      "conflict_level": "HIGH_CONFLICT",
+      "phase2_blob_sha": "804df90e4fb123802a5872709e2d06174036da1d"
+    },
+    {
+      "path": "frontend/e2e/day2-query-flow.spec.ts",
+      "area": "REGRESSION_GUARD",
+      "conflict_level": "HIGH_CONFLICT",
+      "phase2_blob_sha": "17b3f053db54db80c5a55d43753f57044e584383"
+    },
+    {
+      "path": "frontend/e2e/day2-visual.spec.ts",
+      "area": "REGRESSION_GUARD",
+      "conflict_level": "HIGH_CONFLICT",
+      "phase2_blob_sha": "632f69aa4cfba017810f49f6479762a18c1dd599"
+    },
+    {
+      "path": "frontend/e2e/day3-product-loop.spec.ts",
+      "area": "REGRESSION_GUARD",
+      "conflict_level": "HIGH_CONFLICT",
+      "phase2_blob_sha": "63c01dfaf2ee4e1914f310d71ca418f8f78ebd1d"
+    },
+    {
+      "path": "frontend/e2e/day4-quality.spec.ts",
+      "area": "REGRESSION_GUARD",
+      "conflict_level": "HIGH_CONFLICT",
+      "phase2_blob_sha": "aa1fd546d7ad3ccbf99d6b16f2e70b251862b9b1"
+    },
+    {
+      "path": "frontend/e2e/day5-rag-multiagent.spec.ts",
+      "area": "REGRESSION_GUARD",
+      "conflict_level": "HIGH_CONFLICT",
+      "phase2_blob_sha": "b76a5cc260ddd1e16074a49714a51e7091efac2a"
+    },
+    {
+      "path": "frontend/e2e/ui14-integration.spec.ts",
+      "area": "REGRESSION_GUARD",
+      "conflict_level": "HIGH_CONFLICT",
+      "phase2_blob_sha": "6f2ac3dc0ed836510649096e73bb561f4c6d144c"
+    },
+    {
+      "path": "frontend/src/test/ask-page.test.tsx",
+      "area": "REGRESSION_GUARD",
+      "conflict_level": "HIGH_CONFLICT",
+      "phase2_blob_sha": "c807c89acff07454d2e25c370c949c9562cf908b"
+    },
+    {
+      "path": "frontend/src/test/login-page.test.tsx",
+      "area": "REGRESSION_GUARD",
+      "conflict_level": "HIGH_CONFLICT",
+      "phase2_blob_sha": "58026455e567a53dcc05339ae16760f103438feb"
+    },
+    {
+      "path": "frontend/src/test/routes.test.tsx",
+      "area": "REGRESSION_GUARD",
+      "conflict_level": "HIGH_CONFLICT",
+      "phase2_blob_sha": "bfee32f99e6c7881137a63f5328dde1f36750dc2"
+    },
+    {
+      "path": "docs/AUTH_RUNTIME_AUDIT.md",
+      "area": "PHASE2_EVIDENCE",
+      "conflict_level": "HIGH_CONFLICT",
+      "phase2_blob_sha": "687c0f5402ac9c1ccdf3372377e0fc5c9ae6cb58"
+    },
+    {
+      "path": "docs/OPEN_ENDED_CHAT_AUDIT.md",
+      "area": "PHASE2_EVIDENCE",
+      "conflict_level": "HIGH_CONFLICT",
+      "phase2_blob_sha": "db4f26d25febd54d697f2d7a6d29a2399cadb7da"
+    },
+    {
+      "path": "docs/PHASE2_BASELINE.md",
+      "area": "PHASE2_EVIDENCE",
+      "conflict_level": "HIGH_CONFLICT",
+      "phase2_blob_sha": "0af1c8ad4ff192e0869c31217c88b34d16387751"
+    },
+    {
+      "path": "docs/evidence/phase2/README.md",
+      "area": "PHASE2_EVIDENCE",
+      "conflict_level": "HIGH_CONFLICT",
+      "phase2_blob_sha": "89d7ea2c48cacada10fc6ba18d7266b2cb7a45de"
+    },
+    {
+      "path": "docs/evidence/phase2/cold-start-isolated.json",
+      "area": "PHASE2_EVIDENCE",
+      "conflict_level": "HIGH_CONFLICT",
+      "phase2_blob_sha": "7a4866d6ccde674d2ac512785ea743bb6a6972eb"
+    }
+  ]
+}

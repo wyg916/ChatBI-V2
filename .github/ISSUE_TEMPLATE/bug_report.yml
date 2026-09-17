@@ -33,7 +33,7 @@ body:
     id: steps
     attributes:
       label: Reproduction steps
-      description: Remove credentials and sensitive business information.
+      description: Use demo data or sanitized examples.
     validations:
       required: true
   - type: textarea
