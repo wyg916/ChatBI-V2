@@ -2,12 +2,12 @@
 setlocal
 cd /d "%~dp0"
 
-powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File "%~dp0scripts\showcase.ps1" -Action Stop
+powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File "%~dp0scripts\stop.ps1"
 set "CHATBI_EXIT_CODE=%ERRORLEVEL%"
 
 if not "%CHATBI_EXIT_CODE%"=="0" (
   echo.
-  echo Showcase stop failed. Review the message above, then press any key to close.
+  echo ChatBI stop failed. Review the message above, then press any key to close.
   pause >nul
 )
 

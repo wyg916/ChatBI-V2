@@ -1,4 +1,4 @@
-import { defineConfig } from 'vitest/config';
+import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 
 const runtimeEnv = (
@@ -27,15 +27,5 @@ export default defineConfig({
       '/api': { target: proxyTarget, changeOrigin: true },
       '/health': { target: proxyTarget, changeOrigin: true },
     },
-  },
-  test: {
-    environment: 'jsdom',
-    setupFiles: './src/test/setup.ts',
-    include: ['src/**/*.test.{ts,tsx}'],
-    css: true,
-    // Several page suites intentionally share module-level API mocks. Running
-    // test files in parallel makes those mocks and jsdom timers contend and
-    // produces non-deterministic inputs/timeouts on release runners.
-    fileParallelism: false,
   },
 });

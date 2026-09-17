@@ -756,7 +756,7 @@ def delete_managed_datasource(
                     text("SELECT chatbi_admin.drop_excel_reader(:role, :schema)"),
                     {"role": expected_role, "schema": expected_schema},
                 )
-            elif datasource.username != get_settings().demo_postgres_username.strip():
+            else:
                 raise SpreadsheetImportError("SPREADSHEET_STORAGE_TARGET_INVALID")
             db.execute(DropSchema(expected_schema, cascade=True, if_exists=True))
         elif bind.dialect.name == "sqlite":

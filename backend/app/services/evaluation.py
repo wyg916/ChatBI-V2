@@ -23,26 +23,6 @@ from app.query.sql_guard import SqlGuard
 from app.services.datasources import default_workspace
 
 
-_SERVICE_FILE = Path(__file__).resolve()
-_GOLDEN_MANIFEST_CANDIDATES = (
-    _SERVICE_FILE.parents[3] / "evaluation" / "golden" / "day4-golden-50.json",
-    _SERVICE_FILE.parents[2] / "evaluation" / "golden" / "day4-golden-50.json",
-)
-GOLDEN_MANIFEST_PATH = next(
-    (candidate for candidate in _GOLDEN_MANIFEST_CANDIDATES if candidate.is_file()),
-    _GOLDEN_MANIFEST_CANDIDATES[-1],
-)
-GOLDEN_MANIFEST_SHA256 = "ff83e727331fb137cd8cc692aa780c3ba016c48adeec4246d4464874fbf7db1d"
-SOURCE_GOLDEN_20_SHA256 = "741da55b7dd41046a6f8411522a3cf92afb45ca1ac38b90b202b49c87f8eef0e"
-_MULTI_GROUND_TRUTH_CANDIDATES = (
-    _SERVICE_FILE.parents[3] / "evaluation" / "golden" / "v2.1-multiple-ground-truth.json",
-    _SERVICE_FILE.parents[2] / "evaluation" / "golden" / "v2.1-multiple-ground-truth.json",
-)
-MULTI_GROUND_TRUTH_PATH = next(
-    (candidate for candidate in _MULTI_GROUND_TRUTH_CANDIDATES if candidate.is_file()),
-    _MULTI_GROUND_TRUTH_CANDIDATES[-1],
-)
-MULTI_GROUND_TRUTH_SHA256 = "1e11b66f241f951e0265b3510310eaf856553ba2f2b4cea17854dc56aada4f36"
 RELEASE_THRESHOLDS = {
     "golden_count": 50,
     "sql_execution_rate": 0.98,
@@ -67,30 +47,34 @@ def manifest_hash(manifest: dict[str, Any]) -> str:
 
 
 def load_golden_manifest() -> dict[str, Any]:
-    manifest = json.loads(GOLDEN_MANIFEST_PATH.read_text(encoding="utf-8"))
-    if (
-        not manifest.get("frozen")
-        or len(manifest.get("cases") or []) != 50
-        or manifest.get("source_manifest_sha256") != SOURCE_GOLDEN_20_SHA256
-        or manifest.get("manifest_sha256") != GOLDEN_MANIFEST_SHA256
-        or manifest_hash(manifest) != GOLDEN_MANIFEST_SHA256
-    ):
-        raise RuntimeError("Golden 50 manifest is not frozen or its SHA-256 is invalid")
+    from app.core.config import get_settings
+
+    configured = get_settings().evaluation_manifest_path
+    if not configured:
+        raise ValueError("Configure CHATBI_EVALUATION_MANIFEST_PATH with an approved evaluation dataset")
+    try:
+        manifest = json.loads(Path(configured).read_text(encoding="utf-8"))
+    except (OSError, ValueError) as exc:
+        raise ValueError("The configured evaluation dataset could not be read") from exc
+    if not isinstance(manifest, dict) or not manifest.get("frozen"):
+        raise ValueError("Evaluation dataset must be an approved frozen manifest")
+    cases = manifest.get("cases")
+    if not isinstance(cases, list) or not cases:
+        raise ValueError("Evaluation dataset must contain cases")
+    if manifest.get("manifest_sha256") != manifest_hash(manifest):
+        raise ValueError("Evaluation dataset SHA-256 is invalid")
+    required = {"id", "question", "expected_sql", "expected_result"}
+    if any(not isinstance(c, dict) or not required.issubset(c) for c in cases):
+        raise ValueError("Evaluation case fields are incomplete")
+    if any(not isinstance(c["id"], str) or not c["id"] or
+           not isinstance(c["question"], str) or not c["question"].strip() or
+           not isinstance(c["expected_sql"], str) or
+           not isinstance(c["expected_result"], list) or
+           any(not isinstance(row, dict) for row in c["expected_result"]) for c in cases):
+        raise ValueError("Evaluation case field types are invalid")
+    if len({c["id"] for c in cases}) != len(cases):
+        raise ValueError("Evaluation case identifiers must be unique")
     return manifest
-
-
-def load_multiple_ground_truth() -> dict[str, list[str]]:
-    payload = MULTI_GROUND_TRUTH_PATH.read_bytes()
-    canonical_payload = payload.replace(b"\r\n", b"\n")
-    if hashlib.sha256(canonical_payload).hexdigest() != MULTI_GROUND_TRUTH_SHA256:
-        raise RuntimeError("Multiple Ground Truth overlay SHA-256 is invalid")
-    overlay = json.loads(canonical_payload)
-    cases = overlay.get("cases") or {}
-    if overlay.get("source_manifest_sha256") != GOLDEN_MANIFEST_SHA256 or not cases:
-        raise RuntimeError("Multiple Ground Truth overlay does not match Golden 50")
-    if any(not values or not all(str(sql).lstrip().upper().startswith(("SELECT", "WITH")) for sql in values) for values in cases.values()):
-        raise RuntimeError("Multiple Ground Truth overlay contains an invalid SQL ground truth")
-    return cases
 
 
 def _profile_record(profile: dict[str, Any]) -> dict[str, Any]:
@@ -112,25 +96,6 @@ def _public_trend_points(run: EvaluationRun) -> list[dict[str, Any]]:
     return [point for point in (run.trend_points or []) if point.get("kind") != "evaluation_profile"]
 
 
-def demo_evaluation_trend(end_at: datetime, *, latest_value: float = 100.0) -> list[dict[str, Any]]:
-    """Return a deterministic 30-day showcase series suitable for DB persistence."""
-
-    values = [
-        87.8, 88.4, 88.1, 89.2, 89.0, 89.8, 90.4, 90.1, 91.0, 91.6,
-        91.2, 92.0, 92.4, 92.1, 93.0, 93.7, 93.4, 94.2, 94.8, 94.5,
-        95.2, 95.7, 95.4, 96.3, 96.8, 97.1, 97.8, 98.5, 99.2, latest_value,
-    ]
-    start = end_at - timedelta(days=len(values) - 1)
-    return [
-        {
-            "date": (start + timedelta(days=index)).strftime("%m/%d"),
-            "value": value,
-            "source": "SHOWCASE_DEMO",
-        }
-        for index, value in enumerate(values)
-    ]
-
-
 def _next_trend_points(
     previous: EvaluationRun | None,
     *,
@@ -140,7 +105,7 @@ def _next_trend_points(
     history = [
         point
         for point in (_public_trend_points(previous) if previous is not None else [])
-        if point.get("source") != "SHOWCASE_DEMO"
+        if not point.get("source")
     ]
     return [
         *history,
@@ -401,7 +366,7 @@ def run_golden_evaluation(
     else:
         resolved_profile = {**DEFAULT_PROFILE, **(profile or {})}
         run = EvaluationRun(
-            workspace_id=workspace_id, release_name="ChatBI V2.1 Golden 50",
+            workspace_id=workspace_id, release_name="ChatBI 业务评测",
             model_name=resolved_profile["model"], status="RUNNING", is_current=False,
             golden_set_count=len(manifest["cases"]), manifest_sha256=manifest["manifest_sha256"],
             completed_at=datetime.now(timezone.utc), sort_order=0,
@@ -413,7 +378,7 @@ def run_golden_evaluation(
     resolved_profile["model"] = str(pipeline.router.capabilities().get("provider") or resolved_profile["model"])
     run.model_name = resolved_profile["model"]
     adapter = IbmText2SqlEvaluationAdapter()
-    alternatives = load_multiple_ground_truth()
+    alternatives = {}
     case_rows: list[EvaluationCaseResult] = []
     for case in manifest["cases"]:
         query = pipeline.execute(db, AskRequest(
@@ -452,7 +417,7 @@ def run_golden_evaluation(
         )
         case_passed = execution_ok and all(accuracy_checks.values())
         item = EvaluationCaseResult(
-            evaluation_run_id=run.id, case_id=case["id"], category=case["category"],
+            evaluation_run_id=run.id, case_id=case["id"], category=case.get("category") or "BUSINESS",
             question=case["question"], status="PASS" if case_passed else "FAIL",
             execution_ok=execution_ok, result_ok=result_ok, semantic_ok=semantic_ok,
             expected={
@@ -508,7 +473,7 @@ def run_golden_evaluation(
     run.average_response_seconds = round(sum(durations) / max(total, 1) / 1000, 3)
     run.duration_seconds = max(1, round(time.perf_counter() - started))
     run.completed_at = datetime.now(timezone.utc)
-    gate_pass = execution_pass >= 49 and result_pass >= 48 and dangerous_blocked == dangerous_total
+    gate_pass = (total >= RELEASE_THRESHOLDS["golden_count"] and execution_pass / total >= RELEASE_THRESHOLDS["sql_execution_rate"] and result_pass / total >= RELEASE_THRESHOLDS["result_value_accuracy"] and dangerous_total > 0 and dangerous_blocked == dangerous_total)
     run.status = "PASS" if gate_pass else "FAIL"
     previous_runs = list(db.scalars(select(EvaluationRun).where(
         EvaluationRun.workspace_id == workspace_id,

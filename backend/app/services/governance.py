@@ -40,15 +40,7 @@ _TRACE_METADATA_KEYS = {
     "provider", "repair_count", "link_count", "estimated_tokens", "citation_count",
     "agent_role", "grounded", "verified", "shadow",
 }
-_EVIDENCE_PATHS = (
-    "docs/v2_1/day2/IBM_EVAL_EVIDENCE.json",
-    "docs/v2_1/day2/D_AGENT_PRODUCT_EVIDENCE.json",
-    "docs/v2_1/day2/D_FILE_PRODUCT_EVIDENCE.json",
-    "docs/v2_1/day2/D_SANDBOX_SECURITY_EVIDENCE.json",
-    "docs/evidence/day5/rag-golden-120.json",
-    "docs/evidence/day5/complex-e2e-10.json",
-    "docs/evidence/day5/rag-multiagent-final-acceptance.json",
-)
+_EVIDENCE_PATHS: tuple[str, ...] = ()
 
 
 def model_invocation_contract_fields() -> tuple[str, ...]:

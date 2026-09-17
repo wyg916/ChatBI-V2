@@ -173,7 +173,7 @@ def _limit(question: str, default: int) -> int:
 
 
 class DeterministicTestProvider(ModelProviderAdapter, Nl2SqlEngine):
-    """Semantic-rule runtime for development, tests, and offline demos.
+    """Semantic-rule runtime for local natural-language queries.
 
     It composes a plan from linked semantic objects and generic analytical intent;
     it never maps a complete question string to a fixed SQL statement.

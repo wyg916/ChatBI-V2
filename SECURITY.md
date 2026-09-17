@@ -21,4 +21,4 @@
 - RAG 在检索前验证签名身份并执行 Workspace/场景 ACL；注入文档、无授权证据或伪造 Citation 必须 fail closed。
 - 文件分析不执行用户或模型生成的 Python/Shell，不访问宿主机、数据库/Provider 凭据或不受限网络。
 
-公开前请撤销测试凭据并对日志、截图、trace 和数据库导出进行脱敏。V1.1.0 主动攻击范围与结果字段见 `docs/SECURITY_REPORT.md`；依赖和许可证见 `docs/OPEN_SOURCE_LICENSE_AUDIT.md` 与 `docs/sbom/`。
+公开信息前请撤销临时凭据，并对日志、截图、trace 和数据库导出进行脱敏。第三方依赖和许可证见 `THIRD_PARTY_NOTICES.md`。

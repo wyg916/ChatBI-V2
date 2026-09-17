@@ -1,5 +1,5 @@
 import re
-from datetime import date, datetime, timedelta, timezone
+from datetime import datetime, timezone
 
 from sqlalchemy import case, func, or_, select
 from sqlalchemy.orm import Session
@@ -23,22 +23,9 @@ from app.core.data_safety import (
     redact_public_sql,
     redact_public_sql_payload,
 )
-from app.query.contracts import SecurityPolicy
-from app.services.data_workspace import execute_sql
 from app.services.datasources import runtime_dialect
 
 
-_DASHBOARD_READ_POLICY = SecurityPolicy(
-    row_limit=500,
-    timeout_ms=30_000,
-    allowed_schemas=["demo_business"],
-    allowed_tables=["daily_kpi", "orders", "regions"],
-    allowed_columns={
-        "daily_kpi": ["kpi_date", "revenue", "cost", "order_count", "charging_kwh", "region_id"],
-        "orders": ["customer_id", "order_date"],
-        "regions": ["region_id", "region_name"],
-    },
-)
 
 _ANSWER_PUBLIC_FIELDS = (
     "id", "question", "module", "sql_synced", "model_name", "owner_name", "status",
@@ -340,137 +327,7 @@ def _percent_change(current: float, previous: float) -> float:
     return round((current - previous) / previous * 100, 1)
 
 
-def _dashboard_rows(
-    db: Session,
-    principal: Principal,
-    datasource: DataSource,
-    sql: str,
-    *,
-    operation: str,
-    require_rows: bool = False,
-) -> list[dict]:
-    """Delegate Dashboard business reads to the existing guarded SQL gateway."""
-
-    run = execute_sql(
-        db,
-        principal,
-        datasource,
-        sql,
-        row_limit=500,
-        operation=f"DASHBOARD_DETAIL_{operation}",
-        trusted_policy=_DASHBOARD_READ_POLICY,
-    )
-    if run.status != "SUCCEEDED":
-        raise RuntimeError(f"Dashboard query failed: {run.error_code or run.status}")
-    rows = list((run.execution_payload or {}).get("rows") or ())
-    if require_rows and not rows:
-        raise RuntimeError(f"Dashboard query returned no rows: {operation}")
-    return rows
-
-
 def dashboard_detail(db: Session, dashboard: Dashboard, principal: Principal) -> dict:
-    datasource = db.scalar(
-        select(DataSource)
-        .where(DataSource.type == "postgresql", DataSource.name == "Demo PostgreSQL", DataSource.workspace_id == dashboard.workspace_id)
-        .order_by(DataSource.created_at)
-    )
-    if datasource is None:
-        raise LookupError("Demo PostgreSQL datasource is not configured")
-
-    summary = _dashboard_rows(db, principal, datasource, """
-        WITH bounds AS (SELECT max(kpi_date) AS max_date FROM demo_business.daily_kpi),
-        current_period AS (
-          SELECT sum(revenue) AS revenue, sum(revenue-cost) AS profit,
-                 sum(order_count) AS order_count, sum(charging_kwh) AS charging_kwh
-          FROM demo_business.daily_kpi, bounds
-          WHERE kpi_date BETWEEN max_date - interval '29 days' AND max_date
-        ),
-        previous_period AS (
-          SELECT sum(revenue) AS revenue, sum(revenue-cost) AS profit,
-                 sum(order_count) AS order_count, sum(charging_kwh) AS charging_kwh
-          FROM demo_business.daily_kpi, bounds
-          WHERE kpi_date BETWEEN max_date - interval '59 days' AND max_date - interval '30 days'
-        ),
-        active_customers AS (
-          SELECT count(DISTINCT customer_id) AS customers
-          FROM demo_business.orders, bounds
-          WHERE order_date BETWEEN max_date - interval '29 days' AND max_date
-        ),
-        previous_customers AS (
-          SELECT count(DISTINCT customer_id) AS customers
-          FROM demo_business.orders, bounds
-          WHERE order_date BETWEEN max_date - interval '59 days' AND max_date - interval '30 days'
-        )
-        SELECT bounds.max_date, current_period.revenue, current_period.profit,
-               current_period.order_count, current_period.charging_kwh,
-               previous_period.revenue AS previous_revenue,
-               previous_period.profit AS previous_profit,
-               active_customers.customers, previous_customers.customers AS previous_customers
-        FROM bounds, current_period, previous_period, active_customers, previous_customers
-    """, operation="SUMMARY", require_rows=True)[0]
-    trend = _dashboard_rows(db, principal, datasource, """
-        WITH bounds AS (SELECT max(kpi_date) AS max_date FROM demo_business.daily_kpi)
-        SELECT kpi_date, sum(revenue) AS revenue
-        FROM demo_business.daily_kpi, bounds
-        WHERE kpi_date BETWEEN max_date - interval '7 days' AND max_date
-        GROUP BY kpi_date ORDER BY kpi_date
-    """, operation="TREND")
-    regions = _dashboard_rows(db, principal, datasource, """
-        WITH bounds AS (SELECT max(kpi_date) AS max_date FROM demo_business.daily_kpi),
-        current_period AS (
-          SELECT region_id, sum(revenue) AS revenue, sum(revenue-cost) AS profit,
-                 sum(order_count) AS order_count, sum(charging_kwh) AS charging_kwh
-          FROM demo_business.daily_kpi, bounds
-          WHERE kpi_date BETWEEN max_date - interval '29 days' AND max_date
-          GROUP BY region_id
-        ),
-        previous_period AS (
-          SELECT region_id, sum(revenue) AS revenue
-          FROM demo_business.daily_kpi, bounds
-          WHERE kpi_date BETWEEN max_date - interval '59 days' AND max_date - interval '30 days'
-          GROUP BY region_id
-        )
-        SELECT r.region_name AS region, c.order_count, c.revenue, c.profit, c.charging_kwh,
-               p.revenue AS previous_revenue
-        FROM current_period c
-        JOIN previous_period p USING (region_id)
-        JOIN demo_business.regions r ON r.region_id = c.region_id
-        ORDER BY c.revenue DESC
-    """, operation="REGIONS")
-
-    max_date = date.fromisoformat(str(summary["max_date"]))
-
-    revenue = _number(summary["revenue"])
-    profit = _number(summary["profit"])
-    previous_revenue = _number(summary["previous_revenue"])
-    previous_profit = _number(summary["previous_profit"])
-    customers = int(summary["customers"] or 0)
-    previous_customers = int(summary["previous_customers"] or 0)
-    margin = round(profit / revenue * 100, 1) if revenue else 0.0
-    previous_margin = round(previous_profit / previous_revenue * 100, 1) if previous_revenue else 0.0
-
-    region_rows = []
-    for row in regions:
-        row_revenue = _number(row["revenue"])
-        row_profit = _number(row["profit"])
-        region_rows.append({
-            "region": row["region"],
-            "order_count": int(row["order_count"] or 0),
-            "revenue": round(row_revenue, 2),
-            "charging_kwh": round(_number(row["charging_kwh"]), 2),
-            "margin_percent": round(row_profit / row_revenue * 100, 1) if row_revenue else 0,
-            "change_percent": _percent_change(row_revenue, _number(row["previous_revenue"])),
-        })
-    leader = region_rows[0] if region_rows else None
-    focus_candidates = [row for row in region_rows if not leader or row["region"] != leader["region"]]
-    focus = min(focus_candidates or region_rows, key=lambda row: row["change_percent"], default=None)
-    insight = "暂无足够数据生成经营洞察。"
-    if leader and focus:
-        insight = (
-            f"{leader['region']}收入在当前周期领先，环比{leader['change_percent']:+.1f}%；"
-            f"{focus['region']}环比{focus['change_percent']:+.1f}%，建议结合订单量与利润率继续核查区域增长质量。"
-        )
-
     cards = []
     for card in db.scalars(select(DashboardCard).where(DashboardCard.dashboard_id == dashboard.id).order_by(DashboardCard.created_at)):
         answer = db.get(VerifiedAnswer, card.answer_id)
@@ -512,18 +369,13 @@ def dashboard_detail(db: Session, dashboard: Dashboard, principal: Principal) ->
                 AuditEvent.created_at >= datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0),
             )) or 0,
         ),
-        "data_as_of": max_date.isoformat(),
-        "range_start": (max_date - timedelta(days=29)).isoformat(),
-        "range_end": max_date.isoformat(),
-        "kpis": [
-            {"label": "总收入", "value": round(revenue, 2), "unit": "元", "change": _percent_change(revenue, previous_revenue)},
-            {"label": "总利润", "value": round(profit, 2), "unit": "元", "change": _percent_change(profit, previous_profit)},
-            {"label": "利润率", "value": margin, "unit": "%", "change": round(margin - previous_margin, 1), "change_unit": "pp"},
-            {"label": "活跃客户", "value": customers, "unit": "个", "change": _percent_change(customers, previous_customers)},
-        ],
-        "revenue_trend": [{"date": str(row["kpi_date"]), "revenue": round(_number(row["revenue"]), 2)} for row in trend],
-        "regions": region_rows,
-        "insight": insight,
+        "data_as_of": dashboard.updated_at.date().isoformat(),
+        "range_start": "",
+        "range_end": "",
+        "kpis": [],
+        "revenue_trend": [],
+        "regions": [],
+        "insight": "",
         "cards": cards,
     }
 
