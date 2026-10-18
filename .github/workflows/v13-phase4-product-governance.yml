@@ -84,7 +84,7 @@ jobs:
           ! grep -E "Some chunks are larger|Circular chunk" ../phase4-frontend-build.txt
       - name: Upload Phase4 deterministic evidence
         if: always()
-        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6, Node 24
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v6, Node 24
         with:
           name: v13-phase4-deterministic-${{ github.sha }}
           path: |
